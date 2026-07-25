@@ -15,9 +15,11 @@ interface DisplayCodeSheetProps {
   container: Container;
 }
 
-/** View / copy / edit / generate the container's Bin ID (displayCode). */
+/** View / copy / edit / generate the container's Bin ID (displayCode), or claim a preprinted label. */
 export function DisplayCodeSheet({ open, onOpenChange, container }: DisplayCodeSheetProps) {
   const assignDisplayCode = useInventoryStore((s) => s.assignDisplayCode);
+  const claimUnassignedLabel = useInventoryStore((s) => s.claimUnassignedLabel);
+  const unassignedLabels = useInventoryStore((s) => s.labelBatchEntries.filter((e) => e.containerId === null));
   const [value, setValue] = useState(container.displayCode ?? "");
   const [error, setError] = useState<string | null>(null);
 
@@ -45,6 +47,16 @@ export function DisplayCodeSheet({ open, onOpenChange, container }: DisplayCodeS
     if (!container.displayCode) return;
     await navigator.clipboard.writeText(container.displayCode);
     toast.success("Bin ID copied");
+  }
+
+  function handleClaim(entryId: string) {
+    const result = claimUnassignedLabel(entryId, container.id);
+    if (!result.ok) {
+      setError(result.error ?? "Couldn't assign that label.");
+      return;
+    }
+    toast.success("Preprinted label assigned");
+    onOpenChange(false);
   }
 
   return (
@@ -80,9 +92,31 @@ export function DisplayCodeSheet({ open, onOpenChange, container }: DisplayCodeS
               Save Bin ID
             </Button>
             <Button variant="outline" size="lg" onClick={handleGenerateNext}>
-              <Icon name="refresh" size={16} /> Generate next unassigned code
+              <Icon name="refresh" size={16} /> Generate next code
             </Button>
           </div>
+
+          {unassignedLabels.length > 0 && (
+            <div className="flex flex-col gap-2 border-t border-border pt-4">
+              <p className="text-caption font-medium text-ink">Or assign a preprinted label</p>
+              <p className="text-caption text-muted-foreground">
+                Labels already printed from a batch, not yet stuck on a container.
+              </p>
+              <div className="flex flex-col gap-1.5">
+                {unassignedLabels.map((entry) => (
+                  <button
+                    key={entry.id}
+                    type="button"
+                    onClick={() => handleClaim(entry.id)}
+                    className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-left text-caption text-ink hover:bg-surface-muted"
+                  >
+                    <span className="font-mono">{entry.displayCode ?? entry.tagToken}</span>
+                    <span className="text-muted-foreground">Use this label</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </SheetContent>
     </Sheet>

@@ -6,6 +6,8 @@ import type {
   Household,
   Invite,
   Item,
+  LabelBatch,
+  LabelBatchEntry,
   Location,
   Member,
   NormalizationRule,
@@ -431,6 +433,9 @@ export const seedNormalizationRules: NormalizationRule[] = [
     updatedAt: "2026-05-14T10:00:00.000Z",
   },
 ];
+
+export const seedLabelBatches: LabelBatch[] = [];
+export const seedLabelBatchEntries: LabelBatchEntry[] = [];
 
 export const seedFavorites: Favorite[] = [
   { userId: CURRENT_USER_ID, itemId: "item_helmet", createdAt: "2026-06-16T10:00:00.000Z" },

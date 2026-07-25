@@ -64,6 +64,7 @@ export function DesktopSidebar() {
       <div className="mt-auto flex flex-col gap-1 border-t border-border pt-4">
         <SidebarLink href="/desktop" icon="activity" label="Activity Dashboard" pathname={pathname} />
         <SidebarLink href="/desktop/manage" icon="box" label="Manage" pathname={pathname} />
+        <SidebarLink href="/desktop/labels" icon="tag" label="Label Printing" pathname={pathname} />
         <SidebarLink href="/settings/trash" icon="trash" label="Trash" pathname={pathname} />
         <SidebarLink href="/settings/import" icon="upload" label="Import CSV" pathname={pathname} />
         <SidebarLink href="/settings" icon="settings" label="Settings" pathname={pathname} />

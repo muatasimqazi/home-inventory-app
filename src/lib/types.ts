@@ -181,6 +181,32 @@ export interface Favorite {
   createdAt: string;
 }
 
+export type LabelPaperPreset = "small-3up" | "medium-2up" | "large-1up";
+export type LabelToggle = "qr" | "qr-code" | "qr-code-name";
+
+export interface LabelBatch {
+  id: string;
+  householdId: string;
+  createdByUserId: string;
+  createdAt: string;
+  paperPreset: LabelPaperPreset;
+  toggle: LabelToggle;
+  includeLocation: boolean;
+  /** Print offset, in mm, to nudge the grid for printer alignment. */
+  offsetX: number;
+  offsetY: number;
+}
+
+export interface LabelBatchEntry {
+  id: string;
+  batchId: string;
+  householdId: string;
+  /** null = unassigned/preprinted — claimable onto a container later. */
+  containerId: string | null;
+  tagToken: string;
+  displayCode: string | null;
+}
+
 export interface Breadcrumb {
   locationId: string | null;
   locationName: string | null;

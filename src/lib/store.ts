@@ -12,6 +12,8 @@ import {
   seedHousehold,
   seedInvites,
   seedItems,
+  seedLabelBatches,
+  seedLabelBatchEntries,
   seedLocations,
   seedMembers,
   seedNormalizationRules,
@@ -27,6 +29,10 @@ import type {
   Household,
   Invite,
   Item,
+  LabelBatch,
+  LabelBatchEntry,
+  LabelPaperPreset,
+  LabelToggle,
   Location,
   Member,
   NormalizationRule,
@@ -77,6 +83,8 @@ interface InventoryState {
   activity: ActivityLogAppend[];
   favorites: Favorite[];
   attachments: Attachment[];
+  labelBatches: LabelBatch[];
+  labelBatchEntries: LabelBatchEntry[];
   currentUserId: string;
   lastUsedDestination: { locationId: string | null; containerId: string | null } | null;
 
@@ -123,6 +131,19 @@ interface InventoryState {
     sizeBytes: number;
   }) => Attachment;
   deleteAttachment: (attachmentId: string) => void;
+
+  // Label batches
+  createLabelBatch: (input: {
+    paperPreset: LabelPaperPreset;
+    toggle: LabelToggle;
+    includeLocation: boolean;
+    offsetX: number;
+    offsetY: number;
+    containerIds: string[];
+    unassignedCount: number;
+  }) => { batch: LabelBatch; entries: LabelBatchEntry[] };
+  /** Adopts a preprinted/unassigned label's tagToken (and a fresh Bin ID, if the container doesn't have one) onto an existing container. */
+  claimUnassignedLabel: (entryId: string, containerId: string) => { ok: boolean; error?: string };
 
   // Tags
   getOrCreateTag: (name: string) => Tag;
@@ -185,6 +206,8 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
   activity: seedActivity,
   favorites: seedFavorites,
   attachments: seedAttachments,
+  labelBatches: seedLabelBatches,
+  labelBatchEntries: seedLabelBatchEntries,
   currentUserId: CURRENT_USER_ID,
   lastUsedDestination: { locationId: "loc_garage", containerId: "con_toolbox" },
 
@@ -465,6 +488,74 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
 
   deleteAttachment: (attachmentId) => {
     set((s) => ({ attachments: s.attachments.filter((a) => a.id !== attachmentId) }));
+  },
+
+  createLabelBatch: (input) => {
+    const householdId = get().household.id;
+    const batch: LabelBatch = {
+      id: id("lblb"),
+      householdId,
+      createdByUserId: get().currentUserId,
+      createdAt: nowIso(),
+      paperPreset: input.paperPreset,
+      toggle: input.toggle,
+      includeLocation: input.includeLocation,
+      offsetX: input.offsetX,
+      offsetY: input.offsetY,
+    };
+
+    const containers = get().containers;
+    const assignedEntries: LabelBatchEntry[] = input.containerIds
+      .map((containerId) => containers.find((c) => c.id === containerId))
+      .filter((c): c is Container => !!c)
+      .map((c) => ({
+        id: id("lble"),
+        batchId: batch.id,
+        householdId,
+        containerId: c.id,
+        tagToken: c.tagToken,
+        displayCode: c.displayCode,
+      }));
+
+    const unassignedEntries: LabelBatchEntry[] = Array.from({ length: Math.max(0, input.unassignedCount) }, () => ({
+      id: id("lble"),
+      batchId: batch.id,
+      householdId,
+      containerId: null,
+      tagToken: tagToken(),
+      displayCode: null,
+    }));
+
+    const entries = [...assignedEntries, ...unassignedEntries];
+    set((s) => ({
+      labelBatches: [batch, ...s.labelBatches],
+      labelBatchEntries: [...s.labelBatchEntries, ...entries],
+    }));
+    return { batch, entries };
+  },
+
+  claimUnassignedLabel: (entryId, containerId) => {
+    const entry = get().labelBatchEntries.find((e) => e.id === entryId);
+    if (!entry) return { ok: false, error: "Label not found." };
+    if (entry.containerId) return { ok: false, error: "This label is already assigned." };
+    const container = get().containers.find((c) => c.id === containerId);
+    if (!container) return { ok: false, error: "Container not found." };
+
+    const location = get().locations.find((l) => l.id === container.locationId);
+    const displayCode = entry.displayCode ?? container.displayCode ?? nextDisplayCode(get().containers, location?.name ?? "BIN");
+
+    set((s) => ({
+      containers: s.containers.map((c) => (c.id === containerId ? { ...c, tagToken: entry.tagToken, displayCode } : c)),
+      labelBatchEntries: s.labelBatchEntries.map((e) => (e.id === entryId ? { ...e, containerId, displayCode } : e)),
+    }));
+    get().logActivity({
+      entityType: "container",
+      entityId: containerId,
+      entityName: container.name,
+      action: "edited",
+      detail: `Preprinted label ${entry.tagToken} assigned`,
+    });
+    return { ok: true };
   },
 
   getOrCreateTag: (name) => {
