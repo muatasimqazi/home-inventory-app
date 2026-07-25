@@ -21,7 +21,7 @@ Tracks progress against the v2 upgrade instructions (updated PRD). Updated as wo
 - [x] Desktop batch label printing: select containers, unassigned labels, paper preset, offset, content toggles
 - [x] Live preview grid = print sheet
 - [x] Mock persistence for label batches/entries
-- [ ] Distinct "Export PDF" mock action (currently print-only via `window.print()`)
+- [x] Distinct "Export PDF" mock action — downloads a manifest of the just-created batch, clearly labeled as mock since real PDF generation isn't wired up. Shared `buildLabelPdfManifest` helper now backs both this and the Settings > Data & Export "Label PDF" card (which targets the most recent batch) instead of duplicating the logic.
 
 ## 4. Recursive Containers / Nested Browser
 - [x] Types/selectors/search support unbounded nesting (verified, no depth assumptions)

@@ -30,6 +30,32 @@ export function buildHouseholdExport(data: Omit<HouseholdExportSnapshot, "export
   return { exportedAt: new Date().toISOString(), ...data };
 }
 
+export interface FileExportResult {
+  fileName: string;
+  content: string;
+  mimeType: string;
+  mock?: boolean;
+}
+
+/**
+ * Label PDF export (mock) — real PDF generation isn't wired up, so this produces a
+ * manifest of what the batch would render. Shared by the label printing flow and
+ * Settings > Data & Export so both describe the same batch the same way.
+ */
+export function buildLabelPdfManifest(batch: LabelBatch | null, entries: LabelBatchEntry[]): FileExportResult {
+  const manifest = {
+    note: "Mock export — real PDF generation isn't wired up yet. This manifest lists what the label batch would render.",
+    batch,
+    labels: entries.map((e) => ({ tagToken: e.tagToken, displayCode: e.displayCode, containerId: e.containerId })),
+  };
+  return {
+    fileName: `shohaz-label-pdf-manifest-${new Date().toISOString().slice(0, 10)}.json`,
+    content: JSON.stringify(manifest, null, 2),
+    mimeType: "application/json",
+    mock: true,
+  };
+}
+
 /** Triggers a browser download for in-memory content — no server round-trip needed for mock exports. */
 export function downloadFile(fileName: string, content: string, mimeType: string) {
   const blob = new Blob([content], { type: mimeType });

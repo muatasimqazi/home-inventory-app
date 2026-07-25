@@ -5,16 +5,11 @@ import { useState } from "react";
 import { Icon, type IconName } from "@/components/icon";
 import { useInventoryStore } from "@/lib/store";
 import { itemsToCsv } from "@/lib/csv";
-import { buildHouseholdExport, downloadFile } from "@/lib/export";
+import { buildHouseholdExport, buildLabelPdfManifest, downloadFile, type FileExportResult } from "@/lib/export";
 
 type Stage = "idle" | "running" | "complete" | "error";
 
-interface ExportResult {
-  fileName: string;
-  content: string;
-  mimeType: string;
-  mock?: boolean;
-}
+type ExportResult = FileExportResult;
 
 export default function DataExportPage() {
   const router = useRouter();
@@ -55,20 +50,10 @@ export default function DataExportPage() {
     };
   }
 
-  function buildLabelPdfManifest(): ExportResult {
-    const latestBatch = labelBatches[0];
+  function buildLatestLabelPdf(): ExportResult {
+    const latestBatch = labelBatches[0] ?? null;
     const entries = latestBatch ? labelBatchEntries.filter((e) => e.batchId === latestBatch.id) : [];
-    const manifest = {
-      note: "Mock export — real PDF generation isn't wired up yet. This manifest lists what the most recent label batch would render.",
-      batch: latestBatch ?? null,
-      labels: entries.map((e) => ({ tagToken: e.tagToken, displayCode: e.displayCode, containerId: e.containerId })),
-    };
-    return {
-      fileName: `shohaz-label-pdf-manifest-${dateStamp}.json`,
-      content: JSON.stringify(manifest, null, 2),
-      mimeType: "application/json",
-      mock: true,
-    };
+    return buildLabelPdfManifest(latestBatch, entries);
   }
 
   function buildFullDataExport(): ExportResult {
@@ -120,7 +105,7 @@ export default function DataExportPage() {
         icon="tag"
         title="Label PDF"
         description="A print-ready PDF of your most recent label batch."
-        buildResult={buildLabelPdfManifest}
+        buildResult={buildLatestLabelPdf}
       />
       <ExportCard
         icon="box"

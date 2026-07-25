@@ -14,6 +14,7 @@ import { activeContainers, activeLocations } from "@/lib/selectors";
 import { LABEL_PRESETS, LABEL_TOGGLE_NAMES } from "@/lib/label-preset";
 import type { LabelPaperPreset, LabelToggle } from "@/lib/types";
 import { formatDate } from "@/lib/format";
+import { buildLabelPdfManifest, downloadFile } from "@/lib/export";
 
 interface PreviewEntry {
   tagToken: string;
@@ -80,12 +81,12 @@ export default function LabelPrintingPage() {
     });
   }
 
-  function handlePrint() {
+  function commitBatch() {
     if (previewEntries.length === 0) {
       toast.error("Select at least one container or add unassigned labels.");
-      return;
+      return null;
     }
-    const { entries } = createLabelBatch({
+    const { batch, entries } = createLabelBatch({
       paperPreset,
       toggle,
       includeLocation,
@@ -105,10 +106,24 @@ export default function LabelPrintingPage() {
         locationName: container ? locations.find((l) => l.id === container.locationId)?.name ?? null : null,
       };
     });
-    setPrintEntries(resolved);
     toast.success(`Batch created — ${resolved.length} label${resolved.length === 1 ? "" : "s"}`);
+    return { batch, entries, resolved };
+  }
+
+  function handlePrint() {
+    const committed = commitBatch();
+    if (!committed) return;
+    setPrintEntries(committed.resolved);
     // Wait for the print-only grid to repaint with the real entries before opening the print dialog.
     requestAnimationFrame(() => requestAnimationFrame(() => window.print()));
+  }
+
+  function handleExportPdf() {
+    const committed = commitBatch();
+    if (!committed) return;
+    const result = buildLabelPdfManifest(committed.batch, committed.entries);
+    downloadFile(result.fileName, result.content, result.mimeType);
+    toast("Downloaded a mock PDF manifest — real PDF generation isn't wired up yet.");
   }
 
   return (
@@ -208,9 +223,14 @@ export default function LabelPrintingPage() {
             </div>
           </div>
 
-          <Button size="lg" onClick={handlePrint}>
-            <Icon name="tag" size={16} /> Print {previewEntries.length} label{previewEntries.length === 1 ? "" : "s"}
-          </Button>
+          <div className="flex flex-col gap-2">
+            <Button size="lg" onClick={handlePrint}>
+              <Icon name="tag" size={16} /> Print {previewEntries.length} label{previewEntries.length === 1 ? "" : "s"}
+            </Button>
+            <Button size="lg" variant="outline" onClick={handleExportPdf}>
+              <Icon name="download" size={16} /> Export PDF (mock)
+            </Button>
+          </div>
         </div>
 
         <div className="flex flex-col gap-4">
