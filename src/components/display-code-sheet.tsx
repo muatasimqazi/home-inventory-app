@@ -1,0 +1,90 @@
+"use client";
+
+import { useState } from "react";
+import { toast } from "sonner";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Icon } from "@/components/icon";
+import { useInventoryStore } from "@/lib/store";
+import type { Container } from "@/lib/types";
+
+interface DisplayCodeSheetProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  container: Container;
+}
+
+/** View / copy / edit / generate the container's Bin ID (displayCode). */
+export function DisplayCodeSheet({ open, onOpenChange, container }: DisplayCodeSheetProps) {
+  const assignDisplayCode = useInventoryStore((s) => s.assignDisplayCode);
+  const [value, setValue] = useState(container.displayCode ?? "");
+  const [error, setError] = useState<string | null>(null);
+
+  function handleSave() {
+    const result = assignDisplayCode(container.id, value);
+    if (!result.ok) {
+      setError(result.error ?? "Couldn't save that Bin ID.");
+      return;
+    }
+    toast.success("Bin ID saved");
+    onOpenChange(false);
+  }
+
+  function handleGenerateNext() {
+    const result = assignDisplayCode(container.id);
+    if (!result.ok) {
+      setError(result.error ?? "Couldn't generate a Bin ID.");
+      return;
+    }
+    toast.success("Bin ID assigned");
+    onOpenChange(false);
+  }
+
+  async function handleCopy() {
+    if (!container.displayCode) return;
+    await navigator.clipboard.writeText(container.displayCode);
+    toast.success("Bin ID copied");
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="bottom" className="rounded-t-3xl">
+        <SheetHeader>
+          <SheetTitle className="text-section-title font-medium text-ink">Bin ID</SheetTitle>
+        </SheetHeader>
+        <div className="flex flex-col gap-4 px-4 pb-6">
+          <div className="flex items-center gap-2">
+            <Input
+              value={value}
+              onChange={(e) => {
+                setValue(e.target.value);
+                if (error) setError(null);
+              }}
+              placeholder="e.g. GAR-234"
+              className="h-11 font-mono uppercase"
+              autoFocus
+            />
+            {container.displayCode && (
+              <Button type="button" variant="outline" size="icon-lg" onClick={handleCopy} aria-label="Copy Bin ID">
+                <Icon name="copy" size={16} />
+              </Button>
+            )}
+          </div>
+          {error && <p className="text-caption text-danger">{error}</p>}
+          <p className="text-caption text-muted-foreground">
+            Bin IDs are unique per household and stay put when this container moves — separate from the QR/NFC tag.
+          </p>
+          <div className="flex flex-col gap-2">
+            <Button size="lg" onClick={handleSave}>
+              Save Bin ID
+            </Button>
+            <Button variant="outline" size="lg" onClick={handleGenerateNext}>
+              <Icon name="refresh" size={16} /> Generate next unassigned code
+            </Button>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}

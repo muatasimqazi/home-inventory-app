@@ -1,0 +1,615 @@
+"use client";
+
+import { create } from "zustand";
+import { id, tagToken } from "./id";
+import { isDisplayCodeTaken, nextDisplayCode, normalizeDisplayCode } from "./display-code";
+import {
+  CURRENT_USER_ID,
+  seedActivity,
+  seedAttachments,
+  seedContainers,
+  seedFavorites,
+  seedHousehold,
+  seedInvites,
+  seedItems,
+  seedLocations,
+  seedMembers,
+  seedNormalizationRules,
+  seedTags,
+} from "./seed";
+import type {
+  ActivityAction,
+  ActivityEntityType,
+  Attachment,
+  AttachmentKind,
+  Container,
+  Favorite,
+  Household,
+  Invite,
+  Item,
+  Location,
+  Member,
+  NormalizationRule,
+  Tag,
+} from "./types";
+
+// In-memory mock data layer. Function names/shapes mirror the future
+// /api/v1/* endpoints (PRD §23) so swapping to real Supabase later means
+// reimplementing these actions, not rewriting call sites. No persistence
+// across a hard page reload by design — client-side navigation keeps the
+// store intact for the duration of a session, which is what the capture
+// -> review -> save -> browse flows in Phase 5 verification need.
+
+const TRASH_RETENTION_DAYS = 30;
+const REVIEW_LOW_CONFIDENCE = 0.75;
+
+export interface NewItemInput {
+  name: string;
+  originalDetectedName?: string | null;
+  category: string;
+  quantity?: number;
+  notes?: string;
+  photoEmoji: string;
+  locationId: string | null;
+  containerId: string | null;
+  needsReview?: boolean;
+  reviewReason?: string;
+  tagIds?: string[];
+  extraDetails?: Record<string, string>;
+}
+
+const QUANTITY_MIN = 0;
+const QUANTITY_MAX = 9999;
+
+function clampQuantity(value: number): number {
+  return Math.min(QUANTITY_MAX, Math.max(QUANTITY_MIN, Math.round(value)));
+}
+
+interface InventoryState {
+  household: Household;
+  members: Member[];
+  invites: Invite[];
+  locations: Location[];
+  containers: Container[];
+  items: Item[];
+  tags: Tag[];
+  normalizationRules: NormalizationRule[];
+  activity: ActivityLogAppend[];
+  favorites: Favorite[];
+  attachments: Attachment[];
+  currentUserId: string;
+  lastUsedDestination: { locationId: string | null; containerId: string | null } | null;
+
+  // Items
+  createItem: (input: NewItemInput) => Item;
+  createItemsBatch: (inputs: NewItemInput[]) => Item[];
+  updateItem: (itemId: string, patch: Partial<Item>) => void;
+  moveItem: (itemId: string, dest: { locationId: string | null; containerId: string | null }) => void;
+  archiveItem: (itemId: string) => void;
+  unarchiveItem: (itemId: string) => void;
+  trashItem: (itemId: string) => void;
+  restoreItem: (itemId: string) => void;
+  permanentlyDeleteItem: (itemId: string) => void;
+
+  // Locations
+  createLocation: (input: { name: string; description?: string; coverPhotoEmoji?: string }) => Location;
+  updateLocation: (locationId: string, patch: Partial<Location>) => void;
+  trashLocation: (locationId: string) => void;
+  restoreLocation: (locationId: string) => void;
+  permanentlyDeleteLocation: (locationId: string) => void;
+
+  // Containers
+  createContainer: (input: {
+    name: string;
+    description?: string;
+    locationId: string;
+    parentContainerId?: string | null;
+    coverPhotoEmoji?: string;
+  }) => Container;
+  updateContainer: (containerId: string, patch: Partial<Container>) => void;
+  moveContainer: (containerId: string, dest: { locationId: string; parentContainerId: string | null }) => void;
+  trashContainer: (containerId: string) => void;
+  restoreContainer: (containerId: string) => void;
+  permanentlyDeleteContainer: (containerId: string) => void;
+  /** Assigns `code` if provided (validated for per-household uniqueness), otherwise generates the next code for the container's location. */
+  assignDisplayCode: (containerId: string, code?: string) => { ok: boolean; error?: string };
+
+  // Attachments
+  addAttachment: (itemId: string, input: {
+    kind: AttachmentKind;
+    fileName: string;
+    storagePath: string;
+    contentType: string;
+    sizeBytes: number;
+  }) => Attachment;
+  deleteAttachment: (attachmentId: string) => void;
+
+  // Tags
+  getOrCreateTag: (name: string) => Tag;
+
+  // Normalization
+  findNormalizationRule: (rawName: string) => NormalizationRule | undefined;
+  saveNormalizationRule: (rawPattern: string, canonicalName: string, category: string) => void;
+
+  // Favorites
+  toggleFavorite: (itemId: string) => void;
+  isFavorite: (itemId: string) => boolean;
+
+  // Household / members
+  inviteMember: (email: string) => void;
+  cancelInvite: (inviteId: string) => void;
+  removeMember: (userId: string) => void;
+  transferOwnership: (toUserId: string) => void;
+
+  // Activity
+  logActivity: (entry: {
+    entityType: ActivityEntityType;
+    entityId: string;
+    entityName: string;
+    action: ActivityAction;
+    detail?: string;
+  }) => void;
+}
+
+export interface ActivityLogAppend {
+  id: string;
+  householdId: string;
+  actorUserId: string;
+  entityType: ActivityEntityType;
+  entityId: string;
+  entityName: string;
+  action: ActivityAction;
+  detail?: string;
+  createdAt: string;
+}
+
+function nowIso(): string {
+  return new Date().toISOString();
+}
+
+function purgeAfter(from: Date): string {
+  const d = new Date(from);
+  d.setDate(d.getDate() + TRASH_RETENTION_DAYS);
+  return d.toISOString();
+}
+
+export const useInventoryStore = create<InventoryState>()((set, get) => ({
+  household: seedHousehold,
+  members: seedMembers,
+  invites: seedInvites,
+  locations: seedLocations,
+  containers: seedContainers,
+  items: seedItems,
+  tags: seedTags,
+  normalizationRules: seedNormalizationRules,
+  activity: seedActivity,
+  favorites: seedFavorites,
+  attachments: seedAttachments,
+  currentUserId: CURRENT_USER_ID,
+  lastUsedDestination: { locationId: "loc_garage", containerId: "con_toolbox" },
+
+  createItem: (input) => {
+    const created = buildItem(get().household.id, get().currentUserId, input);
+    set((s) => ({
+      items: [...s.items, created],
+      lastUsedDestination: { locationId: input.locationId, containerId: input.containerId },
+    }));
+    get().logActivity({
+      entityType: "item",
+      entityId: created.id,
+      entityName: created.name,
+      action: "created",
+    });
+    return created;
+  },
+
+  createItemsBatch: (inputs) => {
+    const created = inputs.map((i) => buildItem(get().household.id, get().currentUserId, i));
+    const last = inputs[inputs.length - 1];
+    set((s) => ({
+      items: [...s.items, ...created],
+      lastUsedDestination: last
+        ? { locationId: last.locationId, containerId: last.containerId }
+        : s.lastUsedDestination,
+    }));
+    created.forEach((it) =>
+      get().logActivity({ entityType: "item", entityId: it.id, entityName: it.name, action: "created" })
+    );
+    return created;
+  },
+
+  updateItem: (itemId, patch) => {
+    const normalizedPatch = patch.quantity !== undefined ? { ...patch, quantity: clampQuantity(patch.quantity) } : patch;
+    set((s) => ({
+      items: s.items.map((it) => (it.id === itemId ? { ...it, ...normalizedPatch, updatedAt: nowIso() } : it)),
+    }));
+    const it = get().items.find((i) => i.id === itemId);
+    if (it) get().logActivity({ entityType: "item", entityId: it.id, entityName: it.name, action: "edited" });
+  },
+
+  moveItem: (itemId, dest) => {
+    set((s) => ({
+      items: s.items.map((it) =>
+        it.id === itemId ? { ...it, locationId: dest.locationId, containerId: dest.containerId, updatedAt: nowIso() } : it
+      ),
+      lastUsedDestination: dest,
+    }));
+    const it = get().items.find((i) => i.id === itemId);
+    if (it) get().logActivity({ entityType: "item", entityId: it.id, entityName: it.name, action: "moved" });
+  },
+
+  archiveItem: (itemId) => {
+    set((s) => ({
+      items: s.items.map((it) => (it.id === itemId ? { ...it, status: "active" === it.status ? "archived" : it.status, updatedAt: nowIso() } : it)),
+    }));
+    const it = get().items.find((i) => i.id === itemId);
+    if (it) get().logActivity({ entityType: "item", entityId: it.id, entityName: it.name, action: "archived" });
+  },
+
+  unarchiveItem: (itemId) => {
+    set((s) => ({
+      items: s.items.map((it) => (it.id === itemId ? { ...it, status: "active", updatedAt: nowIso() } : it)),
+    }));
+    const it = get().items.find((i) => i.id === itemId);
+    if (it) get().logActivity({ entityType: "item", entityId: it.id, entityName: it.name, action: "restored" });
+  },
+
+  trashItem: (itemId) => {
+    const trashedAt = nowIso();
+    set((s) => ({
+      items: s.items.map((it) =>
+        it.id === itemId
+          ? { ...it, status: "trashed", trashedAt, permanentlyDeleteAfter: purgeAfter(new Date(trashedAt)), updatedAt: trashedAt }
+          : it
+      ),
+    }));
+    const it = get().items.find((i) => i.id === itemId);
+    if (it) get().logActivity({ entityType: "item", entityId: it.id, entityName: it.name, action: "trashed" });
+  },
+
+  restoreItem: (itemId) => {
+    set((s) => ({
+      items: s.items.map((it) =>
+        it.id === itemId ? { ...it, status: "active", trashedAt: null, permanentlyDeleteAfter: null, updatedAt: nowIso() } : it
+      ),
+    }));
+    const it = get().items.find((i) => i.id === itemId);
+    if (it) get().logActivity({ entityType: "item", entityId: it.id, entityName: it.name, action: "restored" });
+  },
+
+  permanentlyDeleteItem: (itemId) => {
+    const it = get().items.find((i) => i.id === itemId);
+    set((s) => ({ items: s.items.filter((i) => i.id !== itemId) }));
+    if (it) get().logActivity({ entityType: "item", entityId: it.id, entityName: it.name, action: "deleted_forever" });
+  },
+
+  createLocation: (input) => {
+    const created: Location = {
+      id: id("loc"),
+      householdId: get().household.id,
+      name: input.name,
+      description: input.description,
+      coverPhotoEmoji: input.coverPhotoEmoji ?? "📦",
+      createdByUserId: get().currentUserId,
+      createdAt: nowIso(),
+      status: "active",
+      trashedAt: null,
+      permanentlyDeleteAfter: null,
+    };
+    set((s) => ({ locations: [...s.locations, created] }));
+    get().logActivity({ entityType: "location", entityId: created.id, entityName: created.name, action: "created" });
+    return created;
+  },
+
+  updateLocation: (locationId, patch) => {
+    set((s) => ({ locations: s.locations.map((l) => (l.id === locationId ? { ...l, ...patch } : l)) }));
+  },
+
+  trashLocation: (locationId) => {
+    const trashedAt = nowIso();
+    const purge = purgeAfter(new Date(trashedAt));
+    const containerIds = get()
+      .containers.filter((c) => c.locationId === locationId)
+      .map((c) => c.id);
+    set((s) => ({
+      items: s.items.map((it) =>
+        it.locationId === locationId
+          ? { ...it, status: "trashed", trashedAt, permanentlyDeleteAfter: purge, updatedAt: trashedAt }
+          : it
+      ),
+      locations: s.locations.map((l) =>
+        l.id === locationId ? { ...l, status: "trashed", trashedAt, permanentlyDeleteAfter: purge } : l
+      ),
+      containers: s.containers.map((c) =>
+        c.locationId === locationId ? { ...c, status: "trashed", trashedAt, permanentlyDeleteAfter: purge } : c
+      ),
+    }));
+    void containerIds;
+    const loc = get().locations.find((l) => l.id === locationId);
+    get().logActivity({
+      entityType: "location",
+      entityId: locationId,
+      entityName: loc?.name ?? "Location",
+      action: "trashed",
+    });
+  },
+
+  restoreLocation: (locationId) => {
+    set((s) => ({
+      locations: s.locations.map((l) =>
+        l.id === locationId ? { ...l, status: "active", trashedAt: null, permanentlyDeleteAfter: null } : l
+      ),
+    }));
+    const loc = get().locations.find((l) => l.id === locationId);
+    if (loc) get().logActivity({ entityType: "location", entityId: loc.id, entityName: loc.name, action: "restored" });
+  },
+
+  permanentlyDeleteLocation: (locationId) => {
+    const loc = get().locations.find((l) => l.id === locationId);
+    set((s) => ({ locations: s.locations.filter((l) => l.id !== locationId) }));
+    if (loc) get().logActivity({ entityType: "location", entityId: loc.id, entityName: loc.name, action: "deleted_forever" });
+  },
+
+  createContainer: (input) => {
+    const created: Container = {
+      id: id("con"),
+      householdId: get().household.id,
+      locationId: input.locationId,
+      parentContainerId: input.parentContainerId ?? null,
+      name: input.name,
+      description: input.description,
+      tagToken: tagToken(),
+      displayCode: null,
+      coverPhotoEmoji: input.coverPhotoEmoji ?? "📦",
+      createdByUserId: get().currentUserId,
+      createdAt: nowIso(),
+      status: "active",
+      trashedAt: null,
+      permanentlyDeleteAfter: null,
+    };
+    set((s) => ({ containers: [...s.containers, created] }));
+    get().logActivity({ entityType: "container", entityId: created.id, entityName: created.name, action: "created" });
+    return created;
+  },
+
+  updateContainer: (containerId, patch) => {
+    set((s) => ({ containers: s.containers.map((c) => (c.id === containerId ? { ...c, ...patch } : c)) }));
+  },
+
+  moveContainer: (containerId, dest) => {
+    set((s) => ({
+      containers: s.containers.map((c) =>
+        c.id === containerId ? { ...c, locationId: dest.locationId, parentContainerId: dest.parentContainerId } : c
+      ),
+    }));
+    const c = get().containers.find((c) => c.id === containerId);
+    if (c) get().logActivity({ entityType: "container", entityId: c.id, entityName: c.name, action: "moved" });
+  },
+
+  trashContainer: (containerId) => {
+    const trashedAt = nowIso();
+    const purge = purgeAfter(new Date(trashedAt));
+    const descendantIds = collectDescendantContainerIds(get().containers, containerId);
+    const allIds = new Set([containerId, ...descendantIds]);
+    const name = get().containers.find((c) => c.id === containerId)?.name ?? "Container";
+    set((s) => ({
+      items: s.items.map((it) =>
+        it.containerId && allIds.has(it.containerId)
+          ? { ...it, status: "trashed", trashedAt, permanentlyDeleteAfter: purge, updatedAt: trashedAt }
+          : it
+      ),
+      containers: s.containers.map((c) =>
+        allIds.has(c.id) ? { ...c, status: "trashed", trashedAt, permanentlyDeleteAfter: purge } : c
+      ),
+    }));
+    get().logActivity({ entityType: "container", entityId: containerId, entityName: name, action: "trashed" });
+  },
+
+  restoreContainer: (containerId) => {
+    set((s) => ({
+      containers: s.containers.map((c) =>
+        c.id === containerId ? { ...c, status: "active", trashedAt: null, permanentlyDeleteAfter: null } : c
+      ),
+    }));
+    const c = get().containers.find((c) => c.id === containerId);
+    if (c) get().logActivity({ entityType: "container", entityId: c.id, entityName: c.name, action: "restored" });
+  },
+
+  permanentlyDeleteContainer: (containerId) => {
+    const c = get().containers.find((c) => c.id === containerId);
+    set((s) => ({ containers: s.containers.filter((c) => c.id !== containerId) }));
+    if (c) get().logActivity({ entityType: "container", entityId: c.id, entityName: c.name, action: "deleted_forever" });
+  },
+
+  assignDisplayCode: (containerId, code) => {
+    const containers = get().containers;
+    const container = containers.find((c) => c.id === containerId);
+    if (!container) return { ok: false, error: "Container not found." };
+    const location = get().locations.find((l) => l.id === container.locationId);
+
+    let resolved: string;
+    if (code && code.trim()) {
+      resolved = normalizeDisplayCode(code);
+      if (isDisplayCodeTaken(containers, resolved, containerId)) {
+        return { ok: false, error: `Bin ID "${resolved}" is already in use.` };
+      }
+    } else {
+      resolved = nextDisplayCode(containers, location?.name ?? "BIN");
+    }
+
+    set((s) => ({
+      containers: s.containers.map((c) => (c.id === containerId ? { ...c, displayCode: resolved } : c)),
+    }));
+    get().logActivity({
+      entityType: "container",
+      entityId: containerId,
+      entityName: container.name,
+      action: "edited",
+      detail: `Bin ID set to ${resolved}`,
+    });
+    return { ok: true };
+  },
+
+  addAttachment: (itemId, input) => {
+    const created: Attachment = {
+      id: id("att"),
+      householdId: get().household.id,
+      itemId,
+      createdByUserId: get().currentUserId,
+      createdAt: nowIso(),
+      ...input,
+    };
+    set((s) => ({ attachments: [...s.attachments, created] }));
+    return created;
+  },
+
+  deleteAttachment: (attachmentId) => {
+    set((s) => ({ attachments: s.attachments.filter((a) => a.id !== attachmentId) }));
+  },
+
+  getOrCreateTag: (name) => {
+    const existing = get().tags.find((t) => t.name.toLowerCase() === name.toLowerCase());
+    if (existing) return existing;
+    const created: Tag = { id: id("tag"), householdId: get().household.id, name };
+    set((s) => ({ tags: [...s.tags, created] }));
+    return created;
+  },
+
+  findNormalizationRule: (rawName) => {
+    const normalized = rawName.trim().toLowerCase();
+    return get().normalizationRules.find((r) => r.rawPattern.toLowerCase() === normalized);
+  },
+
+  saveNormalizationRule: (rawPattern, canonicalName, category) => {
+    const existing = get().normalizationRules.find((r) => r.rawPattern.toLowerCase() === rawPattern.toLowerCase());
+    if (existing) {
+      set((s) => ({
+        normalizationRules: s.normalizationRules.map((r) =>
+          r.id === existing.id ? { ...r, canonicalName, category, usageCount: r.usageCount + 1, updatedAt: nowIso() } : r
+        ),
+      }));
+      return;
+    }
+    const created: NormalizationRule = {
+      id: id("rule"),
+      householdId: get().household.id,
+      rawPattern,
+      canonicalName,
+      category,
+      source: "learned",
+      usageCount: 1,
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    };
+    set((s) => ({ normalizationRules: [...s.normalizationRules, created] }));
+  },
+
+  toggleFavorite: (itemId) => {
+    const userId = get().currentUserId;
+    const exists = get().favorites.some((f) => f.itemId === itemId && f.userId === userId);
+    set((s) => ({
+      favorites: exists
+        ? s.favorites.filter((f) => !(f.itemId === itemId && f.userId === userId))
+        : [...s.favorites, { userId, itemId, createdAt: nowIso() }],
+    }));
+  },
+
+  isFavorite: (itemId) => {
+    const userId = get().currentUserId;
+    return get().favorites.some((f) => f.itemId === itemId && f.userId === userId);
+  },
+
+  inviteMember: (email) => {
+    const created: Invite = {
+      id: id("invite"),
+      householdId: get().household.id,
+      invitedEmail: email,
+      invitedByUserId: get().currentUserId,
+      status: "pending",
+      createdAt: nowIso(),
+      expiresAt: purgeAfter(new Date()),
+    };
+    set((s) => ({ invites: [...s.invites, created] }));
+    get().logActivity({ entityType: "member", entityId: created.id, entityName: email, action: "invited" });
+  },
+
+  cancelInvite: (inviteId) => {
+    set((s) => ({ invites: s.invites.filter((i) => i.id !== inviteId) }));
+  },
+
+  removeMember: (userId) => {
+    const m = get().members.find((m) => m.userId === userId);
+    set((s) => ({ members: s.members.filter((m) => m.userId !== userId) }));
+    if (m) get().logActivity({ entityType: "member", entityId: userId, entityName: m.displayName, action: "removed" });
+  },
+
+  transferOwnership: (toUserId) => {
+    set((s) => ({
+      members: s.members.map((m) => ({
+        ...m,
+        role: m.userId === toUserId ? "owner" : m.userId === s.currentUserId ? "member" : m.role,
+      })),
+    }));
+    const m = get().members.find((m) => m.userId === toUserId);
+    if (m)
+      get().logActivity({
+        entityType: "member",
+        entityId: toUserId,
+        entityName: m.displayName,
+        action: "ownership_transferred",
+      });
+  },
+
+  logActivity: (entry) => {
+    const created: ActivityLogAppend = {
+      id: id("act"),
+      householdId: get().household.id,
+      actorUserId: get().currentUserId,
+      createdAt: nowIso(),
+      ...entry,
+    };
+    set((s) => ({ activity: [created, ...s.activity] }));
+  },
+}));
+
+function buildItem(householdId: string, userId: string, input: NewItemInput): Item {
+  const timestamp = nowIso();
+  return {
+    id: id("item"),
+    householdId,
+    locationId: input.locationId,
+    containerId: input.containerId,
+    name: input.name,
+    originalDetectedName: input.originalDetectedName ?? null,
+    category: input.category,
+    quantity: clampQuantity(input.quantity ?? 1),
+    notes: input.notes ?? "",
+    photoEmoji: input.photoEmoji,
+    status: "active",
+    needsReview: input.needsReview ?? false,
+    reviewReason: input.reviewReason,
+    tagIds: input.tagIds ?? [],
+    extraDetails: input.extraDetails ?? {},
+    createdByUserId: userId,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    trashedAt: null,
+    permanentlyDeleteAfter: null,
+  };
+}
+
+function collectDescendantContainerIds(containers: Container[], rootId: string): string[] {
+  const out: string[] = [];
+  const stack = [rootId];
+  while (stack.length) {
+    const current = stack.pop()!;
+    const children = containers.filter((c) => c.parentContainerId === current);
+    for (const child of children) {
+      out.push(child.id);
+      stack.push(child.id);
+    }
+  }
+  return out;
+}
+
+export { REVIEW_LOW_CONFIDENCE };

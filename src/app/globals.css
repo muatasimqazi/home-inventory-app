@@ -1,0 +1,108 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Shohaz design tokens — sourced from the PRD (§3) and the finalized Figma
+ * mocks (Dashboard, Editorial Utility System reference frame). Every screen
+ * should build from these tokens, never raw hex values.
+ */
+@theme inline {
+  /* Core palette */
+  --color-ink: #050505;
+  --color-yellow: #ffc123;
+  --color-white: #ffffff;
+  --color-surface-muted: #eff1f2;
+  --color-border: #d8d8d2;
+  --color-text-muted: #747b82;
+  --color-danger: #d6304a;
+  --color-danger-foreground: #ffffff;
+
+  /* Category accent trio — item-type color coding only, never chrome/actions */
+  --color-accent-yellow: #ffc123;
+  --color-accent-orange: #fd8549;
+  --color-accent-pink: #f20855;
+
+  /* shadcn semantic slots, mapped onto the Shohaz palette */
+  --color-background: var(--color-surface-muted);
+  --color-foreground: var(--color-ink);
+  --color-card: var(--color-white);
+  --color-card-foreground: var(--color-ink);
+  --color-popover: var(--color-white);
+  --color-popover-foreground: var(--color-ink);
+  --color-primary: var(--color-yellow);
+  --color-primary-foreground: var(--color-ink);
+  --color-secondary: var(--color-ink);
+  --color-secondary-foreground: var(--color-white);
+  --color-muted: var(--color-surface-muted);
+  --color-muted-foreground: var(--color-text-muted);
+  --color-accent: var(--color-surface-muted);
+  --color-accent-foreground: var(--color-ink);
+  --color-destructive: var(--color-danger);
+  --color-destructive-foreground: var(--color-danger-foreground);
+  --color-input: var(--color-border);
+  --color-ring: var(--color-ink);
+
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+    system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* Radius scale — PRD §3 */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-2xl: 24px;
+  --radius-full: 999px;
+
+  /* Shadows — Handoff Plan §3 */
+  --shadow-sm: 0 3px 10px -4px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 22px -10px rgba(0, 0, 0, 0.1);
+  --shadow-sheet: 0 -8px 24px -6px rgba(0, 0, 0, 0.12);
+
+  /* Typography scale — PRD §3, Display through Micro */
+  --text-display: 30px;
+  --text-display--line-height: 36px;
+  --text-desktop-title: 26px;
+  --text-desktop-title--line-height: 32px;
+  --text-screen-title: 22px;
+  --text-screen-title--line-height: 28px;
+  --text-section-title: 17px;
+  --text-section-title--line-height: 23px;
+  --text-item-title: 15px;
+  --text-item-title--line-height: 20px;
+  --text-body: 14px;
+  --text-body--line-height: 19px;
+  --text-caption: 12px;
+  --text-caption--line-height: 16px;
+  --text-micro: 11px;
+  --text-micro--line-height: 14px;
+}
+
+:root {
+  --radius: 16px;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    letter-spacing: 0;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+@layer utilities {
+  /* Minimum 44px touch target helper, per PRD §10.6 */
+  .tap-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
