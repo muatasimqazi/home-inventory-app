@@ -10,7 +10,7 @@ Tracks progress against the v2 upgrade instructions (updated PRD). Updated as wo
 - [x] Bin ID badges flat, no shadow
 - [x] Scan FAB (rounded taupe, white icon) in mobile bottom nav
 - [x] Needs-review status indicator as inline dot + muted label
-- [ ] Full screen-by-screen audit (icon wrapper squares, invisible text, etc.) — only the systemic token fix has been done, not a per-screen pass
+- [x] Full screen-by-screen audit: grepped every screen/component for icon-wrapper squares (none found), invisible text combos (none — false positives from ternary same-line patterns), large category fills (only one thin-rail usage exists), Bin ID badge shadows (none), text-glyph icons (none). Found and fixed 2 real leftover v1 hex values the token retheme couldn't reach: `layout.tsx` viewport `themeColor` and the single-container label page's QR `fgColor`, both still `#050505` instead of the new `#212121`. Also bumped the bottom-nav active tab label from `text-yellow` (brand-500, ~3.9:1 on the dark bar) to `text-brand-200` for clearer contrast.
 
 ## 2. Container/Bin Display Codes
 - [x] `displayCode` on Container type, unique per household

@@ -31,7 +31,7 @@ export default function TagLabelPage() {
       </div>
 
       <div className="flex flex-col items-center gap-4 rounded-2xl border border-border bg-white p-8 print:border-0 print:shadow-none">
-        <QRCodeSVG value={resolveUrl} size={180} bgColor="#ffffff" fgColor="#050505" />
+        <QRCodeSVG value={resolveUrl} size={180} bgColor="#ffffff" fgColor="#212121" />
         <div className="text-center">
           <p className="text-item-title font-medium text-ink">{container.name}</p>
           <BreadcrumbTrail segments={breadcrumb.slice(0, -1)} interactive={false} className="justify-center" />

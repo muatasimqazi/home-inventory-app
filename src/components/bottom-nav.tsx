@@ -35,7 +35,7 @@ export function BottomNav() {
         >
           <Icon name={tab.icon} size={20} />
         </span>
-        <span className={cn("text-[11px] leading-none", active ? "text-yellow" : "text-border")}>{tab.label}</span>
+        <span className={cn("text-[11px] leading-none", active ? "text-brand-200" : "text-border")}>{tab.label}</span>
       </Link>
     );
   }
