@@ -30,7 +30,7 @@ export default function SignInPage() {
       <div className="flex w-full max-w-sm flex-col items-center gap-8">
         <div className="flex flex-col items-center gap-2 text-center">
           <div className="flex size-14 items-center justify-center rounded-2xl bg-yellow">
-            <Icon name="box" size={26} className="text-ink" />
+            <Icon name="box" size={26} className="text-white" />
           </div>
           <p className="text-display font-medium text-white">Shohaz</p>
           <p className="text-body text-white/60">Find anything you own, in seconds.</p>

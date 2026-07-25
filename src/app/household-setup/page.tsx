@@ -35,7 +35,7 @@ export default function HouseholdSetupPage() {
         {mode === "choice" && (
           <div className="flex flex-col gap-3 text-center">
             <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-yellow">
-              <Icon name="users" size={22} className="text-ink" />
+              <Icon name="users" size={22} className="text-white" />
             </div>
             <h1 className="text-screen-title font-medium text-ink">Set up your household</h1>
             <p className="text-body text-muted-foreground">Households are shared — everyone in it sees the same inventory.</p>

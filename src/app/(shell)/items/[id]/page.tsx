@@ -81,8 +81,8 @@ export default function ItemDetailPage() {
         <div className="flex items-start justify-between gap-2">
           <h1 className="text-screen-title font-medium text-ink">{item.name}</h1>
           {item.needsReview && (
-            <span className="flex shrink-0 items-center gap-1 rounded-full bg-ink px-2 py-1 text-micro font-medium text-white">
-              <Icon name="needsReview" size={12} /> Needs review
+            <span className="flex shrink-0 items-center gap-1.5 text-micro font-medium text-muted-foreground">
+              <span className="size-1.5 rounded-full bg-yellow" aria-hidden /> Needs review
             </span>
           )}
         </div>

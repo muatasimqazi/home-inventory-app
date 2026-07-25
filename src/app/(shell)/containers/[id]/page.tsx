@@ -94,7 +94,7 @@ export default function ContainerDetailPage() {
 
       <Link
         href={`/capture?locationId=${container.locationId}&containerId=${container.id}`}
-        className="tap-target flex items-center justify-center gap-2 rounded-2xl bg-yellow py-3.5 text-body font-medium text-ink shadow-lg"
+        className="tap-target flex items-center justify-center gap-2 rounded-2xl bg-yellow py-3.5 text-body font-medium text-white shadow-lg"
       >
         <Icon name="camera" size={18} /> Add items here
       </Link>

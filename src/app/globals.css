@@ -5,37 +5,44 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Shohaz design tokens — sourced from the PRD (§3) and the finalized Figma
- * mocks (Dashboard, Editorial Utility System reference frame). Every screen
- * should build from these tokens, never raw hex values.
+ * Shohaz design tokens — v2 taupe/neutral system. Variable and utility
+ * *names* are kept from v1 (--color-ink, bg-yellow, etc.) so the hundreds of
+ * existing call sites repaint automatically; only the hex values below moved
+ * to the v2 palette. --color-yellow now holds brand-500 (taupe), not yellow —
+ * treat it as "the brand accent" token, not literally yellow.
  */
 @theme inline {
-  /* Core palette */
-  --color-ink: #050505;
-  --color-yellow: #ffc123;
-  --color-white: #ffffff;
-  --color-surface-muted: #eff1f2;
-  --color-border: #d8d8d2;
-  --color-text-muted: #747b82;
-  --color-danger: #d6304a;
+  /* Core palette (v2 neutral/brand) */
+  --color-ink: #212121; /* neutral-900 */
+  --color-yellow: #a1887f; /* brand-500 — brand accent, not literally yellow */
+  --color-white: #ffffff; /* neutral-0 */
+  --color-surface-muted: #f1eded; /* neutral-100 */
+  --color-border: #e4ddd8; /* neutral-200 */
+  --color-text-muted: #8d7b73; /* neutral-500 */
+  --color-danger: #a31b1b;
   --color-danger-foreground: #ffffff;
 
-  /* Category accent trio — item-type color coding only, never chrome/actions */
-  --color-accent-yellow: #ffc123;
-  --color-accent-orange: #fd8549;
-  --color-accent-pink: #f20855;
+  /* Brand scale, for spots that need the fuller ramp than --color-yellow alone */
+  --color-brand-100: #f2edea;
+  --color-brand-200: #d0c2ba;
+  --color-brand-700: #715c52;
+
+  /* Category accent trio — muted data accents only (dots/rails/chips), never chrome/actions or large fills */
+  --color-accent-yellow: #c9974b;
+  --color-accent-orange: #c1774a;
+  --color-accent-pink: #b06b79;
 
   /* shadcn semantic slots, mapped onto the Shohaz palette */
-  --color-background: var(--color-surface-muted);
+  --color-background: #faf8f6; /* neutral-50 */
   --color-foreground: var(--color-ink);
   --color-card: var(--color-white);
   --color-card-foreground: var(--color-ink);
   --color-popover: var(--color-white);
   --color-popover-foreground: var(--color-ink);
   --color-primary: var(--color-yellow);
-  --color-primary-foreground: var(--color-ink);
-  --color-secondary: var(--color-ink);
-  --color-secondary-foreground: var(--color-white);
+  --color-primary-foreground: var(--color-white);
+  --color-secondary: var(--color-surface-muted);
+  --color-secondary-foreground: var(--color-ink);
   --color-muted: var(--color-surface-muted);
   --color-muted-foreground: var(--color-text-muted);
   --color-accent: var(--color-surface-muted);

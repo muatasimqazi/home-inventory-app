@@ -83,7 +83,7 @@ function StatTile({
 }) {
   return (
     <Link href={href} className="flex flex-col gap-2 rounded-xl bg-white p-4 shadow-sm hover:shadow-lg">
-      <div className={`flex size-9 items-center justify-center rounded-lg ${tone === "attention" ? "bg-danger/10 text-danger" : "bg-yellow text-ink"}`}>
+      <div className={`flex size-9 items-center justify-center rounded-lg ${tone === "attention" ? "bg-danger/10 text-danger" : "bg-yellow text-white"}`}>
         <Icon name={icon} size={18} />
       </div>
       <p className="text-desktop-title font-medium text-ink">{value}</p>

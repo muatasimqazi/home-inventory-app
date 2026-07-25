@@ -53,7 +53,7 @@ export default function DashboardPage() {
             action={
               <Link
                 href="/capture"
-                className="tap-target inline-flex h-11 items-center justify-center rounded-full bg-yellow px-6 text-body font-medium text-ink"
+                className="tap-target inline-flex h-11 items-center justify-center rounded-full bg-yellow px-6 text-body font-medium text-white"
               >
                 Scan item
               </Link>

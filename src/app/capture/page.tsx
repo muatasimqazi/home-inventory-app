@@ -152,7 +152,7 @@ function CameraCaptureInner() {
             <button
               type="button"
               onClick={() => router.push("/add")}
-              className="tap-target h-11 w-full max-w-xs rounded-full bg-yellow text-body font-medium text-ink"
+              className="tap-target h-11 w-full max-w-xs rounded-full bg-yellow text-body font-medium text-white"
             >
               Enter manually
             </button>
@@ -168,7 +168,7 @@ function CameraCaptureInner() {
                   type="button"
                   onClick={handleReviewAndSave}
                   disabled={saving}
-                  className="tap-target h-11 w-full max-w-xs rounded-full bg-yellow text-body font-medium text-ink disabled:opacity-60"
+                  className="tap-target h-11 w-full max-w-xs rounded-full bg-yellow text-body font-medium text-white disabled:opacity-60"
                 >
                   {saving ? "Analyzing…" : `Review & Save (${photos.length})`}
                 </button>
@@ -218,7 +218,7 @@ function CameraCaptureInner() {
                   setPreviewUrl(null);
                   setMode("live");
                 }}
-                className="tap-target h-11 flex-1 rounded-full bg-yellow text-body font-medium text-ink"
+                className="tap-target h-11 flex-1 rounded-full bg-yellow text-body font-medium text-white"
               >
                 Use Photo
               </button>

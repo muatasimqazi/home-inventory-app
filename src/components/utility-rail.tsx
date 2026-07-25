@@ -15,7 +15,7 @@ export function UtilityRail() {
       </div>
       <Link
         href="/capture"
-        className="tap-target flex h-9 shrink-0 items-center justify-center rounded-full bg-yellow px-4 text-caption font-medium text-ink"
+        className="tap-target flex h-9 shrink-0 items-center justify-center rounded-full bg-yellow px-4 text-caption font-medium text-white"
       >
         Scan item
       </Link>
