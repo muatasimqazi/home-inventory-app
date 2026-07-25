@@ -17,7 +17,7 @@ export interface VisionProvider {
   detectItems(photos: string[]): Promise<DetectedItem[]>;
 }
 
-const REVIEW_THRESHOLD = 0.75;
+export const REVIEW_THRESHOLD = 0.75;
 
 const CANNED_POOL: Omit<DetectedItem, "needsReview" | "reviewReason">[] = [
   { suggestedName: "Phillips Screwdriver", category: "Tool", suggestedTags: ["hand-tools"], confidence: 0.94, photoEmoji: "🪛" },
@@ -35,7 +35,8 @@ const CANNED_POOL: Omit<DetectedItem, "needsReview" | "reviewReason">[] = [
   { suggestedName: "Water Bottle", category: "Kitchen", suggestedTags: [], confidence: 0.92, photoEmoji: "🍶" },
 ];
 
-function withReview(candidate: Omit<DetectedItem, "needsReview" | "reviewReason">): DetectedItem {
+/** Shared by MockVisionProvider and the /api/v1/vision/detect route, so both apply the same review threshold. */
+export function withReview(candidate: Omit<DetectedItem, "needsReview" | "reviewReason">): DetectedItem {
   const needsReview = candidate.confidence < REVIEW_THRESHOLD;
   return {
     ...candidate,
@@ -66,4 +67,30 @@ function weightedSingleOrFew(): number {
   return 4;
 }
 
+/**
+ * Real Gemini-backed provider — client-safe by construction: it only ever
+ * calls the /api/v1/vision/detect route over fetch, never touches
+ * GEMINI_API_KEY directly (that lives server-side in lib/gemini/vision.ts).
+ * Not the active default; see `visionProvider` below.
+ */
+export class GeminiVisionProvider implements VisionProvider {
+  async detectItems(photos: string[]): Promise<DetectedItem[]> {
+    const res = await fetch("/api/v1/vision/detect", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ photos }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.error ?? `Vision detection failed (${res.status}).`);
+    }
+    const { items } = (await res.json()) as { items: DetectedItem[] };
+    return items;
+  }
+}
+
+// MockVisionProvider stays the active default — swap to `new
+// GeminiVisionProvider()` here (and nowhere else) once the backend is ready
+// to go live. Every call site in the app depends only on the VisionProvider
+// interface.
 export const visionProvider: VisionProvider = new MockVisionProvider();

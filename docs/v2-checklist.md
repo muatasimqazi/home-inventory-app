@@ -60,10 +60,12 @@ Tracks progress against the v2 upgrade instructions (updated PRD). Updated as wo
 - [x] Full-screen routes (capture, add, sign-in, household-setup, scan) remain chrome-free, unchanged
 
 ## 12. Supabase/Gemini Readiness
-- [ ] Supabase client utilities (new key names, server/client boundary)
-- [ ] Gemini `VisionProvider` implementation (mock stays default/available)
-- [ ] Migration SQL reflecting v2 schema (display_code, attachments, extra details, label batches, export jobs)
-- Scope agreed: scaffolding only, no live calls, no migrations run against the real DB, until asked
+- [x] Supabase client utilities: `lib/supabase/client.ts` (browser, publishable key) and `lib/supabase/server.ts` (secret key, guarded by the `server-only` package so an accidental client import is a build error, not a runtime leak). Neither is wired into the store yet.
+- [x] Gemini `VisionProvider` implementation: `lib/gemini/vision.ts` (server-only, real call via AI SDK `generateText` + `Output.object` structured output, `@ai-sdk/google` provider, `GEMINI_API_KEY`) behind a new `POST /api/v1/vision/detect` route, plus a client-safe `GeminiVisionProvider` in `lib/ai.ts` that only ever fetches that route. `MockVisionProvider` stays the active default — swapping is a one-line export change.
+- [x] Migration SQL: `supabase/migrations/0001_init.sql` — full v2 schema (households through label_batch_entries, `containers.display_code`, `items.extra_details` jsonb, attachments, label batches/entries) with RLS policies scoped by household membership. Skipped a dedicated `export_jobs` table since Data & Export (§9) runs synchronously client-side with no server job to track — noted as a design choice, not an oversight.
+- [x] `.env.example` added documenting the required/optional env vars without real values.
+- Verified: build succeeds (the `server-only` guard would fail the build on a boundary violation), and grepped `.next/static` for both real secret values from `.env.local` — zero matches, confirming neither key reaches the client bundle.
+- Scope honored: scaffolding only. Nothing in the running app calls Gemini or Supabase by default; the migration was never run against the real project; the one live-call test I could have run (a real photo through `/api/v1/vision/detect`) was deliberately skipped since a real `GEMINI_API_KEY` is present in `.env.local` and would have made an actual paid call.
 
 ## Verification
 - [x] `tsc --noEmit` clean (after each phase)
