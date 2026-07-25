@@ -92,7 +92,7 @@ export function DisplayCodeSheet({ open, onOpenChange, container }: DisplayCodeS
             Bin IDs are unique per household and stay put when this container moves — separate from the QR/NFC tag.
           </p>
           <div className="flex flex-col gap-2">
-            <Button size="lg" onClick={handleSave}>
+            <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={handleSave}>
               Save Bin ID
             </Button>
             <Button variant="outline" size="lg" onClick={handleGenerateNext}>

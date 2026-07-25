@@ -128,12 +128,14 @@ export default function LabelPrintingPage() {
 
   return (
     <div className="flex flex-col gap-6 pb-10 print:pb-0">
-      <div className="flex items-center justify-between print:hidden">
-        <button onClick={() => router.back()} className="tap-target flex size-9 items-center justify-center rounded-full bg-white shadow-sm">
+      <div className="flex items-center gap-3 print:hidden">
+        <button onClick={() => router.back()} className="tap-target flex size-9 shrink-0 items-center justify-center rounded-full bg-white shadow-sm">
           <Icon name="arrowLeft" size={18} />
         </button>
-        <h1 className="text-screen-title font-medium text-ink">Label Printing</h1>
-        <div className="size-9" />
+        <div>
+          <h1 className="text-screen-title font-semibold text-ink">Print bin labels</h1>
+          <p className="text-caption text-muted-foreground">Select bins, choose a label format, and preview before printing.</p>
+        </div>
       </div>
 
       <div className="grid gap-6 print:hidden md:grid-cols-[320px_1fr]">
@@ -223,12 +225,12 @@ export default function LabelPrintingPage() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-2">
-            <Button size="lg" onClick={handlePrint}>
-              <Icon name="tag" size={16} /> Print {previewEntries.length} label{previewEntries.length === 1 ? "" : "s"}
+          <div className="flex gap-2">
+            <Button size="lg" variant="outline" className="flex-1" onClick={handleExportPdf}>
+              <Icon name="download" size={16} /> Export as PDF
             </Button>
-            <Button size="lg" variant="outline" onClick={handleExportPdf}>
-              <Icon name="download" size={16} /> Export PDF (mock)
+            <Button size="lg" className="flex-1 bg-ink text-white hover:bg-ink/90" onClick={handlePrint}>
+              Print {previewEntries.length} label{previewEntries.length === 1 ? "" : "s"}
             </Button>
           </div>
         </div>

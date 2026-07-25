@@ -10,13 +10,17 @@ export default function SettingsPage() {
   const household = useInventoryStore((s) => s.household);
   const currentUserId = useInventoryStore((s) => s.currentUserId);
   const members = useInventoryStore((s) => s.members);
+  const tags = useInventoryStore((s) => s.tags);
   const me = members.find((m) => m.userId === currentUserId);
 
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-screen-title font-medium text-ink">Settings</h1>
+    <div className="flex flex-col gap-5">
+      <div>
+        <h1 className="text-screen-title font-semibold text-ink">Settings</h1>
+        <p className="mt-0.5 text-caption text-muted-foreground">Manage household preferences and data.</p>
+      </div>
 
-      <div className="flex items-center gap-3 rounded-xl bg-white p-4 shadow-sm">
+      <div className="flex items-center gap-3 rounded-2xl border border-border bg-white p-4 shadow-sm">
         <div className="flex size-12 items-center justify-center rounded-full bg-ink text-body font-medium text-white">
           {me?.displayName.slice(0, 1) ?? "?"}
         </div>
@@ -26,24 +30,25 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      <div className="rounded-xl bg-white shadow-sm">
-        <SettingsRow icon="users" label={household.name} sublabel="Household" href="/settings/members" />
+      <div className="flex flex-col gap-2">
+        <SettingsRow icon="home" label="Household" sublabel={household.name} href="/settings/members" />
+        <SettingsRow icon="user" label="Members" sublabel={`${members.length} active`} href="/settings/members" />
+        <SettingsRow icon="printer" label="Label printing" sublabel="Bin ID labels" href="/desktop/labels" />
+        <SettingsRow icon="upload" label="Import CSV" sublabel="Desktop recommended" href="/settings/import" />
+        <SettingsRow icon="download" label="Data & Export" sublabel="CSV, PDF, JSON" href="/settings/export" />
+        <SettingsRow icon="tag" label="Tags" sublabel={`${tags.length} tags`} href="/tags" />
         <SettingsRow icon="needsReview" label="Needs-Review Queue" href="/review" />
         <SettingsRow icon="activity" label="Activity Feed" href="/activity" />
-        <SettingsRow icon="tag" label="Tags" href="/tags" />
-        <SettingsRow icon="trash" label="Trash" href="/settings/trash" />
-        <SettingsRow icon="upload" label="Import CSV" sublabel="Desktop recommended" href="/settings/import" />
-        <SettingsRow icon="download" label="Data & Export" href="/settings/export" />
-        <SettingsRow icon="key" label="API Keys" href="/settings/api-keys" last />
+        <SettingsRow icon="key" label="API Keys" href="/settings/api-keys" />
       </div>
 
-      <div className="rounded-xl bg-white shadow-sm">
-        <SettingsRow icon="user" label="Members" sublabel={`${members.length} in this household`} href="/settings/members" last />
-      </div>
+      <Link href="/settings/trash" className="text-center text-caption font-medium text-muted-foreground">
+        Trash and deleted items
+      </Link>
 
       <button
         onClick={() => router.push("/sign-in")}
-        className="tap-target flex items-center justify-center gap-2 rounded-xl bg-white py-3 text-body font-medium text-danger shadow-sm"
+        className="tap-target flex items-center justify-center gap-2 rounded-2xl border border-border bg-white py-3 text-body font-medium text-danger"
       >
         <Icon name="logOut" size={16} /> Sign out
       </button>
@@ -56,25 +61,22 @@ function SettingsRow({
   label,
   sublabel,
   href,
-  last,
 }: {
   icon: IconName;
   label: string;
   sublabel?: string;
   href: string;
-  last?: boolean;
 }) {
   return (
-    <Link
-      href={href}
-      className={`tap-target flex items-center gap-3 px-4 py-3 ${last ? "" : "border-b border-border"}`}
-    >
-      <Icon name={icon} size={18} className="text-ink" />
+    <Link href={href} className="tap-target flex items-center gap-3 rounded-2xl border border-border bg-white px-4 py-3 shadow-sm">
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-[10px] bg-brand-100">
+        <Icon name={icon} size={18} className="text-yellow" />
+      </span>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-body text-ink">{label}</p>
+        <p className="truncate text-body font-medium text-ink">{label}</p>
         {sublabel && <p className="truncate text-caption text-muted-foreground">{sublabel}</p>}
       </div>
-      <Icon name="chevronRight" size={16} className="text-muted-foreground" />
+      <span className="shrink-0 text-caption font-semibold text-ink">Open</span>
     </Link>
   );
 }

@@ -27,6 +27,7 @@ import {
   Paperclip,
   Pencil,
   Plus,
+  Printer,
   QrCode,
   RefreshCw,
   RotateCcw,
@@ -88,6 +89,7 @@ const ICONS = {
   file: File,
   bell: Bell,
   pin: MapPin,
+  printer: Printer,
 } as const;
 
 export type IconName = keyof typeof ICONS;

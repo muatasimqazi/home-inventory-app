@@ -92,18 +92,20 @@ function ManualAddItemInner() {
   }
 
   return (
-    <div className="min-h-dvh bg-surface-muted">
-      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-white px-4 py-3">
+    <div className="min-h-dvh bg-background">
+      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-white px-4 py-3">
         <button
           type="button"
           onClick={() => router.back()}
-          className="tap-target flex size-9 items-center justify-center rounded-full hover:bg-surface-muted"
+          className="tap-target flex size-9 shrink-0 items-center justify-center rounded-full hover:bg-surface-muted"
           aria-label="Cancel"
         >
-          <Icon name="close" size={18} />
+          <Icon name="arrowLeft" size={18} />
         </button>
-        <h1 className="text-body font-medium text-ink">New Item</h1>
-        <div className="size-9" />
+        <div>
+          <h1 className="text-body font-semibold text-ink">Add manually</h1>
+          <p className="text-micro text-muted-foreground">Create one item without using a photo.</p>
+        </div>
       </header>
 
       <div className="mx-auto flex max-w-lg flex-col gap-4 px-4 py-4">
@@ -216,8 +218,8 @@ function ManualAddItemInner() {
           <Button variant="outline" size="lg" className="flex-1" onClick={() => router.back()}>
             Cancel
           </Button>
-          <Button size="lg" className="flex-1" onClick={handleSave} disabled={saving}>
-            {saving ? <Icon name="spinner" size={16} className="animate-spin" /> : "Save"}
+          <Button size="lg" className="flex-1 bg-ink text-white hover:bg-ink/90" onClick={handleSave} disabled={saving}>
+            {saving ? <Icon name="spinner" size={16} className="animate-spin" /> : "Save item"}
           </Button>
         </div>
       </div>

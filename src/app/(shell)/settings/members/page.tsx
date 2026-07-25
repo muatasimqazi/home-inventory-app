@@ -29,8 +29,11 @@ export default function HouseholdMembersPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-screen-title font-medium text-ink">Household Members</h1>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-screen-title font-semibold text-ink">Household Members</h1>
+          <p className="mt-0.5 text-caption text-muted-foreground">Invite family or roommates.</p>
+        </div>
         {isOwner && (
           <Button size="sm" onClick={() => setInviteOpen(true)}>
             <Icon name="plus" size={14} /> Invite
@@ -38,10 +41,10 @@ export default function HouseholdMembersPage() {
         )}
       </div>
 
-      <div className="rounded-xl bg-white shadow-sm">
+      <div className="rounded-2xl border border-border bg-white shadow-sm">
         {members.map((m, i) => (
           <div key={m.userId} className={`flex items-center gap-3 px-4 py-3 ${i === members.length - 1 && invites.length === 0 ? "" : "border-b border-border"}`}>
-            <div className="flex size-10 items-center justify-center rounded-full bg-surface-muted text-body font-medium text-ink">
+            <div className="flex size-10 items-center justify-center rounded-full bg-brand-100 text-body font-medium text-yellow">
               {m.displayName.slice(0, 1)}
             </div>
             <div className="min-w-0 flex-1">

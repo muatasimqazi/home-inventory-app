@@ -78,16 +78,13 @@ export default function DataExportPage() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex items-center justify-between">
-        <button onClick={() => router.back()} className="tap-target flex size-9 items-center justify-center rounded-full bg-white shadow-sm">
-          <Icon name="arrowLeft" size={18} />
-        </button>
-        <h1 className="text-screen-title font-medium text-ink">Data & Export</h1>
-        <div className="size-9" />
+      <button onClick={() => router.back()} className="tap-target flex size-9 items-center justify-center rounded-full bg-white shadow-sm">
+        <Icon name="arrowLeft" size={18} />
+      </button>
+      <div>
+        <h1 className="text-screen-title font-semibold text-ink">Data & export</h1>
+        <p className="mt-0.5 text-caption text-muted-foreground">Your household inventory is personal and portable.</p>
       </div>
-      <p className="text-body text-muted-foreground">
-        Your data belongs to you. Export any of the following at any time — no support ticket required.
-      </p>
 
       <ExportCard
         icon="download"
@@ -160,9 +157,9 @@ function ExportCard({
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl bg-white p-4 shadow-sm">
+    <div className="flex flex-col gap-3 rounded-2xl border border-border bg-white p-4 shadow-sm">
       <div className="flex items-start gap-3">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-surface-muted text-ink">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-[10px] bg-brand-100 text-yellow">
           <Icon name={icon} size={18} />
         </span>
         <div className="min-w-0 flex-1">

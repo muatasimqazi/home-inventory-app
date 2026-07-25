@@ -149,9 +149,11 @@ export default function CsvImportPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <h1 className="text-desktop-title font-medium text-ink">Import from CSV</h1>
-      <p className="text-body text-muted-foreground">Migrate from a Sheets-based system — upload, map columns, preview, then confirm.</p>
+    <div className="flex flex-col gap-4 rounded-2xl border border-border bg-white p-8 shadow-sm">
+      <div>
+        <h1 className="text-desktop-title font-semibold text-ink">CSV import</h1>
+        <p className="mt-0.5 text-body text-muted-foreground">Map spreadsheet columns before importing inventory.</p>
+      </div>
 
       {stage === "upload" && (
         <div
@@ -161,10 +163,10 @@ export default function CsvImportPage() {
             const file = e.dataTransfer.files?.[0];
             if (file) handleFile(file);
           }}
-          className="flex flex-col items-center gap-3 rounded-xl border-2 border-dashed border-border bg-white p-12 text-center"
+          className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-white p-12 text-center"
         >
-          <Icon name="upload" size={28} className="text-muted-foreground" />
-          <p className="text-body text-ink">Drag a CSV file here, or</p>
+          <Icon name="file" size={28} className="text-muted-foreground" />
+          <p className="text-body font-semibold text-ink">Drop CSV file here</p>
           <Button onClick={() => fileInputRef.current?.click()}>Choose file</Button>
           <input
             ref={fileInputRef}

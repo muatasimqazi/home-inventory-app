@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Icon, type IconName } from "@/components/icon";
 import { EmptyState } from "@/components/empty-state";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { SearchBar } from "@/components/search-bar";
 import { Button } from "@/components/ui/button";
 import { useInventoryStore } from "@/lib/store";
 import { daysUntil } from "@/lib/selectors";
@@ -36,6 +37,7 @@ export default function TrashPage() {
   const permanentlyDeleteLocation = useInventoryStore((s) => s.permanentlyDeleteLocation);
 
   const [filter, setFilter] = useState<EntityType | "all">("all");
+  const [query, setQuery] = useState("");
   const [pendingDelete, setPendingDelete] = useState<TrashRow | null>(null);
 
   const rows: TrashRow[] = [
@@ -50,7 +52,10 @@ export default function TrashPage() {
       .map((l) => ({ type: "location" as const, id: l.id, name: l.name, emoji: l.coverPhotoEmoji ?? "📦", trashedAt: l.trashedAt!, purgeAfter: l.permanentlyDeleteAfter! })),
   ].sort((a, b) => b.trashedAt.localeCompare(a.trashedAt));
 
-  const filteredRows = filter === "all" ? rows : rows.filter((r) => r.type === filter);
+  const typeFilteredRows = filter === "all" ? rows : rows.filter((r) => r.type === filter);
+  const filteredRows = query.trim()
+    ? typeFilteredRows.filter((r) => r.name.toLowerCase().includes(query.trim().toLowerCase()))
+    : typeFilteredRows;
 
   function restore(row: TrashRow) {
     if (row.type === "item") restoreItem(row.id);
@@ -68,7 +73,12 @@ export default function TrashPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-screen-title font-medium text-ink">Trash</h1>
+      <div>
+        <h1 className="text-screen-title font-semibold text-ink">Trash</h1>
+        <p className="mt-0.5 text-caption text-muted-foreground">Restore items or remove them permanently.</p>
+      </div>
+
+      {rows.length > 0 && <SearchBar value={query} onChange={setQuery} placeholder="Search items, bins, locations..." />}
 
       {rows.length > 0 && (
         <div className="flex gap-2 overflow-x-auto pb-1">
@@ -93,8 +103,8 @@ export default function TrashPage() {
       ) : (
         <div className="flex flex-col gap-2">
           {filteredRows.map((row) => (
-            <div key={`${row.type}-${row.id}`} className="flex items-center gap-3 rounded-xl bg-white p-3 shadow-sm">
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-surface-muted text-xl">{row.emoji}</span>
+            <div key={`${row.type}-${row.id}`} className="flex items-center gap-3 rounded-2xl border border-border bg-white p-3 shadow-sm">
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-[10px] bg-brand-100 text-xl">{row.emoji}</span>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
                   <p className="truncate text-body text-ink">{row.name}</p>

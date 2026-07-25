@@ -6,6 +6,7 @@ import { Icon } from "@/components/icon";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useInventoryStore } from "@/lib/store";
+import { cn } from "@/lib/utils";
 
 type Mode = "requesting" | "scanning" | "denied" | "not-found";
 
@@ -92,14 +93,19 @@ export default function QrScannerPage() {
     }
   }
 
+  const dark = mode === "scanning";
+
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-ink text-white">
+    <div className={cn("fixed inset-0 z-50 flex flex-col", dark ? "bg-ink text-white" : "bg-background text-ink")}>
       <header className="flex items-center justify-between px-4 pt-[max(1rem,env(safe-area-inset-top))]">
         <button
           type="button"
           onClick={() => router.back()}
           aria-label="Close scanner"
-          className="tap-target flex size-10 items-center justify-center rounded-full bg-white/10"
+          className={cn(
+            "tap-target flex size-10 items-center justify-center rounded-full",
+            dark ? "bg-white/10" : "bg-white shadow-sm"
+          )}
         >
           <Icon name="close" size={20} />
         </button>
@@ -111,7 +117,7 @@ export default function QrScannerPage() {
         {mode === "requesting" && (
           <div className="flex h-full flex-col items-center justify-center gap-3">
             <Icon name="spinner" size={28} className="animate-spin" />
-            <p className="text-body">Requesting camera access…</p>
+            <p className="text-body text-muted-foreground">Requesting camera access…</p>
           </div>
         )}
 
@@ -130,15 +136,15 @@ export default function QrScannerPage() {
         )}
 
         {(mode === "denied" || mode === "not-found" || !supportsDetection) && mode !== "requesting" && (
-          <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 bg-ink px-6 pb-8 pt-4">
-            {mode === "denied" && <p className="text-center text-body text-white/70">Camera access is off. Enter the label code manually.</p>}
+          <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 px-6 pb-8 pt-4">
+            {mode === "denied" && <p className="text-center text-body text-muted-foreground">Camera access is off. Enter the label code manually.</p>}
             {mode === "not-found" && <p className="text-center text-body text-danger">No container matches that code.</p>}
             <div className="flex gap-2">
               <Input
                 value={manualCode}
                 onChange={(e) => setManualCode(e.target.value)}
                 placeholder="SHZ-XXXXXXXX"
-                className="h-11 flex-1 border-white/20 bg-white/10 text-white placeholder:text-white/40"
+                className="h-11 flex-1"
               />
               <Button size="lg" onClick={() => handleResolve(manualCode)}>
                 Go

@@ -66,7 +66,7 @@ export function EntityFormSheet({
             <label className="mb-1 block text-caption text-muted-foreground">Description (optional)</label>
             <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
           </div>
-          <Button size="lg" onClick={handleSubmit}>
+          <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={handleSubmit}>
             Save
           </Button>
         </div>

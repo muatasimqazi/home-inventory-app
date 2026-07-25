@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Icon } from "@/components/icon";
 import { useCaptureSession } from "@/lib/capture-session-store";
 import { useInventoryStore } from "@/lib/store";
+import { cn } from "@/lib/utils";
 
 type Mode = "requesting" | "live" | "preview" | "denied";
 
@@ -109,8 +110,10 @@ function CameraCaptureInner() {
     router.push("/capture/review");
   }
 
+  const dark = mode === "live" || mode === "preview";
+
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-ink">
+    <div className={cn("fixed inset-0 z-50 flex flex-col", dark ? "bg-ink" : "bg-background")}>
       <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFilePicked} />
 
       <header className="flex items-center justify-between px-4 pt-[max(1rem,env(safe-area-inset-top))]">
@@ -118,7 +121,10 @@ function CameraCaptureInner() {
           type="button"
           onClick={() => router.push("/")}
           aria-label="Close camera"
-          className="tap-target flex size-10 items-center justify-center rounded-full bg-white/10 text-white"
+          className={cn(
+            "tap-target flex size-10 items-center justify-center rounded-full",
+            dark ? "bg-white/10 text-white" : "bg-white text-ink shadow-sm"
+          )}
         >
           <Icon name="close" size={20} />
         </button>
@@ -132,27 +138,29 @@ function CameraCaptureInner() {
 
       <div className="relative flex-1 overflow-hidden">
         {mode === "requesting" && (
-          <div className="flex h-full flex-col items-center justify-center gap-3 text-white">
+          <div className="flex h-full flex-col items-center justify-center gap-3 text-ink">
             <Icon name="spinner" size={28} className="animate-spin" />
-            <p className="text-body">Requesting camera access…</p>
+            <p className="text-body text-muted-foreground">Requesting camera access…</p>
           </div>
         )}
 
         {mode === "denied" && (
-          <div className="flex h-full flex-col items-center justify-center gap-4 px-8 text-center text-white">
-            <div className="flex size-14 items-center justify-center rounded-full bg-white/10">
-              <Icon name="camera" size={26} />
-            </div>
-            <div>
-              <p className="text-item-title font-medium">Camera access is off</p>
-              <p className="mt-1 text-body text-white/70">
-                Enable camera access for Shohaz in your browser settings, or add this item manually instead.
-              </p>
+          <div className="flex h-full flex-col items-center justify-center gap-4 px-8 text-center">
+            <div className="flex w-full max-w-xs flex-col items-center gap-3 rounded-2xl border border-border bg-white p-8">
+              <div className="flex size-14 items-center justify-center rounded-full bg-brand-100">
+                <Icon name="camera" size={26} className="text-yellow" />
+              </div>
+              <div>
+                <p className="text-item-title font-semibold text-ink">Camera access is off</p>
+                <p className="mt-1 text-body text-muted-foreground">
+                  Enable camera access for Shohaz in your browser settings, or add this item manually instead.
+                </p>
+              </div>
             </div>
             <button
               type="button"
               onClick={() => router.push("/add")}
-              className="tap-target h-11 w-full max-w-xs rounded-full bg-yellow text-body font-medium text-white"
+              className="tap-target h-11 w-full max-w-xs rounded-full bg-ink text-body font-medium text-white"
             >
               Enter manually
             </button>

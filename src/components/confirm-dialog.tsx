@@ -60,9 +60,9 @@ export function ConfirmDialog({
           {icon ? (
             <div
               className={
-                tone === "danger"
+                tone === "danger" || icon === "trash"
                   ? "flex size-11 items-center justify-center rounded-full bg-danger/10 text-danger"
-                  : "flex size-11 items-center justify-center rounded-full bg-surface-muted text-ink"
+                  : "flex size-11 items-center justify-center rounded-full bg-brand-100 text-yellow"
               }
             >
               <Icon name={icon} size={20} />
@@ -77,8 +77,8 @@ export function ConfirmDialog({
           </Button>
           <Button
             size="lg"
-            className="flex-1"
-            variant={tone === "danger" ? "destructive" : "secondary"}
+            className={tone === "danger" ? "flex-1" : "flex-1 bg-ink text-white hover:bg-ink/90"}
+            variant={tone === "danger" ? "destructive" : "default"}
             onClick={handleConfirm}
             disabled={pending}
           >
