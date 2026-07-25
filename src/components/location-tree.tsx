@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Icon } from "@/components/icon";
 import { EmptyState } from "@/components/empty-state";
 import { cn } from "@/lib/utils";
+import { binIdBadgeClasses } from "@/lib/badge-color";
 import { activeItemCountForLocation, directChildContainers, itemsIn } from "@/lib/selectors";
 import type { Container, Item, Location } from "@/lib/types";
 
@@ -38,12 +39,17 @@ function ContainerNode({ container, locationId, containers, items, depth, openId
         ) : (
           <span className="size-6 shrink-0" />
         )}
-        <Link href={`/containers/${container.id}`} className="flex min-w-0 flex-1 items-center gap-2 text-caption text-ink hover:underline">
-          <span className="truncate">{container.name}</span>
+        <Link
+          href={`/containers/${container.id}`}
+          className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-border bg-white px-3 py-2 text-caption text-ink"
+        >
           {container.displayCode && (
-            <span className="shrink-0 rounded-md bg-surface-muted px-1.5 py-0.5 font-mono text-micro text-ink">{container.displayCode}</span>
+            <span className={cn("shrink-0 rounded-full border px-2 py-0.5 font-mono text-micro font-semibold", binIdBadgeClasses(container.id))}>
+              {container.displayCode}
+            </span>
           )}
-          <span className="shrink-0 text-micro text-muted-foreground">{directItemCount}</span>
+          <span className="min-w-0 flex-1 truncate font-medium">{container.name}</span>
+          <span className="shrink-0 text-micro text-muted-foreground">{directItemCount} items</span>
         </Link>
       </div>
       {isOpen && children.length > 0 && (

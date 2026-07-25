@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,11 @@ interface DisplayCodeSheetProps {
 export function DisplayCodeSheet({ open, onOpenChange, container }: DisplayCodeSheetProps) {
   const assignDisplayCode = useInventoryStore((s) => s.assignDisplayCode);
   const claimUnassignedLabel = useInventoryStore((s) => s.claimUnassignedLabel);
-  const unassignedLabels = useInventoryStore((s) => s.labelBatchEntries.filter((e) => e.containerId === null));
+  // Filter in a memo, not inline in the selector — a selector that returns a
+  // new array every call breaks Zustand's useSyncExternalStore snapshot
+  // comparison and causes an infinite render loop.
+  const allLabelBatchEntries = useInventoryStore((s) => s.labelBatchEntries);
+  const unassignedLabels = useMemo(() => allLabelBatchEntries.filter((e) => e.containerId === null), [allLabelBatchEntries]);
   const [value, setValue] = useState(container.displayCode ?? "");
   const [error, setError] = useState<string | null>(null);
 

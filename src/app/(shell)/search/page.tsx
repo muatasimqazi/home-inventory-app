@@ -4,9 +4,9 @@ import Link from "next/link";
 import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { SearchBar } from "@/components/search-bar";
-import { ItemCard } from "@/components/item-card";
 import { EmptyState } from "@/components/empty-state";
 import { Icon } from "@/components/icon";
+import { categoryAccentClass } from "@/lib/category";
 import { useInventoryStore } from "@/lib/store";
 import { searchItems } from "@/lib/search";
 import { cn } from "@/lib/utils";
@@ -71,9 +71,22 @@ function SearchPageInner() {
           <p className="text-caption text-muted-foreground">
             {filteredResults.length} result{filteredResults.length === 1 ? "" : "s"}
           </p>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="flex flex-col gap-2">
             {filteredResults.map((r) => (
-              <ItemCard key={r.item.id} item={r.item} breadcrumbLabel={r.breadcrumbLabel} />
+              <Link
+                key={r.item.id}
+                href={`/items/${r.item.id}`}
+                className="flex items-center gap-3 rounded-2xl border border-border bg-white p-3 shadow-sm"
+              >
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-surface-muted">
+                  <Icon name="box" size={20} className="text-ink" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-item-title font-medium text-ink">{r.item.name}</p>
+                  <p className="truncate text-caption text-muted-foreground">{r.breadcrumbLabel}</p>
+                </div>
+                <span className={cn("h-1 w-6 shrink-0 rounded-full", categoryAccentClass(r.item.category))} />
+              </Link>
             ))}
           </div>
         </>

@@ -50,7 +50,10 @@ export default function DesktopManagementPage() {
 
   return (
     <div className="flex h-[calc(100dvh-5rem)] flex-col gap-4">
-      <h1 className="text-desktop-title font-medium text-ink">Manage</h1>
+      <div>
+        <h1 className="text-desktop-title font-semibold text-ink">Inventory management</h1>
+        <p className="mt-0.5 text-caption text-muted-foreground">Search, edit, move, export, and print labels.</p>
+      </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-[280px_1fr] gap-4">
         <div className="overflow-y-auto rounded-xl bg-white p-3 shadow-sm">
@@ -225,7 +228,7 @@ function TreeRow({ label, icon, active, depth, onClick }: { label: string; icon:
       style={{ paddingLeft: 8 + depth * 18 }}
       className={cn(
         "flex w-full items-center gap-2 rounded-lg py-1.5 pr-2 text-left text-body",
-        active ? "bg-ink text-white" : "text-ink hover:bg-surface-muted"
+        active ? "bg-surface-muted font-medium text-ink" : "text-ink hover:bg-surface-muted"
       )}
     >
       <span aria-hidden>{icon}</span>

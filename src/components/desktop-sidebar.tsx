@@ -8,20 +8,16 @@ import { useInventoryStore } from "@/lib/store";
 import { computeHouseholdSummary } from "@/lib/selectors";
 import { cn } from "@/lib/utils";
 
-// Primary nav order follows the v2 spec (Dashboard, Locations, Needs Review,
-// Tags, Trash, Settings) with Search kept first-class near the top and
-// Favorites/Activity preserved from v1 (not called out for removal).
-const LINKS: { href: string; icon: IconName; label: string }[] = [
-  { href: "/", icon: "home", label: "Dashboard" },
-  { href: "/search", icon: "search", label: "Search" },
-  { href: "/locations", icon: "box", label: "Locations" },
-];
+// Primary nav order/set matches Figma v2 Desktop Dashboard sidebar (node
+// 190:19) exactly: Dashboard, Locations, Needs Review, Tags, Trash — see
+// SidebarLink calls below.
 
-const LINKS_AFTER_REVIEW: { href: string; icon: IconName; label: string }[] = [
-  { href: "/tags", icon: "tag", label: "Tags" },
+// Kept reachable but not in Figma's primary list — grouped separately so the
+// primary nav stays a tight match to the design.
+const SECONDARY_LINKS: { href: string; icon: IconName; label: string }[] = [
+  { href: "/search", icon: "search", label: "Search" },
   { href: "/favorites", icon: "heart", label: "Favorites" },
   { href: "/activity", icon: "activity", label: "Activity" },
-  { href: "/settings/trash", icon: "trash", label: "Trash" },
 ];
 
 export function DesktopSidebar() {
@@ -33,27 +29,36 @@ export function DesktopSidebar() {
 
   return (
     <aside className="hidden md:flex md:w-64 md:shrink-0 md:flex-col md:gap-6 md:border-r md:border-border md:bg-white md:px-4 md:py-6">
-      <div className="px-2">
-        <p className="text-section-title font-medium text-ink">Shohaz</p>
-        <p className="truncate text-caption text-muted-foreground">{household.name}</p>
+      <div className="flex items-center gap-3 px-2">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-yellow text-white">
+          <Icon name="home" size={18} />
+        </span>
+        <div className="min-w-0">
+          <p className="text-body font-semibold text-ink">Shohaz</p>
+          <p className="truncate text-caption text-muted-foreground">{household.name}</p>
+        </div>
       </div>
 
       <nav className="flex flex-col gap-1" aria-label="Primary">
-        {LINKS.map((link) => (
-          <SidebarLink key={link.href} {...link} pathname={pathname} exact={link.href === "/"} />
-        ))}
+        <SidebarLink href="/" icon="home" label="Dashboard" pathname={pathname} exact />
+        <SidebarLink href="/locations" icon="box" label="Locations" pathname={pathname} />
         <Link
           href="/review"
           className={cn(
             "flex items-center gap-3 rounded-lg px-3 py-2 text-body",
-            pathname.startsWith("/review") ? "bg-ink text-white" : "text-ink hover:bg-surface-muted"
+            pathname.startsWith("/review") ? "bg-surface-muted text-ink" : "text-ink hover:bg-surface-muted"
           )}
         >
           <Icon name="needsReview" size={18} />
           <span className="flex-1">Needs Review</span>
           <ReviewBadge count={summary.needsReviewCount} />
         </Link>
-        {LINKS_AFTER_REVIEW.map((link) => (
+        <SidebarLink href="/tags" icon="tag" label="Tags" pathname={pathname} />
+        <SidebarLink href="/settings/trash" icon="trash" label="Trash" pathname={pathname} />
+      </nav>
+
+      <nav className="flex flex-col gap-1 border-t border-border pt-4" aria-label="More">
+        {SECONDARY_LINKS.map((link) => (
           <SidebarLink key={link.href} {...link} pathname={pathname} />
         ))}
       </nav>
@@ -64,6 +69,13 @@ export function DesktopSidebar() {
         <SidebarLink href="/desktop/labels" icon="tag" label="Label Printing" pathname={pathname} />
         <SidebarLink href="/settings/import" icon="upload" label="Import CSV" pathname={pathname} />
         <SidebarLink href="/settings" icon="settings" label="Settings" pathname={pathname} />
+        <Link
+          href="/capture"
+          className="tap-target mt-2 flex items-center justify-center gap-2 rounded-xl bg-yellow px-4 py-3 text-body font-medium text-white"
+        >
+          <Icon name="camera" size={18} />
+          Scan
+        </Link>
       </div>
     </aside>
   );
@@ -88,7 +100,7 @@ function SidebarLink({
       href={href}
       className={cn(
         "flex items-center gap-3 rounded-lg px-3 py-2 text-body",
-        active ? "bg-ink text-white" : "text-ink hover:bg-surface-muted"
+        active ? "bg-surface-muted text-ink" : "text-ink hover:bg-surface-muted"
       )}
     >
       <Icon name={icon} size={18} />

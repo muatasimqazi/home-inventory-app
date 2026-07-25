@@ -15,6 +15,8 @@ import { Button } from "@/components/ui/button";
 import { useInventoryStore } from "@/lib/store";
 import { buildBreadcrumb, daysUntil } from "@/lib/selectors";
 import { extraFieldsForCategory } from "@/lib/category";
+import { relativeTime } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 export default function ItemDetailPage() {
   const params = useParams<{ id: string }>();
@@ -32,6 +34,7 @@ export default function ItemDetailPage() {
   const restoreItem = useInventoryStore((s) => s.restoreItem);
   const permanentlyDeleteItem = useInventoryStore((s) => s.permanentlyDeleteItem);
   const moveItem = useInventoryStore((s) => s.moveItem);
+  const updateItem = useInventoryStore((s) => s.updateItem);
 
   const [moveOpen, setMoveOpen] = useState(false);
   const [trashConfirmOpen, setTrashConfirmOpen] = useState(false);
@@ -43,29 +46,13 @@ export default function ItemDetailPage() {
   const breadcrumb = buildBreadcrumb(item.locationId, item.containerId, locations, containers);
   const itemActivity = activity.filter((a) => a.entityId === item.id);
   const favorite = isFavorite(item.id);
+  const extraFields = extraFieldsForCategory(item.category).filter((f) => item.extraDetails[f.key]);
 
   return (
     <div className="flex flex-col gap-5 pb-6">
-      <div className="flex items-center justify-between">
-        <button onClick={() => router.back()} className="tap-target flex size-9 items-center justify-center rounded-full bg-white shadow-sm">
-          <Icon name="arrowLeft" size={18} />
-        </button>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => toggleFavorite(item.id)}
-            aria-pressed={favorite}
-            aria-label={favorite ? "Remove from favorites" : "Add to favorites"}
-            className="tap-target flex size-9 items-center justify-center rounded-full bg-white shadow-sm"
-          >
-            <Icon name="heart" size={18} className={favorite ? "fill-danger text-danger" : "text-ink"} />
-          </button>
-          {item.status === "active" && (
-            <Link href={`/items/${item.id}/edit`} className="tap-target flex size-9 items-center justify-center rounded-full bg-white shadow-sm">
-              <Icon name="edit" size={18} />
-            </Link>
-          )}
-        </div>
-      </div>
+      <button onClick={() => router.back()} className="tap-target flex size-9 items-center justify-center rounded-full bg-white shadow-sm">
+        <Icon name="arrowLeft" size={18} />
+      </button>
 
       {item.status !== "active" && (
         <div className={item.status === "trashed" ? "rounded-lg bg-danger/10 px-3 py-2 text-caption text-danger" : "rounded-lg bg-surface-muted px-3 py-2 text-caption text-muted-foreground"}>
@@ -75,11 +62,11 @@ export default function ItemDetailPage() {
         </div>
       )}
 
-      <PhotoThumb emoji={item.photoEmoji} label={item.category} className="h-56 w-full" emojiClassName="text-6xl" />
+      <PhotoThumb emoji={item.photoEmoji} className="h-48 w-full" emojiClassName="text-6xl" />
 
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-1">
         <div className="flex items-start justify-between gap-2">
-          <h1 className="text-screen-title font-medium text-ink">{item.name}</h1>
+          <h1 className="text-screen-title font-semibold text-ink">{item.name}</h1>
           {item.needsReview && (
             <span className="flex shrink-0 items-center gap-1.5 text-micro font-medium text-muted-foreground">
               <span className="size-1.5 rounded-full bg-yellow" aria-hidden /> Needs review
@@ -89,22 +76,41 @@ export default function ItemDetailPage() {
         <BreadcrumbTrail segments={breadcrumb} />
       </div>
 
-      <dl className="grid grid-cols-2 gap-3 rounded-xl bg-white p-4 shadow-sm">
+      <dl className="grid grid-cols-2 gap-4 rounded-2xl border border-border bg-white p-4 shadow-sm">
+        <div>
+          <dt className="text-caption text-muted-foreground">Quantity</dt>
+          <dd className="mt-1.5 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => updateItem(item.id, { quantity: item.quantity - 1 })}
+              disabled={item.status !== "active" || item.quantity <= 0}
+              aria-label="Decrease quantity"
+              className="tap-target flex size-7 items-center justify-center rounded-full border border-border text-ink disabled:opacity-40"
+            >
+              −
+            </button>
+            <span className="w-6 text-center text-body font-semibold text-ink">{item.quantity}</span>
+            <button
+              type="button"
+              onClick={() => updateItem(item.id, { quantity: item.quantity + 1 })}
+              disabled={item.status !== "active" || item.quantity >= 9999}
+              aria-label="Increase quantity"
+              className="tap-target flex size-7 items-center justify-center rounded-full border border-border text-ink disabled:opacity-40"
+            >
+              +
+            </button>
+          </dd>
+        </div>
         <Field label="Category" value={item.category} />
-        <Field label="Quantity" value={String(item.quantity)} />
         {item.tagIds.length > 0 && (
           <div className="col-span-2">
             <dt className="text-caption text-muted-foreground">Tags</dt>
-            <dd className="mt-1 flex flex-wrap gap-1.5">
+            <dd className="mt-1.5 flex flex-wrap gap-1.5">
               <TagList itemId={item.id} />
             </dd>
           </div>
         )}
-        {extraFieldsForCategory(item.category).map((field) =>
-          item.extraDetails[field.key] ? (
-            <Field key={field.key} label={field.label} value={item.extraDetails[field.key]} />
-          ) : null
-        )}
+        <Field label="Updated" value={relativeTime(item.updatedAt)} />
         {item.notes && (
           <div className="col-span-2">
             <dt className="text-caption text-muted-foreground">Notes</dt>
@@ -119,18 +125,58 @@ export default function ItemDetailPage() {
         )}
       </dl>
 
-      {item.status === "active" && (
-        <div className="grid grid-cols-2 gap-2">
-          <Button variant="secondary" size="lg" onClick={() => setMoveOpen(true)}>
-            <Icon name="move" size={16} /> Move
-          </Button>
-          <Button variant="outline" size="lg" onClick={() => archiveItem(item.id)}>
-            <Icon name="archive" size={16} /> Archive
-          </Button>
-          <Button variant="outline" size="lg" className="col-span-2 text-danger hover:text-danger" onClick={() => setTrashConfirmOpen(true)}>
-            <Icon name="trash" size={16} /> Move to Trash
-          </Button>
+      {extraFields.length > 0 && (
+        <div className="flex flex-col gap-3 rounded-2xl border border-border bg-white p-4 shadow-sm">
+          <div className="flex items-center justify-between">
+            <h2 className="text-body font-semibold text-ink">Extra details</h2>
+            <span className="rounded-full bg-brand-100 px-2.5 py-1 text-micro font-medium text-yellow">{item.category}</span>
+          </div>
+          <dl className="flex flex-col gap-2.5">
+            {extraFields.map((field) => (
+              <div key={field.key} className="flex items-center justify-between text-caption">
+                <dt className="text-muted-foreground">{field.label}</dt>
+                <dd className="font-medium text-ink">{item.extraDetails[field.key]}</dd>
+              </div>
+            ))}
+          </dl>
         </div>
+      )}
+
+      <ItemAttachments itemId={item.id} />
+
+      {item.status === "active" && (
+        <>
+          <div className="grid grid-cols-3 gap-2">
+            <Button variant="outline" size="lg" onClick={() => setMoveOpen(true)}>
+              <Icon name="move" size={16} /> Move
+            </Button>
+            <Link
+              href={`/items/${item.id}/edit`}
+              className="tap-target flex items-center justify-center gap-1.5 rounded-lg border border-border text-body font-medium text-ink"
+            >
+              <Icon name="edit" size={16} /> Edit
+            </Link>
+            <button
+              type="button"
+              onClick={() => toggleFavorite(item.id)}
+              aria-pressed={favorite}
+              className={cn(
+                "tap-target flex items-center justify-center gap-1.5 rounded-lg text-body font-medium",
+                favorite ? "bg-ink text-white" : "border border-border text-ink"
+              )}
+            >
+              <Icon name="heart" size={16} className={favorite ? "fill-white" : undefined} /> Favorite
+            </button>
+          </div>
+          <div className="flex items-center justify-center gap-4 text-caption font-medium text-muted-foreground">
+            <button type="button" onClick={() => archiveItem(item.id)} className="flex items-center gap-1.5 hover:text-ink">
+              <Icon name="archive" size={14} /> Archive
+            </button>
+            <button type="button" onClick={() => setTrashConfirmOpen(true)} className="flex items-center gap-1.5 hover:text-danger">
+              <Icon name="trash" size={14} /> Move to Trash
+            </button>
+          </div>
+        </>
       )}
 
       {item.status === "archived" && (
@@ -150,10 +196,8 @@ export default function ItemDetailPage() {
         </div>
       )}
 
-      <ItemAttachments itemId={item.id} />
-
       {itemActivity.length > 0 && (
-        <div className="flex flex-col gap-1 rounded-xl bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-1 rounded-2xl border border-border bg-white p-4 shadow-sm">
           <h2 className="text-section-title font-medium text-ink">Activity</h2>
           <div className="divide-y divide-border">
             {itemActivity.map((entry) => (
@@ -210,7 +254,7 @@ function Field({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <dt className="text-caption text-muted-foreground">{label}</dt>
-      <dd className="mt-0.5 text-body text-ink">{value}</dd>
+      <dd className="mt-1.5 text-body text-ink">{value}</dd>
     </div>
   );
 }

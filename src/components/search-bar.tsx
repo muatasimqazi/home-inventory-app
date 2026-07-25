@@ -12,9 +12,22 @@ interface SearchBarProps {
   onFocus?: () => void;
 }
 
-export function SearchBar({ value, onChange, placeholder = "Search your home...", autoFocus, className, onFocus }: SearchBarProps) {
+export function SearchBar({
+  value,
+  onChange,
+  placeholder = "Search items, bins, locations...",
+  autoFocus,
+  className,
+  onFocus,
+}: SearchBarProps) {
   return (
-    <div className={cn("relative flex h-12 items-center rounded-full bg-white shadow-sm", className)}>
+    <div
+      className={cn(
+        "relative flex h-13.5 items-center rounded-2xl border border-border bg-white shadow-sm",
+        className
+      )}
+    >
+      <Icon name="search" size={20} className="pointer-events-none absolute left-4 text-muted-foreground" />
       <input
         type="text"
         value={value}
@@ -22,10 +35,13 @@ export function SearchBar({ value, onChange, placeholder = "Search your home..."
         onFocus={onFocus}
         autoFocus={autoFocus}
         placeholder={placeholder}
-        aria-label="Search your home"
-        className="tap-target h-full w-full rounded-full bg-transparent pl-4 pr-11 text-body text-ink outline-none placeholder:text-muted-foreground"
+        aria-label="Search"
+        className="tap-target h-full w-full rounded-2xl bg-transparent pr-4 pl-11 text-body text-ink outline-none placeholder:text-muted-foreground"
       />
-      <Icon name="search" size={20} className="pointer-events-none absolute right-4 text-ink" />
+      {/* Keyboard shortcut hint — desktop only, per design (never shown on mobile). */}
+      <span className="pointer-events-none absolute right-3 hidden items-center justify-center rounded-md bg-surface-muted px-1.5 py-0.5 text-micro text-muted-foreground md:flex">
+        ⌘K
+      </span>
     </div>
   );
 }

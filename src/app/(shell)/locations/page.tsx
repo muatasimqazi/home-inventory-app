@@ -1,16 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
-import { EntityCard } from "@/components/entity-card";
 import { EmptyState } from "@/components/empty-state";
 import { EntityFormSheet } from "@/components/entity-form-sheet";
 import { LocationAccordionRow } from "@/components/location-tree";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useInventoryStore } from "@/lib/store";
-import { activeItemCountForLocation, activeLocations, directChildContainers } from "@/lib/selectors";
+import { activeItemCountForLocation, activeLocations } from "@/lib/selectors";
 
 export default function LocationsListPage() {
   const locations = activeLocations(useInventoryStore((s) => s.locations));
@@ -32,9 +32,12 @@ export default function LocationsListPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-screen-title font-medium text-ink">Locations</h1>
-        <Button size="icon" className="rounded-full" onClick={() => setCreateOpen(true)} aria-label="Add location">
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-screen-title font-semibold text-ink">Locations</h1>
+          <p className="mt-0.5 text-caption text-muted-foreground">Browse household storage areas.</p>
+        </div>
+        <Button size="icon" className="rounded-xl" onClick={() => setCreateOpen(true)} aria-label="Add location">
           <Icon name="plus" size={18} />
         </Button>
       </div>
@@ -51,25 +54,33 @@ export default function LocationsListPage() {
           }
         />
       ) : (
-        <Tabs defaultValue="grid">
+        <Tabs defaultValue="list">
           <TabsList>
-            <TabsTrigger value="grid">Grid</TabsTrigger>
+            <TabsTrigger value="list">List</TabsTrigger>
             <TabsTrigger value="browse">Browse</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="grid">
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <TabsContent value="list">
+            <div className="flex flex-col gap-2">
               {locations.map((loc) => {
-                const containerCount = directChildContainers(containers, null, loc.id).length;
                 const itemCount = activeItemCountForLocation(items, loc.id);
                 return (
-                  <EntityCard
+                  <Link
                     key={loc.id}
                     href={`/locations/${loc.id}`}
-                    emoji={loc.coverPhotoEmoji ?? "📦"}
-                    title={loc.name}
-                    subtitle={`${containerCount} container${containerCount === 1 ? "" : "s"} · ${itemCount} item${itemCount === 1 ? "" : "s"}`}
-                  />
+                    className="flex items-center gap-3 rounded-2xl border border-border bg-white px-4 py-3.5 shadow-sm"
+                  >
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-[10px] bg-brand-100">
+                      <Icon name="pin" size={18} className="text-yellow" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-item-title font-medium text-ink">{loc.name}</p>
+                      <p className="truncate text-caption text-muted-foreground">
+                        {itemCount} item{itemCount === 1 ? "" : "s"}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-caption font-semibold text-ink">Open</span>
+                  </Link>
                 );
               })}
             </div>

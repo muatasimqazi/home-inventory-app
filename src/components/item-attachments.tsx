@@ -1,100 +1,126 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useInventoryStore } from "@/lib/store";
-import { formatBytes } from "@/lib/format";
-import type { AttachmentKind } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import type { Attachment, AttachmentKind } from "@/lib/types";
 
 const KIND_LABELS: Record<AttachmentKind, string> = {
   receipt: "Receipt",
   manual: "Manual",
   warranty: "Warranty",
-  other: "Other file",
+  other: "Other",
 };
 
-/** Secondary/quiet section on Item Detail — receipts, manuals, warranty docs, misc files. No OCR or reminders. */
+const KINDS = Object.keys(KIND_LABELS) as AttachmentKind[];
+
+function fileTypeTag(contentType: string): string {
+  if (contentType.includes("pdf")) return "PDF";
+  if (contentType.startsWith("image/")) return "IMG";
+  return "DOC";
+}
+
+/** Secondary/quiet section on Item Detail — one fixed tile per kind (Receipt/Manual/Warranty/Other). No OCR or reminders. */
 export function ItemAttachments({ itemId }: { itemId: string }) {
-  const attachments = useInventoryStore((s) => s.attachments.filter((a) => a.itemId === itemId));
+  // Filter in a memo, not inline in the selector — a selector that returns a
+  // new array every call breaks Zustand's useSyncExternalStore snapshot
+  // comparison and causes an infinite render loop.
+  const allAttachments = useInventoryStore((s) => s.attachments);
+  const attachments = useMemo(() => allAttachments.filter((a) => a.itemId === itemId), [allAttachments, itemId]);
   const addAttachment = useInventoryStore((s) => s.addAttachment);
   const deleteAttachment = useInventoryStore((s) => s.deleteAttachment);
-  const [kind, setKind] = useState<AttachmentKind>("receipt");
+  const [uploadingKind, setUploadingKind] = useState<AttachmentKind | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function startUpload(kind: AttachmentKind) {
+    setUploadingKind(kind);
+    fileInputRef.current?.click();
+  }
 
   function handleFileChosen(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
-    if (!file) return;
+    if (!file || !uploadingKind) return;
     addAttachment(itemId, {
-      kind,
+      kind: uploadingKind,
       fileName: file.name,
       storagePath: URL.createObjectURL(file),
       contentType: file.type || "application/octet-stream",
       sizeBytes: file.size,
     });
     toast.success(`Added ${file.name}`);
+    setUploadingKind(null);
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl bg-white p-4 shadow-sm">
-      <div className="flex items-center justify-between">
-        <h2 className="text-section-title font-medium text-ink">Attachments</h2>
-        <span className="text-caption text-muted-foreground">Receipts, manuals, warranty docs</span>
+    <div className="flex flex-col gap-3 rounded-2xl border border-border bg-white p-4 shadow-sm">
+      <h2 className="text-body font-semibold text-ink">Attachments</h2>
+      <div className="grid grid-cols-4 gap-2">
+        {KINDS.map((kind) => (
+          <AttachmentTile
+            key={kind}
+            kind={kind}
+            attachment={attachments.find((a) => a.kind === kind)}
+            onUpload={() => startUpload(kind)}
+            onDelete={(id) => {
+              deleteAttachment(id);
+              toast("Attachment removed");
+            }}
+          />
+        ))}
       </div>
+      <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChosen} />
+    </div>
+  );
+}
 
-      {attachments.length > 0 && (
-        <div className="flex flex-col divide-y divide-border">
-          {attachments.map((a) => (
-            <div key={a.id} className="flex items-center gap-3 py-2">
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-surface-muted text-ink">
-                <Icon name="file" size={15} />
-              </span>
-              <a href={a.storagePath} target="_blank" rel="noreferrer" className="min-w-0 flex-1">
-                <p className="truncate text-body text-ink">{a.fileName}</p>
-                <p className="text-caption text-muted-foreground">
-                  {KIND_LABELS[a.kind]} · {formatBytes(a.sizeBytes)}
-                </p>
-              </a>
-              <button
-                type="button"
-                onClick={() => {
-                  deleteAttachment(a.id);
-                  toast("Attachment removed");
-                }}
-                aria-label={`Remove ${a.fileName}`}
-                className="tap-target flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-muted hover:text-danger"
-              >
-                <Icon name="close" size={14} />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+function AttachmentTile({
+  kind,
+  attachment,
+  onUpload,
+  onDelete,
+}: {
+  kind: AttachmentKind;
+  attachment: Attachment | undefined;
+  onUpload: () => void;
+  onDelete: (id: string) => void;
+}) {
+  if (!attachment) {
+    return (
+      <button
+        type="button"
+        onClick={onUpload}
+        className="tap-target flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-border text-muted-foreground hover:border-yellow hover:text-yellow"
+      >
+        <Icon name="plus" size={18} />
+        <span className="text-micro">{KIND_LABELS[kind]}</span>
+      </button>
+    );
+  }
 
-      <div className="flex items-center gap-2">
-        <Select value={kind} onValueChange={(v) => setKind(v as AttachmentKind)}>
-          <SelectTrigger className="h-9 flex-1 text-caption">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {(Object.keys(KIND_LABELS) as AttachmentKind[]).map((k) => (
-              <SelectItem key={k} value={k}>
-                {KIND_LABELS[k]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          className="tap-target flex items-center gap-1.5 rounded-lg border border-border px-3 text-caption text-ink"
+  return (
+    <div className="relative flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border border-border bg-white">
+      <a href={attachment.storagePath} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1">
+        <span
+          className={cn(
+            "rounded-full px-2 py-0.5 text-micro font-semibold",
+            attachment.contentType.includes("pdf") ? "bg-badge-green-bg text-badge-green-text" : "bg-badge-blue-bg text-badge-blue-text"
+          )}
         >
-          <Icon name="attachment" size={14} /> Add file
-        </button>
-        <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChosen} />
-      </div>
+          {fileTypeTag(attachment.contentType)}
+        </span>
+        <span className="text-micro text-muted-foreground">{KIND_LABELS[kind]}</span>
+      </a>
+      <button
+        type="button"
+        onClick={() => onDelete(attachment.id)}
+        aria-label={`Remove ${attachment.fileName}`}
+        className="tap-target absolute -right-1 -top-1 flex size-5 items-center justify-center rounded-full border border-border bg-white text-muted-foreground hover:text-danger"
+      >
+        <Icon name="close" size={11} />
+      </button>
     </div>
   );
 }

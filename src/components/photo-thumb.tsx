@@ -8,22 +8,21 @@ interface PhotoThumbProps {
 }
 
 /**
- * Stand-in for a captured photo. Mirrors the Figma mocks' own
- * "IntentionalThumbnail" placeholder pattern (a muted box + glyph + label)
- * rather than inventing a different empty-photo treatment.
+ * Stand-in for a captured photo — a pale brand-tinted panel + emoji, so the
+ * fallback still reads as designed rather than a flat gray placeholder box.
  */
 export function PhotoThumb({ emoji, label, className, emojiClassName }: PhotoThumbProps) {
   return (
     <div
       className={cn(
-        "flex flex-col items-center justify-center gap-1 rounded-md bg-[#d9dbd8] overflow-hidden",
+        "flex flex-col items-center justify-center gap-1 overflow-hidden rounded-2xl bg-brand-100",
         className
       )}
     >
       <span className={cn("text-3xl leading-none", emojiClassName)} aria-hidden>
         {emoji}
       </span>
-      {label ? <span className="text-caption text-ink/70">{label}</span> : null}
+      {label ? <span className="text-caption text-yellow/80">{label}</span> : null}
     </div>
   );
 }

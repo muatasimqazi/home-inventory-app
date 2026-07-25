@@ -15,6 +15,8 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { DisplayCodeSheet } from "@/components/display-code-sheet";
 import { Button } from "@/components/ui/button";
 import { useInventoryStore } from "@/lib/store";
+import { binIdBadgeClasses } from "@/lib/badge-color";
+import { cn } from "@/lib/utils";
 import {
   activeItemCountForContainer,
   buildBreadcrumb,
@@ -81,10 +83,13 @@ export default function ContainerDetailPage() {
           <button
             type="button"
             onClick={() => setDisplayCodeOpen(true)}
-            className="flex items-center gap-1.5 rounded-md bg-surface-muted px-2 py-1 font-mono text-caption text-ink"
+            className={cn(
+              "flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-caption font-semibold",
+              container.displayCode ? binIdBadgeClasses(container.id) : "border-border bg-surface-muted text-ink"
+            )}
           >
             {container.displayCode ?? "Assign Bin ID"}
-            <Icon name="edit" size={12} className="text-muted-foreground" />
+            <Icon name="edit" size={12} className="opacity-60" />
           </button>
           <span className="flex items-center gap-1.5 text-caption text-muted-foreground">
             <Icon name="tag" size={12} /> {container.tagToken}

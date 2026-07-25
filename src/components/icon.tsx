@@ -3,6 +3,7 @@ import {
   AlertCircle,
   Archive,
   ArrowLeft,
+  Bell,
   Box,
   Camera,
   Check,
@@ -20,6 +21,7 @@ import {
   Loader2,
   LogOut,
   type LucideProps,
+  MapPin,
   MoreVertical,
   Move,
   Paperclip,
@@ -84,6 +86,8 @@ const ICONS = {
   refresh: RefreshCw,
   attachment: Paperclip,
   file: File,
+  bell: Bell,
+  pin: MapPin,
 } as const;
 
 export type IconName = keyof typeof ICONS;

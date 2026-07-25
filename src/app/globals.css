@@ -12,13 +12,14 @@
  * treat it as "the brand accent" token, not literally yellow.
  */
 @theme inline {
-  /* Core palette (v2 neutral/brand) */
+  /* Core palette (v2 neutral/brand) — hex values verified against the Figma
+     "v2 · Current design" page (Dashboard frame 198:19), not eyeballed. */
   --color-ink: #212121; /* neutral-900 */
-  --color-yellow: #a1887f; /* brand-500 — brand accent, not literally yellow */
+  --color-yellow: #7d5f54; /* brand action color — treat as "the brand accent" token, not literally yellow */
   --color-white: #ffffff; /* neutral-0 */
   --color-surface-muted: #f1eded; /* neutral-100 */
   --color-border: #e4ddd8; /* neutral-200 */
-  --color-text-muted: #8d7b73; /* neutral-500 */
+  --color-text-muted: #75625a; /* neutral-500 */
   --color-danger: #a31b1b;
   --color-danger-foreground: #ffffff;
 
@@ -31,6 +32,23 @@
   --color-accent-yellow: #c9974b;
   --color-accent-orange: #c1774a;
   --color-accent-pink: #b06b79;
+
+  /* Bin ID badge palette — pastel-fill/border + deep text, hashed per container. Flat (no shadow). */
+  --color-badge-red-bg: #fae7e7;
+  --color-badge-red-border: #f2c4c4;
+  --color-badge-red-text: #a31b1b;
+  --color-badge-green-bg: #e8f2e9;
+  --color-badge-green-border: #c8e0ca;
+  --color-badge-green-text: #1b5e20;
+  --color-badge-purple-bg: #f3e8f7;
+  --color-badge-purple-border: #e3cdee;
+  --color-badge-purple-text: #4a148c;
+  --color-badge-orange-bg: #fdeedf;
+  --color-badge-orange-border: #f6d9b8;
+  --color-badge-orange-text: #b34700;
+  --color-badge-blue-bg: #e6eef7;
+  --color-badge-blue-border: #c4d6ec;
+  --color-badge-blue-text: #1a4a80;
 
   /* shadcn semantic slots, mapped onto the Shohaz palette */
   --color-background: #faf8f6; /* neutral-50 */
@@ -65,9 +83,9 @@
   --radius-2xl: 24px;
   --radius-full: 999px;
 
-  /* Shadows — Handoff Plan §3 */
-  --shadow-sm: 0 3px 10px -4px rgba(0, 0, 0, 0.08);
-  --shadow-lg: 0 8px 22px -10px rgba(0, 0, 0, 0.1);
+  /* Shadows — matched to Figma's card/nav elevation (soft, two-layer) */
+  --shadow-sm: 0px 1px 2px rgba(0, 0, 0, 0.05), 0px 10px 11px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0px 1px 4px rgba(0, 0, 0, 0.05), 0px 10px 22px rgba(0, 0, 0, 0.1);
   --shadow-sheet: 0 -8px 24px -6px rgba(0, 0, 0, 0.12);
 
   /* Typography scale — PRD §3, Display through Micro */

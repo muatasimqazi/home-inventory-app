@@ -96,6 +96,31 @@ export function computeHouseholdSummary(items: Item[], locations: Location[]): H
   };
 }
 
+/** Active items sitting directly in a Location, not yet put in a bin — the Dashboard "Action queue" Loose count. */
+export function looseItemCount(items: Item[]): number {
+  return items.filter((it) => it.status === "active" && it.locationId !== null && it.containerId === null).length;
+}
+
+/** Active items still on the generic placeholder photo emoji — the Dashboard "Action queue" Photos count. */
+export function genericPhotoItemCount(items: Item[]): number {
+  return items.filter((it) => it.status === "active" && it.photoEmoji === "📦").length;
+}
+
+export interface ContainerStatusFlags {
+  needsReview: boolean;
+  genericPhoto: boolean;
+}
+
+/** Rolls up whether any item within a container (including sub-containers) needs review or still has a generic photo. */
+export function containerStatusFlags(items: Item[], containers: Container[], containerId: string): ContainerStatusFlags {
+  const ids = new Set([containerId, ...collectDescendantIds(containers, containerId)]);
+  const inContainer = items.filter((it) => it.status === "active" && it.containerId && ids.has(it.containerId));
+  return {
+    needsReview: inContainer.some((it) => it.needsReview),
+    genericPhoto: inContainer.some((it) => it.photoEmoji === "📦"),
+  };
+}
+
 export interface TagWithCount {
   tag: Tag;
   count: number;

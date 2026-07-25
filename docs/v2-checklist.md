@@ -55,8 +55,8 @@ Tracks progress against the v2 upgrade instructions (updated PRD). Updated as wo
 - [x] Audited — v1 already correct (cascading trash, 30-day retention, restore, danger-treated delete-forever)
 
 ## 11. Navigation / Layout
-- [x] Mobile bottom nav: Home/Search, Locations, Favorites, Settings + Scan FAB (Home tab already leads with a search bar, satisfying "Home/Search")
-- [x] Desktop sidebar: Dashboard, Locations, Needs Review, Tags, Trash now in the primary nav list; Search kept first-class near the top; Favorites/Activity preserved from v1; Settings anchored at the bottom of the desktop-utility group
+- [x] Mobile bottom nav: Home, Search, Locations, Settings + Scan FAB — corrected to match the actual Figma frame (node 198:76) exactly, which has no Favorites tab; white pill instead of the old black one, with a small active-dot indicator instead of a filled icon circle
+- [x] Desktop sidebar: Dashboard, Locations, Needs Review, Tags, Trash in the primary nav list; Search/Favorites/Activity moved to a secondary group; a Scan button now pinned at the very bottom (Figma has one, the app previously had no desktop Scan entry point at all); active-state changed from solid black to the quiet pale-tan pill Figma actually uses
 - [x] Full-screen routes (capture, add, sign-in, household-setup, scan) remain chrome-free, unchanged
 
 ## 12. Supabase/Gemini Readiness
@@ -67,9 +67,25 @@ Tracks progress against the v2 upgrade instructions (updated PRD). Updated as wo
 - Verified: build succeeds (the `server-only` guard would fail the build on a boundary violation), and grepped `.next/static` for both real secret values from `.env.local` — zero matches, confirming neither key reaches the client bundle.
 - Scope honored: scaffolding only. Nothing in the running app calls Gemini or Supabase by default; the migration was never run against the real project; the one live-call test I could have run (a real photo through `/api/v1/vision/detect`) was deliberately skipped since a real `GEMINI_API_KEY` is present in `.env.local` and would have made an actual paid call.
 
+## 13. Visual Fidelity Pass vs. Figma "v2 · Current design"
+Feature work (items 1–12) was complete but the running app didn't actually look like the Figma v2 mocks — this was a design-fidelity-only pass, no new product features. Pulled real screenshots and `get_design_context` (exact hex/spacing/shadow values) from the Figma file for the Dashboard, Locations, Container/Item Detail, and Desktop Dashboard/Management frames, then fixed:
+- [x] Brand color was measurably wrong: token repoint in a much earlier session used `#a1887f`, but Figma's actual brand action color is `#7d5f54`. Also corrected secondary text to `#75625a` (was `#8d7b73`) and card shadows to Figma's two-layer soft elevation.
+- [x] Bottom nav was solid black with the wrong tab set — rebuilt white/pale per Figma, corrected tabs (see §11).
+- [x] Search bar had the icon on the wrong side (right, should be left) and no keyboard-shortcut hint on desktop.
+- [x] Removed a whole leftover v1 component (`UtilityRail`, the black "Find it fast / Scan item" bar) that doesn't exist anywhere in Figma v2 — the Scan FAB replaced its purpose.
+- [x] Bin ID badges were a single flat gray everywhere; Figma hashes each bin to one of five pastel fill/border/text combinations (`lib/badge-color.ts`), applied consistently across the Dashboard, Locations browse tree, and the container's own detail page.
+- [x] Dashboard (mobile + desktop) was missing entirely: household header, item/bin/review summary strip, and the "Action queue" card (Review/Photos/Loose chips) didn't exist. Rebuilt using only real store data — "Loose" (items with a location but no container) and "Photos" (items still on the generic photo emoji) are genuine computed selectors, not fabricated stats. The dashboard's item grid was replaced with a `BinCard` component matching Figma's photo-edge-to-edge container cards with a status dot (Review/Photo) that sits in the metadata row, never overlapping the Bin ID badge.
+- [x] `PhotoThumb`'s fallback was flat gray (`#d9dbd8`); changed to a pale brand-tinted panel so empty/fallback cards read as designed, not placeholder.
+- [x] Locations page defaulted to a photo-card grid; Figma's actual default is a flat list (pin icon chip + name + count + "Open"). Renamed the tab to "List" and rebuilt it; the "Browse" nested-tree tab kept its structure but got the same badge/card treatment.
+- [x] Item Detail: added an inline quantity +/- stepper (Figma shows one; backed by the existing `updateItem` action, no new logic), split "Extra details" into its own card with a category pill, and rebuilt Attachments as 4 fixed kind-tiles (Receipt/Manual/Warranty/Other — dashed empty state or a colored file-type chip) instead of a dropdown + generic list. Action buttons reordered to Move/Edit/Favorite per Figma, with Archive/Move to Trash demoted to a quieter secondary row (kept reachable, not removed).
+- [x] Desktop Management: added a subtitle, changed the inner container-tree's active-row treatment from solid black to the same quiet pale-tan pattern used everywhere else. Kept its two-panel (tree + table) layout rather than forcing Figma's flatter single-list structure, since that would have removed the tree-navigation capability — a functional regression, not a visual fix.
+- [x] Search results list: switched from a photo-card grid to plain list rows (icon chip + name + breadcrumb), matching Figma's search frame.
+- Real bug caught mid-pass (unrelated to visual work but found via the first Playwright load): `DisplayCodeSheet` and `ItemAttachments` selectors did `useInventoryStore(s => s.x.filter(...))` — a new array every render, which breaks Zustand's `useSyncExternalStore` snapshot check and causes an infinite render loop. Fixed by selecting the raw array and filtering in `useMemo`.
+- Deferred (explicitly out of scope for this pass, or not yet reviewed against Figma): onboarding flow (1–8), NFC/QR tag setup screens (36–42), Confirm Dialogs/Move Sheet/Trash/Members/Invite screens, CSV Import Desktop, Desktop Review Queue, Print Labels Desktop, Additional States frame. These were not visually audited against Figma in this pass and may still carry v1-era styling in places the systemic token fix didn't reach.
+
 ## Verification
-- [x] `tsc --noEmit` clean (after each phase)
-- [x] `eslint .` clean (after each phase)
-- [x] `next build` clean (after each phase)
-- [x] Smoke-tested new routes against the running dev server (curl + content checks)
-- [ ] Playwright screenshot/console sweep (Playwright not currently installed in `node_modules`)
+- [x] `tsc --noEmit` clean (after every phase, including the visual pass)
+- [x] `eslint .` clean
+- [x] `next build` clean
+- [x] Playwright installed (`playwright`, `@playwright/test`) and used for real screenshot + console-error sweeps across mobile (390×844) and desktop (1440×900) — 28 routes × 2 viewports, zero console errors
+- [x] Fixed the one real bug the sweep surfaced (infinite render loop, see above) and re-swept clean
