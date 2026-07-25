@@ -33,6 +33,7 @@ export default function SettingsPage() {
         <SettingsRow icon="tag" label="Tags" href="/tags" />
         <SettingsRow icon="trash" label="Trash" href="/settings/trash" />
         <SettingsRow icon="upload" label="Import CSV" sublabel="Desktop recommended" href="/settings/import" />
+        <SettingsRow icon="download" label="Data & Export" href="/settings/export" />
         <SettingsRow icon="key" label="API Keys" href="/settings/api-keys" last />
       </div>
 
