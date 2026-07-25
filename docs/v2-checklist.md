@@ -55,9 +55,9 @@ Tracks progress against the v2 upgrade instructions (updated PRD). Updated as wo
 - [x] Audited — v1 already correct (cascading trash, 30-day retention, restore, danger-treated delete-forever)
 
 ## 11. Navigation / Layout
-- [x] Mobile bottom nav: Scan FAB added
-- [x] Desktop sidebar: Tags, Label Printing added
-- [ ] Full desktop sidebar reorder per spec (Trash still in bottom utility group, not promoted to primary list)
+- [x] Mobile bottom nav: Home/Search, Locations, Favorites, Settings + Scan FAB (Home tab already leads with a search bar, satisfying "Home/Search")
+- [x] Desktop sidebar: Dashboard, Locations, Needs Review, Tags, Trash now in the primary nav list; Search kept first-class near the top; Favorites/Activity preserved from v1; Settings anchored at the bottom of the desktop-utility group
+- [x] Full-screen routes (capture, add, sign-in, household-setup, scan) remain chrome-free, unchanged
 
 ## 12. Supabase/Gemini Readiness
 - [ ] Supabase client utilities (new key names, server/client boundary)

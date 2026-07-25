@@ -8,13 +8,20 @@ import { useInventoryStore } from "@/lib/store";
 import { computeHouseholdSummary } from "@/lib/selectors";
 import { cn } from "@/lib/utils";
 
+// Primary nav order follows the v2 spec (Dashboard, Locations, Needs Review,
+// Tags, Trash, Settings) with Search kept first-class near the top and
+// Favorites/Activity preserved from v1 (not called out for removal).
 const LINKS: { href: string; icon: IconName; label: string }[] = [
   { href: "/", icon: "home", label: "Dashboard" },
   { href: "/search", icon: "search", label: "Search" },
   { href: "/locations", icon: "box", label: "Locations" },
+];
+
+const LINKS_AFTER_REVIEW: { href: string; icon: IconName; label: string }[] = [
+  { href: "/tags", icon: "tag", label: "Tags" },
   { href: "/favorites", icon: "heart", label: "Favorites" },
   { href: "/activity", icon: "activity", label: "Activity" },
-  { href: "/tags", icon: "tag", label: "Tags" },
+  { href: "/settings/trash", icon: "trash", label: "Trash" },
 ];
 
 export function DesktopSidebar() {
@@ -32,22 +39,9 @@ export function DesktopSidebar() {
       </div>
 
       <nav className="flex flex-col gap-1" aria-label="Primary">
-        {LINKS.map((link) => {
-          const active = link.href === "/" ? pathname === "/" : pathname.startsWith(link.href);
-          return (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-body",
-                active ? "bg-ink text-white" : "text-ink hover:bg-surface-muted"
-              )}
-            >
-              <Icon name={link.icon} size={18} />
-              {link.label}
-            </Link>
-          );
-        })}
+        {LINKS.map((link) => (
+          <SidebarLink key={link.href} {...link} pathname={pathname} exact={link.href === "/"} />
+        ))}
         <Link
           href="/review"
           className={cn(
@@ -59,13 +53,15 @@ export function DesktopSidebar() {
           <span className="flex-1">Needs Review</span>
           <ReviewBadge count={summary.needsReviewCount} />
         </Link>
+        {LINKS_AFTER_REVIEW.map((link) => (
+          <SidebarLink key={link.href} {...link} pathname={pathname} />
+        ))}
       </nav>
 
       <div className="mt-auto flex flex-col gap-1 border-t border-border pt-4">
         <SidebarLink href="/desktop" icon="activity" label="Activity Dashboard" pathname={pathname} />
         <SidebarLink href="/desktop/manage" icon="box" label="Manage" pathname={pathname} />
         <SidebarLink href="/desktop/labels" icon="tag" label="Label Printing" pathname={pathname} />
-        <SidebarLink href="/settings/trash" icon="trash" label="Trash" pathname={pathname} />
         <SidebarLink href="/settings/import" icon="upload" label="Import CSV" pathname={pathname} />
         <SidebarLink href="/settings" icon="settings" label="Settings" pathname={pathname} />
       </div>
@@ -78,13 +74,15 @@ function SidebarLink({
   icon,
   label,
   pathname,
+  exact,
 }: {
   href: string;
   icon: IconName;
   label: string;
   pathname: string;
+  exact?: boolean;
 }) {
-  const active = pathname.startsWith(href);
+  const active = exact ? pathname === href : pathname.startsWith(href);
   return (
     <Link
       href={href}
