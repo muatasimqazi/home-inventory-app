@@ -25,8 +25,8 @@ Tracks progress against the v2 upgrade instructions (updated PRD). Updated as wo
 
 ## 4. Recursive Containers / Nested Browser
 - [x] Types/selectors/search support unbounded nesting (verified, no depth assumptions)
-- [ ] Expandable accordion/tree browser UI (still page-to-page drill-down + breadcrumbs, same as v1)
-- [ ] "One location open at a time" constrained-view behavior
+- [x] Expandable accordion/tree browser UI — new "Browse" tab on `/locations` (Grid tab is still the default, preserving v1's landing view)
+- [x] "One location open at a time" accordion (single `openLocationId` state; sub-container nodes expand independently of each other)
 
 ## 5. Item Attachments
 - [x] Attachment type + store actions (add/list/delete)
