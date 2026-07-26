@@ -118,7 +118,7 @@ export default function DashboardPage() {
             }
           />
         ) : (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="-mx-5 flex gap-3 overflow-x-auto px-5 pb-1 md:mx-0 md:px-0">
             {recentContainers.map((container) => {
               const flags = containerStatusFlags(items, containers, container.id);
               const itemCount = items.filter((it) => it.status === "active" && it.containerId === container.id).length;
@@ -134,6 +134,7 @@ export default function DashboardPage() {
                   itemCount={itemCount}
                   breadcrumbLabel={breadcrumbLabel(buildBreadcrumb(container.locationId, container.parentContainerId ?? null, locations, containers))}
                   status={status}
+                  className="w-42 shrink-0"
                 />
               );
             })}
