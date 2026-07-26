@@ -238,6 +238,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       attachments: state.attachments,
       labelBatches: state.labelBatches,
       labelBatchEntries: state.labelBatchEntries,
+      lastUsedDestination: state.lastUsedDestination,
     };
   }
 

@@ -28,6 +28,8 @@ export interface HouseholdSeedBundle {
   attachments: Attachment[];
   labelBatches: LabelBatch[];
   labelBatchEntries: LabelBatchEntry[];
+  /** Last location/container picked in Add Item / Capture — scoped per household so switching doesn't carry a destination ID from one household's locations into another's. */
+  lastUsedDestination: { locationId: string | null; containerId: string | null } | null;
 }
 
 // Fixed, deterministic seed data (no Math.random/Date.now at module scope)
@@ -708,6 +710,7 @@ export const otherHouseholdSeedData: Record<string, HouseholdSeedBundle> = {
     attachments: [],
     labelBatches: [],
     labelBatchEntries: [],
+    lastUsedDestination: { locationId: "loc_khan_garage", containerId: "con_khan_garage_bin2" },
   },
 };
 
@@ -785,6 +788,7 @@ export const invitableHouseholds: Record<string, { household: Household; bundle:
       attachments: [],
       labelBatches: [],
       labelBatchEntries: [],
+      lastUsedDestination: { locationId: "loc_chen_living_room", containerId: null },
     },
   },
 };
