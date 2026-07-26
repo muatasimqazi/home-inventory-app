@@ -81,6 +81,7 @@ export default function LocationDetailPage() {
                   title={c.name}
                   subtitle={`${count} item${count === 1 ? "" : "s"}`}
                   badge={c.displayCode ?? undefined}
+                  badgeKey={c.id}
                 />
               );
             })}

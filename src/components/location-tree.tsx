@@ -44,7 +44,7 @@ function ContainerNode({ container, locationId, containers, items, depth, openId
           className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-border bg-white px-3 py-2 text-caption text-ink"
         >
           {container.displayCode && (
-            <span className={cn("shrink-0 rounded-full border px-2 py-0.5 font-mono text-micro font-semibold", binIdBadgeClasses(container.id))}>
+            <span className={cn("shrink-0 rounded-full border px-2 py-0.5 text-micro font-semibold", binIdBadgeClasses(container.id))}>
               {container.displayCode}
             </span>
           )}

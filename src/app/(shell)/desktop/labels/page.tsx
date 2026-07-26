@@ -152,7 +152,7 @@ export default function LabelPrintingPage() {
                         <label key={c.id} className="flex items-center gap-2 text-caption text-ink">
                           <Checkbox checked={selectedIds.has(c.id)} onCheckedChange={() => toggleContainer(c.id)} />
                           {c.name}
-                          {c.displayCode && <span className="font-mono text-micro text-muted-foreground">{c.displayCode}</span>}
+                          {c.displayCode && <span className="text-micro font-semibold text-muted-foreground">{c.displayCode}</span>}
                         </label>
                       ))}
                     </div>

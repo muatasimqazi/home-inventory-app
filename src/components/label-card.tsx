@@ -25,7 +25,7 @@ export function LabelCard({ tagToken, displayCode, name, locationName, toggle, i
       <QRCodeSVG value={resolveUrl} size={qrSize} bgColor="#ffffff" fgColor="#212121" />
       {toggle !== "qr" && (
         <div className="min-w-0 flex-1">
-          <p className="truncate font-mono text-caption font-medium text-ink">{displayCode ?? "Unassigned"}</p>
+          <p className="truncate text-caption font-semibold text-ink">{displayCode ?? "Unassigned"}</p>
           {toggle === "qr-code-name" && <p className="truncate text-micro text-ink">{name ?? "Unclaimed label"}</p>}
           {includeLocation && locationName && <p className="truncate text-micro text-muted-foreground">{locationName}</p>}
         </div>

@@ -78,7 +78,7 @@ export function DisplayCodeSheet({ open, onOpenChange, container }: DisplayCodeS
                 if (error) setError(null);
               }}
               placeholder="e.g. GAR-234"
-              className="h-11 font-mono uppercase"
+              className="h-11 font-semibold uppercase"
               autoFocus
             />
             {container.displayCode && (

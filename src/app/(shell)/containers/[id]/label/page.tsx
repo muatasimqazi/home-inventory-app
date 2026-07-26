@@ -40,7 +40,7 @@ export default function TagLabelPage() {
           <p className="mt-1 font-mono text-caption tracking-widest text-muted-foreground">{container.tagToken}</p>
         </div>
         {container.displayCode && (
-          <span className={cn("rounded-full border px-3 py-1 font-mono text-caption font-semibold", binIdBadgeClasses(container.id))}>
+          <span className={cn("rounded-full border px-3 py-1 text-caption font-semibold", binIdBadgeClasses(container.id))}>
             {container.displayCode}
           </span>
         )}

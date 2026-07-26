@@ -84,7 +84,7 @@ export default function ContainerDetailPage() {
             type="button"
             onClick={() => setDisplayCodeOpen(true)}
             className={cn(
-              "flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-caption font-semibold",
+              "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-caption font-semibold",
               container.displayCode ? binIdBadgeClasses(container.id) : "border-border bg-surface-muted text-ink"
             )}
           >
@@ -135,6 +135,7 @@ export default function ContainerDetailPage() {
                       title={c.name}
                       subtitle={`${count} item${count === 1 ? "" : "s"}`}
                       badge={c.displayCode ?? undefined}
+                      badgeKey={c.id}
                     />
                   );
                 })}

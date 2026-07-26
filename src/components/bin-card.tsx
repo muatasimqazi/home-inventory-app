@@ -35,7 +35,7 @@ export function BinCard({ container, itemCount, breadcrumbLabel, status, classNa
         {container.displayCode && (
           <span
             className={cn(
-              "absolute left-2 top-2 rounded-full border px-2 py-1 font-mono text-micro font-semibold",
+              "absolute left-2 top-2 rounded-full border px-2 py-1 text-micro font-semibold",
               binIdBadgeClasses(container.id)
             )}
           >
