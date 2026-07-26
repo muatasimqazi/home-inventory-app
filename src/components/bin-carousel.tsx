@@ -63,7 +63,7 @@ export function BinCarousel({ entries }: { entries: BinCarouselEntry[] }) {
   return (
     <div
       ref={containerRef}
-      className="scrollbar-hide -mx-5 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-pl-5 px-5 py-2 md:mx-0 md:scroll-pl-0 md:px-0"
+      className="scrollbar-hide -mx-5 -mb-6 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-pl-5 px-5 pt-2 pb-8 md:mx-0 md:mb-0 md:scroll-pl-0 md:px-0"
     >
       {entries.map((entry, i) => (
         <div
