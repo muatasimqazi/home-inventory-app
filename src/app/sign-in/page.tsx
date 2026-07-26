@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useInventoryStore } from "@/lib/store";
 
 type Mode = "default" | "email" | "authenticating" | "error";
 
 export default function SignInPage() {
   const router = useRouter();
+  const members = useInventoryStore((s) => s.members);
   const [mode, setMode] = useState<Mode>("default");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -21,7 +23,12 @@ export default function SignInPage() {
         setMode("error");
         return;
       }
-      router.push("/");
+      // "Continue with Google" (no email typed) always signs in as the
+      // existing demo user. For "Continue with email", an address that
+      // doesn't match any known member simulates a brand-new signup with
+      // no household yet — routes into onboarding instead of the dashboard.
+      const isKnownMember = !email.trim() || members.some((m) => m.email.toLowerCase() === email.trim().toLowerCase());
+      router.push(isKnownMember ? "/" : "/household-setup");
     }, 700);
   }
 

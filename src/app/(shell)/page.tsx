@@ -6,7 +6,7 @@ import { SearchBar } from "@/components/search-bar";
 import { BinCarousel } from "@/components/bin-carousel";
 import { Icon } from "@/components/icon";
 import { EmptyState } from "@/components/empty-state";
-import { useInventoryStore } from "@/lib/store";
+import { useInventoryStore, useCurrentHousehold } from "@/lib/store";
 import {
   activeContainers,
   activeLocations,
@@ -22,7 +22,7 @@ const ONBOARDING_THRESHOLD = 5;
 
 export default function DashboardPage() {
   const router = useRouter();
-  const household = useInventoryStore((s) => s.household);
+  const household = useCurrentHousehold();
   const items = useInventoryStore((s) => s.items);
   const containers = useInventoryStore((s) => s.containers);
   const locations = activeLocations(useInventoryStore((s) => s.locations));

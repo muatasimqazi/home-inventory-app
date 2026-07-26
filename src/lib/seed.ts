@@ -14,6 +14,22 @@ import type {
   Tag,
 } from "./types";
 
+/** Everything scoped to one household — what the store swaps out on switchHousehold(). */
+export interface HouseholdSeedBundle {
+  members: Member[];
+  invites: Invite[];
+  locations: Location[];
+  containers: Container[];
+  items: Item[];
+  tags: Tag[];
+  normalizationRules: NormalizationRule[];
+  activity: ActivityLogEntry[];
+  favorites: Favorite[];
+  attachments: Attachment[];
+  labelBatches: LabelBatch[];
+  labelBatchEntries: LabelBatchEntry[];
+}
+
 // Fixed, deterministic seed data (no Math.random/Date.now at module scope)
 // so server and client render the same initial HTML.
 
@@ -550,3 +566,145 @@ export const seedActivity: ActivityLogEntry[] = [
     createdAt: "2026-07-21T11:00:00.000Z",
   },
 ];
+
+// ---------------------------------------------------------------------------
+// A second household — demonstrates that a user (Priya) can belong to more
+// than one household at once, each with its own separate roster and
+// inventory. Deliberately minimal (one location, one bin, two items):
+// enough to prove switching actually changes what you see, not a full
+// second demo dataset to maintain in parallel with the one above.
+// ---------------------------------------------------------------------------
+
+const HOUSEHOLD_KHAN_ID = "hh_khan";
+
+export const seedHouseholdKhan: Household = {
+  id: HOUSEHOLD_KHAN_ID,
+  name: "Khan Home",
+  createdAt: "2026-07-10T09:00:00.000Z",
+};
+
+export const seedHouseholds: Household[] = [seedHousehold, seedHouseholdKhan];
+
+const seedMembersKhan: Member[] = [
+  {
+    householdId: HOUSEHOLD_KHAN_ID,
+    userId: CURRENT_USER_ID,
+    role: "owner",
+    joinedAt: "2026-07-10T09:00:00.000Z",
+    displayName: "Priya",
+    email: "priya@example.com",
+  },
+];
+
+const seedLocationsKhan: Location[] = [
+  {
+    id: "loc_khan_garage",
+    householdId: HOUSEHOLD_KHAN_ID,
+    name: "Garage",
+    description: "Tools and seasonal storage.",
+    coverPhotoEmoji: "🚗",
+    createdByUserId: CURRENT_USER_ID,
+    createdAt: "2026-07-10T09:05:00.000Z",
+    status: "active",
+    trashedAt: null,
+    permanentlyDeleteAfter: null,
+  },
+];
+
+const seedContainersKhan: Container[] = [
+  {
+    id: "con_khan_garage_bin2",
+    householdId: HOUSEHOLD_KHAN_ID,
+    locationId: "loc_khan_garage",
+    parentContainerId: null,
+    name: "Garage Bin 2",
+    tagToken: "SHZ-KHNGB2X1",
+    displayCode: "GAR-234",
+    coverPhotoEmoji: "📦",
+    createdByUserId: CURRENT_USER_ID,
+    createdAt: "2026-07-10T09:10:00.000Z",
+    status: "active",
+    trashedAt: null,
+    permanentlyDeleteAfter: null,
+  },
+];
+
+const seedItemsKhan: Item[] = [
+  {
+    id: "item_khan_tires",
+    householdId: HOUSEHOLD_KHAN_ID,
+    locationId: "loc_khan_garage",
+    containerId: "con_khan_garage_bin2",
+    name: "Winter Tires",
+    originalDetectedName: null,
+    category: "Outdoor",
+    quantity: 4,
+    notes: "",
+    photoEmoji: "🛞",
+    status: "active",
+    needsReview: false,
+    tagIds: [],
+    extraDetails: {},
+    ownerUserId: CURRENT_USER_ID,
+    createdByUserId: CURRENT_USER_ID,
+    createdAt: "2026-07-10T09:15:00.000Z",
+    updatedAt: "2026-07-10T09:15:00.000Z",
+    trashedAt: null,
+    permanentlyDeleteAfter: null,
+  },
+  {
+    id: "item_khan_ladder",
+    householdId: HOUSEHOLD_KHAN_ID,
+    locationId: "loc_khan_garage",
+    containerId: "con_khan_garage_bin2",
+    name: "Extension Ladder",
+    originalDetectedName: null,
+    category: "Tool",
+    quantity: 1,
+    notes: "",
+    photoEmoji: "🪜",
+    status: "active",
+    needsReview: false,
+    tagIds: [],
+    extraDetails: {},
+    ownerUserId: null,
+    createdByUserId: CURRENT_USER_ID,
+    createdAt: "2026-07-10T09:16:00.000Z",
+    updatedAt: "2026-07-10T09:16:00.000Z",
+    trashedAt: null,
+    permanentlyDeleteAfter: null,
+  },
+];
+
+const seedActivityKhan: ActivityLogEntry[] = [
+  {
+    id: "act_khan_1",
+    householdId: HOUSEHOLD_KHAN_ID,
+    actorUserId: CURRENT_USER_ID,
+    entityType: "household",
+    entityId: HOUSEHOLD_KHAN_ID,
+    entityName: "Khan Home",
+    action: "created",
+    createdAt: "2026-07-10T09:00:00.000Z",
+  },
+];
+
+/** Household 1 (hh_shohaz) is the default active household, loaded directly
+ * into the store's top-level state — see store.ts. This map only holds the
+ * *other* households' data, lazily swapped in on switchHousehold(). */
+export const otherHouseholdSeedData: Record<string, HouseholdSeedBundle> = {
+  [HOUSEHOLD_KHAN_ID]: {
+    members: seedMembersKhan,
+    invites: [],
+    locations: seedLocationsKhan,
+    containers: seedContainersKhan,
+    items: seedItemsKhan,
+    tags: [],
+    normalizationRules: [],
+    activity: seedActivityKhan,
+    favorites: [],
+    attachments: [],
+    labelBatches: [],
+    labelBatchEntries: [],
+  },
+};

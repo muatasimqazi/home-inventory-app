@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon, type IconName } from "@/components/icon";
-import { useInventoryStore } from "@/lib/store";
+import { useInventoryStore, useCurrentHousehold } from "@/lib/store";
 
 export default function SettingsPage() {
   const router = useRouter();
-  const household = useInventoryStore((s) => s.household);
+  const household = useCurrentHousehold();
   const currentUserId = useInventoryStore((s) => s.currentUserId);
   const members = useInventoryStore((s) => s.members);
+  const households = useInventoryStore((s) => s.households);
   const tags = useInventoryStore((s) => s.tags);
   const me = members.find((m) => m.userId === currentUserId);
 
@@ -32,6 +33,7 @@ export default function SettingsPage() {
 
       <div className="flex flex-col gap-2">
         <SettingsRow icon="home" label="Household" sublabel={household.name} href="/settings/members" />
+        <SettingsRow icon="users" label="My Households" sublabel={`${households.length} household${households.length === 1 ? "" : "s"}`} href="/settings/households" />
         <SettingsRow icon="user" label="Members" sublabel={`${members.length} active`} href="/settings/members" />
         <SettingsRow icon="printer" label="Label printing" sublabel="Bin ID labels" href="/desktop/labels" />
         <SettingsRow icon="upload" label="Import CSV" sublabel="Desktop recommended" href="/settings/import" />

@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Icon, type IconName } from "@/components/icon";
-import { useInventoryStore } from "@/lib/store";
+import { useInventoryStore, useCurrentHousehold } from "@/lib/store";
 import { itemsToCsv } from "@/lib/csv";
 import { buildHouseholdExport, buildLabelPdfManifest, downloadFile, type FileExportResult } from "@/lib/export";
 
@@ -13,7 +13,7 @@ type ExportResult = FileExportResult;
 
 export default function DataExportPage() {
   const router = useRouter();
-  const household = useInventoryStore((s) => s.household);
+  const household = useCurrentHousehold();
   const items = useInventoryStore((s) => s.items);
   const containers = useInventoryStore((s) => s.containers);
   const locations = useInventoryStore((s) => s.locations);

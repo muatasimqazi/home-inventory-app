@@ -5,11 +5,12 @@ import { id, tagToken } from "./id";
 import { isDisplayCodeTaken, nextDisplayCode, normalizeDisplayCode } from "./display-code";
 import {
   CURRENT_USER_ID,
+  otherHouseholdSeedData,
   seedActivity,
   seedAttachments,
   seedContainers,
   seedFavorites,
-  seedHousehold,
+  seedHouseholds,
   seedInvites,
   seedItems,
   seedLabelBatches,
@@ -18,6 +19,7 @@ import {
   seedMembers,
   seedNormalizationRules,
   seedTags,
+  type HouseholdSeedBundle,
 } from "./seed";
 import type {
   ActivityAction,
@@ -74,7 +76,10 @@ function clampQuantity(value: number): number {
 }
 
 interface InventoryState {
-  household: Household;
+  /** Every household the current user belongs to. */
+  households: Household[];
+  /** Which household's data currently occupies the fields below. */
+  currentHouseholdId: string;
   members: Member[];
   invites: Invite[];
   locations: Location[];
@@ -159,6 +164,10 @@ interface InventoryState {
   isFavorite: (itemId: string) => boolean;
 
   // Household / members
+  /** Creates a brand-new household, adds the current user as its Owner, switches to it, and starts it with empty inventory. */
+  createHousehold: (input: { name: string; displayName: string; email: string; avatarUrl?: string }) => Household;
+  /** Swaps the active household's data for another one the current user belongs to. No-op if already current. */
+  switchHousehold: (householdId: string) => void;
   inviteMember: (email: string) => void;
   cancelInvite: (inviteId: string) => void;
   removeMember: (userId: string) => void;
@@ -196,8 +205,35 @@ function purgeAfter(from: Date): string {
   return d.toISOString();
 }
 
-export const useInventoryStore = create<InventoryState>()((set, get) => ({
-  household: seedHousehold,
+export const useInventoryStore = create<InventoryState>()((set, get) => {
+  // Households the user belongs to besides the active one, keyed by id.
+  // Seeded with each household's pristine data up front; switchHousehold()
+  // overwrites an entry with the live (possibly edited) snapshot whenever
+  // you switch away from it, so edits survive switching back and forth
+  // within a session — same "no persistence across a hard reload" scoping
+  // as the rest of this mock store.
+  const otherHouseholdData: Record<string, HouseholdSeedBundle> = { ...otherHouseholdSeedData };
+
+  function snapshotCurrent(state: InventoryState): HouseholdSeedBundle {
+    return {
+      members: state.members,
+      invites: state.invites,
+      locations: state.locations,
+      containers: state.containers,
+      items: state.items,
+      tags: state.tags,
+      normalizationRules: state.normalizationRules,
+      activity: state.activity,
+      favorites: state.favorites,
+      attachments: state.attachments,
+      labelBatches: state.labelBatches,
+      labelBatchEntries: state.labelBatchEntries,
+    };
+  }
+
+  return {
+  households: seedHouseholds,
+  currentHouseholdId: seedHouseholds[0].id,
   members: seedMembers,
   invites: seedInvites,
   locations: seedLocations,
@@ -213,8 +249,53 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
   currentUserId: CURRENT_USER_ID,
   lastUsedDestination: { locationId: "loc_garage", containerId: "con_toolbox" },
 
+  createHousehold: (input) => {
+    const state = get();
+    otherHouseholdData[state.currentHouseholdId] = snapshotCurrent(state);
+
+    const household: Household = { id: id("hh"), name: input.name, createdAt: nowIso() };
+    const owner: Member = {
+      householdId: household.id,
+      userId: state.currentUserId,
+      role: "owner",
+      joinedAt: nowIso(),
+      displayName: input.displayName,
+      email: input.email,
+      avatarUrl: input.avatarUrl,
+    };
+
+    set({
+      households: [...state.households, household],
+      currentHouseholdId: household.id,
+      members: [owner],
+      invites: [],
+      locations: [],
+      containers: [],
+      items: [],
+      tags: [],
+      normalizationRules: [],
+      activity: [],
+      favorites: [],
+      attachments: [],
+      labelBatches: [],
+      labelBatchEntries: [],
+      lastUsedDestination: null,
+    });
+    return household;
+  },
+
+  switchHousehold: (householdId) => {
+    const state = get();
+    if (householdId === state.currentHouseholdId) return;
+    const next = otherHouseholdData[householdId];
+    if (!next) return;
+
+    otherHouseholdData[state.currentHouseholdId] = snapshotCurrent(state);
+    set({ currentHouseholdId: householdId, ...next });
+  },
+
   createItem: (input) => {
-    const created = buildItem(get().household.id, get().currentUserId, input);
+    const created = buildItem(get().currentHouseholdId, get().currentUserId, input);
     set((s) => ({
       items: [...s.items, created],
       lastUsedDestination: { locationId: input.locationId, containerId: input.containerId },
@@ -229,7 +310,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
   },
 
   createItemsBatch: (inputs) => {
-    const created = inputs.map((i) => buildItem(get().household.id, get().currentUserId, i));
+    const created = inputs.map((i) => buildItem(get().currentHouseholdId, get().currentUserId, i));
     const last = inputs[inputs.length - 1];
     set((s) => ({
       items: [...s.items, ...created],
@@ -311,7 +392,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
   createLocation: (input) => {
     const created: Location = {
       id: id("loc"),
-      householdId: get().household.id,
+      householdId: get().currentHouseholdId,
       name: input.name,
       description: input.description,
       coverPhotoEmoji: input.coverPhotoEmoji ?? "📦",
@@ -378,7 +459,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
   createContainer: (input) => {
     const created: Container = {
       id: id("con"),
-      householdId: get().household.id,
+      householdId: get().currentHouseholdId,
       locationId: input.locationId,
       parentContainerId: input.parentContainerId ?? null,
       name: input.name,
@@ -492,7 +573,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
   addAttachment: (itemId, input) => {
     const created: Attachment = {
       id: id("att"),
-      householdId: get().household.id,
+      householdId: get().currentHouseholdId,
       itemId,
       createdByUserId: get().currentUserId,
       createdAt: nowIso(),
@@ -507,7 +588,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
   },
 
   createLabelBatch: (input) => {
-    const householdId = get().household.id;
+    const householdId = get().currentHouseholdId;
     const batch: LabelBatch = {
       id: id("lblb"),
       householdId,
@@ -577,7 +658,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
   getOrCreateTag: (name) => {
     const existing = get().tags.find((t) => t.name.toLowerCase() === name.toLowerCase());
     if (existing) return existing;
-    const created: Tag = { id: id("tag"), householdId: get().household.id, name };
+    const created: Tag = { id: id("tag"), householdId: get().currentHouseholdId, name };
     set((s) => ({ tags: [...s.tags, created] }));
     return created;
   },
@@ -599,7 +680,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
     }
     const created: NormalizationRule = {
       id: id("rule"),
-      householdId: get().household.id,
+      householdId: get().currentHouseholdId,
       rawPattern,
       canonicalName,
       category,
@@ -629,7 +710,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
   inviteMember: (email) => {
     const created: Invite = {
       id: id("invite"),
-      householdId: get().household.id,
+      householdId: get().currentHouseholdId,
       invitedEmail: email,
       invitedByUserId: get().currentUserId,
       status: "pending",
@@ -670,14 +751,26 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
   logActivity: (entry) => {
     const created: ActivityLogAppend = {
       id: id("act"),
-      householdId: get().household.id,
+      householdId: get().currentHouseholdId,
       actorUserId: get().currentUserId,
       createdAt: nowIso(),
       ...entry,
     };
     set((s) => ({ activity: [created, ...s.activity] }));
   },
-}));
+  };
+});
+
+/** The household currently active in the store — components that just need name/id/createdAt shouldn't have to find() it themselves. */
+export function useCurrentHousehold(): Household {
+  const households = useInventoryStore((s) => s.households);
+  const currentHouseholdId = useInventoryStore((s) => s.currentHouseholdId);
+  const household = households.find((h) => h.id === currentHouseholdId);
+  if (!household) {
+    throw new Error(`currentHouseholdId ${currentHouseholdId} has no matching household — store is in an inconsistent state.`);
+  }
+  return household;
+}
 
 function buildItem(householdId: string, userId: string, input: NewItemInput): Item {
   const timestamp = nowIso();

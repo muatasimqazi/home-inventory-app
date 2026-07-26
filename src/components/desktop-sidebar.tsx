@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon, type IconName } from "@/components/icon";
 import { ReviewBadge } from "@/components/review-badge";
-import { useInventoryStore } from "@/lib/store";
+import { useInventoryStore, useCurrentHousehold } from "@/lib/store";
 import { computeHouseholdSummary } from "@/lib/selectors";
 import { cn } from "@/lib/utils";
 
@@ -22,7 +22,7 @@ const SECONDARY_LINKS: { href: string; icon: IconName; label: string }[] = [
 
 export function DesktopSidebar() {
   const pathname = usePathname();
-  const household = useInventoryStore((s) => s.household);
+  const household = useCurrentHousehold();
   const locations = useInventoryStore((s) => s.locations);
   const items = useInventoryStore((s) => s.items);
   const summary = computeHouseholdSummary(items, locations);
