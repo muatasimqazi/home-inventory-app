@@ -24,6 +24,7 @@ import {
   MapPin,
   MoreVertical,
   Move,
+  Nfc,
   Paperclip,
   Pencil,
   Plus,
@@ -35,6 +36,7 @@ import {
   Search,
   Settings,
   ShieldAlert,
+  Smartphone,
   Sparkles,
   Tag,
   Trash2,
@@ -90,6 +92,8 @@ const ICONS = {
   bell: Bell,
   pin: MapPin,
   printer: Printer,
+  nfc: Nfc,
+  smartphone: Smartphone,
 } as const;
 
 export type IconName = keyof typeof ICONS;

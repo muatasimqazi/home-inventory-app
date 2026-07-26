@@ -96,6 +96,7 @@ function container(overrides: Partial<Container> & Pick<Container, "id" | "name"
     status: "active",
     trashedAt: null,
     permanentlyDeleteAfter: null,
+    nfcLinkedAt: null,
     ...overrides,
   };
 }
@@ -626,6 +627,7 @@ const seedContainersKhan: Container[] = [
     status: "active",
     trashedAt: null,
     permanentlyDeleteAfter: null,
+    nfcLinkedAt: null,
   },
 ];
 

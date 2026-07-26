@@ -63,6 +63,8 @@ export interface Container {
   status: EntityLifecycleStatus;
   trashedAt?: string | null;
   permanentlyDeleteAfter?: string | null;
+  /** When an NFC tag was linked to this container (native write or the iOS Shortcuts fallback) — null if only the QR label has been set up. */
+  nfcLinkedAt: string | null;
 }
 
 export type ItemStatus = "active" | "archived" | "trashed";

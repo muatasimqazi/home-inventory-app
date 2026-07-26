@@ -126,10 +126,21 @@ Same "measure, don't assume" discipline as §13/§14, but this pass was driven b
 - [x] Settings → My Households: switcher between households the user belongs to, plus entry points to create another or redeem an invite
 - [x] Invite acceptance wired end-to-end: a third seed household ("The Chen House") the user is *not* initially a member of, with a pending invite to her email, redeemable via the wizard's join mode — calls the mock's `acceptInvite()`, which mirrors `accept_invite()`'s email-matching logic
 
+## 16. NFC/QR Tag Setup Flow — the other §14 deferral, now closed
+§14 flagged two true gaps with no UI at all: the onboarding wizard (closed in §15) and this 7-screen NFC/QR tag setup flow (frames 265:2–272:29: iOS Native, Write NFC Tag, iOS Shortcuts Only, Bin Tag Linked, Android Native, QR Only, Shortcuts Setup Steps). Previously the app had one sentence of static NFC text on the label page and no way to actually link a tag.
+
+- [x] `Container.nfcLinkedAt` (nullable timestamp) added — types, seed, migration column, and a `linkNfcTag()` store action/`accept`-style mock write, so "linked" is real state, not a route transition with nothing behind it
+- [x] One page (`containers/[id]/nfc-setup`) covers all 7 frames as 5 UI states across 3 platform branches — matches the household-setup wizard's established "step state machine in one route" pattern rather than 7 separate routes
+- [x] Platform branching is **real** capability detection (user-agent sniffing for iOS/Android/other, verified independently per branch via a spoofed Playwright `userAgent`), not a fake toggle — but the actual "write" action is a timed simulation on every platform, since no browser can write NFC here without physical hardware; this matches the app's existing real-vs-mocked boundary (e.g. `MockVisionProvider`), not a shortcut specific to this feature
+- [x] iOS gets the Shortcuts-fallback path (a real, separate iOS system feature, not a lesser copy of Android's native write — Web NFC doesn't exist on iOS in any browser, which is the actual reason Shortcuts exists as a fallback); Android gets native write; desktop/other gets QR-only
+- [x] Entry point wired from the existing label page, replacing the static text block with an actionable card that also shows a "Linked" status once `nfcLinkedAt` is set
+- [x] Platform detection uses `useSyncExternalStore` (server snapshot `"other"`, client snapshot from `navigator.userAgent`) rather than `useEffect` + `setState`, avoiding the cascading-render lint error that pattern trips and the SSR/CSR hydration mismatch a naive `useState(() => detectPlatform())` would have caused
+
 ## Verification
 - [x] `tsc --noEmit` clean (after every individual screen fix, not just at the end)
 - [x] `eslint .` clean
 - [x] `next build` clean
 - [x] Playwright console-error sweep re-run after this pass — 28 routes × 2 viewports (mobile 390×844, desktop 1440×900), **zero console errors**
 - [x] §15's migration changes verified against a scratch local Postgres 17 instance (initdb + pg_ctl, mock `auth.uid()`/`auth.email()`, an `authenticated` role to exercise RLS as a real non-superuser) — every invariant's success *and* failure paths (owner-only writes, the one-owner index, cycle rejection, invite expiry/wrong-email/already-redeemed) behaved as designed, not just "applied without error"
+- [x] §16's migration column re-verified the same way; the NFC flow itself verified via Playwright with a spoofed `userAgent` per platform (iOS native write → linked, iOS Shortcuts info → steps → linked, Android native write → linked, desktop → QR-only), plus the label page's before/after "Linked" badge state
 - [x] Visual spot-check via Playwright screenshots against the downloaded Figma references for the highest-change screens (Settings, Sign-in, Locations, Item Detail)

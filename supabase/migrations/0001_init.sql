@@ -223,6 +223,9 @@ create table containers (
   status text not null default 'active' check (status in ('active', 'trashed')),
   trashed_at timestamptz,
   permanently_delete_after timestamptz,
+  -- Set once an NFC tag has actually been linked (native write or the iOS
+  -- Shortcuts fallback both count) — null means only the QR label exists.
+  nfc_linked_at timestamptz,
   unique (household_id, tag_token)
 );
 

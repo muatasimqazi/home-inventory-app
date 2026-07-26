@@ -46,13 +46,29 @@ export default function TagLabelPage() {
         )}
       </div>
 
-      <div className="rounded-2xl border border-border bg-white p-4 text-caption text-muted-foreground shadow-sm print:hidden">
-        <p className="mb-1 font-medium text-ink">Also works as an NFC tag</p>
-        <p>
-          Write this same code (<span className="font-mono">{container.tagToken}</span>) to a blank NFC tag using Shortcuts on iOS
-          (“Write Tags”) or NFC Tools on Android — both resolve to this Container, same as scanning the QR code.
-        </p>
-      </div>
+      <button
+        type="button"
+        onClick={() => router.push(`/containers/${container.id}/nfc-setup`)}
+        className="flex items-start gap-3 rounded-2xl border border-border bg-white p-4 text-left shadow-sm print:hidden"
+      >
+        <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-brand-100">
+          <Icon name="nfc" size={20} className="text-brand-700" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-2">
+            <span className="text-body font-semibold text-ink">Also works as an NFC tag</span>
+            {container.nfcLinkedAt && (
+              <span className="rounded-lg bg-badge-green-bg px-2 py-0.5 text-micro font-semibold text-badge-green-text">Linked</span>
+            )}
+          </span>
+          <span className="mt-1 block text-caption text-muted-foreground">
+            {container.nfcLinkedAt
+              ? "Tap to view or re-link this bin's NFC tag."
+              : "Write this bin's link to a blank NFC tag — set up NFC, or use Shortcuts on iOS."}
+          </span>
+        </span>
+        <Icon name="chevronRight" size={16} className="mt-1 shrink-0 text-muted-foreground" />
+      </button>
 
       <Button size="lg" onClick={() => window.print()} className="bg-ink text-white hover:bg-ink/90 print:hidden">
         <Icon name="tag" size={16} /> Print label

@@ -129,6 +129,8 @@ interface InventoryState {
   permanentlyDeleteContainer: (containerId: string) => void;
   /** Assigns `code` if provided (validated for per-household uniqueness), otherwise generates the next code for the container's location. */
   assignDisplayCode: (containerId: string, code?: string) => { ok: boolean; error?: string };
+  /** Marks a container's NFC tag as linked (native write or the iOS Shortcuts fallback both call this — same end state). */
+  linkNfcTag: (containerId: string) => void;
 
   // Attachments
   addAttachment: (itemId: string, input: {
@@ -518,6 +520,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       status: "active",
       trashedAt: null,
       permanentlyDeleteAfter: null,
+      nfcLinkedAt: null,
     };
     set((s) => ({ containers: [...s.containers, created] }));
     get().logActivity({ entityType: "container", entityId: created.id, entityName: created.name, action: "created" });
@@ -614,6 +617,21 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       detail: `Bin ID set to ${resolved}`,
     });
     return { ok: true };
+  },
+
+  linkNfcTag: (containerId) => {
+    const container = get().containers.find((c) => c.id === containerId);
+    if (!container) return;
+    set((s) => ({
+      containers: s.containers.map((c) => (c.id === containerId ? { ...c, nfcLinkedAt: nowIso() } : c)),
+    }));
+    get().logActivity({
+      entityType: "container",
+      entityId: containerId,
+      entityName: container.name,
+      action: "edited",
+      detail: "NFC tag linked",
+    });
   },
 
   addAttachment: (itemId, input) => {
