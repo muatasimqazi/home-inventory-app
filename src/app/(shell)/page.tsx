@@ -118,7 +118,7 @@ export default function DashboardPage() {
             }
           />
         ) : (
-          <div className="-mx-5 flex gap-3 overflow-x-auto px-5 pb-1 md:mx-0 md:px-0">
+          <div className="scrollbar-hide -mx-5 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-pl-5 px-5 md:mx-0 md:scroll-pl-0 md:px-0">
             {recentContainers.map((container) => {
               const flags = containerStatusFlags(items, containers, container.id);
               const itemCount = items.filter((it) => it.status === "active" && it.containerId === container.id).length;
@@ -134,7 +134,7 @@ export default function DashboardPage() {
                   itemCount={itemCount}
                   breadcrumbLabel={breadcrumbLabel(buildBreadcrumb(container.locationId, container.parentContainerId ?? null, locations, containers))}
                   status={status}
-                  className="w-42 shrink-0"
+                  className="w-42 shrink-0 snap-start"
                 />
               );
             })}

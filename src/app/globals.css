@@ -130,4 +130,15 @@
     min-height: 44px;
     min-width: 44px;
   }
+
+  /* Hides the native scrollbar on horizontal card carousels (e.g. Dashboard
+     Storage bins) while keeping real touch/trackpad/keyboard scrolling —
+     pairs with snap-x for a carousel feel without a JS dependency. */
+  .scrollbar-hide {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
 }
