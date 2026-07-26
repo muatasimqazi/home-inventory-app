@@ -50,6 +50,7 @@ function HouseholdSetupInner() {
   const createContainer = useInventoryStore((s) => s.createContainer);
   const assignDisplayCode = useInventoryStore((s) => s.assignDisplayCode);
   const inviteMember = useInventoryStore((s) => s.inviteMember);
+  const acceptInvite = useInventoryStore((s) => s.acceptInvite);
   const containers = useInventoryStore((s) => s.containers);
   const me = members.find((m) => m.userId === currentUserId);
 
@@ -164,7 +165,13 @@ function HouseholdSetupInner() {
       setJoinError("Enter the email your invite was sent to.");
       return;
     }
-    setJoinError("No pending invite found for that email in this demo.");
+    const result = acceptInvite(joinEmail.trim(), me?.displayName ?? "You");
+    if (!result.ok) {
+      setJoinError(result.error ?? "No pending invite found for that email in this demo.");
+      return;
+    }
+    toast.success(`You've joined ${result.household?.name}`);
+    router.push("/");
   }
 
   return (

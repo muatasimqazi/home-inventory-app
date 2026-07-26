@@ -145,6 +145,50 @@ begin
 end;
 $$;
 
+-- Redeeming an invite is keyed off the caller's own authenticated email
+-- (auth.email(), the JWT claim — not a string the client can spoof by
+-- passing an arbitrary "email" argument) matched case-insensitively
+-- against invites.invited_email, not off household membership the caller
+-- doesn't have yet. security definer so it can insert into `members` and
+-- update `invites` despite the caller not being a member of that
+-- household at call time — the entire reason RLS can't just grow an
+-- "accept your own invite" policy for a normal client-side UPDATE.
+create function accept_invite(p_invite_id uuid, p_display_name text, p_avatar_url text default null)
+returns households
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  target_invite invites;
+  joined_household households;
+begin
+  select * into target_invite from invites where id = p_invite_id;
+  if not found then
+    raise exception 'Invite not found.';
+  end if;
+  if target_invite.status <> 'pending' then
+    raise exception 'This invite is no longer pending.';
+  end if;
+  if target_invite.expires_at <= now() then
+    update invites set status = 'expired' where id = p_invite_id;
+    raise exception 'This invite has expired.';
+  end if;
+  if lower(target_invite.invited_email) <> lower(auth.email()) then
+    raise exception 'This invite was sent to a different email address.';
+  end if;
+
+  insert into members (household_id, user_id, role, display_name, email, avatar_url)
+  values (target_invite.household_id, auth.uid(), 'member', p_display_name, auth.email(), p_avatar_url)
+  on conflict (household_id, user_id) do nothing;
+
+  update invites set status = 'accepted' where id = p_invite_id;
+
+  select * into joined_household from households where id = target_invite.household_id;
+  return joined_household;
+end;
+$$;
+
 -- ---------------------------------------------------------------------------
 -- Locations & containers
 -- ---------------------------------------------------------------------------
@@ -465,11 +509,10 @@ create policy "household owner write" on invites
   for insert with check (is_household_owner(household_id));
 create policy "household owner delete" on invites
   for delete using (is_household_owner(household_id));
--- No UPDATE policy yet: invite acceptance (status -> 'accepted') is keyed
--- off the invited email, not existing household membership, so it needs
--- its own security-definer accept_invite() function once that flow is
--- built. Not on the app's active path yet — store.ts has inviteMember and
--- cancelInvite mock actions to mirror, but no acceptInvite.
+-- Deliberately no UPDATE policy: invite acceptance (status -> 'accepted')
+-- is keyed off the invited email, not existing household membership the
+-- caller doesn't have yet, so it goes through accept_invite() above
+-- (security definer, bypasses RLS) rather than a client-side UPDATE.
 
 create policy "household member read/write" on locations
   for all using (is_household_member(household_id)) with check (is_household_member(household_id));

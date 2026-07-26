@@ -5,6 +5,7 @@ import { id, tagToken } from "./id";
 import { isDisplayCodeTaken, nextDisplayCode, normalizeDisplayCode } from "./display-code";
 import {
   CURRENT_USER_ID,
+  invitableHouseholds,
   otherHouseholdSeedData,
   seedActivity,
   seedAttachments,
@@ -168,6 +169,8 @@ interface InventoryState {
   createHousehold: (input: { name: string; displayName: string; email: string; avatarUrl?: string }) => Household;
   /** Swaps the active household's data for another one the current user belongs to. No-op if already current. */
   switchHousehold: (householdId: string) => void;
+  /** Redeems a pending invite matching `email` for a household the current user isn't a member of yet, joins as a Member, and switches to it. */
+  acceptInvite: (email: string, displayName: string) => { ok: boolean; error?: string; household?: Household };
   inviteMember: (email: string) => void;
   cancelInvite: (inviteId: string) => void;
   removeMember: (userId: string) => void;
@@ -213,6 +216,11 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
   // within a session — same "no persistence across a hard reload" scoping
   // as the rest of this mock store.
   const otherHouseholdData: Record<string, HouseholdSeedBundle> = { ...otherHouseholdSeedData };
+
+  // Households with a pending invite the current user hasn't redeemed yet.
+  // Mutable local copy (not the imported seed) so a redeemed invite's
+  // household is removed from the pool and can't be joined twice.
+  const invitablePool: Record<string, { household: Household; bundle: HouseholdSeedBundle }> = { ...invitableHouseholds };
 
   function snapshotCurrent(state: InventoryState): HouseholdSeedBundle {
     return {
@@ -292,6 +300,44 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
 
     otherHouseholdData[state.currentHouseholdId] = snapshotCurrent(state);
     set({ currentHouseholdId: householdId, ...next });
+  },
+
+  acceptInvite: (email, displayName) => {
+    const normalizedEmail = email.trim().toLowerCase();
+    const match = Object.entries(invitablePool).find(([, entry]) =>
+      entry.bundle.invites.some((inv) => inv.status === "pending" && inv.invitedEmail.toLowerCase() === normalizedEmail)
+    );
+    if (!match) {
+      return { ok: false, error: "No pending invite found for that email in this demo." };
+    }
+    const [householdId, entry] = match;
+    delete invitablePool[householdId];
+
+    const state = get();
+    otherHouseholdData[state.currentHouseholdId] = snapshotCurrent(state);
+
+    const invite = entry.bundle.invites.find((inv) => inv.status === "pending" && inv.invitedEmail.toLowerCase() === normalizedEmail)!;
+    const joinedAt = nowIso();
+    const newMember: Member = {
+      householdId,
+      userId: state.currentUserId,
+      role: "member",
+      joinedAt,
+      displayName,
+      email: invite.invitedEmail,
+    };
+    const nextBundle: HouseholdSeedBundle = {
+      ...entry.bundle,
+      members: [...entry.bundle.members, newMember],
+      invites: entry.bundle.invites.map((inv) => (inv.id === invite.id ? { ...inv, status: "accepted" } : inv)),
+    };
+
+    set({
+      households: [...state.households, entry.household],
+      currentHouseholdId: householdId,
+      ...nextBundle,
+    });
+    return { ok: true, household: entry.household };
   },
 
   createItem: (input) => {

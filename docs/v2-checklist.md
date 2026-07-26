@@ -97,9 +97,39 @@ Feature work (items 1–12) was complete but the running app didn't actually loo
 - [x] CSV Import Desktop, Print Labels Desktop, Tag Label Print: added Figma's outer-card/header-subtitle treatment, fixed icon-chip colors, added the missing Bin ID badge to the single-container label page (it only showed the raw `tagToken`, never the human-facing display code).
 - Reviewed and intentionally left alone (structurally different from Figma but not a v1 leftover, and rebuilding would mean removing working capability, not fixing styling): `MoveSheet` (tap-to-pick tree vs. Figma's two-dropdown-plus-confirm form — the tree pattern is already used consistently elsewhere), `EntityFormSheet` for Add Location/Bin (bottom sheet vs. Figma's full page — sheet is a reasonable, common mobile pattern for a quick add), Desktop Management's two-panel tree+table layout (kept from §13 for the same reason), Review queue (richer inline-edit rows vs. Figma's simpler Edit/Approve buttons — an enhancement, not wrong).
 
+## 15. Third Visual Fidelity Pass — targeted bug reports, backend audit, and two new features
+Same "measure, don't assume" discipline as §13/§14, but this pass was driven by specific user-reported bugs rather than a systematic screen sweep, plus a first real look at the backend (still scaffolding-only per §12) and two features the mocks didn't cover at all.
+
+**Targeted bug fixes** (each root-caused via Playwright computed-style/bounding-box measurement, not guessed):
+- [x] Bin ID badge typography, badge font-size silently dropped by a `tailwind-merge` custom-token gap (`lib/utils.ts`'s `cn()` now uses `extendTailwindMerge` for the custom font-size scale)
+- [x] Button/icon-chip radius overshoot — this app's `--radius-xl` is 24px (not Tailwind's default), so `rounded-xl` on button-sized elements ballooned into pills/circles; switched affected call sites to `rounded-md`
+- [x] Dashboard Storage bins: grid → horizontal scroll-snap carousel with a scroll-driven magnify effect (`BinCarousel`), then fixed the carousel clipping its own card shadow (scroll container's padding didn't contain `--shadow-sm`'s full extent — overflow-x-auto forces overflow-y to auto per the CSS spec)
+- [x] `PhotoThumb`/`BinCard` emoji sizing (oversized dead space around fallback art) — including catching a same-fix regression (two `size-14` compact thumbnails would have inherited a new oversized default) before it shipped
+- [x] `<main>`'s `max-w-[430px]` cap causing dead margins at mid-range mobile widths (only visible ≥600px, not at the 390px viewport used for the first, incomplete measurement)
+- [x] Archive/Move to Trash buttons and the category Select dropdown — undersized tap targets and cramped popover padding
+- [x] ConfirmDialog's Cancel/Confirm buttons collapsing to 22px on mobile: `flex-1` (`flex-basis: 0%`) overrides explicit height in a `flex-col-reverse` layout; switched to `flex-auto` so height wins
+- [x] Locations List/Browse tabs undersized (32px pill, sub-44px trigger targets) — bumped to the app's 44px tap-target convention
+
+**Backend audit** (`supabase/migrations/0001_init.sql` — still unapplied scaffolding, see §12): compared the migration against `lib/types.ts`/`lib/store.ts` field-by-field and against the PRD's stated invariants. Found and fixed four real gaps, each verified against a real local Postgres 17 instance (not just read) under a non-superuser `authenticated` role exercising RLS:
+- [x] One-Owner-per-household enforced via a partial unique index + `transfer_ownership()`/`create_household()` security-definer RPCs (atomic role-flip via `CASE`, avoiding a transient two-owner state)
+- [x] RLS on households/members/invites tightened from blanket per-member read/write to owner-gated writes, matching what `settings/members` already enforced client-side only
+- [x] Container cycle prevention (BEFORE INSERT/UPDATE trigger, recursive CTE) — this surfaced a **live, reachable bug in the mock UI**: `MoveSheet` let you move a container into its own descendant with zero filtering; fixed both the DB trigger and the client-side exclusion, plus added the matching `moveContainer` → nested-container/item location cascade the DB trigger now also performs
+- [x] `items.location_id` kept in sync with its container's location via trigger (mirrors the mock's denormalization convention)
+- [x] `accept_invite()` security-definer RPC added, keyed off the caller's authenticated email (`auth.email()`) against `invited_email` — not a client-supplied string — closing the "no UPDATE policy" gap noted when invites RLS was first tightened
+
+**New feature — per-item ownership** (roommate households, not just families): `Item.ownerUserId` (nullable — null reads as "Shared"), set from the Add/Edit item forms, shown on the Item Detail page. Single-owner, not multi-owner, by design (covers the common case; a join table can replace it later without touching unrelated code).
+
+**New feature — household onboarding + real multi-household support**: verified the 5-step Figma onboarding wizard (Create Household → Invite Members → Add Locations → Add First Bin → Ready, frames 257:82–257:219) had **no corresponding UI at all** — `/household-setup` was an orphaned single-screen stub nothing linked to, and sign-in always pushed straight to `/`. Built:
+- [x] Store: `household` (singular) → `households[]` + `currentHouseholdId`, with per-household data swapped via an in-memory cache on `switchHousehold()` so edits survive switching back and forth within a session; `createHousehold()` mirrors the migration's RPC
+- [x] The actual 5-step wizard, matching Figma, wired to real store actions at every step (not static copy — the Ready screen's checklist reflects what was actually created)
+- [x] Sign-in now routes a known member email (or the default Google path) to the dashboard, and an unrecognized email into onboarding — so the new-signup path is reachable/demoable, not just structurally correct
+- [x] Settings → My Households: switcher between households the user belongs to, plus entry points to create another or redeem an invite
+- [x] Invite acceptance wired end-to-end: a third seed household ("The Chen House") the user is *not* initially a member of, with a pending invite to her email, redeemable via the wizard's join mode — calls the mock's `acceptInvite()`, which mirrors `accept_invite()`'s email-matching logic
+
 ## Verification
 - [x] `tsc --noEmit` clean (after every individual screen fix, not just at the end)
 - [x] `eslint .` clean
 - [x] `next build` clean
 - [x] Playwright console-error sweep re-run after this pass — 28 routes × 2 viewports (mobile 390×844, desktop 1440×900), **zero console errors**
+- [x] §15's migration changes verified against a scratch local Postgres 17 instance (initdb + pg_ctl, mock `auth.uid()`/`auth.email()`, an `authenticated` role to exercise RLS as a real non-superuser) — every invariant's success *and* failure paths (owner-only writes, the one-owner index, cycle rejection, invite expiry/wrong-email/already-redeemed) behaved as designed, not just "applied without error"
 - [x] Visual spot-check via Playwright screenshots against the downloaded Figma references for the highest-change screens (Settings, Sign-in, Locations, Item Detail)

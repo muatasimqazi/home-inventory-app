@@ -708,3 +708,81 @@ export const otherHouseholdSeedData: Record<string, HouseholdSeedBundle> = {
     labelBatchEntries: [],
   },
 };
+
+// ---------------------------------------------------------------------------
+// A third household Priya is NOT a member of yet — demonstrates the "join
+// with invite code" flow actually joining a real household, not just
+// failing gracefully. She was invited by its owner (a different person,
+// "Alex Chen") and can redeem that invite from household-setup's join mode
+// using her own email (priya@example.com).
+// ---------------------------------------------------------------------------
+
+const HOUSEHOLD_CHEN_ID = "hh_chen";
+const CHEN_OWNER_USER_ID = "user_alex_chen";
+
+const seedHouseholdChen: Household = {
+  id: HOUSEHOLD_CHEN_ID,
+  name: "The Chen House",
+  createdAt: "2026-07-15T10:00:00.000Z",
+};
+
+const seedMembersChen: Member[] = [
+  {
+    householdId: HOUSEHOLD_CHEN_ID,
+    userId: CHEN_OWNER_USER_ID,
+    role: "owner",
+    joinedAt: "2026-07-15T10:00:00.000Z",
+    displayName: "Alex Chen",
+    email: "alex@example.com",
+  },
+];
+
+const seedInvitesChen: Invite[] = [
+  {
+    id: "invite_chen_priya",
+    householdId: HOUSEHOLD_CHEN_ID,
+    invitedEmail: "priya@example.com",
+    invitedByUserId: CHEN_OWNER_USER_ID,
+    status: "pending",
+    createdAt: "2026-07-20T10:00:00.000Z",
+    expiresAt: "2026-08-20T10:00:00.000Z",
+  },
+];
+
+const seedLocationsChen: Location[] = [
+  {
+    id: "loc_chen_living_room",
+    householdId: HOUSEHOLD_CHEN_ID,
+    name: "Living Room",
+    coverPhotoEmoji: "🛋️",
+    createdByUserId: CHEN_OWNER_USER_ID,
+    createdAt: "2026-07-15T10:05:00.000Z",
+    status: "active",
+    trashedAt: null,
+    permanentlyDeleteAfter: null,
+  },
+];
+
+/** Households with a pending invite to someone who isn't a member yet —
+ * separate from otherHouseholdSeedData, which only holds households the
+ * current user already belongs to. acceptInvite() in store.ts is the only
+ * way one of these moves into `households[]`. */
+export const invitableHouseholds: Record<string, { household: Household; bundle: HouseholdSeedBundle }> = {
+  [HOUSEHOLD_CHEN_ID]: {
+    household: seedHouseholdChen,
+    bundle: {
+      members: seedMembersChen,
+      invites: seedInvitesChen,
+      locations: seedLocationsChen,
+      containers: [],
+      items: [],
+      tags: [],
+      normalizationRules: [],
+      activity: [],
+      favorites: [],
+      attachments: [],
+      labelBatches: [],
+      labelBatchEntries: [],
+    },
+  },
+};
