@@ -168,11 +168,19 @@ export default function ItemDetailPage() {
               <Icon name="heart" size={16} className={favorite ? "fill-white" : undefined} /> Favorite
             </button>
           </div>
-          <div className="flex items-center justify-center gap-4 text-caption font-medium text-muted-foreground">
-            <button type="button" onClick={() => archiveItem(item.id)} className="flex items-center gap-1.5 hover:text-ink">
+          <div className="flex items-center justify-center gap-2 text-caption font-medium text-muted-foreground">
+            <button
+              type="button"
+              onClick={() => archiveItem(item.id)}
+              className="tap-target flex items-center gap-1.5 rounded-lg px-3 hover:bg-muted hover:text-ink"
+            >
               <Icon name="archive" size={14} /> Archive
             </button>
-            <button type="button" onClick={() => setTrashConfirmOpen(true)} className="flex items-center gap-1.5 hover:text-danger">
+            <button
+              type="button"
+              onClick={() => setTrashConfirmOpen(true)}
+              className="tap-target flex items-center gap-1.5 rounded-lg px-3 hover:bg-danger/10 hover:text-danger"
+            >
               <Icon name="trash" size={14} /> Move to Trash
             </button>
           </div>
