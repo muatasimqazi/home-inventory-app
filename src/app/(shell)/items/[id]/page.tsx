@@ -62,7 +62,7 @@ export default function ItemDetailPage() {
         </div>
       )}
 
-      <PhotoThumb emoji={item.photoEmoji} className="h-48 w-full" emojiClassName="text-6xl" />
+      <PhotoThumb emoji={item.photoEmoji} className="h-48 w-full" emojiClassName="text-8xl" />
 
       <div className="flex flex-col gap-1">
         <div className="flex items-start justify-between gap-2">

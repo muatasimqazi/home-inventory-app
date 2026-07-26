@@ -19,7 +19,7 @@ export function PhotoThumb({ emoji, label, className, emojiClassName }: PhotoThu
         className
       )}
     >
-      <span className={cn("text-3xl leading-none", emojiClassName)} aria-hidden>
+      <span className={cn("text-7xl leading-none", emojiClassName)} aria-hidden>
         {emoji}
       </span>
       {label ? <span className="text-caption text-yellow/80">{label}</span> : null}

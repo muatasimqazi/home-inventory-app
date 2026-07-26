@@ -29,7 +29,7 @@ export function BinCard({ container, itemCount, breadcrumbLabel, status, classNa
       className={cn("flex flex-col overflow-hidden rounded-2xl border border-border bg-white shadow-sm transition-shadow hover:shadow-lg", className)}
     >
       <div className="relative flex h-26 items-center justify-center bg-brand-100">
-        <span className="text-4xl" aria-hidden>
+        <span className="text-8xl" aria-hidden>
           {container.coverPhotoEmoji ?? "📦"}
         </span>
         {container.displayCode && (

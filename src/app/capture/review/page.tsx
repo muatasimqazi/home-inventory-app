@@ -199,7 +199,7 @@ function SingleReviewForm({
         // eslint-disable-next-line @next/next/no-img-element
         <img src={photo} alt="Captured item" className="h-48 w-full rounded-lg object-cover" />
       ) : (
-        <PhotoThumb emoji={row.photoEmoji} className="h-48 w-full" emojiClassName="text-6xl" />
+        <PhotoThumb emoji={row.photoEmoji} className="h-48 w-full" emojiClassName="text-8xl" />
       )}
 
       <div>
@@ -281,7 +281,7 @@ function BulkRow({
   return (
     <div className={cn("flex flex-col gap-2 rounded-xl bg-white p-3 shadow-sm", row.excluded && "opacity-40")}>
       <div className="flex items-start gap-3">
-        <PhotoThumb emoji={row.photoEmoji} className="size-14 shrink-0" />
+        <PhotoThumb emoji={row.photoEmoji} className="size-14 shrink-0" emojiClassName="text-3xl" />
         <div className="min-w-0 flex-1 space-y-2">
           <div className="flex items-center gap-2">
             <Input
