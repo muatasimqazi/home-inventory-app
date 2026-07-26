@@ -235,6 +235,27 @@ create index containers_parent_container_id_idx on containers(parent_container_i
 -- Bin IDs are unique per household, but only when assigned (many containers can be unassigned).
 create unique index containers_household_display_code_idx on containers(household_id, display_code) where display_code is not null;
 
+-- Cross-household reference validation (PRD §22's blanket rule: every
+-- write validates that *all* foreign-key references, not just the primary
+-- entity, resolve to the caller's household — enforced here, not left to
+-- API-layer discipline). A container's location must actually belong to
+-- the same household as the container itself.
+create function validate_container_location_household()
+returns trigger
+language plpgsql
+as $$
+begin
+  if not exists (select 1 from locations where id = new.location_id and household_id = new.household_id) then
+    raise exception 'Container location must belong to the same household as the container.';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger containers_validate_location_household
+  before insert or update of location_id, household_id on containers
+  for each row execute function validate_container_location_household();
+
 -- Cycle prevention (A contains B contains A) — PRD §22 calls for this as a
 -- database-level invariant, not just API-layer discipline every engineer
 -- has to remember. Walks up NEW.parent_container_id's ancestor chain and
@@ -242,6 +263,8 @@ create unique index containers_household_display_code_idx on containers(househol
 -- self-parent case). The Move sheet (move-sheet.tsx) already filters a
 -- container's own subtree out of its destination list client-side — this
 -- is the second line of defense for any write that doesn't go through it.
+-- Also enforces the same cross-household rule as above: a parent
+-- container must belong to the same household as its child.
 create function prevent_container_cycle()
 returns trigger
 language plpgsql
@@ -252,6 +275,11 @@ begin
   end if;
   if new.parent_container_id = new.id then
     raise exception 'A container cannot be its own parent.';
+  end if;
+  if exists (
+    select 1 from containers where id = new.parent_container_id and household_id <> new.household_id
+  ) then
+    raise exception 'Parent container must belong to the same household.';
   end if;
   if exists (
     with recursive ancestors as (
@@ -318,10 +346,12 @@ create table items (
   extra_details jsonb not null default '{}'::jsonb,
   -- Which household member this item personally belongs to (roommate
   -- households, not just families) — null means shared/household item, not
-  -- owned by one person. Not validated against household membership here,
-  -- same as created_by_user_id below; both rely on API-layer discipline
-  -- (PRD §22's "cross-household reference validation" blanket rule) rather
-  -- than a per-column trigger.
+  -- owned by one person. Validated by sync_item_location() below (it must
+  -- be an actual member of this item's household, not just any auth user) —
+  -- created_by_user_id doesn't need the same check: RLS's
+  -- is_household_member(household_id) already gates every write to this
+  -- table, so whoever the API sets created_by_user_id to (always the
+  -- caller, auth.uid()) is already guaranteed to be a member.
   owner_user_id uuid references auth.users(id) on delete set null,
   created_by_user_id uuid not null references auth.users(id),
   created_at timestamptz not null default now(),
@@ -341,22 +371,48 @@ create index items_owner_user_id_idx on items(owner_user_id) where owner_user_id
 -- friends (src/lib/selectors.ts) filter on both columns together and
 -- would silently drop an item from every location-scoped view if they
 -- disagreed. container_id null (a loose item, not in a container) leaves
--- location_id untouched — that's the only case where it's the source of
--- truth rather than a denormalized copy.
+-- location_id as whatever was written directly — validated below instead.
+--
+-- Also where the cross-household reference checks for items live (PRD
+-- §22): the container (or, for a loose item, the location) must belong
+-- to the same household as the item, and owner_user_id — if set — must
+-- actually be a member of that household, not just any Supabase auth user.
 create function sync_item_location()
 returns trigger
 language plpgsql
 as $$
+declare
+  container_household uuid;
+  container_location uuid;
 begin
   if new.container_id is not null then
-    select location_id into new.location_id from containers where id = new.container_id;
+    select household_id, location_id into container_household, container_location
+    from containers where id = new.container_id;
+    if container_household is null then
+      raise exception 'Container not found.';
+    end if;
+    if container_household <> new.household_id then
+      raise exception 'Item''s container must belong to the same household as the item.';
+    end if;
+    new.location_id := container_location;
+  elsif new.location_id is not null then
+    if not exists (select 1 from locations where id = new.location_id and household_id = new.household_id) then
+      raise exception 'Item''s location must belong to the same household as the item.';
+    end if;
   end if;
+
+  if new.owner_user_id is not null and not exists (
+    select 1 from members where household_id = new.household_id and user_id = new.owner_user_id
+  ) then
+    raise exception 'Item owner must be a member of the item''s household.';
+  end if;
+
   return new;
 end;
 $$;
 
 create trigger items_sync_location
-  before insert or update of container_id on items
+  before insert or update of container_id, location_id, household_id, owner_user_id on items
   for each row execute function sync_item_location();
 
 create table tags (
@@ -371,6 +427,33 @@ create table item_tags (
   tag_id uuid not null references tags(id) on delete cascade,
   primary key (item_id, tag_id)
 );
+
+-- item_tags has no household_id of its own (it's a pure join table) — the
+-- cross-household check here is that the item and the tag actually belong
+-- to the *same* household, not just that each individually does.
+create function validate_item_tag_household()
+returns trigger
+language plpgsql
+as $$
+declare
+  item_household uuid;
+  tag_household uuid;
+begin
+  select household_id into item_household from items where id = new.item_id;
+  select household_id into tag_household from tags where id = new.tag_id;
+  if item_household is null or tag_household is null then
+    raise exception 'Item or tag not found.';
+  end if;
+  if item_household <> tag_household then
+    raise exception 'Item and tag must belong to the same household.';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger item_tags_validate_household
+  before insert or update on item_tags
+  for each row execute function validate_item_tag_household();
 
 create table normalization_rules (
   id uuid primary key default gen_random_uuid(),
@@ -405,6 +488,22 @@ create table attachments (
 
 create index attachments_item_id_idx on attachments(item_id);
 
+create function validate_attachment_household()
+returns trigger
+language plpgsql
+as $$
+begin
+  if not exists (select 1 from items where id = new.item_id and household_id = new.household_id) then
+    raise exception 'Attachment must belong to the same household as its item.';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger attachments_validate_household
+  before insert or update of item_id, household_id on attachments
+  for each row execute function validate_attachment_household();
+
 -- ---------------------------------------------------------------------------
 -- Label batches (PRD v2 §3)
 -- ---------------------------------------------------------------------------
@@ -432,6 +531,27 @@ create table label_batch_entries (
 
 create index label_batch_entries_batch_id_idx on label_batch_entries(batch_id);
 create index label_batch_entries_container_id_idx on label_batch_entries(container_id);
+
+create function validate_label_batch_entry_household()
+returns trigger
+language plpgsql
+as $$
+begin
+  if not exists (select 1 from label_batches where id = new.batch_id and household_id = new.household_id) then
+    raise exception 'Label batch entry must belong to the same household as its batch.';
+  end if;
+  if new.container_id is not null and not exists (
+    select 1 from containers where id = new.container_id and household_id = new.household_id
+  ) then
+    raise exception 'Label batch entry''s container must belong to the same household.';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger label_batch_entries_validate_household
+  before insert or update of batch_id, container_id, household_id on label_batch_entries
+  for each row execute function validate_label_batch_entry_household();
 
 -- ---------------------------------------------------------------------------
 -- Favorites & activity log
