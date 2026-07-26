@@ -517,7 +517,11 @@ create table label_batches (
   toggle text not null check (toggle in ('qr', 'qr-code', 'qr-code-name')),
   include_location boolean not null default true,
   offset_x numeric not null default 0,
-  offset_y numeric not null default 0
+  offset_y numeric not null default 0,
+  -- 'draft' isn't produced by the app's current single-step create+generate
+  -- flow, but stays the schema default (PRD §22) so a future save-for-later
+  -- flow doesn't need a migration to add it.
+  status text not null default 'draft' check (status in ('draft', 'generated', 'printed'))
 );
 
 create table label_batch_entries (
@@ -526,7 +530,16 @@ create table label_batch_entries (
   household_id uuid not null references households(id) on delete cascade,
   container_id uuid references containers(id) on delete set null, -- null = unassigned/preprinted
   tag_token text not null,
-  display_code text
+  display_code text,
+  -- Tied to container_id, not independently settable: unassigned iff no
+  -- container yet; assigned/printed both require one. Mirrors the mock's
+  -- own derivation (claimUnassignedLabel / markLabelBatchPrinted) as a
+  -- CHECK rather than a trigger, since it only depends on this row's own
+  -- columns.
+  status text not null default 'unassigned' check (
+    (status = 'unassigned' and container_id is null) or
+    (status in ('assigned', 'printed') and container_id is not null)
+  )
 );
 
 create index label_batch_entries_batch_id_idx on label_batch_entries(batch_id);

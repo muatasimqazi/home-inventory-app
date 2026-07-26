@@ -154,6 +154,8 @@ interface InventoryState {
   }) => { batch: LabelBatch; entries: LabelBatchEntry[] };
   /** Adopts a preprinted/unassigned label's tagToken (and a fresh Bin ID, if the container doesn't have one) onto an existing container. */
   claimUnassignedLabel: (entryId: string, containerId: string) => { ok: boolean; error?: string };
+  /** Transitions a batch (and every one of its entries) to 'printed' — the actual "this physically went to the printer" moment, distinct from just exporting a PDF. */
+  markLabelBatchPrinted: (batchId: string) => void;
 
   // Tags
   getOrCreateTag: (name: string) => Tag;
@@ -689,6 +691,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       includeLocation: input.includeLocation,
       offsetX: input.offsetX,
       offsetY: input.offsetY,
+      status: "generated",
     };
 
     const containers = get().containers;
@@ -702,6 +705,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
         containerId: c.id,
         tagToken: c.tagToken,
         displayCode: c.displayCode,
+        status: "assigned",
       }));
 
     const unassignedEntries: LabelBatchEntry[] = Array.from({ length: Math.max(0, input.unassignedCount) }, () => ({
@@ -711,6 +715,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       containerId: null,
       tagToken: tagToken(),
       displayCode: null,
+      status: "unassigned",
     }));
 
     const entries = [...assignedEntries, ...unassignedEntries];
@@ -730,10 +735,18 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
 
     const location = get().locations.find((l) => l.id === container.locationId);
     const displayCode = entry.displayCode ?? container.displayCode ?? nextDisplayCode(get().containers, location?.name ?? "BIN");
+    // A preprinted/unassigned label is claimed onto a container after the
+    // physical label already exists — if its batch was already printed,
+    // the entry jumps straight to 'printed' rather than sitting at
+    // 'assigned' as if it were still waiting to go to the printer.
+    const batch = get().labelBatches.find((b) => b.id === entry.batchId);
+    const nextStatus = batch?.status === "printed" ? "printed" : "assigned";
 
     set((s) => ({
       containers: s.containers.map((c) => (c.id === containerId ? { ...c, tagToken: entry.tagToken, displayCode } : c)),
-      labelBatchEntries: s.labelBatchEntries.map((e) => (e.id === entryId ? { ...e, containerId, displayCode } : e)),
+      labelBatchEntries: s.labelBatchEntries.map((e) =>
+        e.id === entryId ? { ...e, containerId, displayCode, status: nextStatus } : e
+      ),
     }));
     get().logActivity({
       entityType: "container",
@@ -743,6 +756,13 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       detail: `Preprinted label ${entry.tagToken} assigned`,
     });
     return { ok: true };
+  },
+
+  markLabelBatchPrinted: (batchId) => {
+    set((s) => ({
+      labelBatches: s.labelBatches.map((b) => (b.id === batchId ? { ...b, status: "printed" } : b)),
+      labelBatchEntries: s.labelBatchEntries.map((e) => (e.batchId === batchId ? { ...e, status: "printed" } : e)),
+    }));
   },
 
   getOrCreateTag: (name) => {

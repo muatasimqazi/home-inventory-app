@@ -188,6 +188,9 @@ export interface Favorite {
 
 export type LabelPaperPreset = "small-3up" | "medium-2up" | "large-1up";
 export type LabelToggle = "qr" | "qr-code" | "qr-code-name";
+/** 'draft' isn't reachable via the current UI (createLabelBatch always finalizes a batch in one step — there's no save-for-later flow) but the type/schema still support it as the PRD-specified starting state, not just what today's one screen happens to produce. */
+export type LabelBatchStatus = "draft" | "generated" | "printed";
+export type LabelBatchEntryStatus = "unassigned" | "assigned" | "printed";
 
 export interface LabelBatch {
   id: string;
@@ -200,6 +203,7 @@ export interface LabelBatch {
   /** Print offset, in mm, to nudge the grid for printer alignment. */
   offsetX: number;
   offsetY: number;
+  status: LabelBatchStatus;
 }
 
 export interface LabelBatchEntry {
@@ -210,6 +214,8 @@ export interface LabelBatchEntry {
   containerId: string | null;
   tagToken: string;
   displayCode: string | null;
+  /** Derived from containerId, not independently settable — 'assigned' iff containerId is set, until markLabelBatchPrinted() cascades 'printed' down from the batch. */
+  status: LabelBatchEntryStatus;
 }
 
 export interface Breadcrumb {

@@ -15,6 +15,7 @@ import { LABEL_PRESETS, LABEL_TOGGLE_NAMES } from "@/lib/label-preset";
 import type { LabelPaperPreset, LabelToggle } from "@/lib/types";
 import { formatDate } from "@/lib/format";
 import { buildLabelPdfManifest, downloadFile } from "@/lib/export";
+import { cn } from "@/lib/utils";
 
 interface PreviewEntry {
   tagToken: string;
@@ -30,6 +31,7 @@ export default function LabelPrintingPage() {
   const labelBatches = useInventoryStore((s) => s.labelBatches);
   const labelBatchEntries = useInventoryStore((s) => s.labelBatchEntries);
   const createLabelBatch = useInventoryStore((s) => s.createLabelBatch);
+  const markLabelBatchPrinted = useInventoryStore((s) => s.markLabelBatchPrinted);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [unassignedCount, setUnassignedCount] = useState("0");
@@ -113,6 +115,7 @@ export default function LabelPrintingPage() {
   function handlePrint() {
     const committed = commitBatch();
     if (!committed) return;
+    markLabelBatchPrinted(committed.batch.id);
     setPrintEntries(committed.resolved);
     // Wait for the print-only grid to repaint with the real entries before opening the print dialog.
     requestAnimationFrame(() => requestAnimationFrame(() => window.print()));
@@ -270,7 +273,21 @@ export default function LabelPrintingPage() {
                       <span>
                         {LABEL_PRESETS[batch.paperPreset].name} · {count} label{count === 1 ? "" : "s"}
                       </span>
-                      <span className="text-muted-foreground">{formatDate(batch.createdAt)}</span>
+                      <span className="flex items-center gap-2">
+                        <span
+                          className={cn(
+                            "rounded-full px-2 py-0.5 text-micro font-medium",
+                            batch.status === "printed"
+                              ? "bg-badge-green-bg text-badge-green-text"
+                              : batch.status === "generated"
+                                ? "bg-brand-100 text-brand-700"
+                                : "bg-surface-muted text-muted-foreground"
+                          )}
+                        >
+                          {batch.status}
+                        </span>
+                        <span className="text-muted-foreground">{formatDate(batch.createdAt)}</span>
+                      </span>
                     </div>
                   );
                 })}
