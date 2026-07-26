@@ -51,10 +51,10 @@ export default function DashboardPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Link href="/add" aria-label="Add item" className="tap-target flex size-11 items-center justify-center rounded-xl bg-yellow text-white shadow-lg">
+          <Link href="/add" aria-label="Add item" className="tap-target flex size-11 items-center justify-center rounded-md bg-yellow text-white shadow-lg">
             <Icon name="plus" size={20} />
           </Link>
-          <Link href="/activity" aria-label="Activity" className="tap-target relative flex size-11 items-center justify-center rounded-xl border border-border bg-white">
+          <Link href="/activity" aria-label="Activity" className="tap-target relative flex size-11 items-center justify-center rounded-md border border-border bg-white">
             <Icon name="bell" size={20} className="text-ink" />
           </Link>
         </div>
@@ -83,7 +83,7 @@ export default function DashboardPage() {
           </div>
           <Link
             href="/review"
-            className="tap-target flex h-11 shrink-0 items-center justify-center rounded-xl bg-yellow px-4 text-caption font-semibold text-white"
+            className="tap-target flex h-11 shrink-0 items-center justify-center rounded-md bg-yellow px-5 text-caption font-semibold text-white"
           >
             Open
           </Link>

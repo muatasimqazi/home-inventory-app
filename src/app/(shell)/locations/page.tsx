@@ -37,7 +37,7 @@ export default function LocationsListPage() {
           <h1 className="text-screen-title font-semibold text-ink">Locations</h1>
           <p className="mt-0.5 text-caption text-muted-foreground">Browse household storage areas.</p>
         </div>
-        <Button size="icon" className="rounded-xl" onClick={() => setCreateOpen(true)} aria-label="Add location">
+        <Button size="icon-lg" className="rounded-md" onClick={() => setCreateOpen(true)} aria-label="Add location">
           <Icon name="plus" size={18} />
         </Button>
       </div>

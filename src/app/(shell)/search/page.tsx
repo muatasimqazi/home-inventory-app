@@ -78,7 +78,7 @@ function SearchPageInner() {
                 href={`/items/${r.item.id}`}
                 className="flex items-center gap-3 rounded-2xl border border-border bg-white p-3 shadow-sm"
               >
-                <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-surface-muted">
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-md bg-surface-muted">
                   <Icon name="box" size={20} className="text-ink" />
                 </span>
                 <div className="min-w-0 flex-1">

@@ -71,7 +71,7 @@ export function DesktopSidebar() {
         <SidebarLink href="/settings" icon="settings" label="Settings" pathname={pathname} />
         <Link
           href="/capture"
-          className="tap-target mt-2 flex items-center justify-center gap-2 rounded-xl bg-yellow px-4 py-3 text-body font-medium text-white"
+          className="tap-target mt-2 flex items-center justify-center gap-2 rounded-md bg-yellow px-4 py-3 text-body font-medium text-white"
         >
           <Icon name="camera" size={18} />
           Scan
