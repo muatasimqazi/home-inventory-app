@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { SearchBar } from "@/components/search-bar";
-import { BinCard } from "@/components/bin-card";
+import { BinCarousel } from "@/components/bin-carousel";
 import { Icon } from "@/components/icon";
 import { EmptyState } from "@/components/empty-state";
 import { useInventoryStore } from "@/lib/store";
@@ -118,8 +118,8 @@ export default function DashboardPage() {
             }
           />
         ) : (
-          <div className="scrollbar-hide -mx-5 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-pl-5 px-5 md:mx-0 md:scroll-pl-0 md:px-0">
-            {recentContainers.map((container) => {
+          <BinCarousel
+            entries={recentContainers.map((container) => {
               const flags = containerStatusFlags(items, containers, container.id);
               const itemCount = items.filter((it) => it.status === "active" && it.containerId === container.id).length;
               const status = flags.needsReview
@@ -127,18 +127,14 @@ export default function DashboardPage() {
                 : flags.genericPhoto
                   ? { label: "Photo", dotClassName: "bg-yellow" }
                   : null;
-              return (
-                <BinCard
-                  key={container.id}
-                  container={container}
-                  itemCount={itemCount}
-                  breadcrumbLabel={breadcrumbLabel(buildBreadcrumb(container.locationId, container.parentContainerId ?? null, locations, containers))}
-                  status={status}
-                  className="w-42 shrink-0 snap-start"
-                />
-              );
+              return {
+                container,
+                itemCount,
+                breadcrumbLabel: breadcrumbLabel(buildBreadcrumb(container.locationId, container.parentContainerId ?? null, locations, containers)),
+                status,
+              };
             })}
-          </div>
+          />
         )}
       </section>
 
