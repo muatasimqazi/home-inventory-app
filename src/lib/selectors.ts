@@ -59,7 +59,7 @@ export function activeItemCountForContainer(items: Item[], containers: Container
   return items.filter((it) => it.status === "active" && it.containerId && descendants.has(it.containerId)).length;
 }
 
-function collectDescendantIds(containers: Container[], rootId: string): string[] {
+export function collectDescendantIds(containers: Container[], rootId: string): string[] {
   const out: string[] = [];
   const stack = [rootId];
   while (stack.length) {

@@ -42,6 +42,13 @@ create table invites (
   expires_at timestamptz not null
 );
 
+-- Exactly one Owner per household, enforced as a database-level invariant
+-- (PRD §13/§22) — not just an application convention. transfer_ownership()
+-- below is the only sanctioned way to move ownership: it flips both roles
+-- in a single UPDATE, so this index is never transiently violated by two
+-- separate statements racing or being applied out of order.
+create unique index members_one_owner_per_household_idx on members(household_id) where role = 'owner';
+
 -- Membership check used by every RLS policy below. security definer so it
 -- can read `members` even under a caller whose own row-level policy hasn't
 -- matched yet.
@@ -57,6 +64,85 @@ as $$
     where household_id = target_household_id
       and user_id = auth.uid()
   );
+$$;
+
+-- Same pattern, but requires the caller's own membership row to have
+-- role = 'owner'. Gates owner-only writes (member removal, invites,
+-- household admin) at the database layer — the Household Members screen
+-- already hides these actions behind an isOwner check client-side, but
+-- that alone doesn't stop a direct API/RLS call from a regular member.
+create function is_household_owner(target_household_id uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (
+    select 1 from members
+    where household_id = target_household_id
+      and user_id = auth.uid()
+      and role = 'owner'
+  );
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Privileged RPCs (security definer) — the only sanctioned way to create a
+-- household/membership row or move ownership. households and members have
+-- no client-facing INSERT policy below (see RLS section): every row is
+-- created through one of these, which run with elevated privileges and
+-- enforce their own invariants explicitly, rather than trying to make RLS
+-- solve "how do you prove membership before your first membership row
+-- exists."
+-- ---------------------------------------------------------------------------
+
+create function create_household(p_name text, p_display_name text, p_email text, p_avatar_url text default null)
+returns households
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  new_household households;
+begin
+  insert into households (name) values (p_name) returning * into new_household;
+  insert into members (household_id, user_id, role, display_name, email, avatar_url)
+  values (new_household.id, auth.uid(), 'owner', p_display_name, p_email, p_avatar_url);
+  return new_household;
+end;
+$$;
+
+-- PRD §13: "an Owner-only action; enforced as a database-level invariant."
+-- Flips both roles in one UPDATE (via CASE) so members_one_owner_per_household_idx
+-- above is satisfied at statement end and never transiently holds two
+-- owners or zero owners.
+create function transfer_ownership(p_household_id uuid, p_new_owner_user_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  caller uuid := auth.uid();
+begin
+  if not is_household_owner(p_household_id) then
+    raise exception 'Only the current Owner can transfer ownership.';
+  end if;
+  if not exists (
+    select 1 from members where household_id = p_household_id and user_id = p_new_owner_user_id
+  ) then
+    raise exception 'Target user is not a member of this household.';
+  end if;
+
+  update members
+  set role = case
+    when user_id = p_new_owner_user_id then 'owner'
+    when user_id = caller then 'member'
+    else role
+  end
+  where household_id = p_household_id
+    and user_id in (p_new_owner_user_id, caller);
+end;
 $$;
 
 -- ---------------------------------------------------------------------------
@@ -102,6 +188,66 @@ create index containers_parent_container_id_idx on containers(parent_container_i
 -- Bin IDs are unique per household, but only when assigned (many containers can be unassigned).
 create unique index containers_household_display_code_idx on containers(household_id, display_code) where display_code is not null;
 
+-- Cycle prevention (A contains B contains A) — PRD §22 calls for this as a
+-- database-level invariant, not just API-layer discipline every engineer
+-- has to remember. Walks up NEW.parent_container_id's ancestor chain and
+-- rejects the write if NEW.id appears in it (including the direct
+-- self-parent case). The Move sheet (move-sheet.tsx) already filters a
+-- container's own subtree out of its destination list client-side — this
+-- is the second line of defense for any write that doesn't go through it.
+create function prevent_container_cycle()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.parent_container_id is null then
+    return new;
+  end if;
+  if new.parent_container_id = new.id then
+    raise exception 'A container cannot be its own parent.';
+  end if;
+  if exists (
+    with recursive ancestors as (
+      select id, parent_container_id from containers where id = new.parent_container_id
+      union all
+      select c.id, c.parent_container_id from containers c
+      join ancestors a on c.id = a.parent_container_id
+    )
+    select 1 from ancestors where id = new.id
+  ) then
+    raise exception 'Moving this container here would create a cycle.';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger containers_prevent_cycle
+  before insert or update of parent_container_id on containers
+  for each row execute function prevent_container_cycle();
+
+-- Mirrors moveContainer()'s cascade in the mock store (src/lib/store.ts):
+-- moving a container to a new location carries its whole subtree — nested
+-- containers and their items — with it. Only touches direct children;
+-- each child's own location_id change re-fires this same trigger, so
+-- depth propagates naturally through the trigger mechanism rather than a
+-- recursive CTE recomputing the full descendant set up front.
+create function cascade_container_location()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.location_id is distinct from old.location_id then
+    update containers set location_id = new.location_id where parent_container_id = new.id;
+    update items set location_id = new.location_id, updated_at = now() where container_id = new.id;
+  end if;
+  return new;
+end;
+$$;
+
+create trigger containers_cascade_location
+  after update of location_id on containers
+  for each row execute function cascade_container_location();
+
 -- ---------------------------------------------------------------------------
 -- Items, tags, extra details
 -- ---------------------------------------------------------------------------
@@ -134,6 +280,29 @@ create index items_household_id_idx on items(household_id);
 create index items_location_id_idx on items(location_id);
 create index items_container_id_idx on items(container_id);
 create index items_status_idx on items(household_id, status);
+
+-- Keeps location_id in sync with the container's own location whenever
+-- container_id is set, so the two can never desync — itemsIn() and
+-- friends (src/lib/selectors.ts) filter on both columns together and
+-- would silently drop an item from every location-scoped view if they
+-- disagreed. container_id null (a loose item, not in a container) leaves
+-- location_id untouched — that's the only case where it's the source of
+-- truth rather than a denormalized copy.
+create function sync_item_location()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.container_id is not null then
+    select location_id into new.location_id from containers where id = new.container_id;
+  end if;
+  return new;
+end;
+$$;
+
+create trigger items_sync_location
+  before insert or update of container_id on items
+  for each row execute function sync_item_location();
 
 create table tags (
   id uuid primary key default gen_random_uuid(),
@@ -227,7 +396,11 @@ create table activity_log (
   entity_type text not null check (entity_type in ('item', 'container', 'location', 'household', 'member')),
   entity_id uuid not null, -- polymorphic — points at whichever table entity_type names, no FK
   entity_name text not null,
-  action text not null,
+  -- Mirrors the ActivityAction union in src/lib/types.ts.
+  action text not null check (action in (
+    'created', 'edited', 'moved', 'archived', 'trashed', 'restored',
+    'deleted_forever', 'invited', 'joined', 'removed', 'ownership_transferred'
+  )),
   detail text,
   created_at timestamptz not null default now()
 );
@@ -253,14 +426,42 @@ alter table label_batch_entries enable row level security;
 alter table favorites enable row level security;
 alter table activity_log enable row level security;
 
-create policy "household member read/write" on households
-  for all using (is_household_member(id)) with check (is_household_member(id));
+-- households, members, and invites get tighter policies than everything
+-- below: PRD §13 requires ownership transfer to be an owner-only,
+-- database-enforced action, and the Household Members screen
+-- (settings/members/page.tsx) already gates every mutation here — invite,
+-- cancel invite, remove, transfer — behind an isOwner check client-side.
+-- These policies back that up server-side instead of trusting the client.
+--
+-- Deliberately no client-facing INSERT policy on households or members:
+-- the only sanctioned ways to create either row are create_household() and
+-- a future accept_invite() security-definer function (see the invites
+-- comment below) — both bypass RLS by design, so a matching INSERT policy
+-- here would just be an unused, harder-to-reason-about second door.
 
-create policy "household member read/write" on members
-  for all using (is_household_member(household_id)) with check (is_household_member(household_id));
+create policy "household member read" on households
+  for select using (is_household_member(id));
+create policy "household owner update" on households
+  for update using (is_household_owner(id)) with check (is_household_owner(id));
+create policy "household owner delete" on households
+  for delete using (is_household_owner(id));
 
-create policy "household member read/write" on invites
-  for all using (is_household_member(household_id)) with check (is_household_member(household_id));
+create policy "household member read" on members
+  for select using (is_household_member(household_id));
+create policy "household owner delete" on members
+  for delete using (is_household_owner(household_id));
+
+create policy "household member read" on invites
+  for select using (is_household_member(household_id));
+create policy "household owner write" on invites
+  for insert with check (is_household_owner(household_id));
+create policy "household owner delete" on invites
+  for delete using (is_household_owner(household_id));
+-- No UPDATE policy yet: invite acceptance (status -> 'accepted') is keyed
+-- off the invited email, not existing household membership, so it needs
+-- its own security-definer accept_invite() function once that flow is
+-- built. Not on the app's active path yet — store.ts has inviteMember and
+-- cancelInvite mock actions to mirror, but no acceptInvite.
 
 create policy "household member read/write" on locations
   for all using (is_household_member(household_id)) with check (is_household_member(household_id));

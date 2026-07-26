@@ -400,9 +400,23 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
   },
 
   moveContainer: (containerId, dest) => {
+    // Moving a container carries its whole subtree with it — nested
+    // containers and their items still need locationId to reflect where
+    // they actually live now, the same invariant the location-sync DB
+    // trigger enforces once this is backed by Postgres (§ migration).
+    const descendantIds = new Set(collectDescendantContainerIds(get().containers, containerId));
     set((s) => ({
       containers: s.containers.map((c) =>
-        c.id === containerId ? { ...c, locationId: dest.locationId, parentContainerId: dest.parentContainerId } : c
+        c.id === containerId
+          ? { ...c, locationId: dest.locationId, parentContainerId: dest.parentContainerId }
+          : descendantIds.has(c.id)
+            ? { ...c, locationId: dest.locationId }
+            : c
+      ),
+      items: s.items.map((it) =>
+        it.containerId && (it.containerId === containerId || descendantIds.has(it.containerId))
+          ? { ...it, locationId: dest.locationId, updatedAt: nowIso() }
+          : it
       ),
     }));
     const c = get().containers.find((c) => c.id === containerId);

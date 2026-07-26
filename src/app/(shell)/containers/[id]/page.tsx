@@ -21,6 +21,7 @@ import {
   activeItemCountForContainer,
   buildBreadcrumb,
   breadcrumbLabel,
+  collectDescendantIds,
   directChildContainers,
   itemsIn,
 } from "@/lib/selectors";
@@ -189,6 +190,7 @@ export default function ContainerDetailPage() {
         onOpenChange={setMoveOpen}
         currentLocationId={container.locationId}
         currentContainerId={container.id}
+        excludeContainerIds={[container.id, ...collectDescendantIds(containers, container.id)]}
         onMove={(dest) => {
           if (!dest.locationId) return;
           moveContainer(container.id, { locationId: dest.locationId, parentContainerId: dest.containerId });

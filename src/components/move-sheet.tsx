@@ -13,11 +13,14 @@ interface MoveSheetProps {
   currentLocationId: string | null;
   currentContainerId: string | null;
   onMove: (dest: { locationId: string | null; containerId: string | null }) => void;
+  /** When moving a container itself, pass its id + all descendant ids so the sheet can't offer them as destinations — picking one would create a cycle. Not needed when moving an item. */
+  excludeContainerIds?: string[];
 }
 
-export function MoveSheet({ open, onOpenChange, currentLocationId, currentContainerId, onMove }: MoveSheetProps) {
+export function MoveSheet({ open, onOpenChange, currentLocationId, currentContainerId, onMove, excludeContainerIds }: MoveSheetProps) {
   const locations = activeLocations(useInventoryStore((s) => s.locations));
   const containers = useInventoryStore((s) => s.containers);
+  const excluded = excludeContainerIds ? new Set(excludeContainerIds) : null;
 
   function isCurrent(locationId: string | null, containerId: string | null) {
     return locationId === currentLocationId && containerId === currentContainerId;
@@ -50,6 +53,7 @@ export function MoveSheet({ open, onOpenChange, currentLocationId, currentContai
                 containers={containers}
                 isCurrent={isCurrent}
                 onPick={pick}
+                excluded={excluded}
               />
             </div>
           ))}
@@ -66,6 +70,7 @@ function ContainerBranch({
   containers,
   isCurrent,
   onPick,
+  excluded,
 }: {
   locationId: string;
   parentId: string | null;
@@ -73,8 +78,9 @@ function ContainerBranch({
   containers: Container[];
   isCurrent: (locationId: string | null, containerId: string | null) => boolean;
   onPick: (locationId: string | null, containerId: string | null) => void;
+  excluded: Set<string> | null;
 }) {
-  const children = directChildContainers(containers, parentId, locationId);
+  const children = directChildContainers(containers, parentId, locationId).filter((c) => !excluded?.has(c.id));
   if (children.length === 0) return null;
   return (
     <>
@@ -88,6 +94,7 @@ function ContainerBranch({
             containers={containers}
             isCurrent={isCurrent}
             onPick={onPick}
+            excluded={excluded}
           />
         </div>
       ))}
