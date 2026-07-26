@@ -269,6 +269,13 @@ create table items (
   -- Category-scoped extra fields (PRD v2 §6), e.g. {"modelNumber": "..."}. Not a
   -- generic custom-field system — the allowed keys per category live in application code.
   extra_details jsonb not null default '{}'::jsonb,
+  -- Which household member this item personally belongs to (roommate
+  -- households, not just families) — null means shared/household item, not
+  -- owned by one person. Not validated against household membership here,
+  -- same as created_by_user_id below; both rely on API-layer discipline
+  -- (PRD §22's "cross-household reference validation" blanket rule) rather
+  -- than a per-column trigger.
+  owner_user_id uuid references auth.users(id) on delete set null,
   created_by_user_id uuid not null references auth.users(id),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -280,6 +287,7 @@ create index items_household_id_idx on items(household_id);
 create index items_location_id_idx on items(location_id);
 create index items_container_id_idx on items(container_id);
 create index items_status_idx on items(household_id, status);
+create index items_owner_user_id_idx on items(owner_user_id) where owner_user_id is not null;
 
 -- Keeps location_id in sync with the container's own location whenever
 -- container_id is set, so the two can never desync — itemsIn() and

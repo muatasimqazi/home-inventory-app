@@ -62,6 +62,8 @@ export interface NewItemInput {
   reviewReason?: string;
   tagIds?: string[];
   extraDetails?: Record<string, string>;
+  /** null/omitted = shared household item, not owned by one person. */
+  ownerUserId?: string | null;
 }
 
 const QUANTITY_MIN = 0;
@@ -695,6 +697,7 @@ function buildItem(householdId: string, userId: string, input: NewItemInput): It
     reviewReason: input.reviewReason,
     tagIds: input.tagIds ?? [],
     extraDetails: input.extraDetails ?? {},
+    ownerUserId: input.ownerUserId ?? null,
     createdByUserId: userId,
     createdAt: timestamp,
     updatedAt: timestamp,

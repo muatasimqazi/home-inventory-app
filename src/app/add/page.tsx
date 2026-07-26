@@ -15,6 +15,8 @@ import { buildBreadcrumb } from "@/lib/selectors";
 import { CATEGORIES } from "@/lib/types";
 import { extraFieldsForCategory } from "@/lib/category";
 
+const SHARED_OWNER_VALUE = "shared";
+
 const CATEGORY_EMOJI: Record<string, string> = {
   Tool: "🛠️",
   Electronics: "🔌",
@@ -42,6 +44,7 @@ function ManualAddItemInner() {
   const searchParams = useSearchParams();
   const locations = useInventoryStore((s) => s.locations);
   const containers = useInventoryStore((s) => s.containers);
+  const members = useInventoryStore((s) => s.members);
   const createItem = useInventoryStore((s) => s.createItem);
   const getOrCreateTag = useInventoryStore((s) => s.getOrCreateTag);
   const lastUsedDestination = useInventoryStore((s) => s.lastUsedDestination);
@@ -53,6 +56,7 @@ function ManualAddItemInner() {
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [extraDetails, setExtraDetails] = useState<Record<string, string>>({});
+  const [ownerUserId, setOwnerUserId] = useState(SHARED_OWNER_VALUE);
   const [destination, setDestinationState] = useState<{ locationId: string | null; containerId: string | null }>(() => {
     const locationId = searchParams.get("locationId");
     const containerId = searchParams.get("containerId");
@@ -86,6 +90,7 @@ function ManualAddItemInner() {
       containerId: destination.containerId,
       tagIds: tags.map((t) => getOrCreateTag(t).id),
       extraDetails,
+      ownerUserId: ownerUserId === SHARED_OWNER_VALUE ? null : ownerUserId,
     });
     toast.success(`Added ${item.name}`);
     router.push(`/items/${item.id}`);
@@ -132,6 +137,22 @@ function ManualAddItemInner() {
               {CATEGORIES.map((c) => (
                 <SelectItem key={c} value={c}>
                   {c}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+
+        <Field label="Belongs to">
+          <Select value={ownerUserId} onValueChange={setOwnerUserId}>
+            <SelectTrigger className="h-11 w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={SHARED_OWNER_VALUE}>Shared</SelectItem>
+              {members.map((m) => (
+                <SelectItem key={m.userId} value={m.userId}>
+                  {m.displayName}
                 </SelectItem>
               ))}
             </SelectContent>

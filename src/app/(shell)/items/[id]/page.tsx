@@ -102,6 +102,10 @@ export default function ItemDetailPage() {
           </dd>
         </div>
         <Field label="Category" value={item.category} />
+        <Field
+          label="Belongs to"
+          value={item.ownerUserId ? (members.find((m) => m.userId === item.ownerUserId)?.displayName ?? "Unknown") : "Shared"}
+        />
         {item.tagIds.length > 0 && (
           <div className="col-span-2">
             <dt className="text-caption text-muted-foreground">Tags</dt>

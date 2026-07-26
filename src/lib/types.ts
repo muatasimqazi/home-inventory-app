@@ -100,6 +100,8 @@ export interface Item {
   tagIds: string[];
   /** Category-scoped extra fields (e.g. { serialNumber: "..." }), keyed by field key from CATEGORY_EXTRA_FIELDS. */
   extraDetails: Record<string, string>;
+  /** Which household member this item personally belongs to. null = shared/household item, not owned by one person. */
+  ownerUserId: string | null;
   createdByUserId: string;
   createdAt: string;
   updatedAt: string;

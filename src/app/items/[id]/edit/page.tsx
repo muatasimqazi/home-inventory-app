@@ -12,27 +12,44 @@ import { useInventoryStore } from "@/lib/store";
 import { CATEGORIES } from "@/lib/types";
 import { extraFieldsForCategory } from "@/lib/category";
 
+const SHARED_OWNER_VALUE = "shared";
+
 export default function EditItemPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const items = useInventoryStore((s) => s.items);
+  const members = useInventoryStore((s) => s.members);
   const updateItem = useInventoryStore((s) => s.updateItem);
 
   const item = items.find((it) => it.id === params.id);
   if (!item) return notFound();
 
-  return <EditItemForm key={item.id} itemId={item.id} initial={item} onSave={updateItem} onDone={() => router.push(`/items/${item.id}`)} />;
+  return (
+    <EditItemForm
+      key={item.id}
+      itemId={item.id}
+      initial={item}
+      members={members}
+      onSave={updateItem}
+      onDone={() => router.push(`/items/${item.id}`)}
+    />
+  );
 }
 
 function EditItemForm({
   itemId,
   initial,
+  members,
   onSave,
   onDone,
 }: {
   itemId: string;
-  initial: { name: string; category: string; quantity: number; notes: string; extraDetails: Record<string, string> };
-  onSave: (id: string, patch: Partial<{ name: string; category: string; quantity: number; notes: string; extraDetails: Record<string, string> }>) => void;
+  initial: { name: string; category: string; quantity: number; notes: string; extraDetails: Record<string, string>; ownerUserId: string | null };
+  members: { userId: string; displayName: string }[];
+  onSave: (
+    id: string,
+    patch: Partial<{ name: string; category: string; quantity: number; notes: string; extraDetails: Record<string, string>; ownerUserId: string | null }>
+  ) => void;
   onDone: () => void;
 }) {
   const router = useRouter();
@@ -41,6 +58,7 @@ function EditItemForm({
   const [quantity, setQuantity] = useState(String(initial.quantity));
   const [notes, setNotes] = useState(initial.notes);
   const [extraDetails, setExtraDetails] = useState<Record<string, string>>(initial.extraDetails);
+  const [ownerUserId, setOwnerUserId] = useState(initial.ownerUserId ?? SHARED_OWNER_VALUE);
   const [error, setError] = useState<string | null>(null);
 
   function handleSave() {
@@ -54,6 +72,7 @@ function EditItemForm({
       quantity: Math.max(0, Math.min(9999, Number(quantity) || 0)),
       notes: notes.trim(),
       extraDetails,
+      ownerUserId: ownerUserId === SHARED_OWNER_VALUE ? null : ownerUserId,
     });
     toast.success("Item updated");
     onDone();
@@ -114,6 +133,22 @@ function EditItemForm({
             onChange={(e) => setQuantity(e.target.value)}
             className="h-11 w-28"
           />
+        </Field>
+
+        <Field label="Belongs to">
+          <Select value={ownerUserId} onValueChange={setOwnerUserId}>
+            <SelectTrigger className="h-11 w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={SHARED_OWNER_VALUE}>Shared</SelectItem>
+              {members.map((m) => (
+                <SelectItem key={m.userId} value={m.userId}>
+                  {m.displayName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </Field>
 
         {extraFieldsForCategory(category).length > 0 && (
