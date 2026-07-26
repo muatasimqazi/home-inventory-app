@@ -165,6 +165,7 @@ export type ActivityAction =
   | "invited"
   | "joined"
   | "removed"
+  | "left"
   | "ownership_transferred";
 
 export interface ActivityLogEntry {

@@ -574,7 +574,7 @@ create table activity_log (
   -- Mirrors the ActivityAction union in src/lib/types.ts.
   action text not null check (action in (
     'created', 'edited', 'moved', 'archived', 'trashed', 'restored',
-    'deleted_forever', 'invited', 'joined', 'removed', 'ownership_transferred'
+    'deleted_forever', 'invited', 'joined', 'removed', 'left', 'ownership_transferred'
   )),
   detail text,
   created_at timestamptz not null default now()
@@ -623,8 +623,19 @@ create policy "household owner delete" on households
 
 create policy "household member read" on members
   for select using (is_household_member(household_id));
+-- "and user_id <> auth.uid()" matters: without it, an Owner could delete
+-- their own row through *this* policy even though the self-leave policy
+-- below blocks it — multiple permissive policies for the same command OR
+-- together, so the restriction has to hold in both, not just one.
 create policy "household owner delete" on members
-  for delete using (is_household_owner(household_id));
+  for delete using (is_household_owner(household_id) and user_id <> auth.uid());
+-- Leave Household (PRD §13/§29): any member can delete their own row,
+-- but not if they're the household's Owner — the one-owner invariant
+-- means there's no "leave, someone else is still owner" case for an
+-- Owner; they must transfer_ownership() first, becoming a plain member,
+-- then this policy applies to them like anyone else.
+create policy "member leaves own row" on members
+  for delete using (user_id = auth.uid() and role <> 'owner');
 
 create policy "household member read" on invites
   for select using (is_household_member(household_id));

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -11,13 +12,16 @@ import { useInventoryStore } from "@/lib/store";
 import type { Member } from "@/lib/types";
 
 export default function HouseholdMembersPage() {
+  const router = useRouter();
   const currentUserId = useInventoryStore((s) => s.currentUserId);
   const members = useInventoryStore((s) => s.members);
   const invites = useInventoryStore((s) => s.invites);
+  const households = useInventoryStore((s) => s.households);
   const inviteMember = useInventoryStore((s) => s.inviteMember);
   const cancelInvite = useInventoryStore((s) => s.cancelInvite);
   const removeMember = useInventoryStore((s) => s.removeMember);
   const transferOwnership = useInventoryStore((s) => s.transferOwnership);
+  const leaveHousehold = useInventoryStore((s) => s.leaveHousehold);
 
   const me = members.find((m) => m.userId === currentUserId);
   const isOwner = me?.role === "owner";
@@ -26,6 +30,7 @@ export default function HouseholdMembersPage() {
   const [email, setEmail] = useState("");
   const [removeTarget, setRemoveTarget] = useState<Member | null>(null);
   const [transferTarget, setTransferTarget] = useState<Member | null>(null);
+  const [leaveOpen, setLeaveOpen] = useState(false);
 
   return (
     <div className="flex flex-col gap-4">
@@ -84,6 +89,16 @@ export default function HouseholdMembersPage() {
         ))}
       </div>
 
+      {me && households.length > 1 && (
+        <button
+          type="button"
+          onClick={() => setLeaveOpen(true)}
+          className="tap-target rounded-xl border border-border bg-white py-3 text-center text-body font-medium text-danger shadow-sm"
+        >
+          Leave Household
+        </button>
+      )}
+
       <Sheet open={inviteOpen} onOpenChange={setInviteOpen}>
         <SheetContent side="bottom" className="rounded-t-3xl">
           <SheetHeader>
@@ -135,6 +150,30 @@ export default function HouseholdMembersPage() {
           if (transferTarget) {
             transferOwnership(transferTarget.userId);
             toast.success(`${transferTarget.displayName} is now the Owner`);
+          }
+        }}
+      />
+
+      <ConfirmDialog
+        open={leaveOpen}
+        onOpenChange={setLeaveOpen}
+        tone={isOwner ? "default" : "danger"}
+        icon={isOwner ? "key" : "danger"}
+        title={isOwner ? "Transfer ownership first" : "Leave this household?"}
+        description={
+          isOwner
+            ? "You're the Owner — transfer ownership to another member (use the key icon next to their name above) before you can leave."
+            : "You'll lose access to this household's inventory immediately. You can rejoin later with a new invite."
+        }
+        confirmLabel={isOwner ? "Got it" : "Leave"}
+        onConfirm={() => {
+          if (isOwner) return;
+          const result = leaveHousehold();
+          if (result.ok) {
+            toast.success("You've left the household");
+            router.push("/settings");
+          } else {
+            toast.error(result.error ?? "Couldn't leave the household.");
           }
         }}
       />

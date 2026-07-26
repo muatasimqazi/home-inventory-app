@@ -173,6 +173,8 @@ interface InventoryState {
   switchHousehold: (householdId: string) => void;
   /** Redeems a pending invite matching `email` for a household the current user isn't a member of yet, joins as a Member, and switches to it. */
   acceptInvite: (email: string, displayName: string) => { ok: boolean; error?: string; household?: Household };
+  /** Leaves the current household. Blocked if the caller is its Owner (transfer ownership first) or if it's their only household. */
+  leaveHousehold: () => { ok: boolean; error?: string };
   inviteMember: (email: string) => void;
   cancelInvite: (inviteId: string) => void;
   removeMember: (userId: string) => void;
@@ -341,6 +343,29 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       ...nextBundle,
     });
     return { ok: true, household: entry.household };
+  },
+
+  leaveHousehold: () => {
+    const state = get();
+    const me = state.members.find((m) => m.userId === state.currentUserId);
+    if (!me) return { ok: false, error: "You're not a member of this household." };
+    if (me.role === "owner") return { ok: false, error: "Transfer ownership to another member before leaving." };
+    if (state.households.length <= 1) return { ok: false, error: "You can't leave your only household." };
+
+    get().logActivity({ entityType: "member", entityId: me.userId, entityName: me.displayName, action: "left" });
+
+    const leavingHouseholdId = state.currentHouseholdId;
+    const nextHousehold = state.households.find((h) => h.id !== leavingHouseholdId)!;
+    const nextBundle = otherHouseholdData[nextHousehold.id];
+    delete otherHouseholdData[leavingHouseholdId];
+    delete otherHouseholdData[nextHousehold.id];
+
+    set({
+      households: state.households.filter((h) => h.id !== leavingHouseholdId),
+      currentHouseholdId: nextHousehold.id,
+      ...nextBundle,
+    });
+    return { ok: true };
   },
 
   createItem: (input) => {
