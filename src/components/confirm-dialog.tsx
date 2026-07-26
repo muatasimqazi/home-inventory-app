@@ -72,12 +72,12 @@ export function ConfirmDialog({
           <DialogDescription className="text-body text-muted-foreground">{description}</DialogDescription>
         </DialogHeader>
         <DialogFooter className="gap-2 sm:gap-2">
-          <Button variant="outline" size="lg" className="flex-1" onClick={() => onOpenChange(false)} disabled={pending}>
+          <Button variant="outline" size="lg" className="flex-auto" onClick={() => onOpenChange(false)} disabled={pending}>
             {cancelLabel}
           </Button>
           <Button
             size="lg"
-            className={tone === "danger" ? "flex-1" : "flex-1 bg-ink text-white hover:bg-ink/90"}
+            className={tone === "danger" ? "flex-auto" : "flex-auto bg-ink text-white hover:bg-ink/90"}
             variant={tone === "danger" ? "destructive" : "default"}
             onClick={handleConfirm}
             disabled={pending}
