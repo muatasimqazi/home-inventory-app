@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon, type IconName } from "@/components/icon";
 import { useInventoryStore, useCurrentHousehold } from "@/lib/store";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -49,7 +50,10 @@ export default function SettingsPage() {
       </Link>
 
       <button
-        onClick={() => router.push("/sign-in")}
+        onClick={async () => {
+          await getSupabaseBrowserClient().auth.signOut();
+          router.push("/sign-in");
+        }}
         className="tap-target flex items-center justify-center gap-2 rounded-2xl border border-border bg-white py-3 text-body font-medium text-danger"
       >
         <Icon name="logOut" size={16} /> Sign out

@@ -1,35 +1,77 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Icon } from "@/components/icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useInventoryStore } from "@/lib/store";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
-type Mode = "default" | "email" | "authenticating" | "error";
+type Mode = "default" | "email" | "authenticating" | "checkEmail";
+type AuthAction = "signin" | "signup";
 
 export default function SignInPage() {
+  return (
+    <Suspense>
+      <SignInInner />
+    </Suspense>
+  );
+}
+
+function SignInInner() {
   const router = useRouter();
-  const members = useInventoryStore((s) => s.members);
+  const searchParams = useSearchParams();
   const [mode, setMode] = useState<Mode>("default");
+  const [authAction, setAuthAction] = useState<AuthAction>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(searchParams.get("error"));
 
-  function authenticate() {
+  async function continueWithGoogle() {
+    setError(null);
     setMode("authenticating");
-    setTimeout(() => {
-      if (password && password.length < 4) {
-        setMode("error");
+    const supabase = getSupabaseBrowserClient();
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? window.location.origin;
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: `${appUrl}/auth/callback` },
+    });
+    // On success the browser navigates away to Google — this only returns
+    // if the redirect itself failed to start.
+    if (oauthError) {
+      setError(oauthError.message);
+      setMode("default");
+    }
+  }
+
+  async function submitEmailForm() {
+    setError(null);
+    setMode("authenticating");
+    const supabase = getSupabaseBrowserClient();
+
+    if (authAction === "signup") {
+      const { data, error: signUpError } = await supabase.auth.signUp({ email: email.trim(), password });
+      if (signUpError) {
+        setError(signUpError.message);
+        setMode("email");
         return;
       }
-      // "Continue with Google" (no email typed) always signs in as the
-      // existing demo user. For "Continue with email", an address that
-      // doesn't match any known member simulates a brand-new signup with
-      // no household yet — routes into onboarding instead of the dashboard.
-      const isKnownMember = !email.trim() || members.some((m) => m.email.toLowerCase() === email.trim().toLowerCase());
-      router.push(isKnownMember ? "/" : "/household-setup");
-    }, 700);
+      if (!data.session) {
+        // Email confirmation is required — no session yet.
+        setMode("checkEmail");
+        return;
+      }
+      router.push("/household-setup");
+      return;
+    }
+
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    if (signInError) {
+      setError(signInError.message);
+      setMode("email");
+      return;
+    }
+    router.push("/");
   }
 
   return (
@@ -48,7 +90,25 @@ export default function SignInPage() {
             <Icon name="spinner" size={24} className="animate-spin" />
             <p className="text-body text-muted-foreground">Signing in…</p>
           </div>
-        ) : mode === "email" || mode === "error" ? (
+        ) : mode === "checkEmail" ? (
+          <div className="flex w-full flex-col items-center gap-3 text-center">
+            <Icon name="bell" size={24} className="text-ink" />
+            <p className="text-body font-medium text-ink">Check your email</p>
+            <p className="text-caption text-muted-foreground">
+              We sent a confirmation link to {email.trim()}. Click it, then come back and sign in.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setMode("email");
+                setAuthAction("signin");
+              }}
+              className="text-caption text-muted-foreground underline underline-offset-2"
+            >
+              Back to sign in
+            </button>
+          </div>
+        ) : mode === "email" ? (
           <div className="flex w-full flex-col gap-3">
             <Input
               type="email"
@@ -56,6 +116,7 @@ export default function SignInPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="h-11"
+              autoFocus
             />
             <Input
               type="password"
@@ -64,20 +125,45 @@ export default function SignInPage() {
               onChange={(e) => setPassword(e.target.value)}
               className="h-11"
             />
-            {mode === "error" && <p className="text-caption text-danger">Couldn&apos;t sign in. Check your details and try again.</p>}
-            <Button size="lg" onClick={authenticate} disabled={!email || !password}>
-              Continue
+            {error && <p className="text-caption text-danger">{error}</p>}
+            <Button size="lg" onClick={submitEmailForm} disabled={!email || !password}>
+              {authAction === "signup" ? "Create account" : "Continue"}
             </Button>
-            <button type="button" onClick={() => setMode("default")} className="text-caption text-muted-foreground">
+            <button
+              type="button"
+              onClick={() => {
+                setAuthAction((a) => (a === "signup" ? "signin" : "signup"));
+                setError(null);
+              }}
+              className="text-caption text-muted-foreground"
+            >
+              {authAction === "signup" ? "Already have an account? Sign in" : "Don't have an account? Sign up"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMode("default");
+                setError(null);
+              }}
+              className="text-caption text-muted-foreground"
+            >
               Back
             </button>
           </div>
         ) : (
           <div className="flex w-full flex-col gap-3">
-            <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={authenticate}>
+            {error && <p className="text-center text-caption text-danger">{error}</p>}
+            <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={continueWithGoogle}>
               Continue with Google
             </Button>
-            <Button size="lg" variant="outline" onClick={() => setMode("email")}>
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={() => {
+                setMode("email");
+                setAuthAction("signin");
+              }}
+            >
               Continue with email
             </Button>
           </div>

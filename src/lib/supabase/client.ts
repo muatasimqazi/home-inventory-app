@@ -1,11 +1,14 @@
 "use client";
 
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createBrowserClient } from "@supabase/ssr";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
-// Browser-safe Supabase client — only the publishable key, never the secret
-// key. Not wired into the store yet: the app still runs entirely on the
-// in-memory mock store (see lib/store.ts). This exists so the swap to a
-// real backend later is a call-site change, not an architecture change.
+// Browser client — only the publishable key, never the secret key.
+// createBrowserClient (not the plain supabase-js createClient) stores the
+// session in cookies rather than localStorage, so the same session is
+// readable server-side (middleware, Server Components, Route Handlers) —
+// required for real auth-gated routing, not just client-side "am I signed
+// in" checks.
 let browserClient: SupabaseClient | null = null;
 
 export function getSupabaseBrowserClient(): SupabaseClient {
@@ -17,6 +20,6 @@ export function getSupabaseBrowserClient(): SupabaseClient {
     throw new Error("NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY must be set.");
   }
 
-  browserClient = createClient(url, publishableKey);
+  browserClient = createBrowserClient(url, publishableKey);
   return browserClient;
 }
