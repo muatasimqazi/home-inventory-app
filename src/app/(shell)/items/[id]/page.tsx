@@ -26,7 +26,13 @@ export default function ItemDetailPage() {
   const containers = useInventoryStore((s) => s.containers);
   const activity = useInventoryStore((s) => s.activity);
   const members = useInventoryStore((s) => s.members);
-  const isFavorite = useInventoryStore((s) => s.isFavorite);
+  // Selecting the isFavorite() action itself (a stable function reference)
+  // wouldn't re-render this component when favorites change elsewhere —
+  // e.g. another tab or a Realtime event — since Zustand only re-renders on
+  // a change to the selected *value*, not on a call to a selected function.
+  // Selecting the reactive fields it's derived from instead fixes that.
+  const favorites = useInventoryStore((s) => s.favorites);
+  const currentUserId = useInventoryStore((s) => s.currentUserId);
   const toggleFavorite = useInventoryStore((s) => s.toggleFavorite);
   const archiveItem = useInventoryStore((s) => s.archiveItem);
   const unarchiveItem = useInventoryStore((s) => s.unarchiveItem);
@@ -45,7 +51,7 @@ export default function ItemDetailPage() {
 
   const breadcrumb = buildBreadcrumb(item.locationId, item.containerId, locations, containers);
   const itemActivity = activity.filter((a) => a.entityId === item.id);
-  const favorite = isFavorite(item.id);
+  const favorite = favorites.some((f) => f.itemId === item.id && f.userId === currentUserId);
   const extraFields = extraFieldsForCategory(item.category).filter((f) => item.extraDetails[f.key]);
 
   return (

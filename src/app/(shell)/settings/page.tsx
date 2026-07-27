@@ -51,6 +51,7 @@ export default function SettingsPage() {
 
       <button
         onClick={async () => {
+          useInventoryStore.getState().unsubscribeRealtime();
           await getSupabaseBrowserClient().auth.signOut();
           router.push("/sign-in");
         }}

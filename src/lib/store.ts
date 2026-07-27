@@ -64,7 +64,7 @@ import type {
   NormalizationRule,
   Tag,
 } from "./types";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
 
 // Supabase-backed data layer — households, members, invites, locations,
 // containers, items, tags, favorites, activity log, attachments, label
@@ -135,6 +135,10 @@ interface InventoryState {
   hydrationError: string | null;
   /** Fetches the real signed-in user's households/membership and the current household's full bundle. Safe to call more than once — no-ops once hydrated, shares an in-flight call. */
   hydrate: () => Promise<void>;
+  /** Opens a Realtime channel scoped to `householdId`, replacing any existing one — so a change made on another device/tab shows up here without a reload. */
+  subscribeRealtime: (householdId: string) => void;
+  /** Tears down the current Realtime channel, if any. Called before sign-out so the socket doesn't linger past the session. */
+  unsubscribeRealtime: () => void;
 
   // Items
   createItem: (input: NewItemInput) => Item;
@@ -349,6 +353,43 @@ function persistOrRevert(op: PromiseLike<{ error: { message: string } | null }>,
   });
 }
 
+interface RealtimeRowChange {
+  eventType: "INSERT" | "UPDATE" | "DELETE";
+  new: Record<string, unknown>;
+  old: Record<string, unknown>;
+}
+
+/**
+ * Builds a postgres_changes handler that keeps one store array in sync by
+ * key: INSERT/UPDATE map the row and replace-or-append it, DELETE removes
+ * it. Covers every realtime-bound table except items (needs to preserve
+ * tagIds, which isn't a column), item_tags and favorites (neither maps
+ * onto a standalone array) — those three get bespoke handlers instead.
+ */
+function arrayMergeHandler<TRow, TDomain>(
+  mapper: (row: TRow) => TDomain,
+  keyOf: (item: TDomain) => string,
+  rowKeyOf: (row: Record<string, unknown>) => string,
+  apply: (updater: (current: TDomain[]) => TDomain[]) => void
+) {
+  return (payload: RealtimeRowChange) => {
+    if (payload.eventType === "DELETE") {
+      const oldKey = rowKeyOf(payload.old);
+      apply((current) => current.filter((item) => keyOf(item) !== oldKey));
+      return;
+    }
+    const mapped = mapper(payload.new as TRow);
+    const mappedKey = keyOf(mapped);
+    apply((current) => {
+      const idx = current.findIndex((item) => keyOf(item) === mappedKey);
+      if (idx === -1) return [...current, mapped];
+      const next = current.slice();
+      next[idx] = mapped;
+      return next;
+    });
+  };
+}
+
 export const useInventoryStore = create<InventoryState>()((set, get) => {
   // Households the user belongs to besides the active one, keyed by id —
   // an in-memory cache of already-fetched bundles so switching back and
@@ -357,6 +398,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
   const otherHouseholdCache: Record<string, HouseholdBundle> = {};
 
   let hydratePromise: Promise<void> | null = null;
+  let realtimeChannel: RealtimeChannel | null = null;
 
   return {
   households: [],
@@ -439,11 +481,129 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
         currentHouseholdId,
         ...bundle,
       });
+      get().subscribeRealtime(currentHouseholdId);
     })().finally(() => {
       hydratePromise = null;
     });
 
     return hydratePromise;
+  },
+
+  subscribeRealtime: (householdId) => {
+    get().unsubscribeRealtime();
+    const supabase = getSupabaseBrowserClient();
+    const currentUserId = get().currentUserId;
+    const householdFilter = `household_id=eq.${householdId}`;
+    const channel = supabase.channel(`household-${householdId}`);
+
+    function bind<TRow, TDomain>(
+      table: string,
+      filter: string,
+      mapper: (row: TRow) => TDomain,
+      keyOf: (item: TDomain) => string,
+      rowKeyOf: (row: Record<string, unknown>) => string,
+      stateKey: "members" | "invites" | "locations" | "containers" | "tags" | "activity" | "attachments" | "labelBatches" | "labelBatchEntries" | "normalizationRules"
+    ) {
+      const handler = arrayMergeHandler<TRow, TDomain>(mapper, keyOf, rowKeyOf, (updater) =>
+        set((s) => ({ [stateKey]: updater(s[stateKey] as unknown as TDomain[]) }) as Partial<InventoryState>)
+      );
+      channel.on("postgres_changes", { event: "*", schema: "public", table, filter }, (payload) => handler(payload as RealtimeRowChange));
+    }
+
+    // households isn't one of the per-household arrays (it's `households[]`
+    // shared across every household the user belongs to) — handled here
+    // directly instead of through `bind`'s stateKey union.
+    channel.on("postgres_changes", { event: "*", schema: "public", table: "households", filter: `id=eq.${householdId}` }, (payload) => {
+      const change = payload as unknown as RealtimeRowChange;
+      if (change.eventType === "DELETE") return; // handled via leaveHousehold's own flow, not expected here
+      const mapped = rowToHousehold(change.new as unknown as HouseholdRow);
+      set((s) => ({ households: s.households.map((h) => (h.id === mapped.id ? mapped : h)) }));
+    });
+
+    bind<MemberRow, Member>("members", householdFilter, rowToMember, (m) => m.userId, (r) => r.user_id as string, "members");
+    bind<InviteRow, Invite>("invites", householdFilter, rowToInvite, (i) => i.id, (r) => r.id as string, "invites");
+    bind<LocationRow, Location>("locations", householdFilter, rowToLocation, (l) => l.id, (r) => r.id as string, "locations");
+    bind<ContainerRow, Container>("containers", householdFilter, rowToContainer, (c) => c.id, (r) => r.id as string, "containers");
+    bind<TagRow, Tag>("tags", householdFilter, rowToTag, (t) => t.id, (r) => r.id as string, "tags");
+    bind<ActivityLogRow, ActivityLogEntry>("activity_log", householdFilter, rowToActivityLogEntry, (a) => a.id, (r) => r.id as string, "activity");
+    bind<AttachmentRow, Attachment>("attachments", householdFilter, rowToAttachment, (a) => a.id, (r) => r.id as string, "attachments");
+    bind<LabelBatchRow, LabelBatch>("label_batches", householdFilter, rowToLabelBatch, (b) => b.id, (r) => r.id as string, "labelBatches");
+    bind<LabelBatchEntryRow, LabelBatchEntry>("label_batch_entries", householdFilter, rowToLabelBatchEntry, (e) => e.id, (r) => r.id as string, "labelBatchEntries");
+    bind<NormalizationRuleRow, NormalizationRule>("normalization_rules", householdFilter, rowToNormalizationRule, (n) => n.id, (r) => r.id as string, "normalizationRules");
+
+    // items: bespoke, since tagIds is derived from item_tags, not a column
+    // on this row — a bare replace-by-id would wipe it back to [] on every
+    // unrelated edit (name, quantity, location...) to an item that already
+    // has tags.
+    channel.on("postgres_changes", { event: "*", schema: "public", table: "items", filter: householdFilter }, (payload) => {
+      const change = payload as unknown as RealtimeRowChange;
+      if (change.eventType === "DELETE") {
+        const oldId = change.old.id as string;
+        set((s) => ({ items: s.items.filter((it) => it.id !== oldId) }));
+        return;
+      }
+      const row = change.new as unknown as ItemRow;
+      set((s) => {
+        const existing = s.items.find((it) => it.id === row.id);
+        const mapped = rowToItem(row, existing?.tagIds ?? []);
+        const idx = s.items.findIndex((it) => it.id === row.id);
+        if (idx === -1) return { items: [...s.items, mapped] };
+        const next = s.items.slice();
+        next[idx] = mapped;
+        return { items: next };
+      });
+    });
+
+    // item_tags: pure join table, no household_id column — patches the
+    // matching item's tagIds directly. The `.find`/`.map` against the
+    // already-household-scoped local `items` array is itself the guard
+    // against a foreign household's item_tags rows (RLS would block those
+    // from arriving at all, but this is a second, cheap line of defense).
+    channel.on("postgres_changes", { event: "*", schema: "public", table: "item_tags" }, (payload) => {
+      const change = payload as unknown as RealtimeRowChange;
+      if (change.eventType === "DELETE") {
+        const itemId = change.old.item_id as string;
+        const tagId = change.old.tag_id as string;
+        set((s) => ({ items: s.items.map((it) => (it.id === itemId ? { ...it, tagIds: it.tagIds.filter((id) => id !== tagId) } : it)) }));
+        return;
+      }
+      const itemId = change.new.item_id as string;
+      const tagId = change.new.tag_id as string;
+      set((s) => ({
+        items: s.items.map((it) => (it.id === itemId && !it.tagIds.includes(tagId) ? { ...it, tagIds: [...it.tagIds, tagId] } : it)),
+      }));
+    });
+
+    // favorites: no household_id column at all (RLS scopes it via items) —
+    // filtered by the caller's own user_id instead, then guarded against a
+    // favorite in a *different* household the user also belongs to by
+    // checking the item is one of the currently-loaded household's items.
+    channel.on("postgres_changes", { event: "*", schema: "public", table: "favorites", filter: `user_id=eq.${currentUserId}` }, (payload) => {
+      const change = payload as unknown as RealtimeRowChange;
+      if (change.eventType === "DELETE") {
+        const itemId = change.old.item_id as string;
+        set((s) => ({ favorites: s.favorites.filter((f) => f.itemId !== itemId) }));
+        return;
+      }
+      const row = change.new as unknown as FavoriteRow;
+      if (!get().items.some((it) => it.id === row.item_id)) return;
+      const mapped = rowToFavorite(row);
+      set((s) => (s.favorites.some((f) => f.itemId === mapped.itemId) ? s : { favorites: [...s.favorites, mapped] }));
+    });
+
+    channel.subscribe((status, err) => {
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+        console.error("Realtime subscription failed:", status, err?.message);
+      }
+    });
+    realtimeChannel = channel;
+  },
+
+  unsubscribeRealtime: () => {
+    if (realtimeChannel) {
+      getSupabaseBrowserClient().removeChannel(realtimeChannel);
+      realtimeChannel = null;
+    }
   },
 
   createHousehold: async (input) => {
@@ -467,6 +627,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       currentHouseholdId: household.id,
       ...bundle,
     }));
+    get().subscribeRealtime(household.id);
     return household;
   },
 
@@ -480,6 +641,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
 
     otherHouseholdCache[state.currentHouseholdId] = snapshotBundle(get());
     set({ currentHouseholdId: householdId, ...bundle });
+    get().subscribeRealtime(householdId);
   },
 
   acceptInvite: async (email, displayName) => {
@@ -505,6 +667,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       currentHouseholdId: household.id,
       ...bundle,
     }));
+    get().subscribeRealtime(household.id);
     return { ok: true, household };
   },
 
@@ -535,6 +698,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       currentHouseholdId: nextHousehold.id,
       ...bundle,
     });
+    get().subscribeRealtime(nextHousehold.id);
     return { ok: true };
   },
 
