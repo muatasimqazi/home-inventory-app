@@ -27,8 +27,8 @@ export function DisplayCodeSheet({ open, onOpenChange, container }: DisplayCodeS
   const [value, setValue] = useState(container.displayCode ?? "");
   const [error, setError] = useState<string | null>(null);
 
-  function handleSave() {
-    const result = assignDisplayCode(container.id, value);
+  async function handleSave() {
+    const result = await assignDisplayCode(container.id, value);
     if (!result.ok) {
       setError(result.error ?? "Couldn't save that Bin ID.");
       return;
@@ -37,8 +37,8 @@ export function DisplayCodeSheet({ open, onOpenChange, container }: DisplayCodeS
     onOpenChange(false);
   }
 
-  function handleGenerateNext() {
-    const result = assignDisplayCode(container.id);
+  async function handleGenerateNext() {
+    const result = await assignDisplayCode(container.id);
     if (!result.ok) {
       setError(result.error ?? "Couldn't generate a Bin ID.");
       return;

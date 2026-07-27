@@ -1,9 +1,12 @@
 export function id(prefix: string): string {
-  const uuid =
-    typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID()
-      : Math.random().toString(36).slice(2) + Date.now().toString(36);
-  return `${prefix}_${uuid}`;
+  return `${prefix}_${newId()}`;
+}
+
+/** A real UUID (matches every table's `id uuid` column) — generated client-side so create* actions can still return the created object synchronously, with the same id the DB row ends up with. */
+export function newId(): string {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
 export function tagToken(): string {

@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useInventoryStore } from "@/lib/store";
-import { nextDisplayCode } from "@/lib/display-code";
 import type { Location } from "@/lib/types";
 
 type Mode = "create" | "join";
@@ -44,6 +43,7 @@ function HouseholdSetupInner() {
   const [step, setStep] = useState<Step>(1);
 
   const currentUserId = useInventoryStore((s) => s.currentUserId);
+  const currentUserEmail = useInventoryStore((s) => s.currentUserEmail);
   const members = useInventoryStore((s) => s.members);
   const createHousehold = useInventoryStore((s) => s.createHousehold);
   const createLocation = useInventoryStore((s) => s.createLocation);
@@ -51,7 +51,6 @@ function HouseholdSetupInner() {
   const assignDisplayCode = useInventoryStore((s) => s.assignDisplayCode);
   const inviteMember = useInventoryStore((s) => s.inviteMember);
   const acceptInvite = useInventoryStore((s) => s.acceptInvite);
-  const containers = useInventoryStore((s) => s.containers);
   const me = members.find((m) => m.userId === currentUserId);
 
   // Step 1 — create household
@@ -93,19 +92,23 @@ function HouseholdSetupInner() {
     router.back();
   }
 
-  function handleCreateHousehold() {
+  async function handleCreateHousehold() {
     if (!householdName.trim()) {
       setCreateError("Give your household a name.");
       return;
     }
-    createHousehold({
-      name: householdName.trim(),
-      displayName: me?.displayName ?? "You",
-      email: me?.email ?? "you@example.com",
-      avatarUrl: me?.avatarUrl,
-    });
-    toast.success(`${householdName.trim()} created — you're the Owner`);
-    setStep(2);
+    try {
+      await createHousehold({
+        name: householdName.trim(),
+        displayName: me?.displayName ?? "You",
+        email: me?.email ?? currentUserEmail,
+        avatarUrl: me?.avatarUrl,
+      });
+      toast.success(`${householdName.trim()} created — you're the Owner`);
+      setStep(2);
+    } catch (e) {
+      setCreateError(e instanceof Error ? e.message : "Couldn't create household.");
+    }
   }
 
   function addInviteEmail() {
@@ -146,28 +149,27 @@ function HouseholdSetupInner() {
     setStep(4);
   }
 
-  function handleCreateBin() {
+  async function handleCreateBin() {
     const location = createdLocations.find((l) => l.id === binLocationId) ?? createdLocations[0];
     const name = binName.trim() || (location ? `${location.name} Bin 1` : "Bin 1");
     if (location) {
       const container = createContainer({ name, locationId: location.id });
-      assignDisplayCode(container.id);
-      const code = nextDisplayCode(containers, location.name);
+      const result = await assignDisplayCode(container.id);
       setCreatedBinName(name);
-      setCreatedBinCode(code);
+      setCreatedBinCode(result.ok ? (result.code ?? null) : null);
       toast.success(`${name} created`);
     }
     setStep(5);
   }
 
-  function handleJoin() {
+  async function handleJoin() {
     if (!joinEmail.trim()) {
       setJoinError("Enter the email your invite was sent to.");
       return;
     }
-    const result = acceptInvite(joinEmail.trim(), me?.displayName ?? "You");
+    const result = await acceptInvite(joinEmail.trim(), me?.displayName ?? "You");
     if (!result.ok) {
-      setJoinError(result.error ?? "No pending invite found for that email in this demo.");
+      setJoinError(result.error ?? "No pending invite found for that email.");
       return;
     }
     toast.success(`You've joined ${result.household?.name}`);

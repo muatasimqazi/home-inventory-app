@@ -166,9 +166,9 @@ export default function HouseholdMembersPage() {
             : "You'll lose access to this household's inventory immediately. You can rejoin later with a new invite."
         }
         confirmLabel={isOwner ? "Got it" : "Leave"}
-        onConfirm={() => {
+        onConfirm={async () => {
           if (isOwner) return;
-          const result = leaveHousehold();
+          const result = await leaveHousehold();
           if (result.ok) {
             toast.success("You've left the household");
             router.push("/settings");

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
+import { HydrationGate } from "@/components/hydration-gate";
 
 export const metadata: Metadata = {
   title: "Shohaz",
@@ -21,7 +22,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full antialiased">
       <body className="min-h-full flex flex-col">
-        {children}
+        <HydrationGate>{children}</HydrationGate>
         <Toaster position="top-center" />
       </body>
     </html>
