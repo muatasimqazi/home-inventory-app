@@ -170,6 +170,16 @@ Same "independent research, not a rehash" approach as §17 — five new angles c
 
 **Not gaps** (checked and ruled out): RLS granting full inventory read/write to any household Member (not just Owner) — intentional, matches the PRD's multi-person-edits-the-same-inventory model; Owner-gating is deliberately reserved for household administration only. Missing invite dedup/rate-limiting — an Owner-only, no-real-email-delivery mock action; worst case is a harmless duplicate row, not worth the complexity.
 
+## 21. Migration applied to the real Supabase project
+Every schema change this session (§15–§20) was verified against scratch local Postgres instances, but the migration itself had never touched the actual linked project (ref `wdzxdatgatmdbtfstcfn`, created 2026-07-24, confirmed `ACTIVE_HEALTHY`). `supabase migration list` showed `"remote":""` — nothing applied yet.
+
+- [x] Dry run (`supabase db push --linked --dry-run`) confirmed a clean apply with no conflicts before touching anything live.
+- [x] Applied for real via `supabase db push --linked`. Succeeded outright — including `create extension if not exists pg_cron`, which couldn't be verified locally since `pg_cron` isn't installed in the local Postgres@17 homebrew build. That was the one part of §20's purge job this session couldn't test firsthand; it's now confirmed for real.
+- [x] Verified against the live database (read-only queries, not just "the push command exited 0"): all 14 tables present, RLS (`relrowsecurity`) enabled on all 14, all 13 functions present, the `purge-expired-trash` `pg_cron` job registered and `active: true` on its `'0 * * * *'` schedule, the one-owner and per-household-display-code partial unique indexes both present, and all 3 attachment `CHECK` constraints (`kind`/`content_type`/`size_bytes`) present.
+- [x] Updated the migration's own header comment, which previously said "this migration has not been applied to any Supabase project" — no longer true.
+
+**Still not live**: the schema is real and populated with RLS/triggers/functions, but holds no data, and nothing in the app calls it yet. Real Supabase Auth (sign-in is currently 100% fake) and rewiring `store.ts` from in-memory arrays to actual Supabase calls are both explicitly separate, not-yet-started efforts — the app continues to run entirely on the mock store for now.
+
 ## Verification
 - [x] `tsc --noEmit` clean (after every individual screen fix, not just at the end)
 - [x] `eslint .` clean

@@ -1,9 +1,12 @@
 -- Shohaz v2 schema — mirrors src/lib/types.ts and the updated PRD (§22-24).
 --
--- SCAFFOLDING ONLY: this migration has not been applied to any Supabase
--- project. The app still runs entirely on the in-memory mock store
--- (src/lib/store.ts). Review and apply with `supabase db push` (or the
--- Supabase dashboard SQL editor) when the real backend work begins.
+-- Applied to the linked Supabase project (ref wdzxdatgatmdbtfstcfn) via
+-- `supabase db push --linked` — schema, RLS, functions/triggers, and the
+-- pg_cron purge job are all live. The app itself still runs entirely on
+-- the in-memory mock store (src/lib/store.ts): this is a real, populated
+-- schema with no data and nothing calling it yet — real auth (currently
+-- 100% fake) and rewiring the store to call Supabase instead of mutating
+-- in-memory arrays are both still open, separate efforts.
 --
 -- This is the first migration for Shohaz — there is no prior schema to
 -- diff against — so it defines the whole v2 data model in one file rather
