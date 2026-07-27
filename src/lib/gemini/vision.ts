@@ -8,9 +8,9 @@ import { CATEGORIES } from "@/lib/types";
 // `server-only` import makes an accidental client-component import of this
 // module a build error — GEMINI_API_KEY must never reach the browser.
 //
-// Not wired up as the active VisionProvider (see lib/ai.ts): MockVisionProvider
-// stays the default so nothing here runs unless a developer deliberately
-// swaps the export. This is the real implementation, ready to flip on.
+// This is the active implementation (see lib/ai.ts's `visionProvider`),
+// called via /api/v1/vision/detect rather than imported directly by any
+// client component.
 
 const GEMINI_MODEL = "gemini-flash-latest";
 

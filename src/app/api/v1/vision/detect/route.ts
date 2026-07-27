@@ -4,11 +4,10 @@ import { withReview, type DetectedItem } from "@/lib/ai";
 
 export const runtime = "nodejs";
 
-// Real Gemini vision endpoint (PRD v2 §12). Not on the app's active path —
-// lib/ai.ts's `visionProvider` still points at MockVisionProvider by
-// default. This route exists so the swap is a one-line change once the
-// backend is ready to go live, and so GEMINI_API_KEY only ever lives here,
-// server-side.
+// Real Gemini vision endpoint (PRD v2 §12), now on the app's active path —
+// lib/ai.ts's `visionProvider` points at GeminiVisionProvider, which calls
+// this route rather than the browser touching Gemini directly, so
+// GEMINI_API_KEY only ever lives here, server-side.
 export async function POST(request: Request) {
   let photos: unknown;
   try {

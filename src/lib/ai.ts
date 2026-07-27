@@ -89,8 +89,8 @@ export class GeminiVisionProvider implements VisionProvider {
   }
 }
 
-// MockVisionProvider stays the active default — swap to `new
-// GeminiVisionProvider()` here (and nowhere else) once the backend is ready
-// to go live. Every call site in the app depends only on the VisionProvider
-// interface.
-export const visionProvider: VisionProvider = new MockVisionProvider();
+// Real Gemini detection is now live — GEMINI_API_KEY is configured and
+// verified (see docs/v2-checklist.md). Every call site in the app depends
+// only on the VisionProvider interface, so this was the only line that
+// needed to change.
+export const visionProvider: VisionProvider = new GeminiVisionProvider();

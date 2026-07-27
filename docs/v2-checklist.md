@@ -239,6 +239,16 @@ Every schema change this session (§15–§20) was verified against scratch loca
 
 **Nothing deliberately deferred remains.** The mock → real Supabase migration (Stages 1-4) plus live Realtime sync is complete.
 
+## 26. Real Gemini vision detection goes live
+Item photo capture (PRD v2 §12) was the other named mock — `lib/ai.ts`'s `visionProvider` still pointed at `MockVisionProvider` (a fixed 13-item canned pool, shuffled per capture) despite a complete real implementation already sitting behind it: `GeminiVisionProvider` (client-safe, calls `/api/v1/vision/detect`), the route itself, and `lib/gemini/vision.ts` (server-only, structured-output Gemini call via the `ai` SDK + `@ai-sdk/google`, `gemini-flash-latest`). Someone had already built and reviewed the real path; it just needed a `GEMINI_API_KEY` and the one-line default switched over.
+
+- [x] `GEMINI_API_KEY` was already present in `.env.local` — verified live against Gemini's API directly (not just assumed present/valid) before touching any app code, confirming both the key and the `gemini-flash-latest` model id actually work.
+- [x] `lib/ai.ts`: `visionProvider` switched from `new MockVisionProvider()` to `new GeminiVisionProvider()` — the only line that needed to change, exactly as the file's own prior comments described. `MockVisionProvider` itself is left in place (not deleted) as a manual fallback for local dev without a key. Stale comments in the route and `lib/gemini/vision.ts` claiming the mock was still the default were updated to match reality.
+- [x] Verified live through the real capture UI, not just the API route in isolation: launched Chromium with `--use-fake-device-for-media-stream`/`--use-fake-ui-for-media-stream` so the camera-permission flow actually reaches `mode: "live"` (headless Chromium has no real camera), used the "Choose from library" fallback to feed in a synthetic but clearly-labeled test photo (a 🧯 emoji + "FIRE EXTINGUISHER" text), and confirmed the real request/response cycle end-to-end: the call took ~5.2s (a real network round trip, not the mock's fixed 1.1s artificial delay), the review screen showed category "Hardware" and tags "safety"/"fire-safety" directly reflecting the photo's actual content, and **none** of the mock's 13 canned-pool item names appeared anywhere in the result — the strongest available proof this is genuinely calling Gemini and not silently still hitting the mock.
+- [x] `tsc`/`eslint`/`next build` all clean.
+
+**Still mock, not addressed this pass**: label PDF export and the full household data export (`lib/export.ts` — explicitly commented as "mock export, real PDF generation isn't wired up yet") were the other named stub from the last "what's left" review; not touched here.
+
 ## Verification
 - [x] `tsc --noEmit` clean (after every individual screen fix, not just at the end)
 - [x] `eslint .` clean
