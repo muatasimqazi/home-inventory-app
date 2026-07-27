@@ -301,7 +301,7 @@ function HouseholdSetupInner() {
             </div>
 
             <div className="rounded-xl border border-brand-200 bg-brand-100 p-3">
-              <p className="text-caption text-brand-700">Owners manage settings and members. Editors can add, move, and archive inventory.</p>
+              <p className="text-caption text-brand-700">Owners manage settings and members. Members can add, move, and archive inventory.</p>
             </div>
           </>
         ) : step === 3 ? (

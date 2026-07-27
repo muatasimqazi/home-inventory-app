@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import { id, tagToken } from "./id";
 import { isDisplayCodeTaken, nextDisplayCode, normalizeDisplayCode } from "./display-code";
+import { ATTACHMENT_MAX_SIZE_BYTES, ATTACHMENT_MAX_SIZE_LABEL, isAttachmentTypeAllowed } from "./attachment-limits";
 import {
   CURRENT_USER_ID,
   invitableHouseholds,
@@ -139,7 +140,7 @@ interface InventoryState {
     storagePath: string;
     contentType: string;
     sizeBytes: number;
-  }) => Attachment;
+  }) => { ok: boolean; error?: string; attachment?: Attachment };
   deleteAttachment: (attachmentId: string) => void;
 
   // Label batches
@@ -190,6 +191,9 @@ interface InventoryState {
     action: ActivityAction;
     detail?: string;
   }) => void;
+
+  /** Sweeps items/containers/locations whose permanentlyDeleteAfter has passed. Client-side stand-in for the migration's purge_expired_trash() + pg_cron schedule — see store.ts's module-level call below for how this actually gets invoked. */
+  purgeExpiredTrash: () => void;
 }
 
 export interface ActivityLogAppend {
@@ -663,6 +667,12 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
   },
 
   addAttachment: (itemId, input) => {
+    if (input.sizeBytes > ATTACHMENT_MAX_SIZE_BYTES) {
+      return { ok: false, error: `File is too large — max ${ATTACHMENT_MAX_SIZE_LABEL}.` };
+    }
+    if (!isAttachmentTypeAllowed(input.contentType)) {
+      return { ok: false, error: "Only images and PDFs can be attached." };
+    }
     const created: Attachment = {
       id: id("att"),
       householdId: get().currentHouseholdId,
@@ -672,7 +682,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       ...input,
     };
     set((s) => ({ attachments: [...s.attachments, created] }));
-    return created;
+    return { ok: true, attachment: created };
   },
 
   deleteAttachment: (attachmentId) => {
@@ -868,8 +878,65 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     };
     set((s) => ({ activity: [created, ...s.activity] }));
   },
+
+  purgeExpiredTrash: () => {
+    const state = get();
+    const now = nowIso();
+    const isExpired = (status: string, after: string | null | undefined) => status === "trashed" && !!after && after <= now;
+
+    let changed = false;
+
+    let items = state.items;
+    const survivingItems = items.filter((it) => !isExpired(it.status, it.permanentlyDeleteAfter));
+    if (survivingItems.length !== items.length) {
+      items = survivingItems;
+      changed = true;
+    }
+
+    // Bounded loop mirrors the migration's purge_expired_trash(): a
+    // container is only safe to drop once it has no remaining (surviving)
+    // children, so a multi-level expired tree resolves in one call instead
+    // of leaving stragglers for next time.
+    let containers = state.containers;
+    for (let i = 0; i < 10; i++) {
+      const survivingContainers = containers.filter((c) => {
+        if (!isExpired(c.status, c.permanentlyDeleteAfter)) return true;
+        return containers.some((child) => child.parentContainerId === c.id);
+      });
+      if (survivingContainers.length === containers.length) break;
+      containers = survivingContainers;
+      changed = true;
+    }
+
+    let locations = state.locations;
+    const survivingLocations = locations.filter((l) => {
+      if (!isExpired(l.status, l.permanentlyDeleteAfter)) return true;
+      return containers.some((c) => c.locationId === l.id);
+    });
+    if (survivingLocations.length !== locations.length) {
+      locations = survivingLocations;
+      changed = true;
+    }
+
+    if (!changed) return;
+    set({ items, containers, locations });
+  },
   };
 });
+
+// Sweep expired trash once at load (catches anything already past its
+// purge date when the app starts) and periodically while the tab stays
+// open, so an item that crosses its purge threshold mid-session
+// disappears without needing a reload — the closest a client-only mock
+// can get to PRD §14's "scheduled job" without a real background worker.
+// See purge_expired_trash() + the pg_cron schedule in the migration for
+// the real equivalent. Guarded for SSR: this module can be evaluated on
+// the server during Next.js's initial render pass, where setInterval
+// would just leak a timer in a process that's about to discard it.
+if (typeof window !== "undefined") {
+  useInventoryStore.getState().purgeExpiredTrash();
+  setInterval(() => useInventoryStore.getState().purgeExpiredTrash(), 60_000);
+}
 
 /** The household currently active in the store — components that just need name/id/createdAt shouldn't have to find() it themselves. */
 export function useCurrentHousehold(): Household {

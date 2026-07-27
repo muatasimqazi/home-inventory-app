@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Icon } from "@/components/icon";
 import { useInventoryStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
+import { ATTACHMENT_ACCEPT, ATTACHMENT_MAX_SIZE_BYTES, ATTACHMENT_MAX_SIZE_LABEL, isAttachmentTypeAllowed } from "@/lib/attachment-limits";
 import type { Attachment, AttachmentKind } from "@/lib/types";
 
 const KIND_LABELS: Record<AttachmentKind, string> = {
@@ -43,14 +44,31 @@ export function ItemAttachments({ itemId }: { itemId: string }) {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file || !uploadingKind) return;
-    addAttachment(itemId, {
+    const contentType = file.type || "application/octet-stream";
+    // Same rules as the store's own check (lib/attachment-limits.ts) — this
+    // is just an earlier, friendlier rejection before the file even loads.
+    if (file.size > ATTACHMENT_MAX_SIZE_BYTES) {
+      toast.error(`File is too large — max ${ATTACHMENT_MAX_SIZE_LABEL}.`);
+      setUploadingKind(null);
+      return;
+    }
+    if (!isAttachmentTypeAllowed(contentType)) {
+      toast.error("Only images and PDFs can be attached.");
+      setUploadingKind(null);
+      return;
+    }
+    const result = addAttachment(itemId, {
       kind: uploadingKind,
       fileName: file.name,
       storagePath: URL.createObjectURL(file),
-      contentType: file.type || "application/octet-stream",
+      contentType,
       sizeBytes: file.size,
     });
-    toast.success(`Added ${file.name}`);
+    if (result.ok) {
+      toast.success(`Added ${file.name}`);
+    } else {
+      toast.error(result.error ?? "Couldn't add that file.");
+    }
     setUploadingKind(null);
   }
 
@@ -71,7 +89,7 @@ export function ItemAttachments({ itemId }: { itemId: string }) {
           />
         ))}
       </div>
-      <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChosen} />
+      <input ref={fileInputRef} type="file" accept={ATTACHMENT_ACCEPT} className="hidden" onChange={handleFileChosen} />
     </div>
   );
 }

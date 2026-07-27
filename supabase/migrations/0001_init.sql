@@ -480,8 +480,13 @@ create table attachments (
   kind text not null check (kind in ('receipt', 'manual', 'warranty', 'other')),
   file_name text not null,
   storage_path text not null, -- Supabase Storage object path
-  content_type text not null,
-  size_bytes bigint not null,
+  -- No PRD-specified numbers for either check below — mirrors
+  -- lib/attachment-limits.ts's 10MB cap and image/PDF-only rule so the
+  -- same limits hold even for a write that bypasses the client (a direct
+  -- API call, a future import path, etc.), not just whichever UI happened
+  -- to check first.
+  content_type text not null check (content_type like 'image/%' or content_type = 'application/pdf'),
+  size_bytes bigint not null check (size_bytes > 0 and size_bytes <= 10485760),
   created_by_user_id uuid not null references auth.users(id),
   created_at timestamptz not null default now()
 );
@@ -594,6 +599,74 @@ create table activity_log (
 );
 
 create index activity_log_household_id_idx on activity_log(household_id, created_at desc);
+
+-- ---------------------------------------------------------------------------
+-- Trash auto-purge (PRD §14: trashed rows are "automatically and
+-- permanently purged by a scheduled job" once permanently_delete_after
+-- passes — until now, permanently_delete_after was computed and stored
+-- everywhere trash happens, but nothing ever read it to actually delete
+-- anything; rows just sat in trash forever past retention unless a human
+-- clicked "Delete Forever").
+--
+-- Requires the pg_cron extension enabled on the Supabase project
+-- (Database → Extensions in the dashboard — available on all plans, but
+-- not on by default, and not something this migration file can turn on
+-- by itself if the project disallows it). If pg_cron truly isn't
+-- available, purge_expired_trash() below still works as a plain function
+-- — call it manually or from an external scheduler instead of relying on
+-- the cron.schedule() call at the bottom of this section.
+-- ---------------------------------------------------------------------------
+
+create extension if not exists pg_cron;
+
+-- security definer: a scheduled job has no household context of its own —
+-- it isn't "a member" of anything, so RLS's is_household_member() checks
+-- would block every delete if this ran under a caller's own privileges.
+-- Deletes leaf-first (items, then containers, then locations) and only
+-- deletes a container/location once nothing still depends on it, so an
+-- expired parent never takes a *not-yet-expired* (or even still-active)
+-- child down with it via ON DELETE CASCADE — the cheap version of this
+-- function would just `delete from locations where ...` and trust cascade,
+-- but containers.location_id and containers.parent_container_id are both
+-- ON DELETE CASCADE, so that would also sweep away any container whose
+-- own retention window hasn't actually expired yet, just because it lives
+-- under an expired parent.
+create function purge_expired_trash()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  i integer;
+begin
+  delete from items
+  where status = 'trashed'
+    and permanently_delete_after is not null
+    and permanently_delete_after <= now();
+
+  -- Bounded loop: a multi-level expired container tree (bins nested a few
+  -- levels deep, all trashed together via the existing cascading-trash
+  -- behavior) fully clears in one run instead of peeling off one level per
+  -- cron tick. 10 iterations is far beyond any realistic nesting depth.
+  for i in 1..10 loop
+    delete from containers c
+    where c.status = 'trashed'
+      and c.permanently_delete_after is not null
+      and c.permanently_delete_after <= now()
+      and not exists (select 1 from containers child where child.parent_container_id = c.id);
+    exit when not found;
+  end loop;
+
+  delete from locations l
+  where l.status = 'trashed'
+    and l.permanently_delete_after is not null
+    and l.permanently_delete_after <= now()
+    and not exists (select 1 from containers c where c.location_id = l.id);
+end;
+$$;
+
+select cron.schedule('purge-expired-trash', '0 * * * *', 'select purge_expired_trash();');
 
 -- ---------------------------------------------------------------------------
 -- Row Level Security — every table is scoped to the caller's household(s)
