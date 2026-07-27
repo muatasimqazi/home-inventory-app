@@ -3,7 +3,7 @@
 import { create } from "zustand";
 import { toast } from "sonner";
 import { getSupabaseBrowserClient } from "./supabase/client";
-import { id, newId, tagToken } from "./id";
+import { newId, tagToken } from "./id";
 import { isDisplayCodeTaken, nextDisplayCode, normalizeDisplayCode } from "./display-code";
 import { ATTACHMENT_MAX_SIZE_BYTES, ATTACHMENT_MAX_SIZE_LABEL, isAttachmentTypeAllowed } from "./attachment-limits";
 import {
@@ -22,6 +22,14 @@ import {
   rowToFavorite,
   rowToActivityLogEntry,
   activityLogEntryToInsertRow,
+  rowToAttachment,
+  attachmentToInsertRow,
+  rowToLabelBatch,
+  labelBatchToInsertRow,
+  rowToLabelBatchEntry,
+  labelBatchEntryToInsertRow,
+  rowToNormalizationRule,
+  normalizationRuleToInsertRow,
   type HouseholdRow,
   type MemberRow,
   type InviteRow,
@@ -31,6 +39,10 @@ import {
   type TagRow,
   type FavoriteRow,
   type ActivityLogRow,
+  type AttachmentRow,
+  type LabelBatchRow,
+  type LabelBatchEntryRow,
+  type NormalizationRuleRow,
 } from "./supabase/mappers";
 import type {
   ActivityAction,
@@ -54,26 +66,22 @@ import type {
 } from "./types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-// Supabase-backed data layer, Stage 3 of the mock -> real migration
-// (identity + core inventory). Households, members, invites, locations,
-// containers, items, tags, favorites, and the activity log are real rows
-// in the linked Supabase project (supabase/migrations/0001_init.sql,
-// 0002_accept_invite_by_email.sql) — RLS enforces household scoping the
-// same way it would for a direct API call.
-//
-// Attachments, label batches, and normalization rules stay exactly as
-// they were (in-memory only, scoped to the current session) — attachments
-// need a real Supabase Storage bucket that doesn't exist yet, and label
-// batches/normalization rules are simply out of scope for this pass. A
-// freshly created or joined real household just starts with empty arrays
-// for these instead of seed data.
+// Supabase-backed data layer — households, members, invites, locations,
+// containers, items, tags, favorites, activity log, attachments, label
+// batches, and normalization rules are all real rows (or, for
+// attachments, real Storage objects) in the linked Supabase project
+// (supabase/migrations/0001_init.sql, 0002_accept_invite_by_email.sql,
+// 0003_attachments_storage.sql) — RLS enforces household scoping the same
+// way it would for a direct API call.
 //
 // Mutations are optimistic: local state updates immediately (same instant
 // UX the mock always had), the write is fired at Supabase in the
 // background, and a failure reverts the optimistic change and toasts an
 // error. The handful of actions whose result already gates UI right now —
-// assignDisplayCode, acceptInvite, leaveHousehold, createHousehold — need
-// a real answer, not a guess, so they're properly async/awaited instead.
+// assignDisplayCode, acceptInvite, leaveHousehold, createHousehold,
+// claimUnassignedLabel — need a real answer, not a guess, so they're
+// properly async/awaited instead. addAttachment is also awaited: a file
+// has to actually finish uploading before there's anything to show.
 
 const TRASH_RETENTION_DAYS = 30;
 const REVIEW_LOW_CONFIDENCE = 0.75;
@@ -164,17 +172,15 @@ interface InventoryState {
   /** Marks a container's NFC tag as linked (native write or the iOS Shortcuts fallback both call this — same end state). */
   linkNfcTag: (containerId: string) => void;
 
-  // Attachments (still mock/local — no Supabase Storage bucket yet)
+  // Attachments — real Supabase Storage (private "attachments" bucket)
+  /** Uploads `file` to Storage, then inserts the attachment row. Real, awaited: a File has to actually finish uploading before there's anything to show. */
   addAttachment: (itemId: string, input: {
     kind: AttachmentKind;
-    fileName: string;
-    storagePath: string;
-    contentType: string;
-    sizeBytes: number;
-  }) => { ok: boolean; error?: string; attachment?: Attachment };
+    file: File;
+  }) => Promise<{ ok: boolean; error?: string; attachment?: Attachment }>;
   deleteAttachment: (attachmentId: string) => void;
 
-  // Label batches (still mock/local)
+  // Label batches
   createLabelBatch: (input: {
     paperPreset: LabelPaperPreset;
     toggle: LabelToggle;
@@ -184,15 +190,15 @@ interface InventoryState {
     containerIds: string[];
     unassignedCount: number;
   }) => { batch: LabelBatch; entries: LabelBatchEntry[] };
-  /** Adopts a preprinted/unassigned label's tagToken (and a fresh Bin ID, if the container doesn't have one) onto an existing container. */
-  claimUnassignedLabel: (entryId: string, containerId: string) => { ok: boolean; error?: string };
+  /** Adopts a preprinted/unassigned label's tagToken (and a fresh Bin ID, if the container doesn't have one) onto an existing container. Real, awaited: "already assigned" can only be answered for real. */
+  claimUnassignedLabel: (entryId: string, containerId: string) => Promise<{ ok: boolean; error?: string }>;
   /** Transitions a batch (and every one of its entries) to 'printed' — the actual "this physically went to the printer" moment, distinct from just exporting a PDF. */
   markLabelBatchPrinted: (batchId: string) => void;
 
   // Tags
   getOrCreateTag: (name: string) => Tag;
 
-  // Normalization (still mock/local)
+  // Normalization
   findNormalizationRule: (rawName: string) => NormalizationRule | undefined;
   saveNormalizationRule: (rawPattern: string, canonicalName: string, category: string) => void;
 
@@ -275,26 +281,43 @@ function snapshotBundle(state: InventoryState): HouseholdBundle {
   };
 }
 
-/** Fetches everything scoped to one household in parallel. Attachments/label batches/normalization rules aren't real yet (see file header) — they always come back empty for a freshly fetched household. */
+/** Fetches everything scoped to one household in parallel. */
 async function fetchHouseholdBundle(
   supabase: SupabaseClient,
   householdId: string,
   userId: string
 ): Promise<HouseholdBundle> {
-  const [membersRes, invitesRes, locationsRes, containersRes, itemsRes, tagsRes, favoritesRes, activityRes] =
-    await Promise.all([
-      supabase.from("members").select("*").eq("household_id", householdId),
-      supabase.from("invites").select("*").eq("household_id", householdId),
-      supabase.from("locations").select("*").eq("household_id", householdId),
-      supabase.from("containers").select("*").eq("household_id", householdId),
-      supabase.from("items").select("*, item_tags(tag_id)").eq("household_id", householdId),
-      supabase.from("tags").select("*").eq("household_id", householdId),
-      supabase.from("favorites").select("*, items!inner(household_id)").eq("user_id", userId).eq("items.household_id", householdId),
-      supabase.from("activity_log").select("*").eq("household_id", householdId).order("created_at", { ascending: false }).limit(500),
-    ]);
+  const [
+    membersRes,
+    invitesRes,
+    locationsRes,
+    containersRes,
+    itemsRes,
+    tagsRes,
+    favoritesRes,
+    activityRes,
+    attachmentsRes,
+    labelBatchesRes,
+    labelBatchEntriesRes,
+    normalizationRulesRes,
+  ] = await Promise.all([
+    supabase.from("members").select("*").eq("household_id", householdId),
+    supabase.from("invites").select("*").eq("household_id", householdId),
+    supabase.from("locations").select("*").eq("household_id", householdId),
+    supabase.from("containers").select("*").eq("household_id", householdId),
+    supabase.from("items").select("*, item_tags(tag_id)").eq("household_id", householdId),
+    supabase.from("tags").select("*").eq("household_id", householdId),
+    supabase.from("favorites").select("*, items!inner(household_id)").eq("user_id", userId).eq("items.household_id", householdId),
+    supabase.from("activity_log").select("*").eq("household_id", householdId).order("created_at", { ascending: false }).limit(500),
+    supabase.from("attachments").select("*").eq("household_id", householdId),
+    supabase.from("label_batches").select("*").eq("household_id", householdId).order("created_at", { ascending: false }),
+    supabase.from("label_batch_entries").select("*").eq("household_id", householdId),
+    supabase.from("normalization_rules").select("*").eq("household_id", householdId),
+  ]);
 
   const firstError =
-    membersRes.error ?? invitesRes.error ?? locationsRes.error ?? containersRes.error ?? itemsRes.error ?? tagsRes.error ?? favoritesRes.error ?? activityRes.error;
+    membersRes.error ?? invitesRes.error ?? locationsRes.error ?? containersRes.error ?? itemsRes.error ?? tagsRes.error ?? favoritesRes.error ?? activityRes.error ??
+    attachmentsRes.error ?? labelBatchesRes.error ?? labelBatchEntriesRes.error ?? normalizationRulesRes.error;
   if (firstError) throw new Error(firstError.message);
 
   type ItemRowWithTags = ItemRow & { item_tags: { tag_id: string }[] | null };
@@ -308,10 +331,10 @@ async function fetchHouseholdBundle(
     tags: ((tagsRes.data ?? []) as TagRow[]).map(rowToTag),
     favorites: ((favoritesRes.data ?? []) as FavoriteRow[]).map(rowToFavorite),
     activity: ((activityRes.data ?? []) as ActivityLogRow[]).map(rowToActivityLogEntry),
-    attachments: [],
-    labelBatches: [],
-    labelBatchEntries: [],
-    normalizationRules: [],
+    attachments: ((attachmentsRes.data ?? []) as AttachmentRow[]).map(rowToAttachment),
+    labelBatches: ((labelBatchesRes.data ?? []) as LabelBatchRow[]).map(rowToLabelBatch),
+    labelBatchEntries: ((labelBatchEntriesRes.data ?? []) as LabelBatchEntryRow[]).map(rowToLabelBatchEntry),
+    normalizationRules: ((normalizationRulesRes.data ?? []) as NormalizationRuleRow[]).map(rowToNormalizationRule),
     lastUsedDestination: null,
   };
 }
@@ -988,33 +1011,71 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     get().logActivity({ entityType: "container", entityId: containerId, entityName: container.name, action: "edited", detail: "NFC tag linked" });
   },
 
-  addAttachment: (itemId, input) => {
-    if (input.sizeBytes > ATTACHMENT_MAX_SIZE_BYTES) {
+  addAttachment: async (itemId, input) => {
+    const { file } = input;
+    const contentType = file.type || "application/octet-stream";
+    if (file.size > ATTACHMENT_MAX_SIZE_BYTES) {
       return { ok: false, error: `File is too large — max ${ATTACHMENT_MAX_SIZE_LABEL}.` };
     }
-    if (!isAttachmentTypeAllowed(input.contentType)) {
+    if (!isAttachmentTypeAllowed(contentType)) {
       return { ok: false, error: "Only images and PDFs can be attached." };
     }
+
+    const supabase = getSupabaseBrowserClient();
+    const householdId = get().currentHouseholdId;
+    const attachmentId = newId();
+    const storagePath = `${householdId}/${attachmentId}`;
+
+    const { error: uploadError } = await supabase.storage.from("attachments").upload(storagePath, file, { contentType });
+    if (uploadError) return { ok: false, error: uploadError.message };
+
     const created: Attachment = {
-      id: id("att"),
-      householdId: get().currentHouseholdId,
+      id: attachmentId,
+      householdId,
       itemId,
+      kind: input.kind,
+      fileName: file.name,
+      storagePath,
+      contentType,
+      sizeBytes: file.size,
       createdByUserId: get().currentUserId,
       createdAt: nowIso(),
-      ...input,
     };
+
+    const { error: insertError } = await supabase.from("attachments").insert(attachmentToInsertRow(created));
+    if (insertError) {
+      // Don't leave an orphaned object behind for a row that doesn't exist.
+      await supabase.storage.from("attachments").remove([storagePath]);
+      return { ok: false, error: insertError.message };
+    }
+
     set((s) => ({ attachments: [...s.attachments, created] }));
     return { ok: true, attachment: created };
   },
 
   deleteAttachment: (attachmentId) => {
+    const supabase = getSupabaseBrowserClient();
+    const previous = get().attachments.find((a) => a.id === attachmentId);
     set((s) => ({ attachments: s.attachments.filter((a) => a.id !== attachmentId) }));
+    if (!previous) return;
+    // Storage cleanup failing alone isn't rolled back over — worst case is
+    // an orphaned object, not a functional problem — but a failed row
+    // delete restores the attachment locally, matching every other revert.
+    supabase.storage.from("attachments").remove([previous.storagePath]).then(({ error }) => {
+      if (error) console.error("Failed to remove attachment from storage:", error.message);
+    });
+    persistOrRevert(
+      supabase.from("attachments").delete().eq("id", attachmentId),
+      () => set((s) => ({ attachments: [...s.attachments, previous] })),
+      "Couldn't delete attachment"
+    );
   },
 
   createLabelBatch: (input) => {
+    const supabase = getSupabaseBrowserClient();
     const householdId = get().currentHouseholdId;
     const batch: LabelBatch = {
-      id: id("lblb"),
+      id: newId(),
       householdId,
       createdByUserId: get().currentUserId,
       createdAt: nowIso(),
@@ -1031,23 +1092,23 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       .map((containerId) => containers.find((c) => c.id === containerId))
       .filter((c): c is Container => !!c)
       .map((c) => ({
-        id: id("lble"),
+        id: newId(),
         batchId: batch.id,
         householdId,
         containerId: c.id,
         tagToken: c.tagToken,
         displayCode: c.displayCode,
-        status: "assigned",
+        status: "assigned" as const,
       }));
 
     const unassignedEntries: LabelBatchEntry[] = Array.from({ length: Math.max(0, input.unassignedCount) }, () => ({
-      id: id("lble"),
+      id: newId(),
       batchId: batch.id,
       householdId,
       containerId: null,
       tagToken: tagToken(),
       displayCode: null,
-      status: "unassigned",
+      status: "unassigned" as const,
     }));
 
     const entries = [...assignedEntries, ...unassignedEntries];
@@ -1055,10 +1116,27 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       labelBatches: [batch, ...s.labelBatches],
       labelBatchEntries: [...s.labelBatchEntries, ...entries],
     }));
+    persistOrRevert(
+      (async () => {
+        const { error } = await supabase.from("label_batches").insert(labelBatchToInsertRow(batch));
+        if (error) return { error };
+        if (entries.length > 0) {
+          const { error: entriesError } = await supabase.from("label_batch_entries").insert(entries.map(labelBatchEntryToInsertRow));
+          if (entriesError) return { error: entriesError };
+        }
+        return { error: null };
+      })(),
+      () =>
+        set((s) => ({
+          labelBatches: s.labelBatches.filter((b) => b.id !== batch.id),
+          labelBatchEntries: s.labelBatchEntries.filter((e) => e.batchId !== batch.id),
+        })),
+      "Couldn't save label batch"
+    );
     return { batch, entries };
   },
 
-  claimUnassignedLabel: (entryId, containerId) => {
+  claimUnassignedLabel: async (entryId, containerId) => {
     const entry = get().labelBatchEntries.find((e) => e.id === entryId);
     if (!entry) return { ok: false, error: "Label not found." };
     if (entry.containerId) return { ok: false, error: "This label is already assigned." };
@@ -1073,6 +1151,21 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     // 'assigned' as if it were still waiting to go to the printer.
     const batch = get().labelBatches.find((b) => b.id === entry.batchId);
     const nextStatus = batch?.status === "printed" ? "printed" : "assigned";
+
+    const supabase = getSupabaseBrowserClient();
+    // Real conflict check — .select() so a 0-row update (someone else
+    // already claimed this entry) is distinguishable from success.
+    const { data, error } = await supabase
+      .from("label_batch_entries")
+      .update({ container_id: containerId, display_code: displayCode, status: nextStatus })
+      .eq("id", entryId)
+      .is("container_id", null)
+      .select("id");
+    if (error) return { ok: false, error: error.message };
+    if (!data || data.length === 0) return { ok: false, error: "This label is already assigned." };
+
+    const { error: containerError } = await supabase.from("containers").update({ tag_token: entry.tagToken, display_code: displayCode }).eq("id", containerId);
+    if (containerError) return { ok: false, error: containerError.message };
 
     set((s) => ({
       containers: s.containers.map((c) => (c.id === containerId ? { ...c, tagToken: entry.tagToken, displayCode } : c)),
@@ -1091,10 +1184,22 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
   },
 
   markLabelBatchPrinted: (batchId) => {
+    const supabase = getSupabaseBrowserClient();
+    const previousBatches = get().labelBatches;
+    const previousEntries = get().labelBatchEntries;
     set((s) => ({
       labelBatches: s.labelBatches.map((b) => (b.id === batchId ? { ...b, status: "printed" } : b)),
       labelBatchEntries: s.labelBatchEntries.map((e) => (e.batchId === batchId ? { ...e, status: "printed" } : e)),
     }));
+    persistOrRevert(
+      (async () => {
+        const { error } = await supabase.from("label_batches").update({ status: "printed" }).eq("id", batchId);
+        if (error) return { error };
+        return supabase.from("label_batch_entries").update({ status: "printed" }).eq("batch_id", batchId);
+      })(),
+      () => set({ labelBatches: previousBatches, labelBatchEntries: previousEntries }),
+      "Couldn't mark batch printed"
+    );
   },
 
   getOrCreateTag: (name) => {
@@ -1117,17 +1222,20 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
   },
 
   saveNormalizationRule: (rawPattern, canonicalName, category) => {
+    const supabase = getSupabaseBrowserClient();
     const existing = get().normalizationRules.find((r) => r.rawPattern.toLowerCase() === rawPattern.toLowerCase());
     if (existing) {
-      set((s) => ({
-        normalizationRules: s.normalizationRules.map((r) =>
-          r.id === existing.id ? { ...r, canonicalName, category, usageCount: r.usageCount + 1, updatedAt: nowIso() } : r
-        ),
-      }));
+      const merged: NormalizationRule = { ...existing, canonicalName, category, usageCount: existing.usageCount + 1, updatedAt: nowIso() };
+      set((s) => ({ normalizationRules: s.normalizationRules.map((r) => (r.id === existing.id ? merged : r)) }));
+      persistOrRevert(
+        supabase.from("normalization_rules").update(normalizationRuleToInsertRow(merged)).eq("id", existing.id),
+        () => set((s) => ({ normalizationRules: s.normalizationRules.map((r) => (r.id === existing.id ? existing : r)) })),
+        "Couldn't save normalization rule"
+      );
       return;
     }
     const created: NormalizationRule = {
-      id: id("rule"),
+      id: newId(),
       householdId: get().currentHouseholdId,
       rawPattern,
       canonicalName,
@@ -1138,6 +1246,11 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       updatedAt: nowIso(),
     };
     set((s) => ({ normalizationRules: [...s.normalizationRules, created] }));
+    persistOrRevert(
+      supabase.from("normalization_rules").insert(normalizationRuleToInsertRow(created)),
+      () => set((s) => ({ normalizationRules: s.normalizationRules.filter((r) => r.id !== created.id) })),
+      "Couldn't save normalization rule"
+    );
   },
 
   toggleFavorite: (itemId) => {

@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
 import { useInventoryStore } from "@/lib/store";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { ATTACHMENT_ACCEPT, ATTACHMENT_MAX_SIZE_BYTES, ATTACHMENT_MAX_SIZE_LABEL, isAttachmentTypeAllowed } from "@/lib/attachment-limits";
 import type { Attachment, AttachmentKind } from "@/lib/types";
@@ -40,7 +41,7 @@ export function ItemAttachments({ itemId }: { itemId: string }) {
     fileInputRef.current?.click();
   }
 
-  function handleFileChosen(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleFileChosen(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file || !uploadingKind) return;
@@ -57,13 +58,7 @@ export function ItemAttachments({ itemId }: { itemId: string }) {
       setUploadingKind(null);
       return;
     }
-    const result = addAttachment(itemId, {
-      kind: uploadingKind,
-      fileName: file.name,
-      storagePath: URL.createObjectURL(file),
-      contentType,
-      sizeBytes: file.size,
-    });
+    const result = await addAttachment(itemId, { kind: uploadingKind, file });
     if (result.ok) {
       toast.success(`Added ${file.name}`);
     } else {
@@ -118,9 +113,21 @@ function AttachmentTile({
     );
   }
 
+  // Objects live in a private bucket — storagePath isn't a usable URL on
+  // its own, so a signed URL (short-lived, just long enough for the
+  // browser to navigate) is fetched on demand rather than kept around.
+  const handleOpen = async () => {
+    const { data, error } = await getSupabaseBrowserClient().storage.from("attachments").createSignedUrl(attachment.storagePath, 60);
+    if (error || !data) {
+      toast.error("Couldn't open that file.");
+      return;
+    }
+    window.open(data.signedUrl, "_blank", "noreferrer");
+  };
+
   return (
     <div className="relative flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border border-border bg-white">
-      <a href={attachment.storagePath} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1">
+      <button type="button" onClick={handleOpen} className="flex flex-col items-center gap-1">
         <span
           className={cn(
             "rounded-full px-2 py-0.5 text-micro font-semibold",
@@ -130,7 +137,7 @@ function AttachmentTile({
           {fileTypeTag(attachment.contentType)}
         </span>
         <span className="text-micro text-muted-foreground">{KIND_LABELS[kind]}</span>
-      </a>
+      </button>
       <button
         type="button"
         onClick={() => onDelete(attachment.id)}

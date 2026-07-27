@@ -15,6 +15,16 @@ import type {
   Tag,
   Favorite,
   ActivityLogEntry,
+  Attachment,
+  AttachmentKind,
+  LabelBatch,
+  LabelBatchEntry,
+  LabelPaperPreset,
+  LabelToggle,
+  LabelBatchStatus,
+  LabelBatchEntryStatus,
+  NormalizationRule,
+  NormalizationSource,
 } from "../types";
 
 export interface HouseholdRow {
@@ -324,5 +334,165 @@ export function activityLogEntryToInsertRow(entry: ActivityLogEntry): ActivityLo
     action: entry.action,
     detail: entry.detail ?? null,
     created_at: entry.createdAt,
+  };
+}
+
+export interface AttachmentRow {
+  id: string;
+  household_id: string;
+  item_id: string;
+  kind: string;
+  file_name: string;
+  storage_path: string;
+  content_type: string;
+  size_bytes: number;
+  created_by_user_id: string;
+  created_at: string;
+}
+
+export function rowToAttachment(row: AttachmentRow): Attachment {
+  return {
+    id: row.id,
+    householdId: row.household_id,
+    itemId: row.item_id,
+    kind: row.kind as AttachmentKind,
+    fileName: row.file_name,
+    storagePath: row.storage_path,
+    contentType: row.content_type,
+    sizeBytes: row.size_bytes,
+    createdByUserId: row.created_by_user_id,
+    createdAt: row.created_at,
+  };
+}
+
+export function attachmentToInsertRow(att: Attachment): AttachmentRow {
+  return {
+    id: att.id,
+    household_id: att.householdId,
+    item_id: att.itemId,
+    kind: att.kind,
+    file_name: att.fileName,
+    storage_path: att.storagePath,
+    content_type: att.contentType,
+    size_bytes: att.sizeBytes,
+    created_by_user_id: att.createdByUserId,
+    created_at: att.createdAt,
+  };
+}
+
+export interface LabelBatchRow {
+  id: string;
+  household_id: string;
+  created_by_user_id: string;
+  created_at: string;
+  paper_preset: string;
+  toggle: string;
+  include_location: boolean;
+  offset_x: number;
+  offset_y: number;
+  status: string;
+}
+
+export function rowToLabelBatch(row: LabelBatchRow): LabelBatch {
+  return {
+    id: row.id,
+    householdId: row.household_id,
+    createdByUserId: row.created_by_user_id,
+    createdAt: row.created_at,
+    paperPreset: row.paper_preset as LabelPaperPreset,
+    toggle: row.toggle as LabelToggle,
+    includeLocation: row.include_location,
+    offsetX: row.offset_x,
+    offsetY: row.offset_y,
+    status: row.status as LabelBatchStatus,
+  };
+}
+
+export function labelBatchToInsertRow(batch: LabelBatch): LabelBatchRow {
+  return {
+    id: batch.id,
+    household_id: batch.householdId,
+    created_by_user_id: batch.createdByUserId,
+    created_at: batch.createdAt,
+    paper_preset: batch.paperPreset,
+    toggle: batch.toggle,
+    include_location: batch.includeLocation,
+    offset_x: batch.offsetX,
+    offset_y: batch.offsetY,
+    status: batch.status,
+  };
+}
+
+export interface LabelBatchEntryRow {
+  id: string;
+  batch_id: string;
+  household_id: string;
+  container_id: string | null;
+  tag_token: string;
+  display_code: string | null;
+  status: string;
+}
+
+export function rowToLabelBatchEntry(row: LabelBatchEntryRow): LabelBatchEntry {
+  return {
+    id: row.id,
+    batchId: row.batch_id,
+    householdId: row.household_id,
+    containerId: row.container_id,
+    tagToken: row.tag_token,
+    displayCode: row.display_code,
+    status: row.status as LabelBatchEntryStatus,
+  };
+}
+
+export function labelBatchEntryToInsertRow(entry: LabelBatchEntry): LabelBatchEntryRow {
+  return {
+    id: entry.id,
+    batch_id: entry.batchId,
+    household_id: entry.householdId,
+    container_id: entry.containerId,
+    tag_token: entry.tagToken,
+    display_code: entry.displayCode,
+    status: entry.status,
+  };
+}
+
+export interface NormalizationRuleRow {
+  id: string;
+  household_id: string;
+  raw_pattern: string;
+  canonical_name: string;
+  category: string;
+  source: string;
+  usage_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export function rowToNormalizationRule(row: NormalizationRuleRow): NormalizationRule {
+  return {
+    id: row.id,
+    householdId: row.household_id,
+    rawPattern: row.raw_pattern,
+    canonicalName: row.canonical_name,
+    category: row.category,
+    source: row.source as NormalizationSource,
+    usageCount: row.usage_count,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function normalizationRuleToInsertRow(rule: NormalizationRule): NormalizationRuleRow {
+  return {
+    id: rule.id,
+    household_id: rule.householdId,
+    raw_pattern: rule.rawPattern,
+    canonical_name: rule.canonicalName,
+    category: rule.category,
+    source: rule.source,
+    usage_count: rule.usageCount,
+    created_at: rule.createdAt,
+    updated_at: rule.updatedAt,
   };
 }

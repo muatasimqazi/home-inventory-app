@@ -53,8 +53,8 @@ export function DisplayCodeSheet({ open, onOpenChange, container }: DisplayCodeS
     toast.success("Bin ID copied");
   }
 
-  function handleClaim(entryId: string) {
-    const result = claimUnassignedLabel(entryId, container.id);
+  async function handleClaim(entryId: string) {
+    const result = await claimUnassignedLabel(entryId, container.id);
     if (!result.ok) {
       setError(result.error ?? "Couldn't assign that label.");
       return;
