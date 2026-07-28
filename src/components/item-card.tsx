@@ -21,7 +21,7 @@ export function ItemCard({ item, breadcrumbLabel, className }: ItemCardProps) {
       )}
     >
       <div className="relative">
-        <PhotoThumb emoji={item.photoEmoji} label={item.category} className="aspect-[145/92] w-full" />
+        <PhotoThumb emoji={item.photoEmoji} coverPhotoPath={item.coverPhotoPath} label={item.category} className="aspect-[145/92] w-full" />
         {item.needsReview && (
           <div className="absolute right-1.5 top-1.5 flex size-6 items-center justify-center rounded-full bg-ink text-white">
             <Icon name="needsReview" size={13} />

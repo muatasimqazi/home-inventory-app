@@ -78,7 +78,7 @@ export default function NeedsReviewPage() {
                     aria-label={`Select ${item.name}`}
                     className="mt-1 size-4 shrink-0"
                   />
-                  <PhotoThumb emoji={item.photoEmoji} className="size-14 shrink-0" emojiClassName="text-3xl" />
+                  <PhotoThumb emoji={item.photoEmoji} coverPhotoPath={item.coverPhotoPath} className="size-14 shrink-0" emojiClassName="text-3xl" />
                   <div className="min-w-0">
                     <p className="text-caption text-muted-foreground">Originally detected</p>
                     <p className="truncate text-caption text-ink">{item.originalDetectedName ?? item.name}</p>

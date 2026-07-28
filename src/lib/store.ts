@@ -177,6 +177,9 @@ interface InventoryState {
   linkNfcTag: (containerId: string) => void;
   /** Clears a container's NFC link so a different physical tag can be written/linked to it. */
   unlinkNfcTag: (containerId: string) => void;
+  /** Uploads `file` to the public "item-photos" bucket and points the item at it, replacing any existing cover photo. Real, awaited: same reasoning as addAttachment. */
+  setItemCoverPhoto: (itemId: string, file: File) => Promise<{ ok: boolean; error?: string }>;
+  removeItemCoverPhoto: (itemId: string) => void;
 
   // Attachments — real Supabase Storage (private "attachments" bucket)
   /** Uploads `file` to Storage, then inserts the attachment row. Real, awaited: a File has to actually finish uploading before there's anything to show. */
@@ -1191,6 +1194,59 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     get().logActivity({ entityType: "container", entityId: containerId, entityName: container.name, action: "edited", detail: "NFC tag unlinked" });
   },
 
+  setItemCoverPhoto: async (itemId, file) => {
+    const contentType = file.type || "application/octet-stream";
+    if (!contentType.startsWith("image/")) {
+      return { ok: false, error: "Only images can be used as a cover photo." };
+    }
+    if (file.size > ATTACHMENT_MAX_SIZE_BYTES) {
+      return { ok: false, error: `File is too large — max ${ATTACHMENT_MAX_SIZE_LABEL}.` };
+    }
+    const item = get().items.find((it) => it.id === itemId);
+    if (!item) return { ok: false, error: "Item not found." };
+
+    const supabase = getSupabaseBrowserClient();
+    // A fresh id per upload, same as attachments — not upsert-in-place:
+    // upsert requires an UPDATE storage.objects policy in addition to
+    // INSERT (per the SDK's own docs), which the migration deliberately
+    // doesn't grant. The old object (if replacing one) is cleaned up
+    // separately, below, once the new one is confirmed live.
+    const previousPath = item.coverPhotoPath;
+    const path = `${item.householdId}/${newId()}`;
+    const { error: uploadError } = await supabase.storage.from("item-photos").upload(path, file, { contentType });
+    if (uploadError) return { ok: false, error: uploadError.message };
+
+    set((s) => ({ items: s.items.map((it) => (it.id === itemId ? { ...it, coverPhotoPath: path } : it)) }));
+    const { error: updateError } = await supabase.from("items").update({ cover_photo_path: path }).eq("id", itemId);
+    if (updateError) {
+      set((s) => ({ items: s.items.map((it) => (it.id === itemId ? { ...it, coverPhotoPath: previousPath } : it)) }));
+      await supabase.storage.from("item-photos").remove([path]);
+      return { ok: false, error: updateError.message };
+    }
+    if (previousPath) {
+      supabase.storage.from("item-photos").remove([previousPath]).then(({ error }) => {
+        if (error) console.error("Failed to remove replaced item cover photo from storage:", error.message);
+      });
+    }
+    return { ok: true };
+  },
+
+  removeItemCoverPhoto: (itemId) => {
+    const supabase = getSupabaseBrowserClient();
+    const item = get().items.find((it) => it.id === itemId);
+    if (!item || !item.coverPhotoPath) return;
+    const previousPath = item.coverPhotoPath;
+    set((s) => ({ items: s.items.map((it) => (it.id === itemId ? { ...it, coverPhotoPath: null } : it)) }));
+    supabase.storage.from("item-photos").remove([previousPath]).then(({ error }) => {
+      if (error) console.error("Failed to remove item cover photo from storage:", error.message);
+    });
+    persistOrRevert(
+      supabase.from("items").update({ cover_photo_path: null }).eq("id", itemId),
+      () => set((s) => ({ items: s.items.map((it) => (it.id === itemId ? { ...it, coverPhotoPath: previousPath } : it)) })),
+      "Couldn't remove cover photo"
+    );
+  },
+
   addAttachment: async (itemId, input) => {
     const { file } = input;
     const contentType = file.type || "application/octet-stream";
@@ -1635,6 +1691,7 @@ function buildItem(householdId: string, userId: string, input: NewItemInput): It
     quantity: clampQuantity(input.quantity ?? 1),
     notes: input.notes ?? "",
     photoEmoji: input.photoEmoji,
+    coverPhotoPath: null,
     status: "active",
     needsReview: input.needsReview ?? false,
     reviewReason: input.reviewReason,

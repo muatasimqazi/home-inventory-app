@@ -1,11 +1,12 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
 import { BreadcrumbTrail } from "@/components/breadcrumb-trail";
 import { MoveSheet } from "@/components/move-sheet";
+import { PhotoThumb } from "@/components/photo-thumb";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -46,9 +47,13 @@ function ManualAddItemInner() {
   const containers = useInventoryStore((s) => s.containers);
   const members = useInventoryStore((s) => s.members);
   const createItem = useInventoryStore((s) => s.createItem);
+  const setItemCoverPhoto = useInventoryStore((s) => s.setItemCoverPhoto);
   const getOrCreateTag = useInventoryStore((s) => s.getOrCreateTag);
   const lastUsedDestination = useInventoryStore((s) => s.lastUsedDestination);
 
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [category, setCategory] = useState<string>(CATEGORIES[0]);
   const [quantity, setQuantity] = useState("1");
@@ -74,6 +79,14 @@ function ManualAddItemInner() {
     setTagInput("");
   }
 
+  function handlePhotoChosen(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setPhotoFile(file);
+    setPhotoPreviewUrl(URL.createObjectURL(file));
+  }
+
   async function handleSave() {
     if (!name.trim()) {
       setError("Give this item a name.");
@@ -92,6 +105,10 @@ function ManualAddItemInner() {
       extraDetails,
       ownerUserId: ownerUserId === SHARED_OWNER_VALUE ? null : ownerUserId,
     });
+    if (photoFile) {
+      const result = await setItemCoverPhoto(item.id, photoFile);
+      if (!result.ok) toast.error(result.error ?? "Item saved, but the photo couldn't be uploaded.");
+    }
     toast.success(`Added ${item.name}`);
     router.push(`/items/${item.id}`);
   }
@@ -114,6 +131,34 @@ function ManualAddItemInner() {
       </header>
 
       <div className="mx-auto flex max-w-lg flex-col gap-4 px-4 py-4">
+        <Field label="Photo (optional)">
+          <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChosen} />
+          <button
+            type="button"
+            onClick={() => photoInputRef.current?.click()}
+            className="flex size-28 items-center justify-center overflow-hidden rounded-xl border border-dashed border-border bg-white"
+          >
+            {photoPreviewUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={photoPreviewUrl} alt="" className="size-full object-cover" />
+            ) : (
+              <PhotoThumb emoji={CATEGORY_EMOJI[category] ?? "📦"} className="size-full" emojiClassName="text-5xl" />
+            )}
+          </button>
+          {photoPreviewUrl && (
+            <button
+              type="button"
+              onClick={() => {
+                setPhotoFile(null);
+                setPhotoPreviewUrl(null);
+              }}
+              className="mt-1 text-caption font-medium text-muted-foreground underline underline-offset-2"
+            >
+              Remove photo
+            </button>
+          )}
+        </Field>
+
         <Field label="Name" required>
           <Input
             value={name}

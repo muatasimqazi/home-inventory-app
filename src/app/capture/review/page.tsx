@@ -24,6 +24,11 @@ function needsCorrection(row: DetectionRow): boolean {
   return row.needsReview && row.suggestedName !== "" && row.name.trim() === row.suggestedName;
 }
 
+async function dataUrlToFile(dataUrl: string): Promise<File> {
+  const blob = await (await fetch(dataUrl)).blob();
+  return new File([blob], "cover.jpg", { type: blob.type || "image/jpeg" });
+}
+
 export default function CaptureReviewPage() {
   const router = useRouter();
   const photos = useCaptureSession((s) => s.photos);
@@ -38,6 +43,7 @@ export default function CaptureReviewPage() {
   const containers = useInventoryStore((s) => s.containers);
   const createItem = useInventoryStore((s) => s.createItem);
   const createItemsBatch = useInventoryStore((s) => s.createItemsBatch);
+  const setItemCoverPhoto = useInventoryStore((s) => s.setItemCoverPhoto);
   const getOrCreateTag = useInventoryStore((s) => s.getOrCreateTag);
   const saveNormalizationRule = useInventoryStore((s) => s.saveNormalizationRule);
 
@@ -92,14 +98,21 @@ export default function CaptureReviewPage() {
   async function handleSave() {
     if (included.length === 0 || blockedCount > 0) return;
     setSaving(true);
+    // Multi-photo sessions have no reliable photo-to-item mapping (Gemini
+    // can find several items in one photo, or one item across several) —
+    // only auto-attach a cover when there's exactly one photo to attribute
+    // to the item(s) it produced.
+    const coverFile = photos.length === 1 ? await dataUrlToFile(photos[0]) : null;
     if (included.length === 1) {
       const item = createItem(buildInput(included[0]));
       persistNormalizationRules(included);
+      if (coverFile) await setItemCoverPhoto(item.id, coverFile);
       toast.success(`Saved ${item.name}`);
       router.push(`/items/${item.id}`);
     } else {
-      createItemsBatch(included.map(buildInput));
+      const created = createItemsBatch(included.map(buildInput));
       persistNormalizationRules(included);
+      if (coverFile) await Promise.all(created.map((it) => setItemCoverPhoto(it.id, coverFile)));
       toast.success(`Saved ${included.length} items`);
       router.push(destination?.containerId ? `/containers/${destination.containerId}` : "/");
     }

@@ -96,6 +96,8 @@ export interface Item {
   quantity: number;
   notes: string;
   photoEmoji: string;
+  /** Path within the public "item-photos" Storage bucket — null falls back to photoEmoji. */
+  coverPhotoPath: string | null;
   status: ItemStatus;
   needsReview: boolean;
   reviewReason?: string;

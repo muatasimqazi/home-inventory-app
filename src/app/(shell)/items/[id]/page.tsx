@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { notFound, useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
 import { PhotoThumb } from "@/components/photo-thumb";
@@ -41,10 +41,14 @@ export default function ItemDetailPage() {
   const permanentlyDeleteItem = useInventoryStore((s) => s.permanentlyDeleteItem);
   const moveItem = useInventoryStore((s) => s.moveItem);
   const updateItem = useInventoryStore((s) => s.updateItem);
+  const setItemCoverPhoto = useInventoryStore((s) => s.setItemCoverPhoto);
+  const removeItemCoverPhoto = useInventoryStore((s) => s.removeItemCoverPhoto);
 
   const [moveOpen, setMoveOpen] = useState(false);
   const [trashConfirmOpen, setTrashConfirmOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   // permanentlyDeleteItem() removes the item from `items` optimistically,
   // before router.push away from this page has finished — without this,
@@ -62,6 +66,20 @@ export default function ItemDetailPage() {
   if (!item) {
     if (!everHadItem) return notFound();
     return null;
+  }
+
+  async function handlePhotoChosen(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !item) return;
+    setUploadingPhoto(true);
+    const result = await setItemCoverPhoto(item.id, file);
+    setUploadingPhoto(false);
+    if (!result.ok) {
+      toast.error(result.error ?? "Couldn't set photo.");
+      return;
+    }
+    toast.success("Photo updated");
   }
 
   const breadcrumb = buildBreadcrumb(item.locationId, item.containerId, locations, containers);
@@ -83,7 +101,31 @@ export default function ItemDetailPage() {
         </div>
       )}
 
-      <PhotoThumb emoji={item.photoEmoji} className="h-48 w-full" emojiClassName="text-8xl" />
+      <div className="relative">
+        <PhotoThumb emoji={item.photoEmoji} coverPhotoPath={item.coverPhotoPath} className="h-48 w-full" emojiClassName="text-8xl" />
+        <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChosen} />
+        <div className="absolute bottom-2 right-2 flex gap-2">
+          {item.coverPhotoPath && (
+            <button
+              type="button"
+              onClick={() => removeItemCoverPhoto(item.id)}
+              aria-label="Remove photo"
+              className="tap-target flex size-9 items-center justify-center rounded-full bg-white/90 shadow-sm"
+            >
+              <Icon name="close" size={16} />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => photoInputRef.current?.click()}
+            disabled={uploadingPhoto}
+            aria-label={item.coverPhotoPath ? "Change photo" : "Add photo"}
+            className="tap-target flex size-9 items-center justify-center rounded-full bg-white/90 shadow-sm disabled:opacity-60"
+          >
+            {uploadingPhoto ? <Icon name="spinner" size={16} className="animate-spin" /> : <Icon name="camera" size={16} />}
+          </button>
+        </div>
+      </div>
 
       <div className="flex flex-col gap-1">
         <div className="flex items-start justify-between gap-2">
