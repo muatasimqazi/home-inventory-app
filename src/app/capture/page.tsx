@@ -114,7 +114,7 @@ function CameraCaptureInner() {
 
   return (
     <div className={cn("fixed inset-0 z-50 flex flex-col", dark ? "bg-ink" : "bg-background")}>
-      <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFilePicked} />
+      <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFilePicked} />
 
       <header className="flex items-center justify-between px-4 pt-[max(1rem,env(safe-area-inset-top))]">
         <button
