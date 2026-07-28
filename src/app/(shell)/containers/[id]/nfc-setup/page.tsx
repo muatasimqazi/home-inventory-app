@@ -9,19 +9,25 @@ import { Button } from "@/components/ui/button";
 import { useInventoryStore } from "@/lib/store";
 import { buildBreadcrumb, breadcrumbLabel } from "@/lib/selectors";
 import { containerResolveUrl } from "@/lib/urls";
-import { shortcutWorkflowName } from "@/lib/apple-shortcut";
 import { cn } from "@/lib/utils";
 
 type Platform = "ios" | "android" | "other";
-type Screen = "setup" | "writing" | "shortcutsInfo" | "shortcutsSteps" | "linked";
+type Screen = "setup" | "writing" | "linked";
 
 // Real (if simple) capability detection — this determines which options are
 // offered, not whether the underlying write is simulated: no browser can
 // actually write NFC here without physical hardware, so "writing" is a
 // timed simulation on every platform (same mock-hardware boundary as the
 // rest of the app, e.g. MockVisionProvider). iOS never supports Web NFC at
-// all (no browser exposes it), which is exactly why Shortcuts exists as a
-// real, separate fallback — not a lesser copy of the Android path.
+// all (no browser exposes it) — Safari can't write a tag itself, full
+// stop. A prior version of this screen worked around that with a
+// downloadable Apple Shortcuts file, but Apple blocks importing unsigned
+// shortcuts from arbitrary URLs (only iCloud-shared, Shortcuts-app-signed
+// ones import), so that path can never actually work. iOS instead points
+// at writing the tag from elsewhere — any *other* NFC writer (this app on
+// Android, or a third-party writer app) can write a plain NDEF URL record,
+// and iOS's own OS-level NFC reading (since iOS 11) opens that URL
+// natively on tap, with no app or setup step needed on the iPhone itself.
 function detectPlatform(): Platform {
   const ua = navigator.userAgent;
   if (/iPhone|iPad|iPod/.test(ua)) return "ios";
@@ -36,17 +42,6 @@ const noSubscription = () => () => {};
  * to do this without the cascading-render footgun of setState-in-an-effect. */
 function usePlatform(): Platform {
   return useSyncExternalStore(noSubscription, detectPlatform, () => "other");
-}
-
-function shortcutSteps(workflowName: string): string[] {
-  return [
-    "Open Shortcuts and go to Automation",
-    "Tap +, then choose NFC",
-    "Scan the 25mm tag",
-    "Choose Run Shortcut",
-    `Select ${workflowName}`,
-    "Turn off Ask Before Running",
-  ];
 }
 
 export default function NfcSetupPage() {
@@ -84,13 +79,9 @@ export default function NfcSetupPage() {
     }, 1400);
   }
 
-  function downloadShortcut() {
-    window.location.href = `/api/nfc-shortcut/${containerId}`;
-  }
-
-  function markLinkedViaShortcuts() {
+  function markTagWritten() {
     linkNfcTag(containerId);
-    toast.success("NFC tag linked via Shortcuts");
+    toast.success("NFC tag linked");
     setScreen("linked");
   }
 
@@ -99,10 +90,6 @@ export default function NfcSetupPage() {
       router.back();
     } else if (screen === "writing") {
       setScreen("setup");
-    } else if (screen === "shortcutsInfo") {
-      setScreen("setup");
-    } else if (screen === "shortcutsSteps") {
-      setScreen("shortcutsInfo");
     } else {
       router.push(`/containers/${containerId}`);
     }
@@ -111,8 +98,6 @@ export default function NfcSetupPage() {
   const titles: Record<Screen, string> = {
     setup: platform === "android" ? "Android tag setup" : platform === "ios" ? "iOS tag setup" : "QR label",
     writing: "Write NFC",
-    shortcutsInfo: "iOS fallback",
-    shortcutsSteps: "Shortcut steps",
     linked: "Tag linked",
   };
 
@@ -139,7 +124,6 @@ export default function NfcSetupPage() {
             breadcrumbText={breadcrumbLabel(breadcrumb)}
             container={container}
             onWriteNfc={startWriting}
-            onShortcutsFallback={() => setScreen("shortcutsInfo")}
           />
         )}
 
@@ -148,10 +132,6 @@ export default function NfcSetupPage() {
         )}
 
         {screen === "writing" && <WritingScreen code={code} resolveUrl={resolveUrl} writing={writing} />}
-
-        {screen === "shortcutsInfo" && <ShortcutsInfoScreen code={code} onViewSteps={() => setScreen("shortcutsSteps")} />}
-
-        {screen === "shortcutsSteps" && <ShortcutsStepsScreen code={code} />}
 
         {screen === "linked" && (
           <LinkedScreen
@@ -171,8 +151,8 @@ export default function NfcSetupPage() {
         <div className="mx-auto flex max-w-lg flex-col gap-2">
           {screen === "setup" && platform === "ios" && (
             <>
-              <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={() => setScreen("shortcutsInfo")}>
-                Set up with Shortcuts
+              <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={markTagWritten}>
+                I&apos;ve written this tag
               </Button>
               <Button size="lg" variant="outline" onClick={() => router.push(`/containers/${container.id}/label`)}>
                 Print QR label instead
@@ -206,26 +186,6 @@ export default function NfcSetupPage() {
               </Button>
               <Button size="lg" variant="outline" onClick={() => router.push(`/containers/${container.id}/label`)} disabled={writing}>
                 Print QR instead
-              </Button>
-            </>
-          )}
-          {screen === "shortcutsInfo" && (
-            <>
-              <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={downloadShortcut}>
-                Install Shohaz Shortcut
-              </Button>
-              <Button size="lg" variant="outline" onClick={() => setScreen("shortcutsSteps")}>
-                View setup steps
-              </Button>
-            </>
-          )}
-          {screen === "shortcutsSteps" && (
-            <>
-              <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={markLinkedViaShortcuts}>
-                Done
-              </Button>
-              <Button size="lg" variant="outline" onClick={() => setScreen("shortcutsInfo")}>
-                Back
               </Button>
             </>
           )}
@@ -281,7 +241,6 @@ function SetupScreen({
   breadcrumbText,
   container,
   onWriteNfc,
-  onShortcutsFallback,
 }: {
   platform: "ios" | "android";
   code: string;
@@ -289,14 +248,13 @@ function SetupScreen({
   breadcrumbText: string;
   container: { name: string; nfcLinkedAt: string | null };
   onWriteNfc: () => void;
-  onShortcutsFallback: () => void;
 }) {
   return (
     <>
       <div>
         <h2 className="text-screen-title font-semibold text-ink">NFC tag</h2>
         <p className="mt-1 text-body text-muted-foreground">
-          {platform === "ios" ? "Set up via Shortcuts on this iPhone" : "Ready to write with Android NFC"} · {code}
+          {platform === "ios" ? "Write this tag from another device" : "Ready to write with Android NFC"} · {code}
         </p>
       </div>
 
@@ -310,29 +268,59 @@ function SetupScreen({
 
       <h3 className="text-item-title font-semibold text-ink">Tag options</h3>
 
-      {/* No browser exposes Web NFC on iOS at all — offering a "Write NFC
-          tag" option there would be a dead end, not a real fallback path.
-          Shortcuts is the actual, working option on this platform. */}
-      <button
-        type="button"
-        onClick={platform === "ios" ? onShortcutsFallback : onWriteNfc}
-        className="flex items-start gap-3 rounded-2xl border border-border bg-white p-4 text-left shadow-sm"
-      >
-        <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-brand-100">
-          <Icon name={platform === "ios" ? "smartphone" : "nfc"} size={20} className="text-brand-700" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-2">
-            <span className="text-body font-semibold text-ink">{platform === "ios" ? "Set up with Shortcuts" : "Write bin link to tag"}</span>
-            {platform === "android" && <span className="rounded-md bg-ink px-1.5 py-0.5 text-micro font-semibold text-white">Best</span>}
+      {/* No browser exposes Web NFC on iOS at all, and Apple blocks
+          importing unsigned Shortcuts files from arbitrary URLs — there is
+          no in-app path that can actually write a tag from an iPhone. iOS
+          does read plain NDEF URL records natively (since iOS 11, no app
+          needed), so the real answer is "write it from elsewhere". */}
+      {platform === "ios" ? (
+        <>
+          <div className="flex items-start gap-3 rounded-2xl border border-border bg-white p-4 shadow-sm">
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-brand-100">
+              <Icon name="smartphone" size={20} className="text-brand-700" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-body font-semibold text-ink">iPhone can&apos;t write NFC tags directly</p>
+              <p className="mt-1 text-caption text-muted-foreground">
+                Write this bin&apos;s link using Shohaz on an Android phone, or any third-party NFC writer app — once
+                written, tapping the tag opens it on any iPhone natively, no app or setup step needed.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              navigator.clipboard.writeText(resolveUrl);
+              toast.success("Link copied");
+            }}
+            className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-white p-4 text-left shadow-sm"
+          >
+            <div className="min-w-0">
+              <p className="text-body font-semibold text-ink">Copy bin link</p>
+              <p className="mt-1 truncate text-caption text-muted-foreground">{resolveUrl}</p>
+            </div>
+            <Icon name="copy" size={18} className="shrink-0 text-muted-foreground" />
+          </button>
+        </>
+      ) : (
+        <button
+          type="button"
+          onClick={onWriteNfc}
+          className="flex items-start gap-3 rounded-2xl border border-border bg-white p-4 text-left shadow-sm"
+        >
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-brand-100">
+            <Icon name="nfc" size={20} className="text-brand-700" />
           </span>
-          <span className="mt-1 block text-caption text-muted-foreground">
-            {platform === "ios"
-              ? "iPhones can't write NFC tags directly — this uses a personal Shortcuts automation instead."
-              : "Writes the bin link to a writable NFC tag."}
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center gap-2">
+              <span className="text-body font-semibold text-ink">Write bin link to tag</span>
+              <span className="rounded-md bg-ink px-1.5 py-0.5 text-micro font-semibold text-white">Best</span>
+            </span>
+            <span className="mt-1 block text-caption text-muted-foreground">Writes the bin link to a writable NFC tag.</span>
           </span>
-        </span>
-      </button>
+        </button>
+      )}
 
       {platform === "android" && (
         <div className="flex items-center gap-3 rounded-2xl border border-badge-green-border bg-badge-green-bg p-4">
@@ -438,86 +426,6 @@ function StepDot({ label, state }: { label: string; state: "done" | "active" | "
       </div>
       <p className={cn("text-micro font-semibold", state === "pending" ? "text-muted-foreground" : "text-ink")}>{label}</p>
     </div>
-  );
-}
-
-function ShortcutsInfoScreen({ code, onViewSteps }: { code: string; onViewSteps: () => void }) {
-  return (
-    <>
-      <div>
-        <h2 className="text-screen-title font-semibold text-ink">Set up with Shortcuts</h2>
-        <p className="mt-1 text-body text-muted-foreground">
-          Use this when direct NFC writing is not available. The tag is linked only on this iPhone.
-        </p>
-      </div>
-
-      <span className="w-fit rounded-lg bg-brand-100 px-3 py-1.5 text-micro font-semibold text-brand-700">iOS · Shortcuts only</span>
-
-      <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
-        <h3 className="text-item-title font-semibold text-ink">Personal automation</h3>
-        <p className="mt-1 text-caption text-muted-foreground">
-          Scanning {code} runs <span className="font-semibold text-ink">{shortcutWorkflowName(code)}</span>, which opens this bin.
-        </p>
-      </div>
-
-      <div className="flex flex-col gap-3 rounded-2xl border border-border bg-white p-4 shadow-sm">
-        <ChecklistItem label={`Install ${shortcutWorkflowName(code)}`} />
-        <ChecklistItem label="Create an NFC automation" />
-        <ChecklistItem label={`Choose ${shortcutWorkflowName(code)}`} />
-      </div>
-
-      <div className="rounded-xl border border-yellow bg-brand-100 p-3">
-        <p className="text-caption text-ink">This setup does not sync to other household members. They need to link the same tag on their own iPhone.</p>
-      </div>
-
-      <button type="button" onClick={onViewSteps} className="text-left text-caption font-medium text-yellow underline underline-offset-2">
-        View setup steps →
-      </button>
-    </>
-  );
-}
-
-function ChecklistItem({ label }: { label: string }) {
-  return (
-    <div className="flex items-center gap-3">
-      <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-brand-100 text-brand-700">
-        <Icon name="check" size={13} />
-      </span>
-      <p className="text-body font-semibold text-ink">{label}</p>
-    </div>
-  );
-}
-
-function ShortcutsStepsScreen({ code }: { code: string }) {
-  return (
-    <>
-      <div>
-        <h2 className="text-screen-title font-semibold text-ink">Link {code} tag</h2>
-        <p className="mt-1 text-body text-muted-foreground">
-          Follow these steps in Apple Shortcuts. This links this physical tag to this bin on this iPhone.
-        </p>
-      </div>
-
-      <div className="flex flex-col gap-2">
-        {shortcutSteps(shortcutWorkflowName(code)).map((step, i, steps) => (
-          <div key={step} className="flex items-center gap-3 rounded-lg border border-border bg-white p-3">
-            <span
-              className={cn(
-                "flex size-6 shrink-0 items-center justify-center rounded-full text-micro font-bold",
-                i === steps.length - 1 ? "bg-ink text-white" : "bg-brand-100 text-brand-700"
-              )}
-            >
-              {i + 1}
-            </span>
-            <p className="text-caption font-semibold text-ink">{step}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="rounded-xl border border-yellow bg-brand-100 p-3">
-        <p className="text-caption text-ink">If iOS changes automation prompts, keep the same bin shortcut and tag scan trigger.</p>
-      </div>
-    </>
   );
 }
 

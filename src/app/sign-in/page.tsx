@@ -6,6 +6,7 @@ import { Icon } from "@/components/icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { appOrigin } from "@/lib/urls";
 
 type Mode = "default" | "email" | "authenticating" | "checkEmail";
 type AuthAction = "signin" | "signup";
@@ -31,10 +32,9 @@ function SignInInner() {
     setError(null);
     setMode("authenticating");
     const supabase = getSupabaseBrowserClient();
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? window.location.origin;
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${appUrl}/auth/callback` },
+      options: { redirectTo: `${appOrigin()}/auth/callback` },
     });
     // On success the browser navigates away to Google — this only returns
     // if the redirect itself failed to start.
