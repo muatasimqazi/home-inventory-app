@@ -2,9 +2,11 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Cropper, { type Area } from "react-easy-crop";
 import { Icon } from "@/components/icon";
 import { useCaptureSession } from "@/lib/capture-session-store";
 import { useInventoryStore } from "@/lib/store";
+import { getCroppedImage } from "@/lib/crop-image";
 import { cn } from "@/lib/utils";
 
 type Mode = "requesting" | "live" | "preview" | "denied";
@@ -27,6 +29,10 @@ function CameraCaptureInner() {
   const [mode, setMode] = useState<Mode>("requesting");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
+  const [cropping, setCropping] = useState(false);
 
   const photos = useCaptureSession((s) => s.photos);
   const addPhoto = useCaptureSession((s) => s.addPhoto);
@@ -79,6 +85,36 @@ function CameraCaptureInner() {
     }
   }, [mode]);
 
+  // Presenting a native sheet over the page (the OS photo picker, in
+  // particular) can suspend or fully stop the getUserMedia stream on iOS
+  // Safari — reacquiring only when needed avoids an unnecessary permission
+  // re-prompt on the (usual) case where the stream is still alive.
+  const returnToLive = useCallback(async () => {
+    const tracks = streamRef.current?.getTracks() ?? [];
+    const alive = tracks.length > 0 && tracks.every((t) => t.readyState === "live");
+    if (alive) {
+      setMode("live");
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+      streamRef.current = stream;
+      setMode("live");
+    } catch {
+      setMode("denied");
+    }
+  }, []);
+
+  const resetCrop = useCallback(() => {
+    setCrop({ x: 0, y: 0 });
+    setZoom(1);
+    setCroppedAreaPixels(null);
+  }, []);
+
+  const onCropComplete = useCallback((_area: Area, pixels: Area) => {
+    setCroppedAreaPixels(pixels);
+  }, []);
+
   const handleShutter = useCallback(() => {
     const video = videoRef.current;
     if (!video || video.videoWidth === 0) return;
@@ -88,20 +124,40 @@ function CameraCaptureInner() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.drawImage(video, 0, 0);
+    resetCrop();
     setPreviewUrl(canvas.toDataURL("image/jpeg", 0.85));
     setMode("preview");
-  }, []);
+  }, [resetCrop]);
 
   function handleFilePicked(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
+      resetCrop();
       setPreviewUrl(reader.result as string);
       setMode("preview");
     };
     reader.readAsDataURL(file);
     e.target.value = "";
+  }
+
+  function handleRetake() {
+    setPreviewUrl(null);
+    returnToLive();
+  }
+
+  async function handleUsePhoto() {
+    if (!previewUrl) return;
+    setCropping(true);
+    try {
+      const finalPhoto = croppedAreaPixels ? await getCroppedImage(previewUrl, croppedAreaPixels) : previewUrl;
+      addPhoto(finalPhoto);
+      setPreviewUrl(null);
+      await returnToLive();
+    } finally {
+      setCropping(false);
+    }
   }
 
   async function handleReviewAndSave() {
@@ -206,30 +262,46 @@ function CameraCaptureInner() {
 
         {mode === "preview" && previewUrl && (
           <div className="flex h-full flex-col">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={previewUrl} alt="Captured preview" className="flex-1 object-cover" />
-            <div className="flex gap-3 bg-ink px-6 py-6">
-              <button
-                type="button"
-                onClick={() => {
-                  setPreviewUrl(null);
-                  setMode("live");
-                }}
-                className="tap-target h-11 flex-1 rounded-full bg-white/10 text-body font-medium text-white"
-              >
-                Retake
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  addPhoto(previewUrl);
-                  setPreviewUrl(null);
-                  setMode("live");
-                }}
-                className="tap-target h-11 flex-1 rounded-full bg-yellow text-body font-medium text-white"
-              >
-                Use Photo
-              </button>
+            <div className="relative flex-1 bg-black">
+              <Cropper
+                image={previewUrl}
+                crop={crop}
+                zoom={zoom}
+                aspect={4 / 3}
+                onCropChange={setCrop}
+                onZoomChange={setZoom}
+                onCropComplete={onCropComplete}
+              />
+            </div>
+            <div className="flex flex-col gap-3 bg-ink px-6 py-4">
+              <input
+                type="range"
+                min={1}
+                max={3}
+                step={0.01}
+                value={zoom}
+                onChange={(e) => setZoom(Number(e.target.value))}
+                aria-label="Zoom"
+                className="w-full accent-yellow"
+              />
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={handleRetake}
+                  disabled={cropping}
+                  className="tap-target h-11 flex-1 rounded-full bg-white/10 text-body font-medium text-white disabled:opacity-60"
+                >
+                  Retake
+                </button>
+                <button
+                  type="button"
+                  onClick={handleUsePhoto}
+                  disabled={cropping}
+                  className="tap-target h-11 flex-1 rounded-full bg-yellow text-body font-medium text-white disabled:opacity-60"
+                >
+                  {cropping ? "Cropping…" : "Use Photo"}
+                </button>
+              </div>
             </div>
           </div>
         )}
