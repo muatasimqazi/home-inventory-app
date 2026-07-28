@@ -6,7 +6,10 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
 import { EntityCard } from "@/components/entity-card";
+import { EntityRow } from "@/components/entity-row";
 import { ItemCard } from "@/components/item-card";
+import { ItemRow } from "@/components/item-row";
+import { ViewToggle, type ViewMode } from "@/components/view-toggle";
 import { EmptyState } from "@/components/empty-state";
 import { BreadcrumbTrail } from "@/components/breadcrumb-trail";
 import { EntityFormSheet } from "@/components/entity-form-sheet";
@@ -42,6 +45,7 @@ export default function ContainerDetailPage() {
   const [moveOpen, setMoveOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [displayCodeOpen, setDisplayCodeOpen] = useState(false);
+  const [view, setView] = useState<ViewMode>("grid");
 
   const container = containers.find((c) => c.id === params.id);
   if (!container) return notFound();
@@ -122,40 +126,73 @@ export default function ContainerDetailPage() {
         />
       ) : (
         <>
+          <div className="flex items-center justify-end">
+            <ViewToggle mode={view} onChange={setView} />
+          </div>
+
           {subContainers.length > 0 && (
             <section className="flex flex-col gap-3">
               <h2 className="text-section-title font-medium text-ink">Sub-containers</h2>
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                {subContainers.map((c) => {
-                  const count = activeItemCountForContainer(items, containers, c.id);
-                  return (
-                    <EntityCard
-                      key={c.id}
-                      href={`/containers/${c.id}`}
-                      emoji={c.coverPhotoEmoji ?? "📦"}
-                      title={c.name}
-                      subtitle={`${count} item${count === 1 ? "" : "s"}`}
-                      badge={c.displayCode ?? undefined}
-                      badgeKey={c.id}
-                    />
-                  );
-                })}
-              </div>
+              {view === "grid" ? (
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                  {subContainers.map((c) => {
+                    const count = activeItemCountForContainer(items, containers, c.id);
+                    return (
+                      <EntityCard
+                        key={c.id}
+                        href={`/containers/${c.id}`}
+                        emoji={c.coverPhotoEmoji ?? "📦"}
+                        title={c.name}
+                        subtitle={`${count} item${count === 1 ? "" : "s"}`}
+                        badge={c.displayCode ?? undefined}
+                        badgeKey={c.id}
+                      />
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {subContainers.map((c) => {
+                    const count = activeItemCountForContainer(items, containers, c.id);
+                    return (
+                      <EntityRow
+                        key={c.id}
+                        href={`/containers/${c.id}`}
+                        icon="archive"
+                        title={c.name}
+                        subtitle={`${count} item${count === 1 ? "" : "s"}${c.displayCode ? ` · ${c.displayCode}` : ""}`}
+                      />
+                    );
+                  })}
+                </div>
+              )}
             </section>
           )}
 
           {directItems.length > 0 && (
             <section className="flex flex-col gap-3">
               <h2 className="text-section-title font-medium text-ink">Items</h2>
-              <div className="grid grid-cols-2 gap-3">
-                {directItems.map((item) => (
-                  <ItemCard
-                    key={item.id}
-                    item={item}
-                    breadcrumbLabel={breadcrumbLabel(buildBreadcrumb(item.locationId, item.containerId, locations, containers))}
-                  />
-                ))}
-              </div>
+              {view === "grid" ? (
+                <div className="grid grid-cols-2 gap-3">
+                  {directItems.map((item) => (
+                    <ItemCard
+                      key={item.id}
+                      item={item}
+                      breadcrumbLabel={breadcrumbLabel(buildBreadcrumb(item.locationId, item.containerId, locations, containers))}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {directItems.map((item) => (
+                    <ItemRow
+                      key={item.id}
+                      item={item}
+                      breadcrumbLabel={breadcrumbLabel(buildBreadcrumb(item.locationId, item.containerId, locations, containers))}
+                    />
+                  ))}
+                </div>
+              )}
             </section>
           )}
         </>

@@ -18,6 +18,8 @@ import {
   ImageOff,
   Images,
   Key,
+  LayoutGrid,
+  List,
   Loader2,
   LogOut,
   type LucideProps,
@@ -94,6 +96,8 @@ const ICONS = {
   printer: Printer,
   nfc: Nfc,
   smartphone: Smartphone,
+  grid: LayoutGrid,
+  list: List,
 } as const;
 
 export type IconName = keyof typeof ICONS;
