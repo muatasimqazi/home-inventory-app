@@ -17,6 +17,6 @@ export const LABEL_PRESETS: Record<LabelPaperPreset, LabelPresetConfig> = {
 
 export const LABEL_TOGGLE_NAMES: Record<LabelToggle, string> = {
   qr: "QR only",
-  "qr-code": "QR + Bin ID",
-  "qr-code-name": "QR + Bin ID + Name",
+  "qr-code": "QR + Container ID",
+  "qr-code-name": "QR + Container ID + Name",
 };

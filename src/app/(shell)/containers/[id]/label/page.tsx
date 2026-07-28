@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useInventoryStore } from "@/lib/store";
 import { buildBreadcrumb } from "@/lib/selectors";
 import { containerResolveUrl } from "@/lib/urls";
-import { binIdBadgeClasses } from "@/lib/badge-color";
+import { displayCodeBadgeClasses } from "@/lib/badge-color";
 import { cn } from "@/lib/utils";
 
 export default function TagLabelPage() {
@@ -29,8 +29,8 @@ export default function TagLabelPage() {
         <Icon name="arrowLeft" size={18} />
       </button>
       <div className="print:hidden">
-        <h1 className="text-screen-title font-semibold text-ink">Print bin label</h1>
-        <p className="mt-0.5 text-caption text-muted-foreground">Generate a durable QR label for this bin.</p>
+        <h1 className="text-screen-title font-semibold text-ink">Print container label</h1>
+        <p className="mt-0.5 text-caption text-muted-foreground">Generate a durable QR label for this container.</p>
       </div>
 
       <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-white p-8 print:border-0 print:shadow-none">
@@ -41,7 +41,7 @@ export default function TagLabelPage() {
           <p className="mt-1 font-mono text-caption tracking-widest text-muted-foreground">{container.tagToken}</p>
         </div>
         {container.displayCode && (
-          <span className={cn("rounded-full border px-3 py-1 text-caption font-semibold", binIdBadgeClasses(container.id))}>
+          <span className={cn("rounded-full border px-3 py-1 text-caption font-semibold", displayCodeBadgeClasses(container.id))}>
             {container.displayCode}
           </span>
         )}
@@ -64,8 +64,8 @@ export default function TagLabelPage() {
           </span>
           <span className="mt-1 block text-caption text-muted-foreground">
             {container.nfcLinkedAt
-              ? "Tap to view or re-link this bin's NFC tag."
-              : "Write this bin's link to a blank NFC tag — set up NFC, or use Shortcuts on iOS."}
+              ? "Tap to view or re-link this container's NFC tag."
+              : "Write this container's link to a blank NFC tag."}
           </span>
         </span>
         <Icon name="chevronRight" size={16} className="mt-1 shrink-0 text-muted-foreground" />

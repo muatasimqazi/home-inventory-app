@@ -157,6 +157,8 @@ interface InventoryState {
   trashLocation: (locationId: string) => void;
   restoreLocation: (locationId: string) => void;
   permanentlyDeleteLocation: (locationId: string) => void;
+  setLocationCoverPhoto: (locationId: string, file: File) => Promise<{ ok: boolean; error?: string }>;
+  removeLocationCoverPhoto: (locationId: string) => void;
 
   // Containers
   createContainer: (input: {
@@ -173,10 +175,12 @@ interface InventoryState {
   permanentlyDeleteContainer: (containerId: string) => void;
   /** Assigns `code` if provided (validated for per-household uniqueness), otherwise generates the next code for the container's location. Real, awaited: uniqueness can only be answered by the database. */
   assignDisplayCode: (containerId: string, code?: string) => Promise<{ ok: boolean; error?: string; code?: string }>;
-  /** Marks a container's NFC tag as linked (native write or the iOS Shortcuts fallback both call this — same end state). */
+  /** Marks a container's NFC tag as linked — native write, or written by another device and read natively (iOS). */
   linkNfcTag: (containerId: string) => void;
   /** Clears a container's NFC link so a different physical tag can be written/linked to it. */
   unlinkNfcTag: (containerId: string) => void;
+  setContainerCoverPhoto: (containerId: string, file: File) => Promise<{ ok: boolean; error?: string }>;
+  removeContainerCoverPhoto: (containerId: string) => void;
   /** Uploads `file` to the public "item-photos" bucket and points the item at it, replacing any existing cover photo. Real, awaited: same reasoning as addAttachment. */
   setItemCoverPhoto: (itemId: string, file: File) => Promise<{ ok: boolean; error?: string }>;
   removeItemCoverPhoto: (itemId: string) => void;
@@ -199,7 +203,7 @@ interface InventoryState {
     containerIds: string[];
     unassignedCount: number;
   }) => { batch: LabelBatch; entries: LabelBatchEntry[] };
-  /** Adopts a preprinted/unassigned label's tagToken (and a fresh Bin ID, if the container doesn't have one) onto an existing container. Real, awaited: "already assigned" can only be answered for real. */
+  /** Adopts a preprinted/unassigned label's tagToken (and a fresh Container ID, if the container doesn't have one) onto an existing container. Real, awaited: "already assigned" can only be answered for real. */
   claimUnassignedLabel: (entryId: string, containerId: string) => Promise<{ ok: boolean; error?: string }>;
   /** Transitions a batch (and every one of its entries) to 'printed' — the actual "this physically went to the printer" moment, distinct from just exporting a PDF. */
   markLabelBatchPrinted: (batchId: string) => void;
@@ -358,6 +362,37 @@ function persistOrRevert(op: PromiseLike<{ error: { message: string } | null }>,
       toast.error(`${label}: ${error.message}`);
     }
   });
+}
+
+/** Shared upload step for item/location/container cover photos — all three
+ * point at the same public "item-photos" bucket and follow the same fresh-
+ * id-per-upload pattern (not upsert-in-place: upsert needs an UPDATE
+ * storage policy in addition to INSERT, which the bucket's migration
+ * deliberately doesn't grant). Callers own updating their own entity's
+ * local state and row, and cleaning up `previousPath` once the new one is
+ * confirmed live — this only handles validation + the upload itself. */
+async function uploadCoverPhotoFile(file: File, householdId: string): Promise<{ ok: true; path: string } | { ok: false; error: string }> {
+  const contentType = file.type || "application/octet-stream";
+  if (!contentType.startsWith("image/")) {
+    return { ok: false, error: "Only images can be used as a cover photo." };
+  }
+  if (file.size > ATTACHMENT_MAX_SIZE_BYTES) {
+    return { ok: false, error: `File is too large — max ${ATTACHMENT_MAX_SIZE_LABEL}.` };
+  }
+  const supabase = getSupabaseBrowserClient();
+  const path = `${householdId}/${newId()}`;
+  const { error: uploadError } = await supabase.storage.from("item-photos").upload(path, file, { contentType });
+  if (uploadError) return { ok: false, error: uploadError.message };
+  return { ok: true, path };
+}
+
+function removeCoverPhotoObject(path: string, context: string) {
+  getSupabaseBrowserClient()
+    .storage.from("item-photos")
+    .remove([path])
+    .then(({ error }) => {
+      if (error) console.error(`Failed to remove ${context} from storage:`, error.message);
+    });
 }
 
 interface RealtimeRowChange {
@@ -865,6 +900,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       name: input.name,
       description: input.description,
       coverPhotoEmoji: input.coverPhotoEmoji ?? "📦",
+      coverPhotoPath: null,
       createdByUserId: get().currentUserId,
       createdAt: nowIso(),
       status: "active",
@@ -970,6 +1006,41 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     if (loc) get().logActivity({ entityType: "location", entityId: loc.id, entityName: loc.name, action: "deleted_forever" });
   },
 
+  setLocationCoverPhoto: async (locationId, file) => {
+    const location = get().locations.find((l) => l.id === locationId);
+    if (!location) return { ok: false, error: "Location not found." };
+    const previousPath = location.coverPhotoPath;
+
+    const uploaded = await uploadCoverPhotoFile(file, location.householdId);
+    if (!uploaded.ok) return uploaded;
+    const { path } = uploaded;
+
+    const supabase = getSupabaseBrowserClient();
+    set((s) => ({ locations: s.locations.map((l) => (l.id === locationId ? { ...l, coverPhotoPath: path } : l)) }));
+    const { error: updateError } = await supabase.from("locations").update({ cover_photo_path: path }).eq("id", locationId);
+    if (updateError) {
+      set((s) => ({ locations: s.locations.map((l) => (l.id === locationId ? { ...l, coverPhotoPath: previousPath } : l)) }));
+      removeCoverPhotoObject(path, "location cover photo upload");
+      return { ok: false, error: updateError.message };
+    }
+    if (previousPath) removeCoverPhotoObject(previousPath, "replaced location cover photo");
+    return { ok: true };
+  },
+
+  removeLocationCoverPhoto: (locationId) => {
+    const supabase = getSupabaseBrowserClient();
+    const location = get().locations.find((l) => l.id === locationId);
+    if (!location || !location.coverPhotoPath) return;
+    const previousPath = location.coverPhotoPath;
+    set((s) => ({ locations: s.locations.map((l) => (l.id === locationId ? { ...l, coverPhotoPath: null } : l)) }));
+    removeCoverPhotoObject(previousPath, "location cover photo");
+    persistOrRevert(
+      supabase.from("locations").update({ cover_photo_path: null }).eq("id", locationId),
+      () => set((s) => ({ locations: s.locations.map((l) => (l.id === locationId ? { ...l, coverPhotoPath: previousPath } : l)) })),
+      "Couldn't remove cover photo"
+    );
+  },
+
   createContainer: (input) => {
     const supabase = getSupabaseBrowserClient();
     const created: Container = {
@@ -982,6 +1053,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       tagToken: tagToken(),
       displayCode: null,
       coverPhotoEmoji: input.coverPhotoEmoji ?? "📦",
+      coverPhotoPath: null,
       createdByUserId: get().currentUserId,
       createdAt: nowIso(),
       status: "active",
@@ -1117,6 +1189,41 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     if (c) get().logActivity({ entityType: "container", entityId: c.id, entityName: c.name, action: "deleted_forever" });
   },
 
+  setContainerCoverPhoto: async (containerId, file) => {
+    const container = get().containers.find((c) => c.id === containerId);
+    if (!container) return { ok: false, error: "Container not found." };
+    const previousPath = container.coverPhotoPath;
+
+    const uploaded = await uploadCoverPhotoFile(file, container.householdId);
+    if (!uploaded.ok) return uploaded;
+    const { path } = uploaded;
+
+    const supabase = getSupabaseBrowserClient();
+    set((s) => ({ containers: s.containers.map((c) => (c.id === containerId ? { ...c, coverPhotoPath: path } : c)) }));
+    const { error: updateError } = await supabase.from("containers").update({ cover_photo_path: path }).eq("id", containerId);
+    if (updateError) {
+      set((s) => ({ containers: s.containers.map((c) => (c.id === containerId ? { ...c, coverPhotoPath: previousPath } : c)) }));
+      removeCoverPhotoObject(path, "container cover photo upload");
+      return { ok: false, error: updateError.message };
+    }
+    if (previousPath) removeCoverPhotoObject(previousPath, "replaced container cover photo");
+    return { ok: true };
+  },
+
+  removeContainerCoverPhoto: (containerId) => {
+    const supabase = getSupabaseBrowserClient();
+    const container = get().containers.find((c) => c.id === containerId);
+    if (!container || !container.coverPhotoPath) return;
+    const previousPath = container.coverPhotoPath;
+    set((s) => ({ containers: s.containers.map((c) => (c.id === containerId ? { ...c, coverPhotoPath: null } : c)) }));
+    removeCoverPhotoObject(previousPath, "container cover photo");
+    persistOrRevert(
+      supabase.from("containers").update({ cover_photo_path: null }).eq("id", containerId),
+      () => set((s) => ({ containers: s.containers.map((c) => (c.id === containerId ? { ...c, coverPhotoPath: previousPath } : c)) })),
+      "Couldn't remove cover photo"
+    );
+  },
+
   assignDisplayCode: async (containerId, code) => {
     const supabase = getSupabaseBrowserClient();
     const container = get().containers.find((c) => c.id === containerId);
@@ -1129,7 +1236,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       if (isExplicit) {
         resolved = normalizeDisplayCode(code!);
         if (isDisplayCodeTaken(get().containers, resolved, containerId)) {
-          return { ok: false, error: `Bin ID "${resolved}" is already in use.` };
+          return { ok: false, error: `Container ID "${resolved}" is already in use.` };
         }
       } else {
         resolved = nextDisplayCode(get().containers, location?.name ?? "BIN");
@@ -1142,7 +1249,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       const { data, error } = await supabase.from("containers").update({ display_code: resolved }).eq("id", containerId).select("id");
       if (!error && data && data.length > 0) {
         set((s) => ({ containers: s.containers.map((c) => (c.id === containerId ? { ...c, displayCode: resolved } : c)) }));
-        get().logActivity({ entityType: "container", entityId: containerId, entityName: container.name, action: "edited", detail: `Bin ID set to ${resolved}` });
+        get().logActivity({ entityType: "container", entityId: containerId, entityName: container.name, action: "edited", detail: `Container ID set to ${resolved}` });
         return { ok: true, code: resolved };
       }
       if (!error) {
@@ -1165,7 +1272,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
         set((s) => ({ containers: s.containers.map((c) => freshContainers.find((f) => f.id === c.id) ?? c) }));
       }
     }
-    return { ok: false, error: "Couldn't assign a Bin ID after a few attempts — try again." };
+    return { ok: false, error: "Couldn't assign a Container ID after a few attempts — try again." };
   },
 
   linkNfcTag: (containerId) => {
@@ -1197,39 +1304,23 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
   },
 
   setItemCoverPhoto: async (itemId, file) => {
-    const contentType = file.type || "application/octet-stream";
-    if (!contentType.startsWith("image/")) {
-      return { ok: false, error: "Only images can be used as a cover photo." };
-    }
-    if (file.size > ATTACHMENT_MAX_SIZE_BYTES) {
-      return { ok: false, error: `File is too large — max ${ATTACHMENT_MAX_SIZE_LABEL}.` };
-    }
     const item = get().items.find((it) => it.id === itemId);
     if (!item) return { ok: false, error: "Item not found." };
+    const previousPath = item.coverPhotoPath;
+
+    const uploaded = await uploadCoverPhotoFile(file, item.householdId);
+    if (!uploaded.ok) return uploaded;
+    const { path } = uploaded;
 
     const supabase = getSupabaseBrowserClient();
-    // A fresh id per upload, same as attachments — not upsert-in-place:
-    // upsert requires an UPDATE storage.objects policy in addition to
-    // INSERT (per the SDK's own docs), which the migration deliberately
-    // doesn't grant. The old object (if replacing one) is cleaned up
-    // separately, below, once the new one is confirmed live.
-    const previousPath = item.coverPhotoPath;
-    const path = `${item.householdId}/${newId()}`;
-    const { error: uploadError } = await supabase.storage.from("item-photos").upload(path, file, { contentType });
-    if (uploadError) return { ok: false, error: uploadError.message };
-
     set((s) => ({ items: s.items.map((it) => (it.id === itemId ? { ...it, coverPhotoPath: path } : it)) }));
     const { error: updateError } = await supabase.from("items").update({ cover_photo_path: path }).eq("id", itemId);
     if (updateError) {
       set((s) => ({ items: s.items.map((it) => (it.id === itemId ? { ...it, coverPhotoPath: previousPath } : it)) }));
-      await supabase.storage.from("item-photos").remove([path]);
+      removeCoverPhotoObject(path, "item cover photo upload");
       return { ok: false, error: updateError.message };
     }
-    if (previousPath) {
-      supabase.storage.from("item-photos").remove([previousPath]).then(({ error }) => {
-        if (error) console.error("Failed to remove replaced item cover photo from storage:", error.message);
-      });
-    }
+    if (previousPath) removeCoverPhotoObject(previousPath, "replaced item cover photo");
     return { ok: true };
   },
 
@@ -1239,9 +1330,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     if (!item || !item.coverPhotoPath) return;
     const previousPath = item.coverPhotoPath;
     set((s) => ({ items: s.items.map((it) => (it.id === itemId ? { ...it, coverPhotoPath: null } : it)) }));
-    supabase.storage.from("item-photos").remove([previousPath]).then(({ error }) => {
-      if (error) console.error("Failed to remove item cover photo from storage:", error.message);
-    });
+    removeCoverPhotoObject(previousPath, "item cover photo");
     persistOrRevert(
       supabase.from("items").update({ cover_photo_path: null }).eq("id", itemId),
       () => set((s) => ({ items: s.items.map((it) => (it.id === itemId ? { ...it, coverPhotoPath: previousPath } : it)) })),

@@ -175,7 +175,7 @@ export default function NfcSetupPage() {
                 Print QR label
               </Button>
               <Button size="lg" variant="outline" onClick={() => router.push(`/containers/${container.id}`)}>
-                Back to bin
+                Back to container
               </Button>
             </>
           )}
@@ -195,7 +195,7 @@ export default function NfcSetupPage() {
                 Print labels
               </Button>
               <Button size="lg" variant="outline" onClick={() => router.push(`/containers/${container.id}`)}>
-                Back to bin
+                Back to container
               </Button>
             </>
           )}
@@ -282,7 +282,7 @@ function SetupScreen({
             <div className="min-w-0 flex-1">
               <p className="text-body font-semibold text-ink">iPhone can&apos;t write NFC tags directly</p>
               <p className="mt-1 text-caption text-muted-foreground">
-                Write this bin&apos;s link using Shohaz on an Android phone, or any third-party NFC writer app — once
+                Write this container&apos;s link using Shohaz on an Android phone, or any third-party NFC writer app — once
                 written, tapping the tag opens it on any iPhone natively, no app or setup step needed.
               </p>
             </div>
@@ -297,7 +297,7 @@ function SetupScreen({
             className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-white p-4 text-left shadow-sm"
           >
             <div className="min-w-0">
-              <p className="text-body font-semibold text-ink">Copy bin link</p>
+              <p className="text-body font-semibold text-ink">Copy container link</p>
               <p className="mt-1 truncate text-caption text-muted-foreground">{resolveUrl}</p>
             </div>
             <Icon name="copy" size={18} className="shrink-0 text-muted-foreground" />
@@ -314,10 +314,10 @@ function SetupScreen({
           </span>
           <span className="min-w-0 flex-1">
             <span className="flex items-center gap-2">
-              <span className="text-body font-semibold text-ink">Write bin link to tag</span>
+              <span className="text-body font-semibold text-ink">Write container link to tag</span>
               <span className="rounded-md bg-ink px-1.5 py-0.5 text-micro font-semibold text-white">Best</span>
             </span>
-            <span className="mt-1 block text-caption text-muted-foreground">Writes the bin link to a writable NFC tag.</span>
+            <span className="mt-1 block text-caption text-muted-foreground">Writes the container link to a writable NFC tag.</span>
           </span>
         </button>
       )}
@@ -378,8 +378,8 @@ function WritingScreen({ code, resolveUrl, writing }: { code: string; resolveUrl
   return (
     <>
       <div>
-        <h2 className="text-screen-title font-semibold text-ink">Write bin link to tag</h2>
-        <p className="mt-1 text-body text-muted-foreground">This writes a direct Shohaz bin link onto a writable NFC tag.</p>
+        <h2 className="text-screen-title font-semibold text-ink">Write container link to tag</h2>
+        <p className="mt-1 text-body text-muted-foreground">This writes a direct Shohaz container link onto a writable NFC tag.</p>
       </div>
 
       <div className="flex items-center justify-between rounded-2xl border border-border bg-white p-4 shadow-sm">
@@ -393,7 +393,7 @@ function WritingScreen({ code, resolveUrl, writing }: { code: string; resolveUrl
       <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
         <p className="text-micro font-semibold text-muted-foreground">NDEF URL</p>
         <p className="mt-1 break-all text-body font-semibold text-ink">{resolveUrl}</p>
-        <p className="mt-1 text-caption text-muted-foreground">Anyone with access can open this bin detail screen.</p>
+        <p className="mt-1 text-caption text-muted-foreground">Anyone with access can open this container detail screen.</p>
       </div>
 
       <div className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-white p-6 shadow-sm">
@@ -493,7 +493,7 @@ function LinkedScreen({
       <div className="flex items-center justify-between rounded-2xl border border-border bg-white p-4 shadow-sm">
         <div>
           <p className="text-item-title font-semibold text-ink">Test the tag</p>
-          <p className="mt-1 text-caption text-muted-foreground">Hold your phone near the tag to confirm it opens this bin.</p>
+          <p className="mt-1 text-caption text-muted-foreground">Hold your phone near the tag to confirm it opens this container.</p>
         </div>
         <Button size="sm" className="shrink-0 bg-yellow text-white hover:bg-yellow/90" onClick={() => testNfcScan(container.name)}>
           Test scan

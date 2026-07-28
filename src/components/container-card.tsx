@@ -1,42 +1,46 @@
 import Link from "next/link";
-import { binIdBadgeClasses } from "@/lib/badge-color";
+import { PhotoThumb } from "@/components/photo-thumb";
+import { displayCodeBadgeClasses } from "@/lib/badge-color";
 import { cn } from "@/lib/utils";
 import type { Container } from "@/lib/types";
 
-interface BinCardStatus {
+interface ContainerCardStatus {
   label: string;
   dotClassName: string;
 }
 
-interface BinCardProps {
+interface ContainerCardProps {
   container: Container;
   itemCount: number;
   breadcrumbLabel: string;
-  status?: BinCardStatus | null;
+  status?: ContainerCardStatus | null;
   className?: string;
 }
 
 /**
- * Bin/container card matching Figma v2's Dashboard "Storage bins" pattern:
+ * Container card matching Figma v2's Dashboard "Storage containers" pattern:
  * photo flush to the card's top/left/right edges (no bottom rounding on the
- * photo itself), a flat hashed-color Bin ID badge, and a quiet status
+ * photo itself), a flat hashed-color Container ID badge, and a quiet status
  * dot+label that sits in the metadata row — never overlapping the badge.
  */
-export function BinCard({ container, itemCount, breadcrumbLabel, status, className }: BinCardProps) {
+export function ContainerCard({ container, itemCount, breadcrumbLabel, status, className }: ContainerCardProps) {
   return (
     <Link
       href={`/containers/${container.id}`}
       className={cn("flex flex-col overflow-hidden rounded-2xl border border-border bg-white shadow-sm transition-shadow hover:shadow-lg", className)}
     >
-      <div className="relative flex h-26 items-center justify-center bg-brand-100">
-        <span className="text-8xl" aria-hidden>
-          {container.coverPhotoEmoji ?? "📦"}
-        </span>
+      <div className="relative h-26">
+        <PhotoThumb
+          emoji={container.coverPhotoEmoji ?? "📦"}
+          coverPhotoPath={container.coverPhotoPath}
+          className="size-full rounded-none"
+          emojiClassName="text-8xl"
+        />
         {container.displayCode && (
           <span
             className={cn(
               "absolute left-2 top-2 rounded-full border px-2 py-1 text-micro font-semibold",
-              binIdBadgeClasses(container.id)
+              displayCodeBadgeClasses(container.id)
             )}
           >
             {container.displayCode}

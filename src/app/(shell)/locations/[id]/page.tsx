@@ -1,13 +1,14 @@
 "use client";
 
+import { useRef, useState } from "react";
 import { notFound, useParams, useRouter } from "next/navigation";
-import { useState } from "react";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
 import { EntityCard } from "@/components/entity-card";
 import { EntityRow } from "@/components/entity-row";
 import { ItemCard } from "@/components/item-card";
 import { ItemRow } from "@/components/item-row";
+import { PhotoThumb } from "@/components/photo-thumb";
 import { ViewToggle, type ViewMode } from "@/components/view-toggle";
 import { EmptyState } from "@/components/empty-state";
 import { EntityFormSheet } from "@/components/entity-form-sheet";
@@ -25,17 +26,35 @@ export default function LocationDetailPage() {
   const createContainer = useInventoryStore((s) => s.createContainer);
   const updateLocation = useInventoryStore((s) => s.updateLocation);
   const trashLocation = useInventoryStore((s) => s.trashLocation);
+  const setLocationCoverPhoto = useInventoryStore((s) => s.setLocationCoverPhoto);
+  const removeLocationCoverPhoto = useInventoryStore((s) => s.removeLocationCoverPhoto);
 
   const [addContainerOpen, setAddContainerOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [view, setView] = useState<ViewMode>("grid");
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   const location = locations.find((l) => l.id === params.id);
   if (!location) return notFound();
 
   const childContainers = directChildContainers(containers, null, location.id);
   const directItems = itemsIn(items, location.id, null);
+
+  async function handlePhotoChosen(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !location) return;
+    setUploadingPhoto(true);
+    const result = await setLocationCoverPhoto(location.id, file);
+    setUploadingPhoto(false);
+    if (!result.ok) {
+      toast.error(result.error ?? "Couldn't set photo.");
+      return;
+    }
+    toast.success("Photo updated");
+  }
 
   return (
     <div className="flex flex-col gap-5 pb-6">
@@ -53,16 +72,35 @@ export default function LocationDetailPage() {
         </div>
       </div>
 
-      <div>
-        <div className="flex items-center gap-3">
-          <span className="text-4xl" aria-hidden>
-            {location.coverPhotoEmoji ?? "📦"}
-          </span>
-          <div>
-            <h1 className="text-screen-title font-medium text-ink">{location.name}</h1>
-            {location.description && <p className="text-caption text-muted-foreground">{location.description}</p>}
-          </div>
+      <div className="relative">
+        <PhotoThumb emoji={location.coverPhotoEmoji ?? "📦"} coverPhotoPath={location.coverPhotoPath} className="h-48 w-full" emojiClassName="text-8xl" />
+        <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChosen} />
+        <div className="absolute bottom-2 right-2 flex gap-2">
+          {location.coverPhotoPath && (
+            <button
+              type="button"
+              onClick={() => removeLocationCoverPhoto(location.id)}
+              aria-label="Remove photo"
+              className="tap-target flex size-9 items-center justify-center rounded-full bg-white/90 shadow-sm"
+            >
+              <Icon name="close" size={16} />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => photoInputRef.current?.click()}
+            disabled={uploadingPhoto}
+            aria-label={location.coverPhotoPath ? "Change photo" : "Add photo"}
+            className="tap-target flex size-9 items-center justify-center rounded-full bg-white/90 shadow-sm disabled:opacity-60"
+          >
+            {uploadingPhoto ? <Icon name="spinner" size={16} className="animate-spin" /> : <Icon name="camera" size={16} />}
+          </button>
         </div>
+      </div>
+
+      <div>
+        <h1 className="text-screen-title font-medium text-ink">{location.name}</h1>
+        {location.description && <p className="text-caption text-muted-foreground">{location.description}</p>}
       </div>
 
       <Button variant="secondary" size="lg" onClick={() => setAddContainerOpen(true)}>
@@ -75,7 +113,7 @@ export default function LocationDetailPage() {
           {childContainers.length > 0 && <ViewToggle mode={view} onChange={setView} />}
         </div>
         {childContainers.length === 0 ? (
-          <EmptyState icon="archive" title="No containers yet" description="Group items into a bin, box, or shelf." />
+          <EmptyState icon="archive" title="No containers yet" description="Group items into a bin, box, shelf, or nightstand." />
         ) : view === "grid" ? (
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             {childContainers.map((c) => {
@@ -85,6 +123,7 @@ export default function LocationDetailPage() {
                   key={c.id}
                   href={`/containers/${c.id}`}
                   emoji={c.coverPhotoEmoji ?? "📦"}
+                  coverPhotoPath={c.coverPhotoPath}
                   title={c.name}
                   subtitle={`${count} item${count === 1 ? "" : "s"}`}
                   badge={c.displayCode ?? undefined}
@@ -102,6 +141,8 @@ export default function LocationDetailPage() {
                   key={c.id}
                   href={`/containers/${c.id}`}
                   icon="archive"
+                  emoji={c.coverPhotoEmoji ?? "📦"}
+                  coverPhotoPath={c.coverPhotoPath}
                   title={c.name}
                   subtitle={`${count} item${count === 1 ? "" : "s"}${c.displayCode ? ` · ${c.displayCode}` : ""}`}
                 />

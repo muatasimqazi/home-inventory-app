@@ -89,7 +89,7 @@ export default function DataExportPage() {
       <ExportCard
         icon="download"
         title="Inventory CSV"
-        description="Every item, its category, quantity, location, and Bin ID — ready to open in Sheets or Excel."
+        description="Every item, its category, quantity, location, and Container ID — ready to open in Sheets or Excel."
         buildResult={buildInventoryCsv}
       />
       <ExportCard

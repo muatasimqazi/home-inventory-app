@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BinCard } from "@/components/bin-card";
+import { ContainerCard } from "@/components/container-card";
 import type { Container } from "@/lib/types";
 
-interface BinCarouselEntry {
+interface ContainerCarouselEntry {
   container: Container;
   itemCount: number;
   breadcrumbLabel: string;
@@ -19,7 +19,7 @@ const MAX_SCALE = 1.08;
  * up and the rest ease back down — driven by scroll position, not a fixed
  * "active index", so it feels continuous rather than stepped.
  */
-export function BinCarousel({ entries }: { entries: BinCarouselEntry[] }) {
+export function ContainerCarousel({ entries }: { entries: ContainerCarouselEntry[] }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [scales, setScales] = useState<number[]>(() => entries.map(() => MIN_SCALE));
@@ -74,7 +74,7 @@ export function BinCarousel({ entries }: { entries: BinCarouselEntry[] }) {
           className="shrink-0 snap-start"
           style={{ transform: `scale(${scales[i] ?? MIN_SCALE})`, transition: "transform 150ms ease-out" }}
         >
-          <BinCard
+          <ContainerCard
             container={entry.container}
             itemCount={entry.itemCount}
             breadcrumbLabel={entry.breadcrumbLabel}

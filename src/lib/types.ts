@@ -40,6 +40,8 @@ export interface Location {
   name: string;
   description?: string;
   coverPhotoEmoji?: string;
+  /** Path within the public "item-photos" Storage bucket (shared across items/locations/containers) — null falls back to coverPhotoEmoji. */
+  coverPhotoPath: string | null;
   createdByUserId: string;
   createdAt: string;
   status: EntityLifecycleStatus;
@@ -55,15 +57,17 @@ export interface Container {
   name: string;
   description?: string;
   tagToken: string;
-  /** Human-facing "Bin ID" (e.g. GAR-234). Stable across moves; separate from tagToken. */
+  /** Human-facing "Container ID" (e.g. GAR-234). Stable across moves; separate from tagToken. */
   displayCode: string | null;
   coverPhotoEmoji?: string;
+  /** Path within the public "item-photos" Storage bucket (shared across items/locations/containers) — null falls back to coverPhotoEmoji. */
+  coverPhotoPath: string | null;
   createdByUserId: string;
   createdAt: string;
   status: EntityLifecycleStatus;
   trashedAt?: string | null;
   permanentlyDeleteAfter?: string | null;
-  /** When an NFC tag was linked to this container (native write or the iOS Shortcuts fallback) — null if only the QR label has been set up. */
+  /** When an NFC tag was linked to this container (native write, or written by another device and read natively on iOS) — null if only the QR label has been set up. */
   nfcLinkedAt: string | null;
 }
 
@@ -96,7 +100,7 @@ export interface Item {
   quantity: number;
   notes: string;
   photoEmoji: string;
-  /** Path within the public "item-photos" Storage bucket — null falls back to photoEmoji. */
+  /** Path within the public "item-photos" Storage bucket (shared across items/locations/containers) — null falls back to photoEmoji. */
   coverPhotoPath: string | null;
   status: ItemStatus;
   needsReview: boolean;

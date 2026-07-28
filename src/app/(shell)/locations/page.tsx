@@ -7,6 +7,7 @@ import { Icon } from "@/components/icon";
 import { EmptyState } from "@/components/empty-state";
 import { EntityFormSheet } from "@/components/entity-form-sheet";
 import { LocationAccordionRow } from "@/components/location-tree";
+import { PhotoThumb } from "@/components/photo-thumb";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useInventoryStore } from "@/lib/store";
@@ -70,9 +71,12 @@ export default function LocationsListPage() {
                     href={`/locations/${loc.id}`}
                     className="flex items-center gap-3 rounded-2xl border border-border bg-white px-4 py-3.5 shadow-sm"
                   >
-                    <span className="flex size-10 shrink-0 items-center justify-center rounded-[10px] bg-brand-100">
-                      <Icon name="pin" size={18} className="text-yellow" />
-                    </span>
+                    <PhotoThumb
+                      emoji={loc.coverPhotoEmoji ?? "📍"}
+                      coverPhotoPath={loc.coverPhotoPath}
+                      className="size-10 shrink-0 rounded-[10px]"
+                      emojiClassName="text-lg"
+                    />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-item-title font-medium text-ink">{loc.name}</p>
                       <p className="truncate text-caption text-muted-foreground">

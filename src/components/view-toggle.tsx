@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 
 export type ViewMode = "grid" | "list";
 
-/** Grid/list toggle for bins & items (docs/bugs.md #12) — session-only, not persisted, consistent with the rest of the app's UI state. */
+/** Grid/list toggle for containers & items (docs/bugs.md #12) — session-only, not persisted, consistent with the rest of the app's UI state. */
 export function ViewToggle({ mode, onChange }: { mode: ViewMode; onChange: (mode: ViewMode) => void }) {
   return (
     <div className="flex shrink-0 items-center gap-0.5 rounded-lg border border-border bg-white p-0.5">

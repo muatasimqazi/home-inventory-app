@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { SearchBar } from "@/components/search-bar";
-import { BinCarousel } from "@/components/bin-carousel";
+import { ContainerCarousel } from "@/components/container-carousel";
 import { Icon } from "@/components/icon";
 import { EmptyState } from "@/components/empty-state";
 import { useInventoryStore, useCurrentHousehold } from "@/lib/store";
@@ -67,7 +67,7 @@ export default function DashboardPage() {
           {summary.totalActiveItems} item{summary.totalActiveItems === 1 ? "" : "s"}
         </span>
         <span className="text-ink">
-          {activeContainerList.length} bin{activeContainerList.length === 1 ? "" : "s"}
+          {activeContainerList.length} container{activeContainerList.length === 1 ? "" : "s"}
         </span>
         <span className="text-ink">
           {summary.needsReviewCount} review
@@ -95,9 +95,9 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <section aria-label="Storage bins" className="flex flex-col gap-3">
+      <section aria-label="Storage containers" className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-section-title font-semibold text-ink">Storage bins</h2>
+          <h2 className="text-section-title font-semibold text-ink">Storage containers</h2>
           <Link href="/locations" className="text-caption font-semibold text-ink">
             View all
           </Link>
@@ -118,7 +118,7 @@ export default function DashboardPage() {
             }
           />
         ) : (
-          <BinCarousel
+          <ContainerCarousel
             entries={recentContainers.map((container) => {
               const flags = containerStatusFlags(items, containers, container.id);
               const itemCount = items.filter((it) => it.status === "active" && it.containerId === container.id).length;

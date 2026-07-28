@@ -54,7 +54,7 @@ const INVENTORY_CSV_HEADERS = [
   "Quantity",
   "Location",
   "Container",
-  "Bin ID",
+  "Container ID",
   "Tags",
   "Notes",
   "Status",

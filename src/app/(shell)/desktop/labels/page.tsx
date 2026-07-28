@@ -137,8 +137,8 @@ export default function LabelPrintingPage() {
           <Icon name="arrowLeft" size={18} />
         </button>
         <div>
-          <h1 className="text-screen-title font-semibold text-ink">Print bin labels</h1>
-          <p className="text-caption text-muted-foreground">Select bins, choose a label format, and preview before printing.</p>
+          <h1 className="text-screen-title font-semibold text-ink">Print container labels</h1>
+          <p className="text-caption text-muted-foreground">Select containers, choose a label format, and preview before printing.</p>
         </div>
       </div>
 
@@ -177,7 +177,7 @@ export default function LabelPrintingPage() {
               className="h-9 w-24"
             />
             <p className="mt-1 text-micro text-muted-foreground">
-              Preprinted blank labels — assign them to a container later from that container&apos;s Bin ID sheet.
+              Preprinted blank labels — assign them to a container later from that container&apos;s ID sheet.
             </p>
           </div>
 

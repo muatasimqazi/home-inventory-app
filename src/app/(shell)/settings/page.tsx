@@ -72,7 +72,7 @@ export default function SettingsPage() {
         <SettingsRow icon="home" label="Household" sublabel={household.name} href="/settings/members" />
         <SettingsRow icon="users" label="My Households" sublabel={`${households.length} household${households.length === 1 ? "" : "s"}`} href="/settings/households" />
         <SettingsRow icon="user" label="Members" sublabel={`${members.length} active`} href="/settings/members" />
-        <SettingsRow icon="printer" label="Label printing" sublabel="Bin ID labels" href="/desktop/labels" />
+        <SettingsRow icon="printer" label="Label printing" sublabel="Container ID labels" href="/desktop/labels" />
         <SettingsRow icon="upload" label="Import CSV" sublabel="Desktop recommended" href="/settings/import" />
         <SettingsRow icon="download" label="Data & Export" sublabel="CSV, PDF, JSON" href="/settings/export" />
         <SettingsRow icon="tag" label="Tags" sublabel={`${tags.length} tags`} href="/tags" />

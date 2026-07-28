@@ -18,7 +18,7 @@ const STEP_TITLES: Record<Step, string> = {
   1: "Set up home",
   2: "Members",
   3: "Locations",
-  4: "First bin",
+  4: "First container",
   5: "Ready",
 };
 
@@ -70,12 +70,12 @@ function HouseholdSetupInner() {
   const [customLocations, setCustomLocations] = useState<string[]>([]);
   const [createdLocations, setCreatedLocations] = useState<Location[]>([]);
 
-  // Step 4 — first bin
-  const [binName, setBinName] = useState("");
-  const [binLocationId, setBinLocationId] = useState<string | null>(null);
+  // Step 4 — first container
+  const [containerName, setContainerName] = useState("");
+  const [containerLocationId, setContainerLocationId] = useState<string | null>(null);
   const [nfcOn, setNfcOn] = useState(true);
-  const [createdBinName, setCreatedBinName] = useState<string | null>(null);
-  const [createdBinCode, setCreatedBinCode] = useState<string | null>(null);
+  const [createdContainerName, setCreatedContainerName] = useState<string | null>(null);
+  const [createdContainerCode, setCreatedContainerCode] = useState<string | null>(null);
 
   // Step 5 — join (redeem invite) mode
   const [joinEmail, setJoinEmail] = useState("");
@@ -153,18 +153,18 @@ function HouseholdSetupInner() {
     ];
     const created = toCreate.map((l) => createLocation({ name: l.name, description: l.description, coverPhotoEmoji: l.emoji }));
     setCreatedLocations(created);
-    if (created.length > 0 && !binLocationId) setBinLocationId(created[0].id);
+    if (created.length > 0 && !containerLocationId) setContainerLocationId(created[0].id);
     setStep(4);
   }
 
   async function handleCreateBin() {
-    const location = createdLocations.find((l) => l.id === binLocationId) ?? createdLocations[0];
-    const name = binName.trim() || (location ? `${location.name} Bin 1` : "Bin 1");
+    const location = createdLocations.find((l) => l.id === containerLocationId) ?? createdLocations[0];
+    const name = containerName.trim() || (location ? `${location.name} Container 1` : "Container 1");
     if (location) {
       const container = createContainer({ name, locationId: location.id });
       const result = await assignDisplayCode(container.id);
-      setCreatedBinName(name);
-      setCreatedBinCode(result.ok ? (result.code ?? null) : null);
+      setCreatedContainerName(name);
+      setCreatedContainerCode(result.ok ? (result.code ?? null) : null);
       toast.success(`${name} created`);
     }
     setStep(5);
@@ -250,7 +250,7 @@ function HouseholdSetupInner() {
             <div>
               <h2 className="text-screen-title font-semibold text-ink">Create your household</h2>
               <p className="mt-1 text-body text-muted-foreground">
-                This is the shared space where locations, bins, items, and labels live.
+                This is the shared space where locations, containers, items, and labels live.
               </p>
             </div>
 
@@ -298,7 +298,7 @@ function HouseholdSetupInner() {
               </div>
               <div className="min-w-0">
                 <p className="truncate text-body font-semibold text-ink">{householdName.trim() || "Your household"}</p>
-                <p className="text-caption text-muted-foreground">0 locations · 0 bins · Owner access</p>
+                <p className="text-caption text-muted-foreground">0 locations · 0 containers · Owner access</p>
               </div>
             </div>
             <p className="text-caption text-muted-foreground">You can rename this later from Settings.</p>
@@ -307,7 +307,7 @@ function HouseholdSetupInner() {
           <>
             <div>
               <h2 className="text-screen-title font-semibold text-ink">Invite household members</h2>
-              <p className="mt-1 text-body text-muted-foreground">Members can scan labels, find bins, and add items. You control roles.</p>
+              <p className="mt-1 text-body text-muted-foreground">Members can scan labels, find containers, and add items. You control roles.</p>
             </div>
 
             <Field label="Invite email">
@@ -352,7 +352,7 @@ function HouseholdSetupInner() {
           <>
             <div>
               <h2 className="text-screen-title font-semibold text-ink">Add your first locations</h2>
-              <p className="mt-1 text-body text-muted-foreground">Locations are rooms or areas where bins and items live.</p>
+              <p className="mt-1 text-body text-muted-foreground">Locations are rooms or areas where containers and items live.</p>
             </div>
 
             <div className="flex flex-col gap-2">
@@ -416,15 +416,15 @@ function HouseholdSetupInner() {
         ) : step === 4 ? (
           <>
             <div>
-              <h2 className="text-screen-title font-semibold text-ink">Create a labeled bin</h2>
-              <p className="mt-1 text-body text-muted-foreground">Each bin gets a readable ID and a QR/NFC label for fast scanning.</p>
+              <h2 className="text-screen-title font-semibold text-ink">Create a labeled container</h2>
+              <p className="mt-1 text-body text-muted-foreground">Each container gets a readable ID and a QR/NFC label for fast scanning.</p>
             </div>
 
-            <Field label="Bin name">
+            <Field label="Container name">
               <Input
-                value={binName}
-                onChange={(e) => setBinName(e.target.value)}
-                placeholder={createdLocations[0] ? `${createdLocations[0].name} Bin 1` : "e.g. Garage Bin 1"}
+                value={containerName}
+                onChange={(e) => setContainerName(e.target.value)}
+                placeholder={createdLocations[0] ? `${createdLocations[0].name} Container 1` : "e.g. Garage Container 1"}
                 className="h-11"
               />
             </Field>
@@ -436,9 +436,9 @@ function HouseholdSetupInner() {
                     <button
                       key={loc.id}
                       type="button"
-                      onClick={() => setBinLocationId(loc.id)}
+                      onClick={() => setContainerLocationId(loc.id)}
                       className={
-                        binLocationId === loc.id
+                        containerLocationId === loc.id
                           ? "tap-target rounded-full border border-yellow bg-brand-100 px-3 text-caption font-medium text-ink"
                           : "tap-target rounded-full border border-border bg-white px-3 text-caption text-ink"
                       }
@@ -452,7 +452,7 @@ function HouseholdSetupInner() {
 
             {createdLocations.length === 0 && (
               <p className="text-caption text-muted-foreground">
-                No locations yet — go back to add one, or add this bin later from the Locations tab.
+                No locations yet — go back to add one, or add this container later from the Locations tab.
               </p>
             )}
 
@@ -469,7 +469,7 @@ function HouseholdSetupInner() {
               </div>
               <h2 className="text-desktop-title font-semibold text-ink">Your home is ready</h2>
               <p className="text-body text-muted-foreground">
-                Start by adding items with photos, or scan a tag when you are standing near a bin.
+                Start by adding items with photos, or scan a tag when you are standing near a container.
               </p>
             </div>
 
@@ -482,17 +482,17 @@ function HouseholdSetupInner() {
               {createdLocations.map((loc) => (
                 <ChecklistRow key={loc.id} label={`${loc.name} added`} />
               ))}
-              {createdBinCode && <ChecklistRow label={`${createdBinCode} bin label ready`} />}
+              {createdContainerCode && <ChecklistRow label={`${createdContainerCode} container label ready`} />}
             </div>
 
-            {createdBinName && (
+            {createdContainerName && (
               <div className="flex items-start gap-3 rounded-2xl border border-border bg-white p-4 shadow-sm">
                 <div className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-brand-100">
                   <Icon name="camera" size={20} className="text-brand-700" />
                 </div>
                 <div>
                   <p className="text-body font-semibold text-ink">Recommended next step</p>
-                  <p className="mt-1 text-caption text-muted-foreground">Add items to {createdBinName} with the photo capture flow.</p>
+                  <p className="mt-1 text-caption text-muted-foreground">Add items to {createdContainerName} with the photo capture flow.</p>
                 </div>
               </div>
             )}
@@ -536,10 +536,10 @@ function HouseholdSetupInner() {
           ) : step === 4 ? (
             <>
               <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={handleCreateBin}>
-                Create bin
+                Create container
               </Button>
               <Button size="lg" variant="outline" onClick={() => setStep(5)}>
-                Add bin later
+                Add container later
               </Button>
             </>
           ) : (

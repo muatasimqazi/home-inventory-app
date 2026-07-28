@@ -99,6 +99,7 @@ export interface LocationRow {
   name: string;
   description: string | null;
   cover_photo_emoji: string | null;
+  cover_photo_path: string | null;
   created_by_user_id: string;
   created_at: string;
   status: string;
@@ -113,6 +114,7 @@ export function rowToLocation(row: LocationRow): Location {
     name: row.name,
     description: row.description ?? undefined,
     coverPhotoEmoji: row.cover_photo_emoji ?? undefined,
+    coverPhotoPath: row.cover_photo_path,
     createdByUserId: row.created_by_user_id,
     createdAt: row.created_at,
     status: row.status as Location["status"],
@@ -128,6 +130,7 @@ export function locationToInsertRow(loc: Location): LocationRow {
     name: loc.name,
     description: loc.description ?? null,
     cover_photo_emoji: loc.coverPhotoEmoji ?? null,
+    cover_photo_path: loc.coverPhotoPath,
     created_by_user_id: loc.createdByUserId,
     created_at: loc.createdAt,
     status: loc.status,
@@ -146,6 +149,7 @@ export interface ContainerRow {
   tag_token: string;
   display_code: string | null;
   cover_photo_emoji: string | null;
+  cover_photo_path: string | null;
   created_by_user_id: string;
   created_at: string;
   status: string;
@@ -165,6 +169,7 @@ export function rowToContainer(row: ContainerRow): Container {
     tagToken: row.tag_token,
     displayCode: row.display_code,
     coverPhotoEmoji: row.cover_photo_emoji ?? undefined,
+    coverPhotoPath: row.cover_photo_path,
     createdByUserId: row.created_by_user_id,
     createdAt: row.created_at,
     status: row.status as Container["status"],
@@ -185,6 +190,7 @@ export function containerToInsertRow(c: Container): ContainerRow {
     tag_token: c.tagToken,
     display_code: c.displayCode,
     cover_photo_emoji: c.coverPhotoEmoji ?? null,
+    cover_photo_path: c.coverPhotoPath,
     created_by_user_id: c.createdByUserId,
     created_at: c.createdAt,
     status: c.status,

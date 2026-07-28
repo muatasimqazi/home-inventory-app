@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { notFound, useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
 import { EntityCard } from "@/components/entity-card";
 import { EntityRow } from "@/components/entity-row";
 import { ItemCard } from "@/components/item-card";
 import { ItemRow } from "@/components/item-row";
+import { PhotoThumb } from "@/components/photo-thumb";
 import { ViewToggle, type ViewMode } from "@/components/view-toggle";
 import { EmptyState } from "@/components/empty-state";
 import { BreadcrumbTrail } from "@/components/breadcrumb-trail";
@@ -18,7 +19,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { DisplayCodeSheet } from "@/components/display-code-sheet";
 import { Button } from "@/components/ui/button";
 import { useInventoryStore } from "@/lib/store";
-import { binIdBadgeClasses } from "@/lib/badge-color";
+import { displayCodeBadgeClasses } from "@/lib/badge-color";
 import { cn } from "@/lib/utils";
 import {
   activeItemCountForContainer,
@@ -39,6 +40,8 @@ export default function ContainerDetailPage() {
   const updateContainer = useInventoryStore((s) => s.updateContainer);
   const moveContainer = useInventoryStore((s) => s.moveContainer);
   const trashContainer = useInventoryStore((s) => s.trashContainer);
+  const setContainerCoverPhoto = useInventoryStore((s) => s.setContainerCoverPhoto);
+  const removeContainerCoverPhoto = useInventoryStore((s) => s.removeContainerCoverPhoto);
 
   const [addSubOpen, setAddSubOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -46,6 +49,8 @@ export default function ContainerDetailPage() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [displayCodeOpen, setDisplayCodeOpen] = useState(false);
   const [view, setView] = useState<ViewMode>("grid");
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   const container = containers.find((c) => c.id === params.id);
   if (!container) return notFound();
@@ -54,6 +59,20 @@ export default function ContainerDetailPage() {
   const subContainers = directChildContainers(containers, container.id, container.locationId);
   const directItems = itemsIn(items, container.locationId, container.id);
   const isEmpty = subContainers.length === 0 && directItems.length === 0;
+
+  async function handlePhotoChosen(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !container) return;
+    setUploadingPhoto(true);
+    const result = await setContainerCoverPhoto(container.id, file);
+    setUploadingPhoto(false);
+    if (!result.ok) {
+      toast.error(result.error ?? "Couldn't set photo.");
+      return;
+    }
+    toast.success("Photo updated");
+  }
 
   return (
     <div className="flex flex-col gap-5 pb-6">
@@ -74,26 +93,45 @@ export default function ContainerDetailPage() {
         </div>
       </div>
 
-      <div>
-        <div className="flex items-center gap-3">
-          <span className="text-4xl" aria-hidden>
-            {container.coverPhotoEmoji ?? "📦"}
-          </span>
-          <div className="min-w-0">
-            <h1 className="text-screen-title font-medium text-ink">{container.name}</h1>
-            <BreadcrumbTrail segments={breadcrumb.slice(0, -1)} />
-          </div>
+      <div className="relative">
+        <PhotoThumb emoji={container.coverPhotoEmoji ?? "📦"} coverPhotoPath={container.coverPhotoPath} className="h-48 w-full" emojiClassName="text-8xl" />
+        <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChosen} />
+        <div className="absolute bottom-2 right-2 flex gap-2">
+          {container.coverPhotoPath && (
+            <button
+              type="button"
+              onClick={() => removeContainerCoverPhoto(container.id)}
+              aria-label="Remove photo"
+              className="tap-target flex size-9 items-center justify-center rounded-full bg-white/90 shadow-sm"
+            >
+              <Icon name="close" size={16} />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => photoInputRef.current?.click()}
+            disabled={uploadingPhoto}
+            aria-label={container.coverPhotoPath ? "Change photo" : "Add photo"}
+            className="tap-target flex size-9 items-center justify-center rounded-full bg-white/90 shadow-sm disabled:opacity-60"
+          >
+            {uploadingPhoto ? <Icon name="spinner" size={16} className="animate-spin" /> : <Icon name="camera" size={16} />}
+          </button>
         </div>
+      </div>
+
+      <div>
+        <h1 className="text-screen-title font-medium text-ink">{container.name}</h1>
+        <BreadcrumbTrail segments={breadcrumb.slice(0, -1)} />
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => setDisplayCodeOpen(true)}
             className={cn(
               "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-caption font-semibold",
-              container.displayCode ? binIdBadgeClasses(container.id) : "border-border bg-surface-muted text-ink"
+              container.displayCode ? displayCodeBadgeClasses(container.id) : "border-border bg-surface-muted text-ink"
             )}
           >
-            {container.displayCode ?? "Assign Bin ID"}
+            {container.displayCode ?? "Assign Container ID"}
             <Icon name="edit" size={12} className="opacity-60" />
           </button>
           <span className="flex items-center gap-1.5 text-caption text-muted-foreground">
@@ -142,6 +180,7 @@ export default function ContainerDetailPage() {
                         key={c.id}
                         href={`/containers/${c.id}`}
                         emoji={c.coverPhotoEmoji ?? "📦"}
+                        coverPhotoPath={c.coverPhotoPath}
                         title={c.name}
                         subtitle={`${count} item${count === 1 ? "" : "s"}`}
                         badge={c.displayCode ?? undefined}
@@ -159,6 +198,8 @@ export default function ContainerDetailPage() {
                         key={c.id}
                         href={`/containers/${c.id}`}
                         icon="archive"
+                        emoji={c.coverPhotoEmoji ?? "📦"}
+                        coverPhotoPath={c.coverPhotoPath}
                         title={c.name}
                         subtitle={`${count} item${count === 1 ? "" : "s"}${c.displayCode ? ` · ${c.displayCode}` : ""}`}
                       />

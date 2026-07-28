@@ -1,6 +1,6 @@
 import type { Container } from "./types";
 
-// Bin ID / display code helpers (PRD v2 §2). Separate from tagToken: this is
+// Container ID / display code helpers (PRD v2 §2). Separate from tagToken: this is
 // the short, human-printable code (e.g. GAR-234), not the QR/NFC resolver.
 
 /** First 3 letters of the location name, uppercased, padded with X. */

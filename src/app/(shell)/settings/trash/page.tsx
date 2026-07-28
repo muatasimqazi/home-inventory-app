@@ -78,7 +78,7 @@ export default function TrashPage() {
         <p className="mt-0.5 text-caption text-muted-foreground">Restore items or remove them permanently.</p>
       </div>
 
-      {rows.length > 0 && <SearchBar value={query} onChange={setQuery} placeholder="Search items, bins, locations..." />}
+      {rows.length > 0 && <SearchBar value={query} onChange={setQuery} placeholder="Search items, containers, locations..." />}
 
       {rows.length > 0 && (
         <div className="flex gap-2 overflow-x-auto pb-1">

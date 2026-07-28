@@ -1,9 +1,9 @@
 import { cn } from "@/lib/utils";
-import { itemCoverPhotoUrl } from "@/lib/item-photo";
+import { coverPhotoUrl } from "@/lib/cover-photo";
 
 interface PhotoThumbProps {
   emoji: string;
-  /** Real cover photo path (Item.coverPhotoPath) — when set, renders the actual photo instead of the emoji fallback. */
+  /** Real cover photo path (Item/Location/Container.coverPhotoPath) — when set, renders the actual photo instead of the emoji fallback. */
   coverPhotoPath?: string | null;
   label?: string;
   className?: string;
@@ -20,7 +20,7 @@ export function PhotoThumb({ emoji, coverPhotoPath, label, className, emojiClass
     return (
       <div className={cn("overflow-hidden rounded-2xl bg-brand-100", className)}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={itemCoverPhotoUrl(coverPhotoPath)} alt="" className="size-full object-cover" />
+        <img src={coverPhotoUrl(coverPhotoPath)} alt="" className="size-full object-cover" />
       </div>
     );
   }

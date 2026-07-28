@@ -96,7 +96,7 @@ export function computeHouseholdSummary(items: Item[], locations: Location[]): H
   };
 }
 
-/** Active items sitting directly in a Location, not yet put in a bin — the Dashboard "Action queue" Loose count. */
+/** Active items sitting directly in a Location, not yet put in a container — the Dashboard "Action queue" Loose count. */
 export function looseItemCount(items: Item[]): number {
   return items.filter((it) => it.status === "active" && it.locationId !== null && it.containerId === null).length;
 }

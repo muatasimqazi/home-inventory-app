@@ -15,7 +15,7 @@ interface SearchBarProps {
 export function SearchBar({
   value,
   onChange,
-  placeholder = "Search items, bins, locations...",
+  placeholder = "Search items, containers, locations...",
   autoFocus,
   className,
   onFocus,
