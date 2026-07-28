@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useInventoryStore } from "@/lib/store";
 import { buildBreadcrumb, breadcrumbLabel } from "@/lib/selectors";
 import { containerResolveUrl } from "@/lib/urls";
+import { shortcutWorkflowName } from "@/lib/apple-shortcut";
 import { cn } from "@/lib/utils";
 
 type Platform = "ios" | "android" | "other";
@@ -37,14 +38,16 @@ function usePlatform(): Platform {
   return useSyncExternalStore(noSubscription, detectPlatform, () => "other");
 }
 
-const SHORTCUT_STEPS = [
-  "Open Shortcuts and go to Automation",
-  "Tap +, then choose NFC",
-  "Scan the 25mm tag",
-  "Choose Run Shortcut",
-  "Select Open Shohaz Bin",
-  "Pick this bin and turn off Ask Before Running",
-];
+function shortcutSteps(workflowName: string): string[] {
+  return [
+    "Open Shortcuts and go to Automation",
+    "Tap +, then choose NFC",
+    "Scan the 25mm tag",
+    "Choose Run Shortcut",
+    `Select ${workflowName}`,
+    "Turn off Ask Before Running",
+  ];
+}
 
 export default function NfcSetupPage() {
   const params = useParams<{ id: string }>();
@@ -81,7 +84,11 @@ export default function NfcSetupPage() {
     }, 1400);
   }
 
-  function installShortcut() {
+  function downloadShortcut() {
+    window.location.href = `/api/nfc-shortcut/${containerId}`;
+  }
+
+  function markLinkedViaShortcuts() {
     linkNfcTag(containerId);
     toast.success("NFC tag linked via Shortcuts");
     setScreen("linked");
@@ -204,7 +211,7 @@ export default function NfcSetupPage() {
           )}
           {screen === "shortcutsInfo" && (
             <>
-              <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={installShortcut}>
+              <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={downloadShortcut}>
                 Install Shohaz Shortcut
               </Button>
               <Button size="lg" variant="outline" onClick={() => setScreen("shortcutsSteps")}>
@@ -214,7 +221,7 @@ export default function NfcSetupPage() {
           )}
           {screen === "shortcutsSteps" && (
             <>
-              <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={installShortcut}>
+              <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={markLinkedViaShortcuts}>
                 Done
               </Button>
               <Button size="lg" variant="outline" onClick={() => setScreen("shortcutsInfo")}>
@@ -448,13 +455,15 @@ function ShortcutsInfoScreen({ code, onViewSteps }: { code: string; onViewSteps:
 
       <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
         <h3 className="text-item-title font-semibold text-ink">Personal automation</h3>
-        <p className="mt-1 text-caption text-muted-foreground">Scanning {code} runs a Shohaz Shortcut that opens this bin.</p>
+        <p className="mt-1 text-caption text-muted-foreground">
+          Scanning {code} runs <span className="font-semibold text-ink">{shortcutWorkflowName(code)}</span>, which opens this bin.
+        </p>
       </div>
 
       <div className="flex flex-col gap-3 rounded-2xl border border-border bg-white p-4 shadow-sm">
-        <ChecklistItem label="Install the Shohaz Shortcut" />
+        <ChecklistItem label={`Install ${shortcutWorkflowName(code)}`} />
         <ChecklistItem label="Create an NFC automation" />
-        <ChecklistItem label={`Choose bin ${code}`} />
+        <ChecklistItem label={`Choose ${shortcutWorkflowName(code)}`} />
       </div>
 
       <div className="rounded-xl border border-yellow bg-brand-100 p-3">
@@ -490,12 +499,12 @@ function ShortcutsStepsScreen({ code }: { code: string }) {
       </div>
 
       <div className="flex flex-col gap-2">
-        {SHORTCUT_STEPS.map((step, i) => (
+        {shortcutSteps(shortcutWorkflowName(code)).map((step, i, steps) => (
           <div key={step} className="flex items-center gap-3 rounded-lg border border-border bg-white p-3">
             <span
               className={cn(
                 "flex size-6 shrink-0 items-center justify-center rounded-full text-micro font-bold",
-                i === SHORTCUT_STEPS.length - 1 ? "bg-ink text-white" : "bg-brand-100 text-brand-700"
+                i === steps.length - 1 ? "bg-ink text-white" : "bg-brand-100 text-brand-700"
               )}
             >
               {i + 1}
