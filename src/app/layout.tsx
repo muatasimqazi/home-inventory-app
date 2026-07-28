@@ -12,10 +12,10 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   themeColor: "#212121",
-  // Without this, iOS overlays the keyboard on top of fixed-position UI
-  // (bottom sheets, dialogs) instead of shrinking the layout viewport —
-  // "resizes-content" makes fixed elements reposition correctly above the
-  // keyboard instead of being covered by it.
+  // Helps Chromium (Android) reposition fixed UI above the keyboard, but
+  // Safari/iOS has never implemented interactive-widget, so this alone does
+  // nothing there — the real cross-browser fix is useKeyboardInset (see
+  // src/hooks/use-keyboard-inset.ts), wired into the bottom sheet itself.
   interactiveWidget: "resizes-content",
 };
 
