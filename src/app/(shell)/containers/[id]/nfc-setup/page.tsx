@@ -8,6 +8,7 @@ import { Icon } from "@/components/icon";
 import { Button } from "@/components/ui/button";
 import { useInventoryStore } from "@/lib/store";
 import { buildBreadcrumb, breadcrumbLabel } from "@/lib/selectors";
+import { containerResolveUrl } from "@/lib/urls";
 import { cn } from "@/lib/utils";
 
 type Platform = "ios" | "android" | "other";
@@ -51,6 +52,7 @@ export default function NfcSetupPage() {
   const containers = useInventoryStore((s) => s.containers);
   const locations = useInventoryStore((s) => s.locations);
   const linkNfcTag = useInventoryStore((s) => s.linkNfcTag);
+  const unlinkNfcTag = useInventoryStore((s) => s.unlinkNfcTag);
 
   const container = containers.find((c) => c.id === params.id);
   const platform = usePlatform();
@@ -63,7 +65,7 @@ export default function NfcSetupPage() {
   const containerId = container.id;
   const breadcrumb = buildBreadcrumb(container.locationId, container.id, locations, containers);
   const code = container.displayCode ?? container.tagToken;
-  const resolveUrl = `https://shohaz.app/c/${container.tagToken}`;
+  const resolveUrl = containerResolveUrl(container.tagToken);
 
   function startWriting() {
     setScreen("writing");
@@ -145,7 +147,16 @@ export default function NfcSetupPage() {
         {screen === "shortcutsSteps" && <ShortcutsStepsScreen code={code} />}
 
         {screen === "linked" && (
-          <LinkedScreen code={code} resolveUrl={resolveUrl} breadcrumbText={breadcrumbLabel(breadcrumb)} container={container} />
+          <LinkedScreen
+            code={code}
+            resolveUrl={resolveUrl}
+            breadcrumbText={breadcrumbLabel(breadcrumb)}
+            container={container}
+            onWriteDifferentTag={() => {
+              unlinkNfcTag(containerId);
+              setScreen("setup");
+            }}
+          />
         )}
       </div>
 
@@ -153,11 +164,11 @@ export default function NfcSetupPage() {
         <div className="mx-auto flex max-w-lg flex-col gap-2">
           {screen === "setup" && platform === "ios" && (
             <>
-              <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={startWriting}>
-                Write NFC tag
+              <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={() => setScreen("shortcutsInfo")}>
+                Set up with Shortcuts
               </Button>
-              <Button size="lg" variant="outline" onClick={() => setScreen("shortcutsInfo")}>
-                Use Shortcuts instead
+              <Button size="lg" variant="outline" onClick={() => router.push(`/containers/${container.id}/label`)}>
+                Print QR label instead
               </Button>
             </>
           )}
@@ -278,7 +289,7 @@ function SetupScreen({
       <div>
         <h2 className="text-screen-title font-semibold text-ink">NFC tag</h2>
         <p className="mt-1 text-body text-muted-foreground">
-          {platform === "ios" ? "Ready to write on this iPhone" : "Ready to write with Android NFC"} · {code}
+          {platform === "ios" ? "Set up via Shortcuts on this iPhone" : "Ready to write with Android NFC"} · {code}
         </p>
       </div>
 
@@ -292,25 +303,9 @@ function SetupScreen({
 
       <h3 className="text-item-title font-semibold text-ink">Tag options</h3>
 
-      {platform === "ios" && (
-        <button
-          type="button"
-          onClick={onWriteNfc}
-          className="flex items-start gap-3 rounded-2xl border border-border bg-white p-4 text-left shadow-sm"
-        >
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-brand-100">
-            <Icon name="nfc" size={20} className="text-brand-700" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="flex items-center gap-2">
-              <span className="text-body font-semibold text-ink">Write NFC tag</span>
-              <span className="rounded-md bg-ink px-1.5 py-0.5 text-micro font-semibold text-white">Best</span>
-            </span>
-            <span className="mt-1 block text-caption text-muted-foreground">Save {resolveUrl} to a writable tag.</span>
-          </span>
-        </button>
-      )}
-
+      {/* No browser exposes Web NFC on iOS at all — offering a "Write NFC
+          tag" option there would be a dead end, not a real fallback path.
+          Shortcuts is the actual, working option on this platform. */}
       <button
         type="button"
         onClick={platform === "ios" ? onShortcutsFallback : onWriteNfc}
@@ -320,10 +315,13 @@ function SetupScreen({
           <Icon name={platform === "ios" ? "smartphone" : "nfc"} size={20} className="text-brand-700" />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="text-body font-semibold text-ink">{platform === "ios" ? "Use Shortcuts fallback" : "Write bin link to tag"}</span>
+          <span className="flex items-center gap-2">
+            <span className="text-body font-semibold text-ink">{platform === "ios" ? "Set up with Shortcuts" : "Write bin link to tag"}</span>
+            {platform === "android" && <span className="rounded-md bg-ink px-1.5 py-0.5 text-micro font-semibold text-white">Best</span>}
+          </span>
           <span className="mt-1 block text-caption text-muted-foreground">
             {platform === "ios"
-              ? "Fallback for this iPhone if writing fails. Other members set it up on their own device."
+              ? "iPhones can't write NFC tags directly — this uses a personal Shortcuts automation instead."
               : "Writes the bin link to a writable NFC tag."}
           </span>
         </span>
@@ -514,16 +512,50 @@ function ShortcutsStepsScreen({ code }: { code: string }) {
   );
 }
 
+/** Minimal Web NFC typing — NDEFReader isn't in TS's DOM lib. */
+interface NDEFReadingLike {
+  onreading: ((this: NDEFReadingLike, ev: unknown) => void) | null;
+  onreadingerror: ((this: NDEFReadingLike, ev: unknown) => void) | null;
+  scan(): Promise<void>;
+}
+
+async function testNfcScan(binName: string) {
+  const NDEFReaderCtor = (window as unknown as { NDEFReader?: new () => NDEFReadingLike }).NDEFReader;
+  if (!NDEFReaderCtor) {
+    toast.error("NFC scanning isn't supported on this device/browser.");
+    return;
+  }
+  try {
+    const reader = new NDEFReaderCtor();
+    await reader.scan();
+    toast("Hold your phone near the tag…");
+    const timeout = setTimeout(() => toast.error("No tag detected within 10s — try again."), 10_000);
+    reader.onreading = () => {
+      clearTimeout(timeout);
+      toast.success(`Test scan resolved to ${binName}`);
+    };
+    reader.onreadingerror = () => {
+      clearTimeout(timeout);
+      toast.error("Couldn't read that tag.");
+    };
+  } catch (err) {
+    // Most commonly a user-denied permission prompt, or no NFC radio present.
+    toast.error(err instanceof Error ? err.message : "Couldn't start NFC scan.");
+  }
+}
+
 function LinkedScreen({
   code,
   resolveUrl,
   breadcrumbText,
   container,
+  onWriteDifferentTag,
 }: {
   code: string;
   resolveUrl: string;
   breadcrumbText: string;
   container: { name: string };
+  onWriteDifferentTag: () => void;
 }) {
   return (
     <>
@@ -546,14 +578,22 @@ function LinkedScreen({
           <p className="text-item-title font-semibold text-ink">Test the tag</p>
           <p className="mt-1 text-caption text-muted-foreground">Hold your phone near the tag to confirm it opens this bin.</p>
         </div>
-        <Button
-          size="sm"
-          className="shrink-0 bg-yellow text-white hover:bg-yellow/90"
-          onClick={() => toast.success(`Test scan resolved to ${container.name}`)}
-        >
+        <Button size="sm" className="shrink-0 bg-yellow text-white hover:bg-yellow/90" onClick={() => testNfcScan(container.name)}>
           Test scan
         </Button>
       </div>
+
+      <button
+        type="button"
+        onClick={onWriteDifferentTag}
+        className="flex items-center justify-between rounded-2xl border border-border bg-white p-4 text-left shadow-sm"
+      >
+        <div>
+          <p className="text-body font-semibold text-ink">Write a different tag</p>
+          <p className="mt-1 text-caption text-muted-foreground">Unlinks this one so you can set up a new physical tag instead.</p>
+        </div>
+        <Icon name="chevronRight" size={16} className="shrink-0 text-muted-foreground" />
+      </button>
 
       <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
         <p className="text-body font-semibold text-ink">Need another label?</p>

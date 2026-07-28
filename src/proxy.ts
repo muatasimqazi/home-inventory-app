@@ -1,11 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-// Auth as a gate, nothing deeper: every route except /sign-in and the OAuth
-// callback requires a real Supabase session. The app's actual content
-// still comes entirely from the mock store (src/lib/store.ts) regardless
-// of who's signed in — identity and data are deliberately decoupled until
-// the store itself is rewired to call Supabase.
+// Auth as a gate: every route except /sign-in and the OAuth callback
+// requires a real Supabase session.
 const PUBLIC_PATHS = ["/sign-in", "/auth/callback"];
 
 export async function proxy(request: NextRequest) {
@@ -46,6 +43,9 @@ export async function proxy(request: NextRequest) {
 
   if (!user && !isPublicPath) {
     const redirectUrl = new URL("/sign-in", request.url);
+    // Preserve where they were headed (e.g. a scanned NFC/QR link at
+    // /c/[token]) so sign-in can send them there instead of just "/".
+    redirectUrl.searchParams.set("next", `${pathname}${request.nextUrl.search}`);
     return NextResponse.redirect(redirectUrl);
   }
 

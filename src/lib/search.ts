@@ -47,22 +47,30 @@ export function searchItems(
       const category = it.category.toLowerCase();
       const notes = it.notes.toLowerCase();
 
-      let score = 0;
-      if (name === q) score += 100;
-      if (name.includes(q)) score += 60;
-      if (original.includes(q)) score += 45;
-      if (category.includes(q)) score += 25;
-      if (breadcrumbText.includes(q)) score += 30;
-      if (displayCode && displayCode === q) score += 80;
-      else if (displayCode.includes(q)) score += 40;
-      if (tagNames.includes(q)) score += 30;
-      if (notes.includes(q)) score += 10;
-
       const searchable = [name, original, category, notes, tagNames, breadcrumbText, displayCode].join(" ");
-      for (const token of queryTokens) {
-        if (name.includes(token)) score += 12;
-        if (breadcrumbText.includes(token)) score += 8;
-        if (searchable.includes(token)) score += 3;
+      // Every query word has to show up *somewhere* for the item to match
+      // at all — a query like "red mug" shouldn't surface an item that
+      // only contains "red", which is what plain per-token OR scoring
+      // below would otherwise do.
+      const matchesAllTokens = queryTokens.length === 0 || queryTokens.every((token) => searchable.includes(token));
+
+      let score = 0;
+      if (matchesAllTokens) {
+        if (name === q) score += 100;
+        if (name.includes(q)) score += 60;
+        if (original.includes(q)) score += 45;
+        if (category.includes(q)) score += 25;
+        if (breadcrumbText.includes(q)) score += 30;
+        if (displayCode && displayCode === q) score += 80;
+        else if (displayCode.includes(q)) score += 40;
+        if (tagNames.includes(q)) score += 30;
+        if (notes.includes(q)) score += 10;
+
+        for (const token of queryTokens) {
+          if (name.includes(token)) score += 12;
+          if (breadcrumbText.includes(token)) score += 8;
+          if (searchable.includes(token)) score += 3;
+        }
       }
 
       return { item: it, score, breadcrumbLabel: breadcrumbLabel(breadcrumb) };

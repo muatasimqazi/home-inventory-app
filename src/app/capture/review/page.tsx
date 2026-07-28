@@ -16,6 +16,14 @@ import { buildBreadcrumb } from "@/lib/selectors";
 import { CATEGORIES } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
+// A low-confidence AI suggestion (row.needsReview) left completely
+// untouched shouldn't be savable as-is — that's how items end up
+// permanently named "unidentified small appliance." Once the user has
+// actually looked at and confirmed/edited the name, it's fine.
+function needsCorrection(row: DetectionRow): boolean {
+  return row.needsReview && row.suggestedName !== "" && row.name.trim() === row.suggestedName;
+}
+
 export default function CaptureReviewPage() {
   const router = useRouter();
   const photos = useCaptureSession((s) => s.photos);
@@ -56,6 +64,7 @@ export default function CaptureReviewPage() {
   const breadcrumb = buildBreadcrumb(destination?.locationId ?? null, destination?.containerId ?? null, locations, containers);
   const included = detections.filter((d) => !d.excluded);
   const isBulk = detections.length > 1;
+  const blockedCount = included.filter(needsCorrection).length;
 
   function buildInput(row: DetectionRow): NewItemInput {
     return {
@@ -81,7 +90,7 @@ export default function CaptureReviewPage() {
   }
 
   async function handleSave() {
-    if (included.length === 0) return;
+    if (included.length === 0 || blockedCount > 0) return;
     setSaving(true);
     if (included.length === 1) {
       const item = createItem(buildInput(included[0]));
@@ -148,13 +157,20 @@ export default function CaptureReviewPage() {
       </div>
 
       <div className="fixed inset-x-0 bottom-0 z-10 border-t border-border bg-white px-4 py-3">
-        <div className="mx-auto flex max-w-xl gap-2">
-          <Button variant="outline" size="lg" className="flex-1" onClick={() => router.push("/capture")}>
-            Add another photo
-          </Button>
-          <Button size="lg" className="flex-1" disabled={included.length === 0 || saving} onClick={handleSave}>
-            {saving ? <Icon name="spinner" size={16} className="animate-spin" /> : isBulk ? `Save All (${included.length})` : "Save"}
-          </Button>
+        <div className="mx-auto flex max-w-xl flex-col gap-2">
+          {blockedCount > 0 && (
+            <p className="text-center text-caption text-danger">
+              Confirm or edit the highlighted name{blockedCount > 1 ? "s" : ""} above before saving.
+            </p>
+          )}
+          <div className="flex gap-2">
+            <Button variant="outline" size="lg" className="flex-1" onClick={() => router.push("/capture")}>
+              Add another photo
+            </Button>
+            <Button size="lg" className="flex-1" disabled={included.length === 0 || blockedCount > 0 || saving} onClick={handleSave}>
+              {saving ? <Icon name="spinner" size={16} className="animate-spin" /> : isBulk ? `Save All (${included.length})` : "Save"}
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -191,7 +207,7 @@ function SingleReviewForm({
   onChange: (patch: Partial<DetectionRow>) => void;
 }) {
   const edited = row.name !== row.suggestedName;
-  const blankLowConfidence = row.needsReview && row.suggestedName !== "" && row.name === row.suggestedName && row.confidence < 0.75;
+  const blocked = needsCorrection(row);
 
   return (
     <div className="flex flex-col gap-4 rounded-xl bg-white p-4 shadow-sm">
@@ -210,10 +226,15 @@ function SingleReviewForm({
         <Input
           value={row.name}
           onChange={(e) => onChange({ name: e.target.value })}
-          placeholder={blankLowConfidence ? "Couldn't identify this — enter a name" : "Item name"}
+          placeholder={blocked ? "Couldn't identify this — enter a name" : "Item name"}
           className={cn("h-11", !edited && row.suggestedName && "border-yellow bg-yellow/5")}
         />
-        {row.needsReview && row.reviewReason && <p className="mt-1 text-caption text-muted-foreground">{row.reviewReason}</p>}
+        {blocked && (
+          <p className="mt-1 text-caption text-danger">
+            Low-confidence AI guess — please confirm or edit this name before saving.
+          </p>
+        )}
+        {row.needsReview && !blocked && row.reviewReason && <p className="mt-1 text-caption text-muted-foreground">{row.reviewReason}</p>}
         {edited && row.suggestedName && (
           <label className="mt-2 flex items-center gap-2 text-caption text-muted-foreground">
             <input type="checkbox" checked={remember} onChange={(e) => onRemember(e.target.checked)} className="size-4" />
@@ -277,6 +298,7 @@ function BulkRow({
   onToggleExclude: () => void;
 }) {
   const edited = row.name !== row.suggestedName;
+  const blocked = needsCorrection(row) && !row.excluded;
 
   return (
     <div className={cn("flex flex-col gap-2 rounded-xl bg-white p-3 shadow-sm", row.excluded && "opacity-40")}>
@@ -293,6 +315,9 @@ function BulkRow({
             />
             {row.needsReview && <Icon name="needsReview" size={16} className="shrink-0 text-ink" />}
           </div>
+          {blocked && (
+            <p className="text-caption text-danger">Low-confidence guess — confirm or edit this name before saving.</p>
+          )}
           <div className="flex gap-2">
             <Select value={row.category} onValueChange={(v) => onChange({ category: v })} disabled={row.excluded}>
               <SelectTrigger className="h-8 flex-1 text-caption">

@@ -2,7 +2,7 @@ import { QRCodeSVG } from "qrcode.react";
 import type { LabelToggle } from "@/lib/types";
 
 interface LabelCardProps {
-  tagToken: string;
+  resolveUrl: string;
   displayCode: string | null;
   name: string | null;
   locationName?: string | null;
@@ -13,8 +13,7 @@ interface LabelCardProps {
 }
 
 /** One printable label — used for both the live preview grid and the print sheet, so what you see is what prints. */
-export function LabelCard({ tagToken, displayCode, name, locationName, toggle, includeLocation, widthMm, heightMm }: LabelCardProps) {
-  const resolveUrl = `https://shohaz.app/c/${tagToken}`;
+export function LabelCard({ resolveUrl, displayCode, name, locationName, toggle, includeLocation, widthMm, heightMm }: LabelCardProps) {
   const qrSize = Math.round(Math.min(widthMm, heightMm) * 2.6);
 
   return (

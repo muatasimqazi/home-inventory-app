@@ -7,6 +7,7 @@ import { BreadcrumbTrail } from "@/components/breadcrumb-trail";
 import { Button } from "@/components/ui/button";
 import { useInventoryStore } from "@/lib/store";
 import { buildBreadcrumb } from "@/lib/selectors";
+import { containerResolveUrl } from "@/lib/urls";
 import { binIdBadgeClasses } from "@/lib/badge-color";
 import { cn } from "@/lib/utils";
 
@@ -20,7 +21,7 @@ export default function TagLabelPage() {
   if (!container) return notFound();
 
   const breadcrumb = buildBreadcrumb(container.locationId, container.id, locations, containers);
-  const resolveUrl = `https://shohaz.app/c/${container.tagToken}`;
+  const resolveUrl = containerResolveUrl(container.tagToken);
 
   return (
     <div className="flex flex-col gap-5 pb-6 print:pb-0">

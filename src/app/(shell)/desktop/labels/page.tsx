@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
 import { LabelCard } from "@/components/label-card";
+import { containerResolveUrl } from "@/lib/urls";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -248,7 +249,7 @@ export default function LabelPrintingPage() {
                 {previewEntries.map((entry, i) => (
                   <LabelCard
                     key={i}
-                    tagToken={entry.tagToken}
+                    resolveUrl={containerResolveUrl(entry.tagToken)}
                     displayCode={entry.displayCode}
                     name={entry.name}
                     locationName={entry.locationName}
@@ -301,7 +302,7 @@ export default function LabelPrintingPage() {
         {(printEntries ?? []).map((entry, i) => (
           <LabelCard
             key={i}
-            tagToken={entry.tagToken}
+            resolveUrl={containerResolveUrl(entry.tagToken)}
             displayCode={entry.displayCode}
             name={entry.name}
             locationName={entry.locationName}

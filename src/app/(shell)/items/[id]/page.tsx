@@ -46,8 +46,23 @@ export default function ItemDetailPage() {
   const [trashConfirmOpen, setTrashConfirmOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
+  // permanentlyDeleteItem() removes the item from `items` optimistically,
+  // before router.push away from this page has finished — without this,
+  // that re-render would call notFound() (item genuinely missing) instead
+  // of just rendering nothing while the navigation is already in flight.
+  // Only a *never-seen* id (a bad URL) should actually 404. Adjusting
+  // state directly during render (conditioned so it only fires once) is
+  // React's own sanctioned pattern for this — a ref can't be read/written
+  // during render.
+  const [everHadItem, setEverHadItem] = useState(false);
   const item = items.find((it) => it.id === params.id);
-  if (!item) return notFound();
+  if (item && !everHadItem) {
+    setEverHadItem(true);
+  }
+  if (!item) {
+    if (!everHadItem) return notFound();
+    return null;
+  }
 
   const breadcrumb = buildBreadcrumb(item.locationId, item.containerId, locations, containers);
   const itemActivity = activity.filter((a) => a.entityId === item.id);

@@ -175,6 +175,8 @@ interface InventoryState {
   assignDisplayCode: (containerId: string, code?: string) => Promise<{ ok: boolean; error?: string; code?: string }>;
   /** Marks a container's NFC tag as linked (native write or the iOS Shortcuts fallback both call this — same end state). */
   linkNfcTag: (containerId: string) => void;
+  /** Clears a container's NFC link so a different physical tag can be written/linked to it. */
+  unlinkNfcTag: (containerId: string) => void;
 
   // Attachments — real Supabase Storage (private "attachments" bucket)
   /** Uploads `file` to Storage, then inserts the attachment row. Real, awaited: a File has to actually finish uploading before there's anything to show. */
@@ -1173,6 +1175,20 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       "Couldn't link NFC tag"
     );
     get().logActivity({ entityType: "container", entityId: containerId, entityName: container.name, action: "edited", detail: "NFC tag linked" });
+  },
+
+  unlinkNfcTag: (containerId) => {
+    const supabase = getSupabaseBrowserClient();
+    const container = get().containers.find((c) => c.id === containerId);
+    if (!container || !container.nfcLinkedAt) return;
+    const previousLinkedAt = container.nfcLinkedAt;
+    set((s) => ({ containers: s.containers.map((c) => (c.id === containerId ? { ...c, nfcLinkedAt: null } : c)) }));
+    persistOrRevert(
+      supabase.from("containers").update({ nfc_linked_at: null }).eq("id", containerId),
+      () => set((s) => ({ containers: s.containers.map((c) => (c.id === containerId ? { ...c, nfcLinkedAt: previousLinkedAt } : c)) })),
+      "Couldn't unlink NFC tag"
+    );
+    get().logActivity({ entityType: "container", entityId: containerId, entityName: container.name, action: "edited", detail: "NFC tag unlinked" });
   },
 
   addAttachment: async (itemId, input) => {

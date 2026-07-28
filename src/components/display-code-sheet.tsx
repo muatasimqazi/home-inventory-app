@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Icon } from "@/components/icon";
 import { useInventoryStore } from "@/lib/store";
+import { nextDisplayCode } from "@/lib/display-code";
 import type { Container } from "@/lib/types";
 
 interface DisplayCodeSheetProps {
@@ -24,7 +25,14 @@ export function DisplayCodeSheet({ open, onOpenChange, container }: DisplayCodeS
   // comparison and causes an infinite render loop.
   const allLabelBatchEntries = useInventoryStore((s) => s.labelBatchEntries);
   const unassignedLabels = useMemo(() => allLabelBatchEntries.filter((e) => e.containerId === null), [allLabelBatchEntries]);
-  const [value, setValue] = useState(container.displayCode ?? "");
+  const containers = useInventoryStore((s) => s.containers);
+  const locations = useInventoryStore((s) => s.locations);
+  // Opens pre-filled with the code Generate/Save would produce anyway,
+  // rather than an empty field with just a placeholder — still fully
+  // editable if the user wants something else.
+  const [value, setValue] = useState(
+    () => container.displayCode ?? nextDisplayCode(containers, locations.find((l) => l.id === container.locationId)?.name ?? "BIN")
+  );
   const [error, setError] = useState<string | null>(null);
 
   async function handleSave() {

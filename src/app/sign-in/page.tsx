@@ -71,7 +71,9 @@ function SignInInner() {
       setMode("email");
       return;
     }
-    router.push("/");
+    // Sends the user back to wherever the proxy intercepted them from
+    // (e.g. a scanned NFC/QR link at /c/[token]) instead of always "/".
+    router.push(searchParams.get("next") ?? "/");
   }
 
   return (

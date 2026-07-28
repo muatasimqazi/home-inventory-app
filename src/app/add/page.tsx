@@ -122,7 +122,7 @@ function ManualAddItemInner() {
               if (error) setError(null);
             }}
             placeholder="e.g. Cordless Drill"
-            className="h-11"
+            className="h-11 bg-white"
             autoFocus
           />
           {error && <p className="mt-1 text-caption text-danger">{error}</p>}
@@ -130,7 +130,7 @@ function ManualAddItemInner() {
 
         <Field label="Category">
           <Select value={category} onValueChange={setCategory}>
-            <SelectTrigger className="h-11 w-full">
+            <SelectTrigger className="h-11 w-full bg-white">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -145,7 +145,7 @@ function ManualAddItemInner() {
 
         <Field label="Belongs to">
           <Select value={ownerUserId} onValueChange={setOwnerUserId}>
-            <SelectTrigger className="h-11 w-full">
+            <SelectTrigger className="h-11 w-full bg-white">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -177,7 +177,7 @@ function ManualAddItemInner() {
             max={9999}
             value={quantity}
             onChange={(e) => setQuantity(e.target.value)}
-            className="h-11 w-28"
+            className="h-11 w-28 bg-white"
           />
         </Field>
 
@@ -190,7 +190,7 @@ function ManualAddItemInner() {
                   value={extraDetails[field.key] ?? ""}
                   onChange={(e) => setExtraDetails((d) => ({ ...d, [field.key]: e.target.value }))}
                   placeholder={field.label}
-                  className="h-11"
+                  className="h-11 bg-white"
                 />
               ))}
             </div>
@@ -209,7 +209,7 @@ function ManualAddItemInner() {
                 }
               }}
               placeholder="Add a tag and press Enter"
-              className="h-11 flex-1"
+              className="h-11 flex-1 bg-white"
             />
           </div>
           {tags.length > 0 && (
@@ -230,7 +230,7 @@ function ManualAddItemInner() {
         </Field>
 
         <Field label="Notes">
-          <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} placeholder="Optional notes" />
+          <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} placeholder="Optional notes" className="bg-white" />
         </Field>
       </div>
 
