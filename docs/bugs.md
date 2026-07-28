@@ -11,7 +11,7 @@ was verified.
 3. ✅ Item deleted on location detail page (/items/[id]) and then clicking delete permanntly shows 404 since the item detail no longer exists
    Real race: the delete removes the item from local state optimistically before navigation away finishes, and the page's 404 guard fired on that re-render. Now only a never-seen id 404s.
 4. ✅ Toasts showing up at the top don't show up properly and seem hidden behind the heading
-   The toaster's default offset landed inside the app's opaque sticky headers. Given an explicit safe-area-aware top offset.
+   First pass only set sonner's `offset` prop, which is the *desktop* offset — sonner switches to a separate `mobileOffset` below a 600px viewport, and without it toasts silently fell back to the ~16px default on every real phone, still colliding with the header exactly as reported. Set `mobileOffset` to the same value as `offset` on `<Toaster>`; verified live at a 390px viewport that toasts now clear the header on both sticky-header and plain-header pages.
 5. ✅ Add manually form inputs don't have white background
    Added.
 6. NFC issues
