@@ -11,7 +11,10 @@ was verified.
 3. ✅ Item deleted on location detail page (/items/[id]) and then clicking delete permanntly shows 404 since the item detail no longer exists
    Real race: the delete removes the item from local state optimistically before navigation away finishes, and the page's 404 guard fired on that re-render. Now only a never-seen id 404s.
 4. ✅ Toasts showing up at the top don't show up properly and seem hidden behind the heading
-   First pass only set sonner's `offset` prop, which is the *desktop* offset — sonner switches to a separate `mobileOffset` below a 600px viewport, and without it toasts silently fell back to the ~16px default on every real phone, still colliding with the header exactly as reported. Set `mobileOffset` to the same value as `offset` on `<Toaster>`; verified live at a 390px viewport that toasts now clear the header on both sticky-header and plain-header pages.
+   Two real, separate bugs, both now fixed:
+   - Offset: the first pass only set sonner's `offset` prop, which is the *desktop* offset — sonner switches to a separate `mobileOffset` below a 600px viewport, and without it toasts silently fell back to the ~16px default on every real phone, still colliding with the header. Set `mobileOffset` to the same value as `offset` on `<Toaster>`.
+   - Background: the toast wrapper (`src/components/ui/sonner.tsx`, shadcn's default template) styled itself with raw `var(--popover)`/`var(--popover-foreground)`/`var(--border)`, but this project's Tailwind v4 setup only ever defined those tokens as `--color-popover`/`--color-popover-foreground`/`--color-border` — every other shadcn component in the codebase reaches them via Tailwind utility classes (`bg-popover`, `border-border`), only this one referenced the bare (non-`--color-`) names directly, which were undefined, so the background fell back to fully transparent, making toasts unreadable against page content. Fixed the variable names to match.
+   Verified live at a 390px viewport: toast now renders solid white with correct text/border color, clear of the header.
 5. ✅ Add manually form inputs don't have white background
    Added.
 6. NFC issues
