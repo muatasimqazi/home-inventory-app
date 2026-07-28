@@ -228,6 +228,8 @@ interface InventoryState {
   cancelInvite: (inviteId: string) => void;
   removeMember: (userId: string) => void;
   transferOwnership: (toUserId: string) => void;
+  /** Updates the caller's own membership row in the current household (display name, avatar). Real, awaited. */
+  updateMyProfile: (patch: { displayName?: string; avatarUrl?: string }) => Promise<{ ok: boolean; error?: string }>;
 
   // Activity
   logActivity: (entry: {
@@ -1585,6 +1587,30 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
         entityName: m.displayName,
         action: "ownership_transferred",
       });
+  },
+
+  updateMyProfile: async (patch) => {
+    const state = get();
+    const me = state.members.find((m) => m.userId === state.currentUserId);
+    if (!me) return { ok: false, error: "You're not a member of this household." };
+
+    const merged: Member = { ...me, ...patch };
+    set((s) => ({ members: s.members.map((m) => (m.userId === state.currentUserId ? merged : m)) }));
+
+    const supabase = getSupabaseBrowserClient();
+    const row: { display_name?: string; avatar_url?: string | null } = {};
+    if (patch.displayName !== undefined) row.display_name = patch.displayName;
+    if (patch.avatarUrl !== undefined) row.avatar_url = patch.avatarUrl;
+    const { error } = await supabase
+      .from("members")
+      .update(row)
+      .eq("household_id", state.currentHouseholdId)
+      .eq("user_id", state.currentUserId);
+    if (error) {
+      set((s) => ({ members: s.members.map((m) => (m.userId === state.currentUserId ? me : m)) }));
+      return { ok: false, error: error.message };
+    }
+    return { ok: true };
   },
 
   logActivity: (entry) => {
