@@ -54,9 +54,11 @@ function HouseholdSetupInner() {
   const me = members.find((m) => m.userId === currentUserId);
 
   // Step 1 — create household
+  const [myName, setMyName] = useState("");
   const [householdName, setHouseholdName] = useState("");
   const [householdType, setHouseholdType] = useState<"home" | "apartment" | "other">("home");
   const [createError, setCreateError] = useState<string | null>(null);
+  const [nameError, setNameError] = useState<string | null>(null);
 
   // Step 2 — invite members
   const [inviteInput, setInviteInput] = useState("");
@@ -93,14 +95,20 @@ function HouseholdSetupInner() {
   }
 
   async function handleCreateHousehold() {
+    let hasError = false;
+    if (!myName.trim()) {
+      setNameError("Let others know who you are.");
+      hasError = true;
+    }
     if (!householdName.trim()) {
       setCreateError("Give your household a name.");
-      return;
+      hasError = true;
     }
+    if (hasError) return;
     try {
       await createHousehold({
         name: householdName.trim(),
-        displayName: me?.displayName ?? "You",
+        displayName: myName.trim(),
         email: me?.email ?? currentUserEmail,
         avatarUrl: me?.avatarUrl,
       });
@@ -163,11 +171,17 @@ function HouseholdSetupInner() {
   }
 
   async function handleJoin() {
+    let hasError = false;
+    if (!myName.trim()) {
+      setNameError("Let others know who you are.");
+      hasError = true;
+    }
     if (!joinEmail.trim()) {
       setJoinError("Enter the email your invite was sent to.");
-      return;
+      hasError = true;
     }
-    const result = await acceptInvite(joinEmail.trim(), me?.displayName ?? "You");
+    if (hasError) return;
+    const result = await acceptInvite(joinEmail.trim(), myName.trim());
     if (!result.ok) {
       setJoinError(result.error ?? "No pending invite found for that email.");
       return;
@@ -202,6 +216,21 @@ function HouseholdSetupInner() {
                 Enter the email your invite was sent to — it must match your signed-in email.
               </p>
             </div>
+            <Field label="Your name">
+              <Input
+                value={myName}
+                onChange={(e) => {
+                  setMyName(e.target.value);
+                  setNameError(null);
+                }}
+                placeholder="e.g. Alex"
+                className="h-11 bg-white"
+                autoFocus
+              />
+              <p className="mt-1 text-caption text-muted-foreground">Shown to other members instead of a generic &ldquo;You&rdquo;.</p>
+              {nameError && <p className="mt-1 text-caption text-danger">{nameError}</p>}
+            </Field>
+
             <Field label="Email">
               <Input
                 type="email"
@@ -211,8 +240,7 @@ function HouseholdSetupInner() {
                   setJoinError(null);
                 }}
                 placeholder="you@example.com"
-                className="h-11"
-                autoFocus
+                className="h-11 bg-white"
               />
               {joinError && <p className="mt-1 text-caption text-danger">{joinError}</p>}
             </Field>
@@ -226,6 +254,21 @@ function HouseholdSetupInner() {
               </p>
             </div>
 
+            <Field label="Your name">
+              <Input
+                value={myName}
+                onChange={(e) => {
+                  setMyName(e.target.value);
+                  setNameError(null);
+                }}
+                placeholder="e.g. Alex"
+                className="h-11 bg-white"
+                autoFocus
+              />
+              <p className="mt-1 text-caption text-muted-foreground">Shown to other members instead of a generic &ldquo;You&rdquo;.</p>
+              {nameError && <p className="mt-1 text-caption text-danger">{nameError}</p>}
+            </Field>
+
             <Field label="Household name">
               <Input
                 value={householdName}
@@ -234,8 +277,7 @@ function HouseholdSetupInner() {
                   setCreateError(null);
                 }}
                 placeholder="e.g. The Qazi Household"
-                className="h-11"
-                autoFocus
+                className="h-11 bg-white"
               />
               {createError && <p className="mt-1 text-caption text-danger">{createError}</p>}
             </Field>
@@ -290,7 +332,7 @@ function HouseholdSetupInner() {
             </Field>
 
             <div className="flex flex-col gap-2">
-              <MemberRow initial={(me?.displayName ?? "?").slice(0, 1)} name={me?.displayName ?? "You"} sublabel="Owner" />
+              <MemberRow initial={(me?.displayName ?? myName).slice(0, 1)} name={me?.displayName ?? myName} sublabel="Owner" />
               {invitedEmails.map((email) => (
                 <MemberRow
                   key={email}
