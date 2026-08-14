@@ -40,6 +40,7 @@ export default function ContainerDetailPage() {
   const updateContainer = useInventoryStore((s) => s.updateContainer);
   const moveContainer = useInventoryStore((s) => s.moveContainer);
   const trashContainer = useInventoryStore((s) => s.trashContainer);
+  const trashItem = useInventoryStore((s) => s.trashItem);
   const setContainerCoverPhoto = useInventoryStore((s) => s.setContainerCoverPhoto);
   const removeContainerCoverPhoto = useInventoryStore((s) => s.removeContainerCoverPhoto);
 
@@ -51,6 +52,9 @@ export default function ContainerDetailPage() {
   const [view, setView] = useState<ViewMode>("grid");
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const [itemSelectMode, setItemSelectMode] = useState(false);
+  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
+  const [bulkTrashOpen, setBulkTrashOpen] = useState(false);
 
   const container = containers.find((c) => c.id === params.id);
   if (!container) return notFound();
@@ -72,6 +76,27 @@ export default function ContainerDetailPage() {
       return;
     }
     toast.success("Photo updated");
+  }
+
+  function toggleItemSelected(itemId: string) {
+    setSelectedItemIds((s) => {
+      const next = new Set(s);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
+  }
+
+  function exitItemSelectMode() {
+    setItemSelectMode(false);
+    setSelectedItemIds(new Set());
+  }
+
+  function bulkTrashItems() {
+    const count = selectedItemIds.size;
+    selectedItemIds.forEach((id) => trashItem(id));
+    toast(`Moved ${count} item${count === 1 ? "" : "s"} to Trash`, { description: "Recoverable for 30 days." });
+    exitItemSelectMode();
   }
 
   return (
@@ -219,7 +244,12 @@ export default function ContainerDetailPage() {
 
           {directItems.length > 0 && (
             <section className="flex flex-col gap-3">
-              <h2 className="text-section-title font-medium text-ink">Items</h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-section-title font-medium text-ink">Items</h2>
+                <Button variant="outline" size="sm" onClick={() => (itemSelectMode ? exitItemSelectMode() : setItemSelectMode(true))}>
+                  {itemSelectMode ? "Cancel" : "Select"}
+                </Button>
+              </div>
               {view === "grid" ? (
                 <div className="grid grid-cols-2 gap-3">
                   {directItems.map((item) => (
@@ -227,6 +257,8 @@ export default function ContainerDetailPage() {
                       key={item.id}
                       item={item}
                       breadcrumbLabel={breadcrumbLabel(buildBreadcrumb(item.locationId, item.containerId, locations, containers))}
+                      selected={selectedItemIds.has(item.id)}
+                      onToggleSelect={itemSelectMode ? () => toggleItemSelected(item.id) : undefined}
                     />
                   ))}
                 </div>
@@ -237,6 +269,8 @@ export default function ContainerDetailPage() {
                       key={item.id}
                       item={item}
                       breadcrumbLabel={breadcrumbLabel(buildBreadcrumb(item.locationId, item.containerId, locations, containers))}
+                      selected={selectedItemIds.has(item.id)}
+                      onToggleSelect={itemSelectMode ? () => toggleItemSelected(item.id) : undefined}
                     />
                   ))}
                 </div>
@@ -244,6 +278,20 @@ export default function ContainerDetailPage() {
             </section>
           )}
         </>
+      )}
+
+      {itemSelectMode && selectedItemIds.size > 0 && (
+        <div className="fixed inset-x-4 bottom-20 z-40 flex items-center justify-between rounded-2xl bg-ink px-4 py-3 text-white shadow-lg md:bottom-4">
+          <span className="text-body">{selectedItemIds.size} selected</span>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" className="border-white/30 bg-transparent text-white hover:bg-white/10" onClick={exitItemSelectMode}>
+              Cancel
+            </Button>
+            <Button size="sm" variant="destructive" onClick={() => setBulkTrashOpen(true)}>
+              <Icon name="trash" size={14} /> Trash
+            </Button>
+          </div>
+        </div>
       )}
 
       <EntityFormSheet
@@ -308,6 +356,17 @@ export default function ContainerDetailPage() {
           toast("Moved to Trash", { description: "Recoverable for 30 days." });
           router.push(`/locations/${container.locationId}`);
         }}
+      />
+
+      <ConfirmDialog
+        open={bulkTrashOpen}
+        onOpenChange={setBulkTrashOpen}
+        tone="default"
+        icon="trash"
+        title={`Move ${selectedItemIds.size} item${selectedItemIds.size === 1 ? "" : "s"} to Trash?`}
+        description="Recoverable for 30 days."
+        confirmLabel="Move to Trash"
+        onConfirm={bulkTrashItems}
       />
     </div>
   );
