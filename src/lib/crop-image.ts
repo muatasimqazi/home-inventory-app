@@ -193,3 +193,27 @@ export async function normalizeUploadedPhoto(file: File): Promise<File> {
   const resized = await resizeImage(dataUrl);
   return dataUrlToFile(resized, file.name);
 }
+
+/**
+ * Rotates an already-stored cover photo (a Supabase public Storage URL) 90
+ * degrees and returns it as a new File, ready to hand straight to
+ * setItemCoverPhoto/setLocationCoverPhoto/setContainerCoverPhoto. For the
+ * "Rotate" action on entity detail pages — automatically-cropped photos
+ * (bulk multi-item detection, see cropToItem) never go through the
+ * interactive crop step's own rotate control at all, so a photo that came
+ * out sideways/upside-down there had no way to be fixed short of deleting
+ * and recapturing it. Works on any already-saved photo regardless of how
+ * it got there.
+ */
+export async function rotateStoredPhoto(url: string, rotationDeg = 90, filename = "photo.jpg"): Promise<File> {
+  const bitmap = await loadOrientedBitmap(url);
+  const { width, height } = bitmap;
+  bitmap.close();
+  // The crop rectangle has to match the POST-rotation canvas getCroppedImage
+  // draws onto internally, not the source's own dimensions — those swap at
+  // 90/270 degrees. Passing the pre-rotation width/height here would crop
+  // out of bounds (or short) against the actual rotated frame.
+  const { width: rotatedWidth, height: rotatedHeight } = rotatedBoundingSize(width, height, rotationDeg);
+  const rotated = await getCroppedImage(url, { x: 0, y: 0, width: Math.round(rotatedWidth), height: Math.round(rotatedHeight) }, rotationDeg);
+  return dataUrlToFile(rotated, filename);
+}

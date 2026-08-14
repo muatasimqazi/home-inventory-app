@@ -16,6 +16,8 @@ import { EntityFormSheet } from "@/components/entity-form-sheet";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { useInventoryStore } from "@/lib/store";
+import { coverPhotoUrl } from "@/lib/cover-photo";
+import { rotateStoredPhoto } from "@/lib/crop-image";
 import { activeItemCountForContainer, buildBreadcrumb, breadcrumbLabel, directChildContainers, itemsIn } from "@/lib/selectors";
 
 export default function LocationDetailPage() {
@@ -36,6 +38,7 @@ export default function LocationDetailPage() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [view, setView] = useState<ViewMode>("grid");
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [rotatingPhoto, setRotatingPhoto] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   const location = locations.find((l) => l.id === params.id);
@@ -58,6 +61,20 @@ export default function LocationDetailPage() {
     toast.success("Photo updated");
   }
 
+  async function handleRotatePhoto() {
+    if (!location || !location.coverPhotoPath) return;
+    setRotatingPhoto(true);
+    try {
+      const rotated = await rotateStoredPhoto(coverPhotoUrl(location.coverPhotoPath), 90);
+      const result = await setLocationCoverPhoto(location.id, rotated);
+      if (!result.ok) toast.error(result.error ?? "Couldn't rotate photo.");
+    } catch {
+      toast.error("Couldn't rotate photo.");
+    } finally {
+      setRotatingPhoto(false);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-5 pb-6">
       <div className="flex items-center justify-between">
@@ -78,6 +95,17 @@ export default function LocationDetailPage() {
         <PhotoThumb emoji={location.coverPhotoEmoji ?? "📦"} coverPhotoPath={location.coverPhotoPath} className="h-48 w-full" emojiClassName="text-8xl" />
         <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChosen} />
         <div className="absolute bottom-2 right-2 flex gap-2">
+          {location.coverPhotoPath && (
+            <button
+              type="button"
+              onClick={handleRotatePhoto}
+              disabled={rotatingPhoto}
+              aria-label="Rotate photo"
+              className="tap-target flex size-9 items-center justify-center rounded-full bg-white/90 shadow-sm disabled:opacity-60"
+            >
+              {rotatingPhoto ? <Icon name="spinner" size={16} className="animate-spin" /> : <Icon name="rotate" size={16} />}
+            </button>
+          )}
           {location.coverPhotoPath && (
             <button
               type="button"

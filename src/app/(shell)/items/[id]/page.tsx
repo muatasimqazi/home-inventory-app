@@ -13,6 +13,8 @@ import { ActivityRow } from "@/components/activity-row";
 import { ItemAttachments } from "@/components/item-attachments";
 import { Button } from "@/components/ui/button";
 import { useInventoryStore } from "@/lib/store";
+import { coverPhotoUrl } from "@/lib/cover-photo";
+import { rotateStoredPhoto } from "@/lib/crop-image";
 import { buildBreadcrumb, daysUntil } from "@/lib/selectors";
 import { extraFieldsForCategory } from "@/lib/category";
 import { relativeTime } from "@/lib/format";
@@ -48,6 +50,7 @@ export default function ItemDetailPage() {
   const [trashConfirmOpen, setTrashConfirmOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [rotatingPhoto, setRotatingPhoto] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   // permanentlyDeleteItem() removes the item from `items` optimistically,
@@ -82,6 +85,25 @@ export default function ItemDetailPage() {
     toast.success("Photo updated");
   }
 
+  // A bulk multi-item capture crops each item's cover automatically (see
+  // cropToItem) — it never goes through the interactive crop step's own
+  // rotate control, so a photo that came out sideways/upside-down there had
+  // no way to be fixed short of deleting and recapturing. Works on any
+  // saved photo, not just those.
+  async function handleRotatePhoto() {
+    if (!item || !item.coverPhotoPath) return;
+    setRotatingPhoto(true);
+    try {
+      const rotated = await rotateStoredPhoto(coverPhotoUrl(item.coverPhotoPath), 90);
+      const result = await setItemCoverPhoto(item.id, rotated);
+      if (!result.ok) toast.error(result.error ?? "Couldn't rotate photo.");
+    } catch {
+      toast.error("Couldn't rotate photo.");
+    } finally {
+      setRotatingPhoto(false);
+    }
+  }
+
   const breadcrumb = buildBreadcrumb(item.locationId, item.containerId, locations, containers);
   const itemActivity = activity.filter((a) => a.entityId === item.id);
   const favorite = favorites.some((f) => f.itemId === item.id && f.userId === currentUserId);
@@ -105,6 +127,17 @@ export default function ItemDetailPage() {
         <PhotoThumb emoji={item.photoEmoji} coverPhotoPath={item.coverPhotoPath} className="h-48 w-full" emojiClassName="text-8xl" />
         <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChosen} />
         <div className="absolute bottom-2 right-2 flex gap-2">
+          {item.coverPhotoPath && (
+            <button
+              type="button"
+              onClick={handleRotatePhoto}
+              disabled={rotatingPhoto}
+              aria-label="Rotate photo"
+              className="tap-target flex size-9 items-center justify-center rounded-full bg-white/90 shadow-sm disabled:opacity-60"
+            >
+              {rotatingPhoto ? <Icon name="spinner" size={16} className="animate-spin" /> : <Icon name="rotate" size={16} />}
+            </button>
+          )}
           {item.coverPhotoPath && (
             <button
               type="button"

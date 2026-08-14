@@ -19,6 +19,8 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { DisplayCodeSheet } from "@/components/display-code-sheet";
 import { Button } from "@/components/ui/button";
 import { useInventoryStore } from "@/lib/store";
+import { coverPhotoUrl } from "@/lib/cover-photo";
+import { rotateStoredPhoto } from "@/lib/crop-image";
 import { displayCodeBadgeClasses } from "@/lib/badge-color";
 import { cn } from "@/lib/utils";
 import {
@@ -51,6 +53,7 @@ export default function ContainerDetailPage() {
   const [displayCodeOpen, setDisplayCodeOpen] = useState(false);
   const [view, setView] = useState<ViewMode>("grid");
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [rotatingPhoto, setRotatingPhoto] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [itemSelectMode, setItemSelectMode] = useState(false);
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
@@ -76,6 +79,20 @@ export default function ContainerDetailPage() {
       return;
     }
     toast.success("Photo updated");
+  }
+
+  async function handleRotatePhoto() {
+    if (!container || !container.coverPhotoPath) return;
+    setRotatingPhoto(true);
+    try {
+      const rotated = await rotateStoredPhoto(coverPhotoUrl(container.coverPhotoPath), 90);
+      const result = await setContainerCoverPhoto(container.id, rotated);
+      if (!result.ok) toast.error(result.error ?? "Couldn't rotate photo.");
+    } catch {
+      toast.error("Couldn't rotate photo.");
+    } finally {
+      setRotatingPhoto(false);
+    }
   }
 
   function toggleItemSelected(itemId: string) {
@@ -122,6 +139,17 @@ export default function ContainerDetailPage() {
         <PhotoThumb emoji={container.coverPhotoEmoji ?? "📦"} coverPhotoPath={container.coverPhotoPath} className="h-48 w-full" emojiClassName="text-8xl" />
         <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChosen} />
         <div className="absolute bottom-2 right-2 flex gap-2">
+          {container.coverPhotoPath && (
+            <button
+              type="button"
+              onClick={handleRotatePhoto}
+              disabled={rotatingPhoto}
+              aria-label="Rotate photo"
+              className="tap-target flex size-9 items-center justify-center rounded-full bg-white/90 shadow-sm disabled:opacity-60"
+            >
+              {rotatingPhoto ? <Icon name="spinner" size={16} className="animate-spin" /> : <Icon name="rotate" size={16} />}
+            </button>
+          )}
           {container.coverPhotoPath && (
             <button
               type="button"
