@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useCaptureSession, type DetectionRow } from "@/lib/capture-session-store";
 import { useInventoryStore, type NewItemInput } from "@/lib/store";
 import { stopCameraStream } from "@/lib/camera-stream";
+import { cropToItem } from "@/lib/crop-image";
 import { buildBreadcrumb } from "@/lib/selectors";
 import { CATEGORIES } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -98,14 +99,23 @@ export default function CaptureReviewPage() {
 
   const missingDestination = !destination?.locationId;
 
+  // Crops just this row's own item out of whichever photo it was detected
+  // in (row.photoIndex), instead of every item in a photo sharing one full
+  // copy of it. Falls back to the (resized) whole photo when there's no
+  // usable box — see isUsableBoundingBox in lib/crop-image.ts — so a model
+  // that can't localize an item, or a genuinely single-item photo, still
+  // gets a real cover instead of none at all.
+  async function buildCoverFile(row: DetectionRow): Promise<File | null> {
+    const sourcePhoto = photos[row.photoIndex] ?? photos[0];
+    if (!sourcePhoto) return null;
+    const cropped = await cropToItem(sourcePhoto, row.boundingBox);
+    return dataUrlToFile(cropped);
+  }
+
   async function handleSave() {
     if (included.length === 0 || blockedCount > 0 || missingDestination) return;
     setSaving(true);
-    // Multi-photo sessions have no reliable photo-to-item mapping (Gemini
-    // can find several items in one photo, or one item across several) —
-    // only auto-attach a cover when there's exactly one photo to attribute
-    // to the item(s) it produced.
-    const coverFile = photos.length === 1 ? await dataUrlToFile(photos[0]) : null;
+    const coverFiles = await Promise.all(included.map(buildCoverFile));
     // The capture flow is done at this point — release the camera for real
     // (it's kept alive across /capture <-> /capture/review round trips up
     // to now so "Add another photo" doesn't re-prompt for permission).
@@ -113,13 +123,13 @@ export default function CaptureReviewPage() {
     if (included.length === 1) {
       const item = createItem(buildInput(included[0]));
       persistNormalizationRules(included);
-      if (coverFile) await setItemCoverPhoto(item.id, coverFile);
+      if (coverFiles[0]) await setItemCoverPhoto(item.id, coverFiles[0]);
       toast.success(`Saved ${item.name}`);
       router.push(`/items/${item.id}`);
     } else {
       const created = createItemsBatch(included.map(buildInput));
       persistNormalizationRules(included);
-      if (coverFile) await Promise.all(created.map((it) => setItemCoverPhoto(it.id, coverFile)));
+      await Promise.all(created.map((it, i) => (coverFiles[i] ? setItemCoverPhoto(it.id, coverFiles[i]!) : null)));
       toast.success(`Saved ${included.length} items`);
       router.push(destination?.containerId ? `/containers/${destination.containerId}` : "/");
     }

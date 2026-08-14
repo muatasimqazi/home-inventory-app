@@ -90,6 +90,8 @@ export const useCaptureSession = create<CaptureSessionState>()((set, get) => ({
           confidence: 1,
           photoEmoji: "📦",
           needsReview: false,
+          photoIndex: 0,
+          boundingBox: null,
           excluded: false,
           name: "",
           quantity: 1,

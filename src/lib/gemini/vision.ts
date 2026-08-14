@@ -22,6 +22,20 @@ const GEMINI_MODEL = "gemini-flash-latest";
 // a fallback, not as the primary detector.
 const FALLBACK_MODEL: LanguageModel = "openai/gpt-5-nano";
 
+const boundingBoxSchema = z
+  .object({
+    x: z.number().min(0).max(1).describe("Left edge of the box, as a fraction of the photo's width (0 = left edge, 1 = right edge)."),
+    y: z.number().min(0).max(1).describe("Top edge of the box, as a fraction of the photo's height (0 = top edge, 1 = bottom edge)."),
+    width: z.number().min(0).max(1).describe("Width of the box, as a fraction of the photo's width."),
+    height: z.number().min(0).max(1).describe("Height of the box, as a fraction of the photo's height."),
+  })
+  .nullable()
+  .describe(
+    "A tight box around just this item within its photo, in normalized 0-1 coordinates. Null if you " +
+      "can't confidently localize it — e.g. it's spread across the whole frame, or it's genuinely " +
+      "hard to tell where it starts/ends. Don't guess a box you're not fairly sure of."
+  );
+
 const detectionSchema = z.object({
   items: z.array(
     z.object({
@@ -30,6 +44,8 @@ const detectionSchema = z.object({
       suggestedTags: z.array(z.string()).describe("0-3 short lowercase tags, e.g. 'power-tools'."),
       confidence: z.number().min(0).max(1).describe("How confident you are in the identification, 0-1."),
       photoEmoji: z.string().describe("A single emoji that best represents this item."),
+      photoIndex: z.number().int().min(0).describe("0-based index of the labeled photo (Photo 0, Photo 1, ...) this item appears in."),
+      boundingBox: boundingBoxSchema,
     })
   ),
 });
@@ -42,7 +58,17 @@ function google() {
   return createGoogleGenerativeAI({ apiKey });
 }
 
+// Each photo gets an explicit "Photo N:" label immediately before its file
+// part — relying on the model to infer index purely from part order was
+// unreliable enough not to trust for something the crop step depends on
+// (photoIndex needs to be right, or an item's cover comes from the wrong
+// photo entirely).
 function buildMessages(photos: string[]): ModelMessage[] {
+  const labeledPhotos = photos.flatMap((photo, i) => [
+    { type: "text" as const, text: `Photo ${i}:` },
+    { type: "file" as const, mediaType: "image" as const, data: photo },
+  ]);
+
   return [
     {
       role: "user",
@@ -51,12 +77,17 @@ function buildMessages(photos: string[]): ModelMessage[] {
           type: "text",
           text:
             "You are cataloging items for a home inventory app. Identify every distinct physical " +
-            "item visible across these photo(s). For each item, pick the category from the allowed " +
-            "list that fits best, suggest a couple of short lowercase tags if relevant, and give an " +
-            "honest confidence score — use a lower score for anything ambiguous, partially obscured, " +
-            "or generic-looking rather than guessing.",
+            "item visible across these labeled photos. For each item, pick the category from the " +
+            "allowed list that fits best, suggest a couple of short lowercase tags if relevant, and " +
+            "give an honest confidence score — use a lower score for anything ambiguous, partially " +
+            "obscured, or generic-looking rather than guessing.\n\n" +
+            "Also report, per item, which labeled photo it's in (photoIndex) and a tight bounding box " +
+            "around just that item within that photo — one photo can contain several items (e.g. a " +
+            "shelf of tools), and each needs its own box so its cover photo can be cropped to just " +
+            "that item instead of the whole shot. See the boundingBox field description for exactly " +
+            "when to leave it null instead of guessing.",
         },
-        ...photos.map((photo) => ({ type: "file" as const, mediaType: "image" as const, data: photo })),
+        ...labeledPhotos,
       ],
     },
   ];
@@ -79,7 +110,10 @@ async function runDetection(model: LanguageModel, photos: string[]): Promise<Gem
  * Gemini is the primary model; if it fails for any reason (its own retries
  * already exhausted — see the AI SDK's default maxRetries), this falls back
  * to a cheap OpenAI model via AI Gateway once before giving up, so a
- * provider-wide Gemini outage doesn't block detection entirely.
+ * provider-wide Gemini outage doesn't block detection entirely. Bounding-box
+ * localization from the fallback model is expected to be less reliable than
+ * Gemini's — that's fine, a missing/invalid box just falls back to the full
+ * photo downstream (see cropToItem in lib/crop-image.ts), never a hard error.
  */
 export async function detectItemsWithGemini(photos: string[]): Promise<GeminiDetectedItem[]> {
   try {
