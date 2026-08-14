@@ -45,7 +45,14 @@ export function BottomNav() {
   return (
     <nav
       aria-label="Primary"
-      className="fixed inset-x-4 bottom-4 z-40 flex h-17.5 items-center justify-around rounded-3xl border border-border bg-white px-2 shadow-sm md:hidden"
+      // bottom-4 was a flat 16px from the true screen edge — fine in a
+      // normal Safari tab (Safari reserves the home-indicator strip itself,
+      // outside the page), but installed to the home screen the page draws
+      // full-bleed under it (viewport-fit=cover, see layout.tsx), so the
+      // pill sat right against the home indicator. Additive rather than
+      // max(): env() is 0 on anything without a home indicator, so this is
+      // still exactly 16px there — unchanged from before.
+      className="fixed inset-x-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-40 flex h-17.5 items-center justify-around rounded-3xl border border-border bg-white px-2 shadow-sm md:hidden"
     >
       {LEFT_TABS.map(renderTab)}
 

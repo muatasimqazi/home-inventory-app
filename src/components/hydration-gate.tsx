@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useInventoryStore } from "@/lib/store";
+import { Icon } from "@/components/icon";
 
 // Guaranteed-unauthenticated routes per src/proxy.ts's own PUBLIC_PATHS —
 // hydrate() would just hit the "not signed in" branch here, so skip it
@@ -47,8 +48,16 @@ export function HydrationGate({ children }: { children: ReactNode }) {
   if (isPublic || isHouseholdSetup) return <>{children}</>;
 
   if (!isHydrated) {
+    // The brand mark, not just plain text — this is the first thing anyone
+    // sees on every cold load, and doubly so launched from a home-screen
+    // icon (no Safari chrome to lend the page any context in the meantime).
+    // Same mark as the sign-in screen, so there's no visual hand-off
+    // between "app is booting" and "app is asking you to sign in."
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-background">
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-background">
+        <div className="flex size-14 items-center justify-center rounded-2xl bg-yellow">
+          <Icon name="box" size={26} className="text-white" />
+        </div>
         <p className="text-body text-muted-foreground">Loading your household…</p>
       </div>
     );
