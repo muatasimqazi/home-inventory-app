@@ -6,7 +6,7 @@ import Cropper, { type Area } from "react-easy-crop";
 import { Icon } from "@/components/icon";
 import { useCaptureSession } from "@/lib/capture-session-store";
 import { useInventoryStore } from "@/lib/store";
-import { getCroppedImage } from "@/lib/crop-image";
+import { getCroppedImage, resizeImage } from "@/lib/crop-image";
 import { getSharedStream, setSharedStream, hasLiveTracks, stopCameraStream } from "@/lib/camera-stream";
 import { cn } from "@/lib/utils";
 
@@ -199,7 +199,10 @@ function CameraCaptureInner() {
     if (!previewUrl) return;
     setCropping(true);
     try {
-      const finalPhoto = croppedAreaPixels ? await getCroppedImage(previewUrl, croppedAreaPixels) : previewUrl;
+      // Always goes through a downscale, whether or not the user actually
+      // touched the crop — an unresized library photo can be tens of MB,
+      // large enough on its own to blow past the request size limit on save.
+      const finalPhoto = croppedAreaPixels ? await getCroppedImage(previewUrl, croppedAreaPixels) : await resizeImage(previewUrl);
       addPhoto(finalPhoto);
       setPreviewUrl(null);
       await returnToLive();
