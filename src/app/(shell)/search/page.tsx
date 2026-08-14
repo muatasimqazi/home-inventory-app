@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { SearchBar } from "@/components/search-bar";
 import { EmptyState } from "@/components/empty-state";
@@ -28,6 +28,22 @@ function SearchPageInner() {
   const locations = useInventoryStore((s) => s.locations);
   const tags = useInventoryStore((s) => s.tags);
 
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    // `autoFocus` below already fires immediately on mount and is enough on
+    // desktop, but arriving here is always a client-side route change (from
+    // the bottom nav's Search tab, or the dashboard's decoy search bar) —
+    // iOS Safari only opens the on-screen keyboard for a focus() call that
+    // lands within its "recently interacted" window, and a focus fired at
+    // the exact instant of mount, before the route transition's paint has
+    // settled, quietly loses that window (cursor/caret shows, keyboard
+    // doesn't). Firing a second focus() one frame later — after the browser
+    // has actually painted the new page — is the fix that's held up in
+    // practice for this exact "focus survives, keyboard doesn't" case.
+    const raf = requestAnimationFrame(() => inputRef.current?.focus());
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
   const results = useMemo(
     () => searchItems(query, items, containers, locations, tags),
     [query, items, containers, locations, tags]
@@ -42,7 +58,7 @@ function SearchPageInner() {
         <Link href="/" className="tap-target flex size-9 shrink-0 items-center justify-center rounded-full bg-white shadow-sm">
           <Icon name="arrowLeft" size={18} />
         </Link>
-        <SearchBar value={query} onChange={setQuery} autoFocus className="flex-1" />
+        <SearchBar ref={inputRef} value={query} onChange={setQuery} autoFocus className="flex-1" />
       </div>
 
       {usedCategories.length > 0 && (

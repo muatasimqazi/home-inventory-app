@@ -1,5 +1,6 @@
 "use client";
 
+import { forwardRef } from "react";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 
@@ -12,14 +13,14 @@ interface SearchBarProps {
   onFocus?: () => void;
 }
 
-export function SearchBar({
-  value,
-  onChange,
-  placeholder = "Search items, containers, locations...",
-  autoFocus,
-  className,
-  onFocus,
-}: SearchBarProps) {
+// forwardRef so callers that need to re-focus the underlying <input>
+// imperatively (see the search page's mount-time refocus — plain
+// `autoFocus` alone isn't reliable enough on iOS Safari after an SPA route
+// change) have something to focus() beyond just setting the prop.
+export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(function SearchBar(
+  { value, onChange, placeholder = "Search items, containers, locations...", autoFocus, className, onFocus },
+  ref
+) {
   return (
     <div
       className={cn(
@@ -29,6 +30,7 @@ export function SearchBar({
     >
       <Icon name="search" size={20} className="pointer-events-none absolute left-4 text-muted-foreground" />
       <input
+        ref={ref}
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -44,4 +46,4 @@ export function SearchBar({
       </span>
     </div>
   );
-}
+});
