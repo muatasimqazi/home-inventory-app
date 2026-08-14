@@ -57,5 +57,11 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  // manifest.webmanifest excluded alongside favicon.ico — browsers (and
+  // iOS's "Add to Home Screen") need to fetch it to decide whether the app
+  // is installable *before* there's necessarily an authenticated session,
+  // so gating it here would silently make the app un-installable while
+  // signed out (confirmed live: an unauthed request came back a 307 to
+  // /sign-in instead of the manifest JSON).
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
 };

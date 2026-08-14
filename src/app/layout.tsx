@@ -6,6 +6,19 @@ import { HydrationGate } from "@/components/hydration-gate";
 export const metadata: Metadata = {
   title: "Shohaz",
   description: "Catalog, search, and locate everything in your home.",
+  // Standalone/"installed" mode — iOS reads apple-touch-icon + appleWebApp
+  // rather than the web manifest (see manifest.ts) to decide how the app
+  // looks and behaves once added to the home screen via Safari's Share
+  // sheet. `capable: true` drops the Safari chrome (address bar, tab bar)
+  // entirely; without it "Add to Home Screen" just opens a normal tab.
+  icons: {
+    apple: "/apple-touch-icon.png",
+  },
+  appleWebApp: {
+    capable: true,
+    title: "Shohaz",
+    statusBarStyle: "black-translucent",
+  },
 };
 
 export const viewport: Viewport = {
@@ -17,6 +30,13 @@ export const viewport: Viewport = {
   // nothing there — the real cross-browser fix is useKeyboardInset (see
   // src/hooks/use-keyboard-inset.ts), wired into the bottom sheet itself.
   interactiveWidget: "resizes-content",
+  // Required for env(safe-area-inset-*) to resolve to anything but 0 —
+  // without it, appleWebApp's black-translucent status bar (see metadata
+  // above) overlays content with no way to detect how far to pad below it.
+  // The app already relies on safe-area-inset-top elsewhere (e.g. the
+  // Toaster offset below), so this was silently a no-op in standalone mode
+  // until now.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
