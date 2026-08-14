@@ -10,6 +10,8 @@ export interface DetectionRow extends DetectedItem {
   name: string; // editable, pre-filled from suggestedName
   category: string; // editable
   quantity: number; // editable, 0-9999
+  /** Explicitly accepted a low-confidence AI suggestion as-is, via the review screen's "Confirm" action — the other way (besides editing the name) to clear needsCorrection's block on Save. */
+  confirmed: boolean;
 }
 
 export interface DetectError {
@@ -59,6 +61,7 @@ export const useCaptureSession = create<CaptureSessionState>()((set, get) => ({
         name: d.suggestedName,
         category: d.category,
         quantity: 1,
+        confirmed: false,
       }));
       set({ detections: rows, detecting: false });
     } catch (error) {
@@ -95,6 +98,7 @@ export const useCaptureSession = create<CaptureSessionState>()((set, get) => ({
           excluded: false,
           name: "",
           quantity: 1,
+          confirmed: false,
         },
       ],
     })),

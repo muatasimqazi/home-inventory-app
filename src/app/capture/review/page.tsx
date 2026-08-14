@@ -21,9 +21,11 @@ import { cn } from "@/lib/utils";
 // A low-confidence AI suggestion (row.needsReview) left completely
 // untouched shouldn't be savable as-is — that's how items end up
 // permanently named "unidentified small appliance." Once the user has
-// actually looked at and confirmed/edited the name, it's fine.
+// actually looked at and either edited the name or explicitly hit
+// "Confirm" (row.confirmed — the AI can simply be right, and typing a
+// no-op edit just to unblock Save was the whole complaint here), it's fine.
 function needsCorrection(row: DetectionRow): boolean {
-  return row.needsReview && row.suggestedName !== "" && row.name.trim() === row.suggestedName;
+  return row.needsReview && !row.confirmed && row.suggestedName !== "" && row.name.trim() === row.suggestedName;
 }
 
 export default function CaptureReviewPage() {
@@ -90,6 +92,10 @@ export default function CaptureReviewPage() {
         saveNormalizationRule(row.suggestedName, row.name.trim(), row.category);
       }
     }
+  }
+
+  function confirmAllBlocked() {
+    for (const row of included.filter(needsCorrection)) updateDetection(row.rowId, { confirmed: true });
   }
 
   const missingDestination = !destination?.locationId;
@@ -191,9 +197,16 @@ export default function CaptureReviewPage() {
             <p className="text-center text-caption text-danger">Choose a location above before saving — otherwise these items can&apos;t be found later.</p>
           )}
           {blockedCount > 0 && (
-            <p className="text-center text-caption text-danger">
-              Confirm or edit the highlighted name{blockedCount > 1 ? "s" : ""} above before saving.
-            </p>
+            <div className="flex items-center justify-between gap-2 rounded-lg bg-danger/5 px-3 py-2">
+              <p className="text-caption text-danger">
+                Confirm or edit the highlighted name{blockedCount > 1 ? "s" : ""} above before saving.
+              </p>
+              {blockedCount > 1 && (
+                <button type="button" onClick={confirmAllBlocked} className="shrink-0 text-caption font-semibold text-ink underline underline-offset-2">
+                  Confirm all
+                </button>
+              )}
+            </div>
           )}
           <div className="flex gap-2">
             <Button variant="outline" size="lg" className="flex-1" onClick={() => router.push("/capture?continue=1")}>
@@ -262,9 +275,16 @@ function SingleReviewForm({
           className={cn("h-11", !edited && row.suggestedName && "border-yellow bg-yellow/5")}
         />
         {blocked && (
-          <p className="mt-1 text-caption text-danger">
-            Low-confidence AI guess — please confirm or edit this name before saving.
-          </p>
+          <div className="mt-1 flex items-center justify-between gap-2">
+            <p className="text-caption text-danger">Low-confidence AI guess — please confirm or edit this name before saving.</p>
+            <button
+              type="button"
+              onClick={() => onChange({ confirmed: true })}
+              className="shrink-0 text-caption font-semibold text-ink underline underline-offset-2"
+            >
+              Confirm
+            </button>
+          </div>
         )}
         {row.needsReview && !blocked && row.reviewReason && <p className="mt-1 text-caption text-muted-foreground">{row.reviewReason}</p>}
         {edited && row.suggestedName && (
@@ -348,7 +368,16 @@ function BulkRow({
             {row.needsReview && <Icon name="needsReview" size={16} className="shrink-0 text-ink" />}
           </div>
           {blocked && (
-            <p className="text-caption text-danger">Low-confidence guess — confirm or edit this name before saving.</p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-caption text-danger">Low-confidence guess — confirm or edit this name before saving.</p>
+              <button
+                type="button"
+                onClick={() => onChange({ confirmed: true })}
+                className="shrink-0 text-caption font-semibold text-ink underline underline-offset-2"
+              >
+                Confirm
+              </button>
+            </div>
           )}
           <div className="flex gap-2">
             <Select value={row.category} onValueChange={(v) => onChange({ category: v })} disabled={row.excluded}>
