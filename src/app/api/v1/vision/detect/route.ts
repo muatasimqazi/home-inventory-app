@@ -33,10 +33,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "`photos` must be a non-empty array of data URL strings." }, { status: 400 });
   }
 
-  if (!process.env.GEMINI_API_KEY) {
-    return NextResponse.json({ error: "GEMINI_API_KEY is not configured." }, { status: 503 });
-  }
-
+  // No upfront GEMINI_API_KEY check here anymore: detectItemsWithGemini
+  // handles a missing/failing key itself and falls back to a Gateway model,
+  // so returning early would skip that fallback entirely in exactly the
+  // case it exists for.
   try {
     const detected = await detectItemsWithGemini(photos);
     const items: DetectedItem[] = detected.map(withReview);
