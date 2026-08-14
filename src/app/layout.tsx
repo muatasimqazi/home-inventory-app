@@ -6,14 +6,16 @@ import { HydrationGate } from "@/components/hydration-gate";
 export const metadata: Metadata = {
   title: "Shohaz",
   description: "Catalog, search, and locate everything in your home.",
-  // Standalone/"installed" mode — iOS reads apple-touch-icon + appleWebApp
-  // rather than the web manifest (see manifest.ts) to decide how the app
-  // looks and behaves once added to the home screen via Safari's Share
-  // sheet. `capable: true` drops the Safari chrome (address bar, tab bar)
-  // entirely; without it "Add to Home Screen" just opens a normal tab.
-  icons: {
-    apple: "/apple-touch-icon.png",
-  },
+  // No manual `icons` field — favicon.ico, icon.svg, and apple-icon.png in
+  // this same app/ directory are Next's file-convention icons (see
+  // app-icons.md), auto-detected and auto-linked into <head> with no
+  // metadata entry needed; adding one here would just duplicate them.
+  //
+  // Standalone/"installed" mode still needs its own config though — iOS
+  // reads appleWebApp separately from either icon source to decide how the
+  // app *behaves* once added to the home screen via Safari's Share sheet.
+  // `capable: true` drops the Safari chrome (address bar, tab bar) entirely;
+  // without it "Add to Home Screen" just opens a normal tab.
   appleWebApp: {
     capable: true,
     title: "Shohaz",
