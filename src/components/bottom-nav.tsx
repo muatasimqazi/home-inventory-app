@@ -45,14 +45,18 @@ export function BottomNav() {
   return (
     <nav
       aria-label="Primary"
-      // bottom-4 was a flat 16px from the true screen edge — fine in a
-      // normal Safari tab (Safari reserves the home-indicator strip itself,
-      // outside the page), but installed to the home screen the page draws
-      // full-bleed under it (viewport-fit=cover, see layout.tsx), so the
-      // pill sat right against the home indicator. Additive rather than
-      // max(): env() is 0 on anything without a home indicator, so this is
-      // still exactly 16px there — unchanged from before.
-      className="fixed inset-x-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-40 flex h-17.5 items-center justify-around rounded-3xl border border-border bg-white px-2 shadow-sm md:hidden"
+      // Was a floating rounded pill inset from every edge (Figma v2's
+      // literal spec) — reads as a card sitting *on* the page rather than
+      // the OS's own chrome, which is what actually made it feel
+      // un-app-like once the page was full-bleed in standalone mode.
+      // Docked to a real native iOS tab bar instead: full-width, flush to
+      // the bottom edge, square corners, a top hairline instead of a
+      // shadow. min-h (not h) + padding-bottom keeps the icon row itself
+      // at its original full height and just appends a same-color strip
+      // below for the safe area, rather than the safe area eating into
+      // the tap targets — that's also why the inset moved from the
+      // outer edge (bottom-*) to inner padding here.
+      className="fixed inset-x-0 bottom-0 z-40 flex min-h-17.5 items-center justify-around border-t border-border bg-white px-2 pb-[env(safe-area-inset-bottom)] md:hidden"
     >
       {LEFT_TABS.map(renderTab)}
 
