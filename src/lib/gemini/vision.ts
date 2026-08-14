@@ -106,13 +106,27 @@ function buildMessages(photos: string[]): ModelMessage[] {
 const CALL_TIMEOUT_MS = 20_000;
 const CALL_MAX_RETRIES = 1;
 
-async function runDetection(model: LanguageModel, photos: string[]): Promise<GeminiDetectedItem[]> {
+// gpt-5-nano (and the GPT-5 family generally) reasons by default even for
+// a straightforward vision task like this — verified live: the exact same
+// detection call took ~11s and burned 1,408 reasoning tokens by default,
+// vs ~2s and 0 reasoning tokens with reasoningEffort "minimal", no
+// measurable loss in bounding-box accuracy. Left at the default, the
+// fallback model itself could occasionally trip CALL_TIMEOUT_MS below —
+// the exact "falls back, and the fallback also times out" case this is
+// fixing. Gemini has no equivalent option (and doesn't need one here), so
+// this is only ever passed for the fallback call.
+type DetectionProviderOptions = Parameters<typeof generateText>[0]["providerOptions"];
+
+const FALLBACK_PROVIDER_OPTIONS: DetectionProviderOptions = { openai: { reasoningEffort: "minimal" } };
+
+async function runDetection(model: LanguageModel, photos: string[], providerOptions?: DetectionProviderOptions): Promise<GeminiDetectedItem[]> {
   const { output } = await generateText({
     model,
     output: Output.object({ schema: detectionSchema }),
     messages: buildMessages(photos),
     timeout: CALL_TIMEOUT_MS,
     maxRetries: CALL_MAX_RETRIES,
+    providerOptions,
   });
   return output.items;
 }
@@ -136,7 +150,7 @@ export async function detectItemsWithGemini(photos: string[]): Promise<GeminiDet
   } catch (geminiError) {
     console.error("Gemini vision detection failed, falling back to", FALLBACK_MODEL, geminiError);
     try {
-      return await runDetection(FALLBACK_MODEL, photos);
+      return await runDetection(FALLBACK_MODEL, photos, FALLBACK_PROVIDER_OPTIONS);
     } catch (fallbackError) {
       console.error(`Fallback model ${FALLBACK_MODEL} also failed:`, fallbackError);
       // Surface the fallback's error — it's the one that actually ended the
