@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCaptureSession, type DetectionRow } from "@/lib/capture-session-store";
 import { useInventoryStore, type NewItemInput } from "@/lib/store";
+import { stopCameraStream } from "@/lib/camera-stream";
 import { buildBreadcrumb } from "@/lib/selectors";
 import { CATEGORIES } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -95,14 +96,20 @@ export default function CaptureReviewPage() {
     }
   }
 
+  const missingDestination = !destination?.locationId;
+
   async function handleSave() {
-    if (included.length === 0 || blockedCount > 0) return;
+    if (included.length === 0 || blockedCount > 0 || missingDestination) return;
     setSaving(true);
     // Multi-photo sessions have no reliable photo-to-item mapping (Gemini
     // can find several items in one photo, or one item across several) —
     // only auto-attach a cover when there's exactly one photo to attribute
     // to the item(s) it produced.
     const coverFile = photos.length === 1 ? await dataUrlToFile(photos[0]) : null;
+    // The capture flow is done at this point — release the camera for real
+    // (it's kept alive across /capture <-> /capture/review round trips up
+    // to now so "Add another photo" doesn't re-prompt for permission).
+    stopCameraStream();
     if (included.length === 1) {
       const item = createItem(buildInput(included[0]));
       persistNormalizationRules(included);
@@ -135,13 +142,17 @@ export default function CaptureReviewPage() {
       </header>
 
       <div className="mx-auto flex max-w-xl flex-col gap-4 px-4 py-4">
-        <div className="flex items-center justify-between rounded-xl bg-white px-4 py-3 shadow-sm">
+        <div className={cn("flex items-center justify-between rounded-xl bg-white px-4 py-3 shadow-sm", missingDestination && "ring-1 ring-danger")}>
           <div className="min-w-0">
             <p className="text-caption text-muted-foreground">Saving to</p>
-            <BreadcrumbTrail segments={breadcrumb} interactive={false} className="text-body text-ink" />
+            {missingDestination ? (
+              <p className="text-body text-danger">Choose a location</p>
+            ) : (
+              <BreadcrumbTrail segments={breadcrumb} interactive={false} className="text-body text-ink" />
+            )}
           </div>
           <Button variant="outline" size="sm" onClick={() => setMoveOpen(true)}>
-            Change
+            {missingDestination ? "Choose" : "Change"}
           </Button>
         </div>
 
@@ -171,16 +182,19 @@ export default function CaptureReviewPage() {
 
       <div className="fixed inset-x-0 bottom-0 z-10 border-t border-border bg-white px-4 py-3">
         <div className="mx-auto flex max-w-xl flex-col gap-2">
+          {missingDestination && (
+            <p className="text-center text-caption text-danger">Choose a location above before saving — otherwise these items can&apos;t be found later.</p>
+          )}
           {blockedCount > 0 && (
             <p className="text-center text-caption text-danger">
               Confirm or edit the highlighted name{blockedCount > 1 ? "s" : ""} above before saving.
             </p>
           )}
           <div className="flex gap-2">
-            <Button variant="outline" size="lg" className="flex-1" onClick={() => router.push("/capture")}>
+            <Button variant="outline" size="lg" className="flex-1" onClick={() => router.push("/capture?continue=1")}>
               Add another photo
             </Button>
-            <Button size="lg" className="flex-1" disabled={included.length === 0 || blockedCount > 0 || saving} onClick={handleSave}>
+            <Button size="lg" className="flex-1" disabled={included.length === 0 || blockedCount > 0 || missingDestination || saving} onClick={handleSave}>
               {saving ? <Icon name="spinner" size={16} className="animate-spin" /> : isBulk ? `Save All (${included.length})` : "Save"}
             </Button>
           </div>

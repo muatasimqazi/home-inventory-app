@@ -18,6 +18,7 @@ export default function LocationsListPage() {
   const items = useInventoryStore((s) => s.items);
   const containers = useInventoryStore((s) => s.containers);
   const createLocation = useInventoryStore((s) => s.createLocation);
+  const setLocationCoverPhoto = useInventoryStore((s) => s.setLocationCoverPhoto);
   const [createOpen, setCreateOpen] = useState(false);
   const [openLocationId, setOpenLocationId] = useState<string | null>(null);
   const [openContainerIds, setOpenContainerIds] = useState<Set<string>>(new Set());
@@ -114,8 +115,12 @@ export default function LocationsListPage() {
         onOpenChange={setCreateOpen}
         title="Add Location"
         namePlaceholder="e.g. Garage"
-        onSubmit={({ name, description }) => {
+        onSubmit={async ({ name, description, photoFile }) => {
           const loc = createLocation({ name, description });
+          if (photoFile) {
+            const result = await setLocationCoverPhoto(loc.id, photoFile);
+            if (!result.ok) toast.error(result.error ?? "Location saved, but the photo couldn't be uploaded.");
+          }
           toast.success(`Added ${loc.name}`);
         }}
       />

@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon, type IconName } from "@/components/icon";
+import { useInventoryStore } from "@/lib/store";
+import { contextualCaptureHref } from "@/lib/selectors";
 import { cn } from "@/lib/utils";
 
 // Tab set and order match Figma v2 Dashboard (node 198:76) exactly: Home,
@@ -19,6 +21,8 @@ const RIGHT_TABS: { href: string; icon: IconName; label: string }[] = [
 
 export function BottomNav() {
   const pathname = usePathname();
+  const containers = useInventoryStore((s) => s.containers);
+  const scanHref = contextualCaptureHref(pathname, containers);
 
   function renderTab(tab: (typeof LEFT_TABS)[number]) {
     const active = tab.href === "/" ? pathname === "/" : pathname.startsWith(tab.href);
@@ -46,7 +50,7 @@ export function BottomNav() {
       {LEFT_TABS.map(renderTab)}
 
       <Link
-        href="/capture"
+        href={scanHref}
         aria-label="Scan item"
         className="tap-target -mt-8 flex size-16 shrink-0 items-center justify-center rounded-full bg-yellow text-white shadow-lg"
       >

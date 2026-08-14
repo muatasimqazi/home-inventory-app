@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Link from "next/link";
 import { notFound, useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
@@ -24,6 +25,7 @@ export default function LocationDetailPage() {
   const containers = useInventoryStore((s) => s.containers);
   const items = useInventoryStore((s) => s.items);
   const createContainer = useInventoryStore((s) => s.createContainer);
+  const setContainerCoverPhoto = useInventoryStore((s) => s.setContainerCoverPhoto);
   const updateLocation = useInventoryStore((s) => s.updateLocation);
   const trashLocation = useInventoryStore((s) => s.trashLocation);
   const setLocationCoverPhoto = useInventoryStore((s) => s.setLocationCoverPhoto);
@@ -101,6 +103,21 @@ export default function LocationDetailPage() {
       <div>
         <h1 className="text-screen-title font-medium text-ink">{location.name}</h1>
         {location.description && <p className="text-caption text-muted-foreground">{location.description}</p>}
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <Link
+          href={`/capture?locationId=${location.id}`}
+          className="tap-target flex items-center justify-center gap-2 rounded-2xl bg-yellow py-3 text-body font-medium text-white shadow-lg"
+        >
+          <Icon name="camera" size={16} /> Add items
+        </Link>
+        <Link
+          href={`/add?locationId=${location.id}`}
+          className="tap-target flex items-center justify-center gap-2 rounded-2xl border border-border bg-white py-3 text-body font-medium text-ink shadow-sm"
+        >
+          <Icon name="edit" size={16} /> Add manually
+        </Link>
       </div>
 
       <Button variant="secondary" size="lg" onClick={() => setAddContainerOpen(true)}>
@@ -184,8 +201,12 @@ export default function LocationDetailPage() {
         onOpenChange={setAddContainerOpen}
         title="Add Container"
         namePlaceholder="e.g. Toolbox"
-        onSubmit={({ name, description }) => {
+        onSubmit={async ({ name, description, photoFile }) => {
           const c = createContainer({ name, description, locationId: location.id });
+          if (photoFile) {
+            const result = await setContainerCoverPhoto(c.id, photoFile);
+            if (!result.ok) toast.error(result.error ?? "Container saved, but the photo couldn't be uploaded.");
+          }
           toast.success(`Added ${c.name}`);
         }}
       />
@@ -197,8 +218,14 @@ export default function LocationDetailPage() {
         namePlaceholder="e.g. Garage"
         initialName={location.name}
         initialDescription={location.description ?? ""}
-        onSubmit={({ name, description }) => {
+        initialCoverPhotoPath={location.coverPhotoPath}
+        initialCoverPhotoEmoji={location.coverPhotoEmoji ?? "📦"}
+        onSubmit={async ({ name, description, photoFile }) => {
           updateLocation(location.id, { name, description });
+          if (photoFile) {
+            const result = await setLocationCoverPhoto(location.id, photoFile);
+            if (!result.ok) toast.error(result.error ?? "Location updated, but the photo couldn't be uploaded.");
+          }
           toast.success("Location updated");
         }}
       />

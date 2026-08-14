@@ -15,6 +15,7 @@ import { useInventoryStore } from "@/lib/store";
 import { buildBreadcrumb } from "@/lib/selectors";
 import { CATEGORIES } from "@/lib/types";
 import { extraFieldsForCategory } from "@/lib/category";
+import { cn } from "@/lib/utils";
 
 const SHARED_OWNER_VALUE = "shared";
 
@@ -69,6 +70,7 @@ function ManualAddItemInner() {
   });
   const [moveOpen, setMoveOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const breadcrumb = buildBreadcrumb(destination.locationId, destination.containerId, locations, containers);
@@ -90,6 +92,10 @@ function ManualAddItemInner() {
   async function handleSave() {
     if (!name.trim()) {
       setError("Give this item a name.");
+      return;
+    }
+    if (!destination.locationId) {
+      setLocationError("Choose a location — otherwise this item can't be found later.");
       return;
     }
     setSaving(true);
@@ -204,15 +210,19 @@ function ManualAddItemInner() {
           </Select>
         </Field>
 
-        <Field label="Location">
+        <Field label="Location" required>
           <button
             type="button"
             onClick={() => setMoveOpen(true)}
-            className="tap-target flex h-11 w-full items-center justify-between rounded-lg border border-border bg-white px-3 text-left"
+            className={cn(
+              "tap-target flex h-11 w-full items-center justify-between rounded-lg border bg-white px-3 text-left",
+              locationError ? "border-danger" : "border-border"
+            )}
           >
             <BreadcrumbTrail segments={breadcrumb} interactive={false} className="text-body text-ink" />
             <Icon name="chevronRight" size={16} className="text-muted-foreground" />
           </button>
+          {locationError && <p className="mt-1 text-caption text-danger">{locationError}</p>}
         </Field>
 
         <Field label="Quantity">
@@ -295,7 +305,10 @@ function ManualAddItemInner() {
         onOpenChange={setMoveOpen}
         currentLocationId={destination.locationId}
         currentContainerId={destination.containerId}
-        onMove={setDestinationState}
+        onMove={(dest) => {
+          setDestinationState(dest);
+          if (dest.locationId) setLocationError(null);
+        }}
       />
     </div>
   );

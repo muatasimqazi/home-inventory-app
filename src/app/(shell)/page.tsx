@@ -91,7 +91,7 @@ export default function DashboardPage() {
         <div className="flex flex-wrap gap-2">
           <ActionChip label="Review" count={summary.needsReviewCount} tone="purple" />
           <ActionChip label="Photos" count={genericPhotos} tone="green" />
-          <ActionChip label="Loose" count={loose} tone="orange" />
+          <ActionChip label="Loose" count={loose} tone="orange" href="/unassigned" />
         </div>
       </div>
 
@@ -159,11 +159,20 @@ const CHIP_TONES = {
   orange: "bg-badge-orange-bg text-badge-orange-text",
 } as const;
 
-function ActionChip({ label, count, tone }: { label: string; count: number; tone: keyof typeof CHIP_TONES }) {
-  return (
-    <span className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-caption font-semibold ${CHIP_TONES[tone]}`}>
+function ActionChip({ label, count, tone, href }: { label: string; count: number; tone: keyof typeof CHIP_TONES; href?: string }) {
+  const className = `flex items-center gap-1.5 rounded-full px-3 py-1.5 text-caption font-semibold ${CHIP_TONES[tone]}`;
+  const content = (
+    <>
       {label}
       <span>{count}</span>
-    </span>
+    </>
   );
+  if (href) {
+    return (
+      <Link href={href} className={className}>
+        {content}
+      </Link>
+    );
+  }
+  return <span className={className}>{content}</span>;
 }

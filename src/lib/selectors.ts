@@ -96,9 +96,9 @@ export function computeHouseholdSummary(items: Item[], locations: Location[]): H
   };
 }
 
-/** Active items sitting directly in a Location, not yet put in a container — the Dashboard "Action queue" Loose count. */
+/** Active items with no Container — sitting directly in a Location, or (should be rare, but nothing used to catch it) with no Location either. The Dashboard "Action queue" Loose count; links to /unassigned, which lists the same set. */
 export function looseItemCount(items: Item[]): number {
-  return items.filter((it) => it.status === "active" && it.locationId !== null && it.containerId === null).length;
+  return items.filter((it) => it.status === "active" && it.containerId === null).length;
 }
 
 /** Active items still on the generic placeholder photo emoji — the Dashboard "Action queue" Photos count. */
@@ -137,6 +137,26 @@ export function tagItemCounts(items: Item[], tags: Tag[]): TagWithCount[] {
 
 export function itemsForTag(items: Item[], tagId: string): Item[] {
   return items.filter((it) => it.status === "active" && it.tagIds.includes(tagId));
+}
+
+/**
+ * The global Scan button (bottom-nav FAB, desktop sidebar) used to always
+ * link to a bare `/capture`, which falls back to whatever `lastUsedDestination`
+ * happened to be — often a different room/container than whichever one is
+ * currently open. Deriving the destination from the current route instead
+ * means "scan while viewing a Location/Container" actually adds items there.
+ */
+export function contextualCaptureHref(pathname: string, containers: Container[]): string {
+  const locationMatch = pathname.match(/^\/locations\/([^/]+)/);
+  if (locationMatch) return `/capture?locationId=${locationMatch[1]}`;
+
+  const containerMatch = pathname.match(/^\/containers\/([^/]+)/);
+  if (containerMatch) {
+    const container = containers.find((c) => c.id === containerMatch[1]);
+    if (container) return `/capture?locationId=${container.locationId}&containerId=${container.id}`;
+  }
+
+  return "/capture";
 }
 
 export function daysUntil(dateIso: string): number {

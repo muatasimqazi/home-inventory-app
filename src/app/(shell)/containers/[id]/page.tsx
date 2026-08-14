@@ -147,6 +147,13 @@ export default function ContainerDetailPage() {
         <Icon name="camera" size={18} /> Add items here
       </Link>
 
+      <Link
+        href={`/add?locationId=${container.locationId}&containerId=${container.id}`}
+        className="tap-target flex items-center justify-center gap-2 rounded-2xl border border-border bg-white py-3 text-body font-medium text-ink shadow-sm"
+      >
+        <Icon name="edit" size={16} /> Add manually
+      </Link>
+
       <div className="grid grid-cols-2 gap-2">
         <Button variant="secondary" size="lg" onClick={() => setMoveOpen(true)}>
           <Icon name="move" size={16} /> Move
@@ -160,7 +167,7 @@ export default function ContainerDetailPage() {
         <EmptyState
           icon="camera"
           title="This container is empty"
-          description="Use “Add items here” above to start filling it — the destination is already set."
+          description="Use “Add items here” to scan, or “Add manually” to type items in one at a time — the destination is already set."
         />
       ) : (
         <>
@@ -244,8 +251,12 @@ export default function ContainerDetailPage() {
         onOpenChange={setAddSubOpen}
         title="Add Sub-container"
         namePlaceholder="e.g. Drawer 2"
-        onSubmit={({ name, description }) => {
+        onSubmit={async ({ name, description, photoFile }) => {
           const c = createContainer({ name, description, locationId: container.locationId, parentContainerId: container.id });
+          if (photoFile) {
+            const result = await setContainerCoverPhoto(c.id, photoFile);
+            if (!result.ok) toast.error(result.error ?? "Container saved, but the photo couldn't be uploaded.");
+          }
           toast.success(`Added ${c.name}`);
         }}
       />
@@ -257,8 +268,14 @@ export default function ContainerDetailPage() {
         namePlaceholder="e.g. Toolbox"
         initialName={container.name}
         initialDescription={container.description ?? ""}
-        onSubmit={({ name, description }) => {
+        initialCoverPhotoPath={container.coverPhotoPath}
+        initialCoverPhotoEmoji={container.coverPhotoEmoji ?? "📦"}
+        onSubmit={async ({ name, description, photoFile }) => {
           updateContainer(container.id, { name, description });
+          if (photoFile) {
+            const result = await setContainerCoverPhoto(container.id, photoFile);
+            if (!result.ok) toast.error(result.error ?? "Container updated, but the photo couldn't be uploaded.");
+          }
           toast.success("Container updated");
         }}
       />

@@ -7,6 +7,7 @@ import { Icon } from "@/components/icon";
 import { useCaptureSession } from "@/lib/capture-session-store";
 import { useInventoryStore } from "@/lib/store";
 import { getCroppedImage } from "@/lib/crop-image";
+import { getSharedStream, setSharedStream, hasLiveTracks, stopCameraStream } from "@/lib/camera-stream";
 import { cn } from "@/lib/utils";
 
 type Mode = "requesting" | "live" | "preview" | "denied";
@@ -43,6 +44,14 @@ function CameraCaptureInner() {
   const lastUsedDestination = useInventoryStore((s) => s.lastUsedDestination);
 
   useEffect(() => {
+    // "Add another photo" (from /capture/review) routes back here with
+    // ?continue=1 to resume the in-progress session — otherwise this ran
+    // unconditionally on every mount, wiping already-captured photos and
+    // silently reverting whatever destination the user had just picked via
+    // "Change" back to lastUsedDestination. A fresh entry (FAB, or a
+    // Location/Container's "Add items" link) has no continue param and
+    // should reset, same as before.
+    if (searchParams.get("continue")) return;
     reset();
     const locationId = searchParams.get("locationId");
     const containerId = searchParams.get("containerId");
@@ -57,6 +66,14 @@ function CameraCaptureInner() {
   useEffect(() => {
     let cancelled = false;
     async function start() {
+      // Reuse a still-live stream from an earlier mount in this session
+      // instead of asking for the camera again.
+      const existing = getSharedStream();
+      if (hasLiveTracks(existing)) {
+        streamRef.current = existing;
+        setMode("live");
+        return;
+      }
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
         if (cancelled) {
@@ -64,6 +81,7 @@ function CameraCaptureInner() {
           return;
         }
         streamRef.current = stream;
+        setSharedStream(stream);
         setMode("live");
       } catch {
         if (!cancelled) setMode("denied");
@@ -72,7 +90,9 @@ function CameraCaptureInner() {
     start();
     return () => {
       cancelled = true;
-      streamRef.current?.getTracks().forEach((t) => t.stop());
+      // Deliberately not stopping the stream here — it's kept alive across
+      // this component unmounting so revisiting /capture doesn't re-request
+      // the camera. Explicitly closing the camera (below) stops it for real.
     };
   }, []);
 
@@ -90,15 +110,14 @@ function CameraCaptureInner() {
   // Safari — reacquiring only when needed avoids an unnecessary permission
   // re-prompt on the (usual) case where the stream is still alive.
   const returnToLive = useCallback(async () => {
-    const tracks = streamRef.current?.getTracks() ?? [];
-    const alive = tracks.length > 0 && tracks.every((t) => t.readyState === "live");
-    if (alive) {
+    if (hasLiveTracks(streamRef.current)) {
       setMode("live");
       return;
     }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
       streamRef.current = stream;
+      setSharedStream(stream);
       setMode("live");
     } catch {
       setMode("denied");
@@ -175,7 +194,10 @@ function CameraCaptureInner() {
       <header className="flex items-center justify-between px-4 pt-[max(1rem,env(safe-area-inset-top))]">
         <button
           type="button"
-          onClick={() => router.push("/")}
+          onClick={() => {
+            stopCameraStream();
+            router.push("/");
+          }}
           aria-label="Close camera"
           className={cn(
             "tap-target flex size-10 items-center justify-center rounded-full",

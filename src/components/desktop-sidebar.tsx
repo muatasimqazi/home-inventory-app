@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { Icon, type IconName } from "@/components/icon";
 import { ReviewBadge } from "@/components/review-badge";
 import { useInventoryStore, useCurrentHousehold } from "@/lib/store";
-import { computeHouseholdSummary } from "@/lib/selectors";
+import { computeHouseholdSummary, contextualCaptureHref } from "@/lib/selectors";
 import { cn } from "@/lib/utils";
 
 // Primary nav order/set matches Figma v2 Desktop Dashboard sidebar (node
@@ -25,7 +25,9 @@ export function DesktopSidebar() {
   const household = useCurrentHousehold();
   const locations = useInventoryStore((s) => s.locations);
   const items = useInventoryStore((s) => s.items);
+  const containers = useInventoryStore((s) => s.containers);
   const summary = computeHouseholdSummary(items, locations);
+  const scanHref = contextualCaptureHref(pathname, containers);
 
   return (
     <aside className="hidden md:flex md:w-64 md:shrink-0 md:flex-col md:gap-6 md:border-r md:border-border md:bg-white md:px-4 md:py-6">
@@ -70,7 +72,7 @@ export function DesktopSidebar() {
         <SidebarLink href="/settings/import" icon="upload" label="Import CSV" pathname={pathname} />
         <SidebarLink href="/settings" icon="settings" label="Settings" pathname={pathname} />
         <Link
-          href="/capture"
+          href={scanHref}
           className="tap-target mt-2 flex items-center justify-center gap-2 rounded-md bg-yellow px-4 py-3 text-body font-medium text-white"
         >
           <Icon name="camera" size={18} />
