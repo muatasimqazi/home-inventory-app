@@ -1,5 +1,5 @@
 // VisionProvider abstraction per PRD §24: detectItems(photo) -> DetectedItem[].
-// MockVisionProvider stands in for Gemini until real credentials exist —
+// MockVisionProvider stands in for a real model until credentials exist —
 // swap the export at the bottom for a real implementation later without
 // touching any call site.
 
@@ -96,12 +96,12 @@ function weightedSingleOrFew(): number {
 }
 
 /**
- * Real Gemini-backed provider — client-safe by construction: it only ever
- * calls the /api/v1/vision/detect route over fetch, never touches
- * GEMINI_API_KEY directly (that lives server-side in lib/gemini/vision.ts).
- * Not the active default; see `visionProvider` below.
+ * Real, active provider — client-safe by construction: it only ever calls
+ * the /api/v1/vision/detect route over fetch, never touches a model
+ * provider directly (that lives server-side in lib/vision/detect.ts, which
+ * routes both the primary and fallback models through Vercel AI Gateway).
  */
-export class GeminiVisionProvider implements VisionProvider {
+export class HttpVisionProvider implements VisionProvider {
   async detectItems(photos: string[]): Promise<DetectedItem[]> {
     let res: Response;
     try {
@@ -125,8 +125,8 @@ export class GeminiVisionProvider implements VisionProvider {
   }
 }
 
-// Real Gemini detection is now live — GEMINI_API_KEY is configured and
-// verified (see docs/v2-checklist.md). Every call site in the app depends
-// only on the VisionProvider interface, so this was the only line that
-// needed to change.
-export const visionProvider: VisionProvider = new GeminiVisionProvider();
+// Real detection is live, routed through Vercel AI Gateway (see
+// lib/vision/detect.ts). Every call site in the app depends only on the
+// VisionProvider interface, so this was the only line that needed to change
+// when the underlying implementation moved off a direct Google API key.
+export const visionProvider: VisionProvider = new HttpVisionProvider();

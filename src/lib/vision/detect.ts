@@ -1,25 +1,33 @@
 import "server-only";
 import { generateText, Output, type LanguageModel, type ModelMessage } from "ai";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { z } from "zod";
 import { CATEGORIES } from "@/lib/types";
 
-// Server-only vision implementation of item detection from photos. The
-// `server-only` import makes an accidental client-component import of this
-// module a build error — GEMINI_API_KEY must never reach the browser.
+// Server-only vision item detection from photos. The `server-only` import
+// makes an accidental client-component import of this module a build error
+// — not that there's a secret key to protect anymore (see below), but the
+// Gateway credentials/OIDC this now runs on still have no business in the
+// browser bundle.
 //
 // This is the active implementation (see lib/ai.ts's `visionProvider`),
 // called via /api/v1/vision/detect rather than imported directly by any
 // client component.
+//
+// Both models below are plain "provider/model" strings, routed through
+// Vercel AI Gateway automatically (no @ai-sdk/gateway package needed) using
+// whatever Gateway credentials/OIDC the project already has — previously
+// only true of the fallback; the primary used to call Google directly via
+// GEMINI_API_KEY. Consolidated onto Gateway for both: one bill instead of
+// two separate ones (Google Cloud billing + Gateway credits), and the
+// primary's free-tier daily quota (20 requests/day, a real 429 seen live —
+// see docs/bugs or git history) was tied to that personal key/project
+// specifically, not to the Gateway's own backing credentials, so routing
+// through Gateway sidesteps it rather than just raising the same ceiling.
+const PRIMARY_MODEL: LanguageModel = "google/gemini-3.7-flash";
 
-const GEMINI_MODEL = "gemini-flash-latest";
-
-// Only used when Gemini itself fails (e.g. the provider-wide "high demand"
-// 503 this was added for) — a plain "provider/model" string routes through
-// Vercel AI Gateway automatically (no @ai-sdk/gateway package needed), using
-// whatever Gateway credentials/OIDC the project already has. Picked as the
-// cheapest current vision-capable OpenAI model, since it only ever runs as
-// a fallback, not as the primary detector.
+// Only used when the primary fails — picked as the cheapest current
+// vision-capable OpenAI model, since it only ever runs as a fallback, not
+// the primary detector.
 const FALLBACK_MODEL: LanguageModel = "openai/gpt-5-nano";
 
 const boundingBoxSchema = z
@@ -50,13 +58,7 @@ const detectionSchema = z.object({
   ),
 });
 
-export type GeminiDetectedItem = z.infer<typeof detectionSchema>["items"][number];
-
-function google() {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("GEMINI_API_KEY is not set.");
-  return createGoogleGenerativeAI({ apiKey });
-}
+export type VisionDetectedItem = z.infer<typeof detectionSchema>["items"][number];
 
 // Each photo gets an explicit "Photo N:" label immediately before its file
 // part — relying on the model to infer index purely from part order was
@@ -93,30 +95,29 @@ function buildMessages(photos: string[]): ModelMessage[] {
   ];
 }
 
-// detectItemsWithGemini can make up to two of these calls back to back
-// (primary, then the fallback model) — each needs its own bound or a
-// stalled provider (not erroring, just never responding) can run
-// unbounded and blow past Vercel's function timeout entirely, which is
-// exactly what "Task timed out after 300 seconds" was: no `timeout` was
-// set, so a slow/stuck call just sat there, and worst case that could
-// happen twice in one request.
+// detectItems can make up to two of these calls back to back (primary,
+// then the fallback model) — each needs its own bound or a stalled
+// provider (not erroring, just never responding) can run unbounded and
+// blow past Vercel's function timeout entirely, which is exactly what
+// "Task timed out after 300 seconds" was: no `timeout` was set, so a
+// slow/stuck call just sat there, and worst case that could happen twice
+// in one request.
 //
 // maxRetries is 0 — the SDK's own default (2) retries the *same* model
-// with an exponential backoff sleep in between. detectItemsWithGemini
-// already has its own, better retry: on any failure it moves to a
-// completely different model rather than hammering the one that just
-// failed. Layering the SDK's retry on top of that was actively harmful
-// once too, not just redundant: on a real 429 (Gemini's free-tier daily
-// quota, 20 requests/day — the actual fix for that is billing, not more
-// retries), if CALL_TIMEOUT_MS fired while the SDK was mid-backoff-sleep
-// for its own internal retry, the *delay itself* got aborted, surfacing
-// as "AbortError: Delay was aborted" instead of a clean timeout — and
-// wasting time that mattered when the fallback call still had to run
-// after it in the same request. A single fast attempt per model, then
-// straight to the fallback, avoids both problems. Timeout bumped up
-// accordingly, since a real (non-stuck) call isn't fighting a wasted
-// backoff sleep for time anymore — worst case is now 2x this, still
-// comfortably under Vercel's 300s ceiling.
+// with an exponential backoff sleep in between. detectItems already has
+// its own, better retry: on any failure it moves to a completely
+// different model rather than hammering the one that just failed.
+// Layering the SDK's retry on top of that was actively harmful once too,
+// not just redundant: on a real 429 (the primary's old free-tier daily
+// quota — see PRIMARY_MODEL's comment), if CALL_TIMEOUT_MS fired while the
+// SDK was mid-backoff-sleep for its own internal retry, the *delay
+// itself* got aborted, surfacing as "AbortError: Delay was aborted"
+// instead of a clean timeout — and wasting time that mattered when the
+// fallback call still had to run after it in the same request. A single
+// fast attempt per model, then straight to the fallback, avoids both
+// problems. Timeout bumped up accordingly, since a real (non-stuck) call
+// isn't fighting a wasted backoff sleep for time anymore — worst case is
+// now 2x this, still comfortably under Vercel's 300s ceiling.
 const CALL_TIMEOUT_MS = 30_000;
 const CALL_MAX_RETRIES = 0;
 
@@ -130,12 +131,12 @@ const CALL_MAX_RETRIES = 0;
 // one item into four garbage entries ("Oval gray sticker/oval mark",
 // "Bright yellow packaging", ...) at 0.25-0.4 confidence each, while the
 // model's own default reasoning read the full name correctly at 0.82
-// confidence in ~9s — comfortably inside the 20s budget, not meaningfully
-// slower than reasoningEffort "low" (~9s too). Not worth trading away
-// accuracy on the one thing this app depends on for a speedup that isn't
-// even real once graded against actual label text. Left unset — the
-// model's own default — for both models; Gemini has no equivalent option.
-async function runDetection(model: LanguageModel, photos: string[]): Promise<GeminiDetectedItem[]> {
+// confidence in ~9s — comfortably inside the timeout budget, not
+// meaningfully slower than reasoningEffort "low" (~9s too). Not worth
+// trading away accuracy on the one thing this app depends on for a
+// speedup that isn't even real once graded against actual label text.
+// Left unset — the model's own default — for both models.
+async function runDetection(model: LanguageModel, photos: string[]): Promise<VisionDetectedItem[]> {
   const { output } = await generateText({
     model,
     output: Output.object({ schema: detectionSchema }),
@@ -151,19 +152,19 @@ async function runDetection(model: LanguageModel, photos: string[]): Promise<Gem
  * URLs (e.g. from a camera capture), passed inline — no persistent file
  * upload needed for this one-shot use case.
  *
- * Gemini is the primary model; if it fails for any reason (its own retries
- * already exhausted — see the AI SDK's default maxRetries), this falls back
- * to a cheap OpenAI model via AI Gateway once before giving up, so a
- * provider-wide Gemini outage doesn't block detection entirely. Bounding-box
+ * The primary model is tried first; if it fails for any reason, this falls
+ * back to a cheap OpenAI model once before giving up, so a provider-wide
+ * outage on one side doesn't block detection entirely. Bounding-box
  * localization from the fallback model is expected to be less reliable than
- * Gemini's — that's fine, a missing/invalid box just falls back to the full
- * photo downstream (see cropToItem in lib/crop-image.ts), never a hard error.
+ * the primary's — that's fine, a missing/invalid box just falls back to the
+ * full photo downstream (see cropToItem in lib/crop-image.ts), never a hard
+ * error.
  */
-export async function detectItemsWithGemini(photos: string[]): Promise<GeminiDetectedItem[]> {
+export async function detectItems(photos: string[]): Promise<VisionDetectedItem[]> {
   try {
-    return await runDetection(google()(GEMINI_MODEL), photos);
-  } catch (geminiError) {
-    console.error("Gemini vision detection failed, falling back to", FALLBACK_MODEL, geminiError);
+    return await runDetection(PRIMARY_MODEL, photos);
+  } catch (primaryError) {
+    console.error("Primary vision model failed, falling back to", FALLBACK_MODEL, primaryError);
     try {
       return await runDetection(FALLBACK_MODEL, photos);
     } catch (fallbackError) {
@@ -171,8 +172,8 @@ export async function detectItemsWithGemini(photos: string[]): Promise<GeminiDet
       // Surface the fallback's error — it's the one that actually ended the
       // attempt. The API route's status-code handling treats a 503/429 from
       // either provider as the same "high demand" case, so which one
-      // surfaces rarely matters for the message the user sees; the Gemini
-      // error is still logged above for debugging.
+      // surfaces rarely matters for the message the user sees; the primary
+      // model's error is still logged above for debugging.
       throw fallbackError;
     }
   }
