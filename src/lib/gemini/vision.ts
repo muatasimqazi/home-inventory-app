@@ -99,12 +99,26 @@ function buildMessages(photos: string[]): ModelMessage[] {
 // unbounded and blow past Vercel's function timeout entirely, which is
 // exactly what "Task timed out after 300 seconds" was: no `timeout` was
 // set, so a slow/stuck call just sat there, and worst case that could
-// happen twice in one request. maxRetries is also trimmed from the SDK's
-// default of 2 down to 1 — with two independent models to fall back
-// across, retrying the same one 3 times before moving on wastes the time
-// budget without meaningfully improving the odds.
-const CALL_TIMEOUT_MS = 20_000;
-const CALL_MAX_RETRIES = 1;
+// happen twice in one request.
+//
+// maxRetries is 0 — the SDK's own default (2) retries the *same* model
+// with an exponential backoff sleep in between. detectItemsWithGemini
+// already has its own, better retry: on any failure it moves to a
+// completely different model rather than hammering the one that just
+// failed. Layering the SDK's retry on top of that was actively harmful
+// once too, not just redundant: on a real 429 (Gemini's free-tier daily
+// quota, 20 requests/day — the actual fix for that is billing, not more
+// retries), if CALL_TIMEOUT_MS fired while the SDK was mid-backoff-sleep
+// for its own internal retry, the *delay itself* got aborted, surfacing
+// as "AbortError: Delay was aborted" instead of a clean timeout — and
+// wasting time that mattered when the fallback call still had to run
+// after it in the same request. A single fast attempt per model, then
+// straight to the fallback, avoids both problems. Timeout bumped up
+// accordingly, since a real (non-stuck) call isn't fighting a wasted
+// backoff sleep for time anymore — worst case is now 2x this, still
+// comfortably under Vercel's 300s ceiling.
+const CALL_TIMEOUT_MS = 30_000;
+const CALL_MAX_RETRIES = 0;
 
 // gpt-5-nano reasons by default even for a straightforward vision task —
 // forcing reasoningEffort down to "minimal" was tried here to keep the
