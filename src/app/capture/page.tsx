@@ -12,6 +12,17 @@ import { cn } from "@/lib/utils";
 
 type Mode = "requesting" | "live" | "preview" | "denied";
 
+// No explicit resolution meant the browser was free to pick a low default
+// (often 640x480) that then got stretched to fill the screen via
+// object-cover — the live preview (and the captured photo itself, since
+// the shutter canvas is sized to the stream's actual videoWidth/videoHeight)
+// read as blurry as a result. Asking for a high ideal resolution lets the
+// browser negotiate the camera's real capability instead.
+const CAMERA_CONSTRAINTS: MediaStreamConstraints = {
+  video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } },
+  audio: false,
+};
+
 export default function CameraCapturePage() {
   return (
     <Suspense>
@@ -34,6 +45,14 @@ function CameraCaptureInner() {
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
   const [cropping, setCropping] = useState(false);
+  // The crop step used to hard-code a 4:3 (landscape) aspect regardless of
+  // the actual photo — most phone photos are portrait, so at the default
+  // zoom the crop box only showed a small center slice and silently
+  // excluded the rest. Deriving it from the real photo dimensions (known
+  // synchronously from the capture canvas for a shutter photo, or probed
+  // via Image() for a library pick) means the crop starts framing the
+  // whole photo, matching its real shape.
+  const [mediaAspect, setMediaAspect] = useState<number | null>(null);
 
   const photos = useCaptureSession((s) => s.photos);
   const addPhoto = useCaptureSession((s) => s.addPhoto);
@@ -75,7 +94,7 @@ function CameraCaptureInner() {
         return;
       }
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+        const stream = await navigator.mediaDevices.getUserMedia(CAMERA_CONSTRAINTS);
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop());
           return;
@@ -115,7 +134,7 @@ function CameraCaptureInner() {
       return;
     }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+      const stream = await navigator.mediaDevices.getUserMedia(CAMERA_CONSTRAINTS);
       streamRef.current = stream;
       setSharedStream(stream);
       setMode("live");
@@ -144,6 +163,7 @@ function CameraCaptureInner() {
     if (!ctx) return;
     ctx.drawImage(video, 0, 0);
     resetCrop();
+    setMediaAspect(canvas.width / canvas.height);
     setPreviewUrl(canvas.toDataURL("image/jpeg", 0.85));
     setMode("preview");
   }, [resetCrop]);
@@ -153,9 +173,18 @@ function CameraCaptureInner() {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      resetCrop();
-      setPreviewUrl(reader.result as string);
-      setMode("preview");
+      const dataUrl = reader.result as string;
+      // Probe real dimensions before showing the crop step so the aspect
+      // is right from the first frame, instead of starting at a wrong
+      // default and jumping once decoded.
+      const probe = new Image();
+      probe.onload = () => {
+        resetCrop();
+        setMediaAspect(probe.naturalWidth / probe.naturalHeight);
+        setPreviewUrl(dataUrl);
+        setMode("preview");
+      };
+      probe.src = dataUrl;
     };
     reader.readAsDataURL(file);
     e.target.value = "";
@@ -289,10 +318,11 @@ function CameraCaptureInner() {
                 image={previewUrl}
                 crop={crop}
                 zoom={zoom}
-                aspect={4 / 3}
+                aspect={mediaAspect ?? 4 / 3}
                 onCropChange={setCrop}
                 onZoomChange={setZoom}
                 onCropComplete={onCropComplete}
+                onMediaLoaded={(size) => setMediaAspect(size.naturalWidth / size.naturalHeight)}
               />
             </div>
             <div className="flex flex-col gap-3 bg-ink px-6 py-4">
