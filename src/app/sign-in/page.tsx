@@ -80,9 +80,8 @@ function SignInInner() {
     <div className="flex min-h-dvh flex-col items-center justify-center bg-background px-6">
       <div className="flex w-full max-w-sm flex-col items-center gap-8">
         <div className="flex flex-col items-center gap-3 text-center">
-          <div className="flex size-14 items-center justify-center rounded-2xl bg-yellow">
-            <Icon name="box" size={26} className="text-white" />
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/icon.svg" alt="" width={56} height={56} className="size-14 rounded-2xl" />
           <p className="text-display font-semibold text-ink">Shohaz</p>
           <p className="text-body text-muted-foreground">Find anything you own, in seconds.</p>
         </div>

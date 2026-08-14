@@ -32,9 +32,8 @@ export function DesktopSidebar() {
   return (
     <aside className="hidden md:flex md:w-64 md:shrink-0 md:flex-col md:gap-6 md:border-r md:border-border md:bg-white md:px-4 md:py-6">
       <div className="flex items-center gap-3 px-2">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-yellow text-white">
-          <Icon name="home" size={18} />
-        </span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/icon.svg" alt="" width={36} height={36} className="size-9 shrink-0 rounded-[10px]" />
         <div className="min-w-0">
           <p className="text-body font-semibold text-ink">Shohaz</p>
           <p className="truncate text-caption text-muted-foreground">{household.name}</p>

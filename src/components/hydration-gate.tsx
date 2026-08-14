@@ -4,7 +4,6 @@ import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useInventoryStore } from "@/lib/store";
-import { Icon } from "@/components/icon";
 
 // Guaranteed-unauthenticated routes per src/proxy.ts's own PUBLIC_PATHS —
 // hydrate() would just hit the "not signed in" branch here, so skip it
@@ -55,9 +54,8 @@ export function HydrationGate({ children }: { children: ReactNode }) {
     // between "app is booting" and "app is asking you to sign in."
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-background">
-        <div className="flex size-14 items-center justify-center rounded-2xl bg-yellow">
-          <Icon name="box" size={26} className="text-white" />
-        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/icon.svg" alt="" width={56} height={56} className="size-14 rounded-2xl" />
         <p className="text-body text-muted-foreground">Loading your household…</p>
       </div>
     );
