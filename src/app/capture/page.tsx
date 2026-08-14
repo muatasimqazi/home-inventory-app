@@ -10,7 +10,7 @@ import { getCroppedImage } from "@/lib/crop-image";
 import { getSharedStream, setSharedStream, hasLiveTracks, stopCameraStream } from "@/lib/camera-stream";
 import { cn } from "@/lib/utils";
 
-type Mode = "requesting" | "live" | "preview" | "denied";
+type Mode = "requesting" | "live" | "preview" | "analyzing" | "denied";
 
 // No explicit resolution meant the browser was free to pick a low default
 // (often 640x480) that then got stretched to fill the screen via
@@ -40,7 +40,6 @@ function CameraCaptureInner() {
 
   const [mode, setMode] = useState<Mode>("requesting");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
@@ -59,6 +58,7 @@ function CameraCaptureInner() {
   const removePhoto = useCaptureSession((s) => s.removePhoto);
   const setDestination = useCaptureSession((s) => s.setDestination);
   const runDetection = useCaptureSession((s) => s.runDetection);
+  const detectError = useCaptureSession((s) => s.detectError);
   const reset = useCaptureSession((s) => s.reset);
   const lastUsedDestination = useInventoryStore((s) => s.lastUsedDestination);
 
@@ -209,8 +209,13 @@ function CameraCaptureInner() {
   }
 
   async function handleReviewAndSave() {
-    setSaving(true);
+    // A dedicated screen, not the live camera feed with just the button
+    // label swapped — the camera was staying visible (and, worse, a
+    // failure like Gemini being overloaded left it stuck there forever
+    // with no feedback; see runDetection's catch).
+    setMode("analyzing");
     await runDetection();
+    if (useCaptureSession.getState().detectError) return;
     router.push("/capture/review");
   }
 
@@ -274,6 +279,47 @@ function CameraCaptureInner() {
           </div>
         )}
 
+        {mode === "analyzing" && (
+          <div className="flex h-full flex-col items-center justify-center gap-4 px-8 text-center">
+            {detectError ? (
+              <>
+                <div className="flex w-full max-w-xs flex-col items-center gap-3 rounded-2xl border border-border bg-white p-8">
+                  <div className="flex size-14 items-center justify-center rounded-full bg-danger/10">
+                    <Icon name="danger" size={26} className="text-danger" />
+                  </div>
+                  <div>
+                    <p className="text-item-title font-semibold text-ink">Couldn&apos;t analyze your photos</p>
+                    <p className="mt-1 text-body text-muted-foreground">{detectError.message}</p>
+                  </div>
+                </div>
+                <div className="flex w-full max-w-xs flex-col gap-2">
+                  {detectError.retryable && (
+                    <button
+                      type="button"
+                      onClick={handleReviewAndSave}
+                      className="tap-target h-11 w-full rounded-full bg-ink text-body font-medium text-white"
+                    >
+                      Try again
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setMode("live")}
+                    className="tap-target h-11 w-full rounded-full border border-border bg-white text-body font-medium text-ink"
+                  >
+                    Back to camera
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <Icon name="spinner" size={28} className="animate-spin text-ink" />
+                <p className="text-body text-muted-foreground">Analyzing {photos.length === 1 ? "your photo" : `${photos.length} photos`}…</p>
+              </>
+            )}
+          </div>
+        )}
+
         {mode === "live" && (
           <>
             <video ref={videoRef} autoPlay playsInline muted className="size-full object-cover" />
@@ -282,10 +328,9 @@ function CameraCaptureInner() {
                 <button
                   type="button"
                   onClick={handleReviewAndSave}
-                  disabled={saving}
-                  className="tap-target h-11 w-full max-w-xs rounded-full bg-yellow text-body font-medium text-white disabled:opacity-60"
+                  className="tap-target h-11 w-full max-w-xs rounded-full bg-yellow text-body font-medium text-white"
                 >
-                  {saving ? "Analyzing…" : `Review & Save (${photos.length})`}
+                  Review & Save ({photos.length})
                 </button>
               )}
               <div className="flex w-full items-center justify-center gap-10">

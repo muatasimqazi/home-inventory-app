@@ -1,6 +1,19 @@
 import { NextResponse } from "next/server";
+import { APICallError, RetryError } from "ai";
 import { detectItemsWithGemini } from "@/lib/gemini/vision";
 import { withReview, type DetectedItem } from "@/lib/ai";
+
+/** Unwraps a (possibly retry-wrapped) AI SDK error down to a real HTTP status code from the provider, if there is one. */
+function upstreamStatusCode(error: unknown): number | undefined {
+  if (APICallError.isInstance(error)) return error.statusCode;
+  if (RetryError.isInstance(error)) {
+    for (const inner of error.errors) {
+      const code = upstreamStatusCode(inner);
+      if (code !== undefined) return code;
+    }
+  }
+  return undefined;
+}
 
 export const runtime = "nodejs";
 
@@ -30,6 +43,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ items });
   } catch (error) {
     console.error("Gemini vision detection failed:", error);
-    return NextResponse.json({ error: "Vision detection failed." }, { status: 502 });
+    const status = upstreamStatusCode(error);
+    // 503/429 from Gemini itself is transient overload/rate-limiting, not a
+    // real failure — worth telling the user that plainly (and that retrying
+    // is the actual fix) instead of a generic "something broke" message.
+    if (status === 503 || status === 429) {
+      return NextResponse.json(
+        { error: "Google's AI is experiencing high demand right now. Please try again in a moment.", retryable: true },
+        { status: 503 }
+      );
+    }
+    return NextResponse.json({ error: "Couldn't analyze your photos. Please try again.", retryable: true }, { status: 502 });
   }
 }

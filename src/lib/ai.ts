@@ -17,6 +17,16 @@ export interface VisionProvider {
   detectItems(photos: string[]): Promise<DetectedItem[]>;
 }
 
+/** Thrown by a VisionProvider on failure — `retryable` tells the UI whether "Try again" is a reasonable next step (true for anything transient, e.g. Gemini overload) vs. something that won't fix itself. */
+export class VisionDetectionError extends Error {
+  retryable: boolean;
+  constructor(message: string, retryable: boolean) {
+    super(message);
+    this.name = "VisionDetectionError";
+    this.retryable = retryable;
+  }
+}
+
 export const REVIEW_THRESHOLD = 0.75;
 
 const CANNED_POOL: Omit<DetectedItem, "needsReview" | "reviewReason">[] = [
@@ -75,14 +85,22 @@ function weightedSingleOrFew(): number {
  */
 export class GeminiVisionProvider implements VisionProvider {
   async detectItems(photos: string[]): Promise<DetectedItem[]> {
-    const res = await fetch("/api/v1/vision/detect", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ photos }),
-    });
+    let res: Response;
+    try {
+      res = await fetch("/api/v1/vision/detect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ photos }),
+      });
+    } catch {
+      // fetch() itself only throws for a real network failure (offline,
+      // DNS, etc.) — not for the server responding with an error status,
+      // which is handled below.
+      throw new VisionDetectionError("Couldn't reach the server. Check your connection and try again.", true);
+    }
     if (!res.ok) {
       const body = await res.json().catch(() => null);
-      throw new Error(body?.error ?? `Vision detection failed (${res.status}).`);
+      throw new VisionDetectionError(body?.error ?? `Vision detection failed (${res.status}).`, body?.retryable ?? true);
     }
     const { items } = (await res.json()) as { items: DetectedItem[] };
     return items;

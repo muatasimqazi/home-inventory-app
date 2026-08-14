@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import { visionProvider, type DetectedItem } from "./ai";
+import { visionProvider, VisionDetectionError, type DetectedItem } from "./ai";
 import { id } from "./id";
 
 export interface DetectionRow extends DetectedItem {
@@ -12,11 +12,18 @@ export interface DetectionRow extends DetectedItem {
   quantity: number; // editable, 0-9999
 }
 
+export interface DetectError {
+  message: string;
+  retryable: boolean;
+}
+
 interface CaptureSessionState {
   photos: string[];
   destination: { locationId: string | null; containerId: string | null } | null;
   detections: DetectionRow[] | null;
   detecting: boolean;
+  /** Set when runDetection() fails (e.g. Gemini overloaded) — null on success or before the first attempt. */
+  detectError: DetectError | null;
 
   setDestination: (dest: { locationId: string | null; containerId: string | null }) => void;
   addPhoto: (dataUrl: string) => void;
@@ -33,6 +40,7 @@ export const useCaptureSession = create<CaptureSessionState>()((set, get) => ({
   destination: null,
   detections: null,
   detecting: false,
+  detectError: null,
 
   setDestination: (dest) => set({ destination: dest }),
 
@@ -41,17 +49,27 @@ export const useCaptureSession = create<CaptureSessionState>()((set, get) => ({
   removePhoto: (index) => set((s) => ({ photos: s.photos.filter((_, i) => i !== index) })),
 
   runDetection: async () => {
-    set({ detecting: true });
-    const detected = await visionProvider.detectItems(get().photos);
-    const rows: DetectionRow[] = detected.map((d) => ({
-      ...d,
-      rowId: id("det"),
-      excluded: false,
-      name: d.suggestedName,
-      category: d.category,
-      quantity: 1,
-    }));
-    set({ detections: rows, detecting: false });
+    set({ detecting: true, detectError: null });
+    try {
+      const detected = await visionProvider.detectItems(get().photos);
+      const rows: DetectionRow[] = detected.map((d) => ({
+        ...d,
+        rowId: id("det"),
+        excluded: false,
+        name: d.suggestedName,
+        category: d.category,
+        quantity: 1,
+      }));
+      set({ detections: rows, detecting: false });
+    } catch (error) {
+      // Previously unhandled — a Gemini failure (e.g. the model being
+      // overloaded, a real and fairly common transient state) left
+      // `detecting: true` forever, silently stranding the caller on
+      // whatever "analyzing" UI it showed with no way out.
+      const message = error instanceof Error ? error.message : "Couldn't analyze your photos.";
+      const retryable = error instanceof VisionDetectionError ? error.retryable : true;
+      set({ detecting: false, detectError: { message, retryable } });
+    }
   },
 
   updateDetection: (rowId, patch) =>
@@ -79,5 +97,5 @@ export const useCaptureSession = create<CaptureSessionState>()((set, get) => ({
       ],
     })),
 
-  reset: () => set({ photos: [], destination: null, detections: null, detecting: false }),
+  reset: () => set({ photos: [], destination: null, detections: null, detecting: false, detectError: null }),
 }));
