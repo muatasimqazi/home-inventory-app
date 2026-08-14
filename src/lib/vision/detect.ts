@@ -39,7 +39,8 @@ const boundingBoxSchema = z
   })
   .nullable()
   .describe(
-    "A tight box around just this item within its photo, in normalized 0-1 coordinates. Null if you " +
+    "A box around this item within its photo, in normalized 0-1 coordinates — loosely covering the " +
+      "whole cluster of them together when quantity is more than 1, not just one of them. Null if you " +
       "can't confidently localize it — e.g. it's spread across the whole frame, or it's genuinely " +
       "hard to tell where it starts/ends. Don't guess a box you're not fairly sure of."
   );
@@ -53,6 +54,17 @@ const detectionSchema = z.object({
       confidence: z.number().min(0).max(1).describe("How confident you are in the identification, 0-1."),
       photoEmoji: z.string().describe("A single emoji that best represents this item."),
       photoIndex: z.number().int().min(0).describe("0-based index of the labeled photo (Photo 0, Photo 1, ...) this item appears in."),
+      quantity: z
+        .number()
+        .int()
+        .min(1)
+        .max(9999)
+        .describe(
+          "How many identical (or near-identical — same product, same use) copies of this item are " +
+            "visible together. 3 identical pens is one entry with quantity 3, not three separate " +
+            "entries — only give an item its own separate entry when it's actually a different item " +
+            "(different product, different color/size that matters, etc.). 1 if there's just one."
+        ),
       boundingBox: boundingBoxSchema,
     })
   ),
@@ -78,16 +90,20 @@ function buildMessages(photos: string[]): ModelMessage[] {
         {
           type: "text",
           text:
-            "You are cataloging items for a home inventory app. Identify every distinct physical " +
-            "item visible across these labeled photos. For each item, pick the category from the " +
-            "allowed list that fits best, suggest a couple of short lowercase tags if relevant, and " +
-            "give an honest confidence score — use a lower score for anything ambiguous, partially " +
-            "obscured, or generic-looking rather than guessing.\n\n" +
-            "Also report, per item, which labeled photo it's in (photoIndex) and a tight bounding box " +
-            "around just that item within that photo — one photo can contain several items (e.g. a " +
-            "shelf of tools), and each needs its own box so its cover photo can be cropped to just " +
-            "that item instead of the whole shot. See the boundingBox field description for exactly " +
-            "when to leave it null instead of guessing.",
+            "You are cataloging items for a home inventory app. Identify every distinct KIND of " +
+            "physical item visible across these labeled photos — when you see multiple identical (or " +
+            "near-identical, e.g. same product) copies of the same item, that's ONE entry with an " +
+            "accurate quantity, not one entry per copy. Someone's drawer of 5 identical pens is a " +
+            "single 'Pen' entry with quantity 5, not 5 separate 'Pen' entries. For each entry, pick " +
+            "the category from the allowed list that fits best, suggest a couple of short lowercase " +
+            "tags if relevant, and give an honest confidence score — use a lower score for anything " +
+            "ambiguous, partially obscured, or generic-looking rather than guessing.\n\n" +
+            "Also report, per entry, which labeled photo it's in (photoIndex) and a bounding box " +
+            "around it within that photo — one photo can contain several different items (e.g. a " +
+            "shelf holding a hammer, a drill, and a box of screws), and each needs its own box so its " +
+            "cover photo can be cropped to just it instead of the whole shot. See the quantity and " +
+            "boundingBox field descriptions for exactly how to handle multiples of the same item, and " +
+            "when to leave boundingBox null instead of guessing.",
         },
         ...labeledPhotos,
       ],

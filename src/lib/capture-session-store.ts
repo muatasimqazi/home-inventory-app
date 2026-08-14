@@ -60,7 +60,10 @@ export const useCaptureSession = create<CaptureSessionState>()((set, get) => ({
         excluded: false,
         name: d.suggestedName,
         category: d.category,
-        quantity: 1,
+        // d.quantity is the model's own count of identical copies grouped
+        // into this one entry — previously hardcoded to 1 regardless, which
+        // is how "3 identical pens" turned into 3 separate item rows.
+        quantity: d.quantity,
         confirmed: false,
       }));
       set({ detections: rows, detecting: false });

@@ -21,7 +21,9 @@ export interface DetectedItem {
   reviewReason?: string;
   /** 0-based index into the photos array this item was found in — which of possibly several session photos to crop its cover from. */
   photoIndex: number;
-  /** Where in that photo this item is, so its cover can be cropped to just it instead of the whole (possibly multi-item) photo. Null when the model couldn't localize it confidently — falls back to the full photo. */
+  /** How many identical/near-identical copies the model reported seeing together — 3 identical pens is one DetectedItem with quantity 3, not three separate ones. */
+  quantity: number;
+  /** Where in that photo this item is, so its cover can be cropped to just it instead of the whole (possibly multi-item) photo — loosely covering the whole group when quantity > 1. Null when the model couldn't localize it confidently — falls back to the full photo. */
   boundingBox: BoundingBox | null;
 }
 
@@ -44,21 +46,22 @@ export const REVIEW_THRESHOLD = 0.75;
 // A few of these get a canned bounding box (roughly the item sitting
 // somewhere other than dead-center) so the mock exercises the same
 // crop-to-item path real detection does; the rest leave it null to
-// exercise the whole-photo fallback too.
+// exercise the whole-photo fallback too. A few also get a quantity above 1
+// to exercise the "one entry, not one per copy" grouping path.
 const CANNED_POOL: Omit<DetectedItem, "needsReview" | "reviewReason" | "photoIndex">[] = [
-  { suggestedName: "Phillips Screwdriver", category: "Tool", suggestedTags: ["hand-tools"], confidence: 0.94, photoEmoji: "🪛", boundingBox: { x: 0.1, y: 0.2, width: 0.25, height: 0.5 } },
-  { suggestedName: "Flashlight", category: "Tool", suggestedTags: ["power-tools"], confidence: 0.91, photoEmoji: "🔦", boundingBox: { x: 0.5, y: 0.15, width: 0.3, height: 0.35 } },
-  { suggestedName: "Duct Tape", category: "Hardware", suggestedTags: [], confidence: 0.88, photoEmoji: "🎞️", boundingBox: { x: 0.3, y: 0.4, width: 0.2, height: 0.2 } },
-  { suggestedName: "Winter Gloves", category: "Clothing", suggestedTags: ["seasonal"], confidence: 0.9, photoEmoji: "🧤", boundingBox: null },
-  { suggestedName: "Picture Frame", category: "Decor", suggestedTags: [], confidence: 0.85, photoEmoji: "🖼️", boundingBox: { x: 0.15, y: 0.1, width: 0.4, height: 0.6 } },
-  { suggestedName: "Yoga Mat", category: "Sporting Goods", suggestedTags: [], confidence: 0.93, photoEmoji: "🧘", boundingBox: null },
-  { suggestedName: "Paint Can", category: "Hardware", suggestedTags: [], confidence: 0.82, photoEmoji: "🎨", boundingBox: { x: 0.4, y: 0.35, width: 0.22, height: 0.3 } },
-  { suggestedName: "Garden Trowel", category: "Outdoor", suggestedTags: [], confidence: 0.89, photoEmoji: "🌱", boundingBox: { x: 0.2, y: 0.5, width: 0.5, height: 0.15 } },
-  { suggestedName: "Phone Charger", category: "Electronics", suggestedTags: [], confidence: 0.9, photoEmoji: "🔌", boundingBox: { x: 0.6, y: 0.6, width: 0.15, height: 0.2 } },
-  { suggestedName: "unidentified small appliance", category: "Electronics", suggestedTags: [], confidence: 0.52, photoEmoji: "📻", boundingBox: null },
-  { suggestedName: "spiral notebook (color unclear)", category: "Miscellaneous", suggestedTags: [], confidence: 0.61, photoEmoji: "📓", boundingBox: { x: 0.25, y: 0.25, width: 0.35, height: 0.4 } },
-  { suggestedName: "Candle", category: "Decor", suggestedTags: [], confidence: 0.87, photoEmoji: "🕯️", boundingBox: { x: 0.45, y: 0.3, width: 0.15, height: 0.35 } },
-  { suggestedName: "Water Bottle", category: "Kitchen", suggestedTags: [], confidence: 0.92, photoEmoji: "🍶", boundingBox: { x: 0.35, y: 0.1, width: 0.15, height: 0.55 } },
+  { suggestedName: "Phillips Screwdriver", category: "Tool", suggestedTags: ["hand-tools"], confidence: 0.94, photoEmoji: "🪛", quantity: 1, boundingBox: { x: 0.1, y: 0.2, width: 0.25, height: 0.5 } },
+  { suggestedName: "Flashlight", category: "Tool", suggestedTags: ["power-tools"], confidence: 0.91, photoEmoji: "🔦", quantity: 1, boundingBox: { x: 0.5, y: 0.15, width: 0.3, height: 0.35 } },
+  { suggestedName: "Duct Tape", category: "Hardware", suggestedTags: [], confidence: 0.88, photoEmoji: "🎞️", quantity: 2, boundingBox: { x: 0.3, y: 0.4, width: 0.2, height: 0.2 } },
+  { suggestedName: "Winter Gloves", category: "Clothing", suggestedTags: ["seasonal"], confidence: 0.9, photoEmoji: "🧤", quantity: 1, boundingBox: null },
+  { suggestedName: "Picture Frame", category: "Decor", suggestedTags: [], confidence: 0.85, photoEmoji: "🖼️", quantity: 1, boundingBox: { x: 0.15, y: 0.1, width: 0.4, height: 0.6 } },
+  { suggestedName: "Yoga Mat", category: "Sporting Goods", suggestedTags: [], confidence: 0.93, photoEmoji: "🧘", quantity: 1, boundingBox: null },
+  { suggestedName: "Paint Can", category: "Hardware", suggestedTags: [], confidence: 0.82, photoEmoji: "🎨", quantity: 1, boundingBox: { x: 0.4, y: 0.35, width: 0.22, height: 0.3 } },
+  { suggestedName: "Garden Trowel", category: "Outdoor", suggestedTags: [], confidence: 0.89, photoEmoji: "🌱", quantity: 1, boundingBox: { x: 0.2, y: 0.5, width: 0.5, height: 0.15 } },
+  { suggestedName: "Phone Charger", category: "Electronics", suggestedTags: [], confidence: 0.9, photoEmoji: "🔌", quantity: 1, boundingBox: { x: 0.6, y: 0.6, width: 0.15, height: 0.2 } },
+  { suggestedName: "unidentified small appliance", category: "Electronics", suggestedTags: [], confidence: 0.52, photoEmoji: "📻", quantity: 1, boundingBox: null },
+  { suggestedName: "spiral notebook (color unclear)", category: "Miscellaneous", suggestedTags: [], confidence: 0.61, photoEmoji: "📓", quantity: 1, boundingBox: { x: 0.25, y: 0.25, width: 0.35, height: 0.4 } },
+  { suggestedName: "Candle", category: "Decor", suggestedTags: [], confidence: 0.87, photoEmoji: "🕯️", quantity: 3, boundingBox: { x: 0.45, y: 0.3, width: 0.15, height: 0.35 } },
+  { suggestedName: "Water Bottle", category: "Kitchen", suggestedTags: [], confidence: 0.92, photoEmoji: "🍶", quantity: 1, boundingBox: { x: 0.35, y: 0.1, width: 0.15, height: 0.55 } },
 ];
 
 /** Shared by MockVisionProvider and the /api/v1/vision/detect route, so both apply the same review threshold. */
