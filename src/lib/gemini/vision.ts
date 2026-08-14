@@ -106,27 +106,28 @@ function buildMessages(photos: string[]): ModelMessage[] {
 const CALL_TIMEOUT_MS = 20_000;
 const CALL_MAX_RETRIES = 1;
 
-// gpt-5-nano (and the GPT-5 family generally) reasons by default even for
-// a straightforward vision task like this — verified live: the exact same
-// detection call took ~11s and burned 1,408 reasoning tokens by default,
-// vs ~2s and 0 reasoning tokens with reasoningEffort "minimal", no
-// measurable loss in bounding-box accuracy. Left at the default, the
-// fallback model itself could occasionally trip CALL_TIMEOUT_MS below —
-// the exact "falls back, and the fallback also times out" case this is
-// fixing. Gemini has no equivalent option (and doesn't need one here), so
-// this is only ever passed for the fallback call.
-type DetectionProviderOptions = Parameters<typeof generateText>[0]["providerOptions"];
-
-const FALLBACK_PROVIDER_OPTIONS: DetectionProviderOptions = { openai: { reasoningEffort: "minimal" } };
-
-async function runDetection(model: LanguageModel, photos: string[], providerOptions?: DetectionProviderOptions): Promise<GeminiDetectedItem[]> {
+// gpt-5-nano reasons by default even for a straightforward vision task —
+// forcing reasoningEffort down to "minimal" was tried here to keep the
+// fallback well under CALL_TIMEOUT_MS, verified against a simple synthetic
+// image (plain colored shapes) with no accuracy loss. That test didn't
+// cover what this app actually needs most: reading real product-label
+// text. On a real label ("GREAT STUFF Gaps & Cracks Insulating Foam
+// Sealant"), "minimal" didn't just get it slightly wrong — it fragmented
+// one item into four garbage entries ("Oval gray sticker/oval mark",
+// "Bright yellow packaging", ...) at 0.25-0.4 confidence each, while the
+// model's own default reasoning read the full name correctly at 0.82
+// confidence in ~9s — comfortably inside the 20s budget, not meaningfully
+// slower than reasoningEffort "low" (~9s too). Not worth trading away
+// accuracy on the one thing this app depends on for a speedup that isn't
+// even real once graded against actual label text. Left unset — the
+// model's own default — for both models; Gemini has no equivalent option.
+async function runDetection(model: LanguageModel, photos: string[]): Promise<GeminiDetectedItem[]> {
   const { output } = await generateText({
     model,
     output: Output.object({ schema: detectionSchema }),
     messages: buildMessages(photos),
     timeout: CALL_TIMEOUT_MS,
     maxRetries: CALL_MAX_RETRIES,
-    providerOptions,
   });
   return output.items;
 }
@@ -150,7 +151,7 @@ export async function detectItemsWithGemini(photos: string[]): Promise<GeminiDet
   } catch (geminiError) {
     console.error("Gemini vision detection failed, falling back to", FALLBACK_MODEL, geminiError);
     try {
-      return await runDetection(FALLBACK_MODEL, photos, FALLBACK_PROVIDER_OPTIONS);
+      return await runDetection(FALLBACK_MODEL, photos);
     } catch (fallbackError) {
       console.error(`Fallback model ${FALLBACK_MODEL} also failed:`, fallbackError);
       // Surface the fallback's error — it's the one that actually ended the
