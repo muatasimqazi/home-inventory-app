@@ -93,11 +93,26 @@ function buildMessages(photos: string[]): ModelMessage[] {
   ];
 }
 
+// detectItemsWithGemini can make up to two of these calls back to back
+// (primary, then the fallback model) — each needs its own bound or a
+// stalled provider (not erroring, just never responding) can run
+// unbounded and blow past Vercel's function timeout entirely, which is
+// exactly what "Task timed out after 300 seconds" was: no `timeout` was
+// set, so a slow/stuck call just sat there, and worst case that could
+// happen twice in one request. maxRetries is also trimmed from the SDK's
+// default of 2 down to 1 — with two independent models to fall back
+// across, retrying the same one 3 times before moving on wastes the time
+// budget without meaningfully improving the odds.
+const CALL_TIMEOUT_MS = 20_000;
+const CALL_MAX_RETRIES = 1;
+
 async function runDetection(model: LanguageModel, photos: string[]): Promise<GeminiDetectedItem[]> {
   const { output } = await generateText({
     model,
     output: Output.object({ schema: detectionSchema }),
     messages: buildMessages(photos),
+    timeout: CALL_TIMEOUT_MS,
+    maxRetries: CALL_MAX_RETRIES,
   });
   return output.items;
 }
