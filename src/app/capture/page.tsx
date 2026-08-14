@@ -391,7 +391,20 @@ function CameraCaptureInner() {
 
         {mode === "preview" && previewUrl && (
           <div className="flex h-full flex-col">
-            <div className="relative flex flex-1 items-center justify-center overflow-hidden bg-black">
+            {/* p-5: react-image-crop's corner resize handles are positioned
+                half-outside the image's own edge (CSS transform, so its
+                center sits exactly on the corner). Verified live (Playwright
+                + a real drag gesture) that without this padding, whenever
+                the photo's rendered size touches this container's edge on
+                any side — routine for a landscape photo in a portrait
+                viewport, i.e. most captures — the corner handles on that
+                side get pushed out of the interactive area entirely and
+                stop receiving pointer events at all: the crop silently
+                never changes from the full-photo default no matter how the
+                user drags, which is exactly what read as "sending the
+                uncropped image." Padding keeps the handles' full hit area
+                inside the container regardless of the photo's aspect ratio. */}
+            <div className="relative flex flex-1 items-center justify-center overflow-hidden bg-black p-5">
               <ReactCrop crop={crop} onChange={(_, percentCrop) => setCrop(percentCrop)} onComplete={(c) => setCompletedCrop(c)} className="max-h-full">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img ref={imgRef} src={previewUrl} alt="Photo to crop" className="max-h-[70vh] max-w-full object-contain" />
