@@ -2,11 +2,12 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Cropper, { type Area } from "react-easy-crop";
+import ReactCrop, { type Crop, type PixelCrop as RICPixelCrop } from "react-image-crop";
+import "react-image-crop/dist/ReactCrop.css";
 import { Icon } from "@/components/icon";
 import { useCaptureSession } from "@/lib/capture-session-store";
 import { useInventoryStore } from "@/lib/store";
-import { getCroppedImage, resizeImage } from "@/lib/crop-image";
+import { getCroppedImage, resizeImage, rotateImage, type PixelCrop } from "@/lib/crop-image";
 import { getSharedStream, setSharedStream, hasLiveTracks, stopCameraStream } from "@/lib/camera-stream";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +24,28 @@ const CAMERA_CONSTRAINTS: MediaStreamConstraints = {
   audio: false,
 };
 
+// Starts covering the whole photo (matches the "show the whole image, don't
+// silently exclude parts of it" fix) — react-image-crop's crop box is fully
+// drag/resize-able from here via its own handles, unlike react-easy-crop's
+// fixed-aspect pan-and-zoom, which could only ever select a region shaped
+// exactly like the source photo — never an arbitrary one.
+const FULL_CROP: Crop = { unit: "%", x: 0, y: 0, width: 100, height: 100 };
+
+// react-image-crop reports crop rectangles in on-screen *rendered* pixels,
+// not the photo's real resolution — has to be scaled by the ratio between
+// the two before it means anything to lib/crop-image.ts, which always works
+// in natural pixels.
+function scaleCropToNatural(crop: RICPixelCrop, img: HTMLImageElement): PixelCrop {
+  const scaleX = img.naturalWidth / img.width;
+  const scaleY = img.naturalHeight / img.height;
+  return {
+    x: Math.round(crop.x * scaleX),
+    y: Math.round(crop.y * scaleY),
+    width: Math.round(crop.width * scaleX),
+    height: Math.round(crop.height * scaleY),
+  };
+}
+
 export default function CameraCapturePage() {
   return (
     <Suspense>
@@ -37,22 +60,14 @@ function CameraCaptureInner() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
 
   const [mode, setMode] = useState<Mode>("requesting");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [crop, setCrop] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
-  const [rotation, setRotation] = useState(0);
-  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
+  const [crop, setCrop] = useState<Crop>(FULL_CROP);
+  const [completedCrop, setCompletedCrop] = useState<RICPixelCrop>();
   const [cropping, setCropping] = useState(false);
-  // The crop step used to hard-code a 4:3 (landscape) aspect regardless of
-  // the actual photo — most phone photos are portrait, so at the default
-  // zoom the crop box only showed a small center slice and silently
-  // excluded the rest. Deriving it from the real photo dimensions (known
-  // synchronously from the capture canvas for a shutter photo, or probed
-  // via Image() for a library pick) means the crop starts framing the
-  // whole photo, matching its real shape.
-  const [mediaAspect, setMediaAspect] = useState<number | null>(null);
+  const [rotatingPreview, setRotatingPreview] = useState(false);
 
   const photos = useCaptureSession((s) => s.photos);
   const addPhoto = useCaptureSession((s) => s.addPhoto);
@@ -145,23 +160,29 @@ function CameraCaptureInner() {
   }, []);
 
   const resetCrop = useCallback(() => {
-    setCrop({ x: 0, y: 0 });
-    setZoom(1);
-    setRotation(0);
-    setCroppedAreaPixels(null);
-  }, []);
-
-  const onCropComplete = useCallback((_area: Area, pixels: Area) => {
-    setCroppedAreaPixels(pixels);
+    setCrop(FULL_CROP);
+    setCompletedCrop(undefined);
   }, []);
 
   // A live capture has no EXIF tag to auto-correct from, and even a
   // library photo's tag doesn't cover every device/browser reliably — this
   // is the direct fix for "came out sideways/upside-down," independent of
   // why: the user rotates it themselves, right where they'd notice it.
-  const handleRotate = useCallback(() => {
-    setRotation((r) => (r + 90) % 360);
-  }, []);
+  // Rotates the actual photo data (rather than passing a rotation prop
+  // through to the crop tool, the way the previous crop library did) since
+  // react-image-crop has no rotation concept of its own — the crop
+  // selection resets after, since the rotated frame's dimensions can swap.
+  async function handleRotatePreview() {
+    if (!previewUrl) return;
+    setRotatingPreview(true);
+    try {
+      const rotated = await rotateImage(previewUrl, 90);
+      setPreviewUrl(rotated);
+      resetCrop();
+    } finally {
+      setRotatingPreview(false);
+    }
+  }
 
   const handleShutter = useCallback(() => {
     const video = videoRef.current;
@@ -173,7 +194,6 @@ function CameraCaptureInner() {
     if (!ctx) return;
     ctx.drawImage(video, 0, 0);
     resetCrop();
-    setMediaAspect(canvas.width / canvas.height);
     setPreviewUrl(canvas.toDataURL("image/jpeg", 0.85));
     setMode("preview");
   }, [resetCrop]);
@@ -183,18 +203,9 @@ function CameraCaptureInner() {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      const dataUrl = reader.result as string;
-      // Probe real dimensions before showing the crop step so the aspect
-      // is right from the first frame, instead of starting at a wrong
-      // default and jumping once decoded.
-      const probe = new Image();
-      probe.onload = () => {
-        resetCrop();
-        setMediaAspect(probe.naturalWidth / probe.naturalHeight);
-        setPreviewUrl(dataUrl);
-        setMode("preview");
-      };
-      probe.src = dataUrl;
+      resetCrop();
+      setPreviewUrl(reader.result as string);
+      setMode("preview");
     };
     reader.readAsDataURL(file);
     e.target.value = "";
@@ -212,9 +223,11 @@ function CameraCaptureInner() {
       // Always goes through a downscale, whether or not the user actually
       // touched the crop — an unresized library photo can be tens of MB,
       // large enough on its own to blow past the request size limit on save.
-      const finalPhoto = croppedAreaPixels
-        ? await getCroppedImage(previewUrl, croppedAreaPixels, rotation)
-        : await resizeImage(previewUrl);
+      const img = imgRef.current;
+      const finalPhoto =
+        completedCrop && img && completedCrop.width > 0 && completedCrop.height > 0
+          ? await getCroppedImage(previewUrl, scaleCropToNatural(completedCrop, img))
+          : await resizeImage(previewUrl);
       addPhoto(finalPhoto);
       setPreviewUrl(null);
       await returnToLive();
@@ -231,7 +244,12 @@ function CameraCaptureInner() {
     setMode("analyzing");
     await runDetection();
     if (useCaptureSession.getState().detectError) return;
-    router.push("/capture/review");
+    // replace, not push — the whole capture -> review -> save flow should
+    // occupy a single history slot above wherever the user actually came
+    // from (a Container/Location page, typically), so the destination
+    // page's own back button returns there directly instead of stepping
+    // back through stale flow screens one at a time.
+    router.replace("/capture/review");
   }
 
   const dark = mode === "live" || mode === "preview";
@@ -245,7 +263,7 @@ function CameraCaptureInner() {
           type="button"
           onClick={() => {
             stopCameraStream();
-            router.push("/");
+            router.replace("/");
           }}
           aria-label="Close camera"
           className={cn(
@@ -286,7 +304,7 @@ function CameraCaptureInner() {
             </div>
             <button
               type="button"
-              onClick={() => router.push("/add")}
+              onClick={() => router.replace("/add")}
               className="tap-target h-11 w-full max-w-xs rounded-full bg-ink text-body font-medium text-white"
             >
               Enter manually
@@ -373,39 +391,23 @@ function CameraCaptureInner() {
 
         {mode === "preview" && previewUrl && (
           <div className="flex h-full flex-col">
-            <div className="relative flex-1 bg-black">
-              <Cropper
-                image={previewUrl}
-                crop={crop}
-                zoom={zoom}
-                rotation={rotation}
-                aspect={mediaAspect ?? 4 / 3}
-                onCropChange={setCrop}
-                onZoomChange={setZoom}
-                onRotationChange={setRotation}
-                onCropComplete={onCropComplete}
-                onMediaLoaded={(size) => setMediaAspect(size.naturalWidth / size.naturalHeight)}
-              />
+            <div className="relative flex flex-1 items-center justify-center overflow-hidden bg-black">
+              <ReactCrop crop={crop} onChange={(_, percentCrop) => setCrop(percentCrop)} onComplete={(c) => setCompletedCrop(c)} className="max-h-full">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img ref={imgRef} src={previewUrl} alt="Photo to crop" className="max-h-[70vh] max-w-full object-contain" />
+              </ReactCrop>
               <button
                 type="button"
-                onClick={handleRotate}
+                onClick={handleRotatePreview}
+                disabled={rotatingPreview}
                 aria-label="Rotate photo 90 degrees"
-                className="tap-target absolute right-3 top-3 flex size-10 items-center justify-center rounded-full bg-black/50 text-white"
+                className="tap-target absolute right-3 top-3 flex size-10 items-center justify-center rounded-full bg-black/50 text-white disabled:opacity-60"
               >
-                <Icon name="rotate" size={18} />
+                {rotatingPreview ? <Icon name="spinner" size={18} className="animate-spin" /> : <Icon name="rotate" size={18} />}
               </button>
             </div>
             <div className="flex flex-col gap-3 bg-ink px-6 py-4">
-              <input
-                type="range"
-                min={1}
-                max={3}
-                step={0.01}
-                value={zoom}
-                onChange={(e) => setZoom(Number(e.target.value))}
-                aria-label="Zoom"
-                className="w-full accent-yellow"
-              />
+              <p className="text-center text-caption text-white/60">Drag the corners to crop just the part you want.</p>
               <div className="flex gap-3">
                 <button
                   type="button"

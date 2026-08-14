@@ -116,7 +116,11 @@ function ManualAddItemInner() {
       if (!result.ok) toast.error(result.error ?? "Item saved, but the photo couldn't be uploaded.");
     }
     toast.success(`Added ${item.name}`);
-    router.push(`/items/${item.id}`);
+    // replace, not push — this page can be reached one hop deep (capture's
+    // camera-denied fallback), and either way the item page's back button
+    // should return straight to wherever the flow actually started, not
+    // step back through this now-empty form.
+    router.replace(`/items/${item.id}`);
   }
 
   return (

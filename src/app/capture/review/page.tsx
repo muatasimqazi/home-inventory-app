@@ -126,13 +126,17 @@ export default function CaptureReviewPage() {
       persistNormalizationRules(included);
       if (coverFiles[0]) await setItemCoverPhoto(item.id, coverFiles[0]);
       toast.success(`Saved ${item.name}`);
-      router.push(`/items/${item.id}`);
+      // replace, not push — closes out the whole capture flow's single
+      // history slot instead of adding yet another one on top of it, so
+      // the item page's own back button returns straight to wherever the
+      // flow was actually started from (a Container/Location page).
+      router.replace(`/items/${item.id}`);
     } else {
       const created = createItemsBatch(included.map(buildInput));
       persistNormalizationRules(included);
       await Promise.all(created.map((it, i) => (coverFiles[i] ? setItemCoverPhoto(it.id, coverFiles[i]!) : null)));
       toast.success(`Saved ${included.length} items`);
-      router.push(destination?.containerId ? `/containers/${destination.containerId}` : "/");
+      router.replace(destination?.containerId ? `/containers/${destination.containerId}` : "/");
     }
     setSaving(false);
   }
@@ -142,7 +146,7 @@ export default function CaptureReviewPage() {
       <header className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-white px-4 py-3">
         <button
           type="button"
-          onClick={() => router.push("/capture")}
+          onClick={() => router.replace("/capture")}
           className="tap-target flex size-9 items-center justify-center rounded-full hover:bg-surface-muted"
           aria-label="Back to camera"
         >
@@ -209,7 +213,7 @@ export default function CaptureReviewPage() {
             </div>
           )}
           <div className="flex gap-2">
-            <Button variant="outline" size="lg" className="flex-1" onClick={() => router.push("/capture?continue=1")}>
+            <Button variant="outline" size="lg" className="flex-1" onClick={() => router.replace("/capture?continue=1")}>
               Add another photo
             </Button>
             <Button size="lg" className="flex-1" disabled={included.length === 0 || blockedCount > 0 || missingDestination || saving} onClick={handleSave}>

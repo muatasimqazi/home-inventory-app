@@ -32,7 +32,7 @@ async function loadOrientedBitmap(src: string): Promise<ImageBitmap> {
   return createImageBitmap(blob, { imageOrientation: "from-image" });
 }
 
-/** The bounding box a rotated width x height rectangle occupies — e.g. at 90/270 degrees its edges swap. Mirrors react-easy-crop's own reference implementation for combining crop + rotation. */
+/** The bounding box a rotated width x height rectangle occupies — e.g. at 90/270 degrees its edges swap. */
 function rotatedBoundingSize(width: number, height: number, rotationDeg: number) {
   const rotRad = (rotationDeg * Math.PI) / 180;
   return {
@@ -42,14 +42,15 @@ function rotatedBoundingSize(width: number, height: number, rotationDeg: number)
 }
 
 /**
- * `rotationDeg` is the manual rotation a user applied in the crop step
- * (react-easy-crop's own `rotation`/`onRotationChange`, for whenever a
- * photo comes out sideways/upside-down and EXIF auto-correction either
- * doesn't apply — a live camera capture has no EXIF tag to read — or isn't
- * enough). `pixelCrop` is reported by react-easy-crop relative to the
- * already-rotated frame, so the source has to actually be rotated onto an
- * intermediate canvas first — cropping straight from the unrotated source
- * with those coordinates would grab the wrong region entirely.
+ * `rotationDeg` is only ever nonzero when called from rotateImage below (a
+ * standalone "just rotate the whole thing" operation — the interactive
+ * crop step handles rotation separately, by re-rotating the source photo
+ * itself before cropping, since react-image-crop has no rotation concept
+ * of its own to combine with a crop region the way this did previously).
+ * When it is set, `pixelCrop` must already be sized to the POST-rotation
+ * frame — rotating happens onto an intermediate canvas first, and cropping
+ * straight from the unrotated source with those coordinates would grab the
+ * wrong region entirely.
  */
 export async function getCroppedImage(imageSrc: string, pixelCrop: PixelCrop, rotationDeg = 0): Promise<string> {
   const bitmap = await loadOrientedBitmap(imageSrc);
@@ -195,8 +196,26 @@ export async function normalizeUploadedPhoto(file: File): Promise<File> {
 }
 
 /**
- * Rotates an already-stored cover photo (a Supabase public Storage URL) 90
- * degrees and returns it as a new File, ready to hand straight to
+ * Rotates any image — a plain data: URL (the in-progress capture-flow
+ * preview) or an already-stored Supabase Storage URL alike, since both are
+ * just fetchable sources to loadOrientedBitmap — 90 degrees and returns it
+ * as a new data URL.
+ */
+export async function rotateImage(url: string, rotationDeg = 90): Promise<string> {
+  const bitmap = await loadOrientedBitmap(url);
+  const { width, height } = bitmap;
+  bitmap.close();
+  // The crop rectangle has to match the POST-rotation canvas getCroppedImage
+  // draws onto internally, not the source's own dimensions — those swap at
+  // 90/270 degrees. Passing the pre-rotation width/height here would crop
+  // out of bounds (or short) against the actual rotated frame.
+  const { width: rotatedWidth, height: rotatedHeight } = rotatedBoundingSize(width, height, rotationDeg);
+  return getCroppedImage(url, { x: 0, y: 0, width: Math.round(rotatedWidth), height: Math.round(rotatedHeight) }, rotationDeg);
+}
+
+/**
+ * Rotates an already-stored cover photo (a Supabase public Storage URL) and
+ * returns it as a new File, ready to hand straight to
  * setItemCoverPhoto/setLocationCoverPhoto/setContainerCoverPhoto. For the
  * "Rotate" action on entity detail pages — automatically-cropped photos
  * (bulk multi-item detection, see cropToItem) never go through the
@@ -206,14 +225,6 @@ export async function normalizeUploadedPhoto(file: File): Promise<File> {
  * it got there.
  */
 export async function rotateStoredPhoto(url: string, rotationDeg = 90, filename = "photo.jpg"): Promise<File> {
-  const bitmap = await loadOrientedBitmap(url);
-  const { width, height } = bitmap;
-  bitmap.close();
-  // The crop rectangle has to match the POST-rotation canvas getCroppedImage
-  // draws onto internally, not the source's own dimensions — those swap at
-  // 90/270 degrees. Passing the pre-rotation width/height here would crop
-  // out of bounds (or short) against the actual rotated frame.
-  const { width: rotatedWidth, height: rotatedHeight } = rotatedBoundingSize(width, height, rotationDeg);
-  const rotated = await getCroppedImage(url, { x: 0, y: 0, width: Math.round(rotatedWidth), height: Math.round(rotatedHeight) }, rotationDeg);
+  const rotated = await rotateImage(url, rotationDeg);
   return dataUrlToFile(rotated, filename);
 }
