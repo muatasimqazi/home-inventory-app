@@ -76,7 +76,7 @@ export function EntityFormSheet({
             >
               {photoPreviewUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={photoPreviewUrl} alt="" className="size-full object-cover" />
+                <img src={photoPreviewUrl} alt="" className="size-full object-contain" />
               ) : (
                 <PhotoThumb emoji={initialCoverPhotoEmoji} coverPhotoPath={initialCoverPhotoPath} className="size-full" emojiClassName="text-3xl" />
               )}

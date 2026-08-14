@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useCaptureSession, type DetectionRow } from "@/lib/capture-session-store";
 import { useInventoryStore, type NewItemInput } from "@/lib/store";
 import { stopCameraStream } from "@/lib/camera-stream";
-import { cropToItem } from "@/lib/crop-image";
+import { cropToItem, dataUrlToFile } from "@/lib/crop-image";
 import { buildBreadcrumb } from "@/lib/selectors";
 import { CATEGORIES } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -24,11 +24,6 @@ import { cn } from "@/lib/utils";
 // actually looked at and confirmed/edited the name, it's fine.
 function needsCorrection(row: DetectionRow): boolean {
   return row.needsReview && row.suggestedName !== "" && row.name.trim() === row.suggestedName;
-}
-
-async function dataUrlToFile(dataUrl: string): Promise<File> {
-  const blob = await (await fetch(dataUrl)).blob();
-  return new File([blob], "cover.jpg", { type: blob.type || "image/jpeg" });
 }
 
 export default function CaptureReviewPage() {
@@ -250,7 +245,7 @@ function SingleReviewForm({
     <div className="flex flex-col gap-4 rounded-xl bg-white p-4 shadow-sm">
       {photo ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={photo} alt="Captured item" className="h-48 w-full rounded-lg object-cover" />
+        <img src={photo} alt="Captured item" className="h-48 w-full rounded-lg bg-surface-muted object-contain" />
       ) : (
         <PhotoThumb emoji={row.photoEmoji} className="h-48 w-full" emojiClassName="text-8xl" />
       )}

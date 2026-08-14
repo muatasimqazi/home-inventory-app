@@ -42,6 +42,7 @@ function CameraCaptureInner() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
+  const [rotation, setRotation] = useState(0);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
   const [cropping, setCropping] = useState(false);
   // The crop step used to hard-code a 4:3 (landscape) aspect regardless of
@@ -146,11 +147,20 @@ function CameraCaptureInner() {
   const resetCrop = useCallback(() => {
     setCrop({ x: 0, y: 0 });
     setZoom(1);
+    setRotation(0);
     setCroppedAreaPixels(null);
   }, []);
 
   const onCropComplete = useCallback((_area: Area, pixels: Area) => {
     setCroppedAreaPixels(pixels);
+  }, []);
+
+  // A live capture has no EXIF tag to auto-correct from, and even a
+  // library photo's tag doesn't cover every device/browser reliably — this
+  // is the direct fix for "came out sideways/upside-down," independent of
+  // why: the user rotates it themselves, right where they'd notice it.
+  const handleRotate = useCallback(() => {
+    setRotation((r) => (r + 90) % 360);
   }, []);
 
   const handleShutter = useCallback(() => {
@@ -202,7 +212,9 @@ function CameraCaptureInner() {
       // Always goes through a downscale, whether or not the user actually
       // touched the crop — an unresized library photo can be tens of MB,
       // large enough on its own to blow past the request size limit on save.
-      const finalPhoto = croppedAreaPixels ? await getCroppedImage(previewUrl, croppedAreaPixels) : await resizeImage(previewUrl);
+      const finalPhoto = croppedAreaPixels
+        ? await getCroppedImage(previewUrl, croppedAreaPixels, rotation)
+        : await resizeImage(previewUrl);
       addPhoto(finalPhoto);
       setPreviewUrl(null);
       await returnToLive();
@@ -366,12 +378,22 @@ function CameraCaptureInner() {
                 image={previewUrl}
                 crop={crop}
                 zoom={zoom}
+                rotation={rotation}
                 aspect={mediaAspect ?? 4 / 3}
                 onCropChange={setCrop}
                 onZoomChange={setZoom}
+                onRotationChange={setRotation}
                 onCropComplete={onCropComplete}
                 onMediaLoaded={(size) => setMediaAspect(size.naturalWidth / size.naturalHeight)}
               />
+              <button
+                type="button"
+                onClick={handleRotate}
+                aria-label="Rotate photo 90 degrees"
+                className="tap-target absolute right-3 top-3 flex size-10 items-center justify-center rounded-full bg-black/50 text-white"
+              >
+                <Icon name="rotate" size={18} />
+              </button>
             </div>
             <div className="flex flex-col gap-3 bg-ink px-6 py-4">
               <input
@@ -412,7 +434,7 @@ function CameraCaptureInner() {
           {photos.map((p, i) => (
             <div key={i} className="relative shrink-0">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={p} alt={`Captured item ${i + 1}`} className="size-14 rounded-lg object-cover" />
+              <img src={p} alt={`Captured item ${i + 1}`} className="size-14 rounded-lg bg-white/10 object-contain" />
               <button
                 type="button"
                 onClick={() => removePhoto(i)}

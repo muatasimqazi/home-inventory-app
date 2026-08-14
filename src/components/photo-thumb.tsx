@@ -20,7 +20,7 @@ export function PhotoThumb({ emoji, coverPhotoPath, label, className, emojiClass
     return (
       <div className={cn("overflow-hidden rounded-2xl bg-brand-100", className)}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={coverPhotoUrl(coverPhotoPath)} alt="" className="size-full object-cover" />
+        <img src={coverPhotoUrl(coverPhotoPath)} alt="" className="size-full object-contain" />
       </div>
     );
   }

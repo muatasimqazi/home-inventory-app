@@ -6,6 +6,7 @@ import { getSupabaseBrowserClient } from "./supabase/client";
 import { newId, tagToken } from "./id";
 import { isDisplayCodeTaken, nextDisplayCode, normalizeDisplayCode } from "./display-code";
 import { ATTACHMENT_MAX_SIZE_BYTES, ATTACHMENT_MAX_SIZE_LABEL, isAttachmentTypeAllowed } from "./attachment-limits";
+import { normalizeUploadedPhoto } from "./crop-image";
 import {
   rowToHousehold,
   rowToMember,
@@ -379,9 +380,14 @@ async function uploadCoverPhotoFile(file: File, householdId: string): Promise<{ 
   if (file.size > ATTACHMENT_MAX_SIZE_BYTES) {
     return { ok: false, error: `File is too large — max ${ATTACHMENT_MAX_SIZE_LABEL}.` };
   }
+  // Unlike the capture flow's own photos, this is the raw file straight off
+  // "choose/take a photo" with nothing done to it yet — bakes in real
+  // orientation (a phone photo taken sideways/upside-down otherwise showed
+  // that way everywhere it's used) and caps resolution, same as capture's.
+  const normalized = await normalizeUploadedPhoto(file);
   const supabase = getSupabaseBrowserClient();
   const path = `${householdId}/${newId()}`;
-  const { error: uploadError } = await supabase.storage.from("item-photos").upload(path, file, { contentType });
+  const { error: uploadError } = await supabase.storage.from("item-photos").upload(path, normalized, { contentType: normalized.type });
   if (uploadError) return { ok: false, error: uploadError.message };
   return { ok: true, path };
 }
