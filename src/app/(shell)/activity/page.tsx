@@ -1,26 +1,53 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { ActivityRow } from "@/components/activity-row";
 import { EmptyState } from "@/components/empty-state";
 import { useInventoryStore } from "@/lib/store";
 import type { ActivityEntityType } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-const FILTERS: { value: ActivityEntityType | "all"; label: string }[] = [
+const FINANCE_ENTITY_TYPES: ActivityEntityType[] = ["account", "transaction", "category", "recurring_bill"];
+
+type DomainFilter = "all" | "inventory" | "finance";
+
+const FILTERS: { value: DomainFilter; label: string }[] = [
   { value: "all", label: "All" },
-  { value: "item", label: "Items" },
-  { value: "container", label: "Containers" },
-  { value: "location", label: "Locations" },
-  { value: "member", label: "Members" },
+  { value: "inventory", label: "Inventory" },
+  { value: "finance", label: "Finance" },
 ];
 
+/**
+ * One shared Activity feed, not two — previously the top-level page here
+ * only showed inventory entity types, with a separate /finance/activity
+ * filtered to finance ones. Unlike Trash's merge (kept as two panels
+ * behind tabs, since each domain's rows carry different destructive
+ * actions), Activity is a pure browse/read surface with one shared
+ * underlying table (activity_log) already — a real combined timeline is
+ * more useful than forcing an artificial split, so this defaults to
+ * "All" and offers Inventory/Finance as a simple domain-level filter
+ * rather than the old per-entity-type chips (Items/Containers/Locations/
+ * Members would have doubled to 8+ chips combined with Finance's own
+ * four; a high-level domain filter reads better than that many chips).
+ */
 export default function ActivityFeedPage() {
   const activity = useInventoryStore((s) => s.activity);
   const members = useInventoryStore((s) => s.members);
-  const [filter, setFilter] = useState<ActivityEntityType | "all">("all");
+  const searchParams = useSearchParams();
+  // Deep-linkable (?domain=inventory|finance) so each domain's own
+  // "Activity" link lands pre-filtered, same reasoning as Trash's ?tab=.
+  const [filter, setFilter] = useState<DomainFilter>(() => {
+    const param = searchParams.get("domain");
+    return param === "finance" || param === "inventory" ? param : "all";
+  });
 
-  const filtered = filter === "all" ? activity : activity.filter((a) => a.entityType === filter);
+  const filtered =
+    filter === "all"
+      ? activity
+      : filter === "finance"
+        ? activity.filter((a) => FINANCE_ENTITY_TYPES.includes(a.entityType))
+        : activity.filter((a) => !FINANCE_ENTITY_TYPES.includes(a.entityType));
 
   const groups = groupByDay(filtered);
 

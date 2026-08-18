@@ -109,7 +109,7 @@ export default function SettingsPage() {
         <SettingsRow icon="users" label="My Households" sublabel={`${households.length} household${households.length === 1 ? "" : "s"}`} href="/settings/households" />
         <SettingsRow icon="user" label="Members" sublabel={`${members.length} active`} href="/settings/members" />
         <SettingsRow icon="printer" label="Label printing" sublabel="Container ID labels" href="/desktop/labels" />
-        <SettingsRow icon="upload" label="Import CSV" sublabel="Desktop recommended" href="/settings/import" />
+        <SettingsRow icon="upload" label="Import CSV" sublabel="Items or transactions" href="/import" />
         <SettingsRow icon="download" label="Data & Export" sublabel="CSV, PDF, JSON" href="/settings/export" />
         <SettingsRow icon="tag" label="Tags" sublabel={`${tags.length} tags`} href="/tags" />
         <SettingsRow icon="needsReview" label="Needs-Review Queue" href="/review" />
@@ -117,7 +117,7 @@ export default function SettingsPage() {
         <SettingsRow icon="key" label="API Keys" href="/settings/api-keys" />
       </div>
 
-      <Link href="/settings/trash" className="text-center text-caption font-medium text-muted-foreground">
+      <Link href="/trash" className="text-center text-caption font-medium text-muted-foreground">
         Trash and deleted items
       </Link>
 

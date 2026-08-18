@@ -351,7 +351,7 @@ export default function ItemDetailPage() {
         onConfirm={() => {
           permanentlyDeleteItem(item.id);
           toast.success("Item permanently deleted");
-          router.push("/settings/trash");
+          router.push("/trash");
         }}
       />
     </div>

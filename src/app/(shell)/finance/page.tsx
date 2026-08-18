@@ -19,8 +19,8 @@ const SECTIONS: { href: string; icon: IconName; label: string; description: stri
   { href: "/finance/recurring", icon: "repeat", label: "Recurring Bills", description: "Mortgage, subscriptions, and other regular bills" },
   { href: "/finance/net-worth", icon: "trendingUp", label: "Net Worth", description: "Trend over time" },
   { href: "/finance/import", icon: "upload", label: "Import from CSV", description: "Bring in transactions from a bank export" },
-  { href: "/finance/activity", icon: "activity", label: "Activity", description: "Who did what, and when" },
-  { href: "/finance/trash", icon: "trash", label: "Trash", description: "Restore or permanently delete" },
+  { href: "/activity?domain=finance", icon: "activity", label: "Activity", description: "Who did what, and when" },
+  { href: "/trash?tab=finance", icon: "trash", label: "Trash", description: "Restore or permanently delete" },
 ];
 
 export default function FinanceIndexPage() {

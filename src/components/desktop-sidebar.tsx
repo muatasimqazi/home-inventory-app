@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 const INVENTORY_LINKS: { href: string; icon: IconName; label: string }[] = [
   { href: "/search", icon: "search", label: "Search" },
   { href: "/favorites", icon: "heart", label: "Favorites" },
-  { href: "/activity", icon: "activity", label: "Activity" },
+  { href: "/activity?domain=inventory", icon: "activity", label: "Activity" },
   { href: "/desktop", icon: "activity", label: "Activity Dashboard" },
   { href: "/desktop/manage", icon: "box", label: "Manage" },
   { href: "/desktop/labels", icon: "tag", label: "Label Printing" },
@@ -65,7 +65,7 @@ export function DesktopSidebar() {
               <ReviewBadge count={summary.needsReviewCount} />
             </Link>
             <SidebarLink href="/tags" icon="tag" label="Tags" pathname={pathname} />
-            <SidebarLink href="/settings/trash" icon="trash" label="Trash" pathname={pathname} />
+            <SidebarLink href="/trash" icon="trash" label="Trash" pathname={pathname} />
             {INVENTORY_LINKS.map((link) => (
               <SidebarLink key={link.href} {...link} pathname={pathname} />
           ))}
@@ -92,9 +92,9 @@ export function DesktopSidebar() {
             <SidebarLink href="/finance/categories" icon="pieChart" label="Categories & Rules" pathname={pathname} />
             <SidebarLink href="/finance/recurring" icon="repeat" label="Recurring Bills" pathname={pathname} />
             <SidebarLink href="/finance/net-worth" icon="trendingUp" label="Net Worth" pathname={pathname} />
-            <SidebarLink href="/finance/activity" icon="activity" label="Activity" pathname={pathname} />
+            <SidebarLink href="/activity?domain=finance" icon="activity" label="Activity" pathname={pathname} />
             <SidebarLink href="/finance/import" icon="upload" label="Import CSV" pathname={pathname} />
-            <SidebarLink href="/finance/trash" icon="trash" label="Trash" pathname={pathname} />
+            <SidebarLink href="/trash?tab=finance" icon="trash" label="Trash" pathname={pathname} />
             <Link
               href="/finance/scan"
               className="tap-target mt-1 flex items-center justify-center gap-2 rounded-md bg-yellow px-4 py-2.5 text-caption font-medium text-white"

@@ -26,7 +26,7 @@ export default function DesktopActivityDashboardPage() {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatTile icon="box" label="Active items" value={summary.totalActiveItems} href="/search" />
         <StatTile icon="needsReview" label="Needs review" value={summary.needsReviewCount} href="/review" tone={summary.needsReviewCount > 0 ? "attention" : "default"} />
-        <StatTile icon="trash" label="Expiring in Trash" value={summary.trashExpiringSoonCount} href="/settings/trash" tone={summary.trashExpiringSoonCount > 0 ? "attention" : "default"} />
+        <StatTile icon="trash" label="Expiring in Trash" value={summary.trashExpiringSoonCount} href="/trash" tone={summary.trashExpiringSoonCount > 0 ? "attention" : "default"} />
         <StatTile icon="users" label="Members" value={members.length + invites.length} href="/settings/members" />
       </div>
 
