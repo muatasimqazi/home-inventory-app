@@ -45,9 +45,23 @@ export default function SettingsPage() {
   return (
     <div className="flex flex-col gap-5">
       <div>
-        <h1 className="text-screen-title font-semibold text-ink">Settings</h1>
-        <p className="mt-0.5 text-caption text-muted-foreground">Manage household preferences and data.</p>
+        <h1 className="text-screen-title font-semibold text-ink">More</h1>
+        <p className="mt-0.5 text-caption text-muted-foreground">Finance, household settings, and data.</p>
       </div>
+
+      <Link
+        href="/finance/dashboard"
+        className="tap-target flex items-center gap-3 rounded-2xl border border-border bg-white p-4 shadow-sm"
+      >
+        <span className="flex size-12 shrink-0 items-center justify-center rounded-[10px] bg-yellow text-white">
+          <Icon name="trendingUp" size={22} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-body font-semibold text-ink">Finance</p>
+          <p className="truncate text-caption text-muted-foreground">Accounts, transactions, budgets & bills</p>
+        </div>
+        <Icon name="chevronRight" size={16} className="shrink-0 text-muted-foreground" />
+      </Link>
 
       <button
         type="button"
@@ -68,6 +82,7 @@ export default function SettingsPage() {
         <Icon name="edit" size={16} className="shrink-0 text-muted-foreground" />
       </button>
 
+      <p className="text-caption font-medium tracking-wide text-muted-foreground uppercase">Settings</p>
       <div className="flex flex-col gap-2">
         <SettingsRow icon="home" label="Household" sublabel={household.name} href="/settings/members" />
         <SettingsRow icon="users" label="My Households" sublabel={`${households.length} household${households.length === 1 ? "" : "s"}`} href="/settings/households" />

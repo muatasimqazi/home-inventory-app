@@ -40,7 +40,8 @@ export function DesktopSidebar() {
         </div>
       </div>
 
-      <nav className="flex flex-col gap-1" aria-label="Primary">
+      <p className="px-3 text-micro font-semibold tracking-wide text-muted-foreground uppercase">Home inventory</p>
+      <nav className="-mt-3 flex flex-col gap-1" aria-label="Home inventory">
         <SidebarLink href="/" icon="home" label="Dashboard" pathname={pathname} exact />
         <SidebarLink href="/locations" icon="box" label="Locations" pathname={pathname} />
         <Link
@@ -56,6 +57,29 @@ export function DesktopSidebar() {
         </Link>
         <SidebarLink href="/tags" icon="tag" label="Tags" pathname={pathname} />
         <SidebarLink href="/settings/trash" icon="trash" label="Trash" pathname={pathname} />
+      </nav>
+
+      {/* Finance domain — 2026-08-18 nav cutover (Household Hub Addendum §6,
+          Platform Foundation Addendum's "desktop shows every domain as a
+          sidebar section, not a mobile-style switcher" recommendation).
+          Additive only: nothing above this changes for existing users. */}
+      <p className="-mb-3 px-3 text-micro font-semibold tracking-wide text-muted-foreground uppercase">Finance</p>
+      <nav className="flex flex-col gap-1" aria-label="Finance">
+        <SidebarLink href="/finance/dashboard" icon="trendingUp" label="Dashboard" pathname={pathname} />
+        <SidebarLink href="/finance/accounts" icon="wallet" label="Accounts" pathname={pathname} />
+        <SidebarLink href="/finance/transactions" icon="receipt" label="Transactions" pathname={pathname} />
+        <SidebarLink href="/finance/categories" icon="pieChart" label="Categories & Rules" pathname={pathname} />
+        <SidebarLink href="/finance/recurring" icon="repeat" label="Recurring Bills" pathname={pathname} />
+        <SidebarLink href="/finance/net-worth" icon="trendingUp" label="Net Worth" pathname={pathname} />
+        <SidebarLink href="/finance/activity" icon="activity" label="Activity" pathname={pathname} />
+        <SidebarLink href="/finance/trash" icon="trash" label="Trash" pathname={pathname} />
+        <Link
+          href="/finance/scan"
+          className="tap-target mt-1 flex items-center justify-center gap-2 rounded-md bg-yellow px-4 py-2.5 text-caption font-medium text-white"
+        >
+          <Icon name="camera" size={16} />
+          Scan Receipt
+        </Link>
       </nav>
 
       <nav className="flex flex-col gap-1 border-t border-border pt-4" aria-label="More">
