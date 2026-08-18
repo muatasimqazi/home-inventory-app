@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { useSearchParams } from "next/navigation";
 import { Icon } from "@/components/icon";
@@ -40,6 +41,7 @@ export default function TransactionsListPage() {
   const accounts = useInventoryStore((s) => s.accounts);
   const transactions = useInventoryStore((s) => s.transactions);
   const financeCategories = useInventoryStore((s) => s.financeCategories);
+  const transactionAttachments = useInventoryStore((s) => s.transactionAttachments);
   const createTransaction = useInventoryStore((s) => s.createTransaction);
   const createLinkedTransactionPair = useInventoryStore((s) => s.createLinkedTransactionPair);
   const updateTransaction = useInventoryStore((s) => s.updateTransaction);
@@ -77,6 +79,7 @@ export default function TransactionsListPage() {
   const detailTxn = transactions.find((t) => t.id === detailId) ?? null;
   const detailAccount = accounts.find((a) => a.id === detailTxn?.accountId);
   const detailCategory = financeCategories.find((c) => c.id === detailTxn?.categoryId);
+  const detailAttachment = transactionAttachments.find((a) => a.transactionId === detailTxn?.id);
 
   return (
     <div className="flex flex-col gap-4">
@@ -85,9 +88,14 @@ export default function TransactionsListPage() {
           <h1 className="text-screen-title font-semibold text-ink">Transactions</h1>
           <p className="mt-0.5 text-caption text-muted-foreground">Every transaction across your accounts.</p>
         </div>
-        <Button size="icon-lg" className="rounded-md" onClick={() => setCreateOpen(true)} aria-label="Add transaction" disabled={accounts.length === 0}>
-          <Icon name="plus" size={18} />
-        </Button>
+        <div className="flex gap-2">
+          <Link href="/finance/scan" className="tap-target flex size-11 items-center justify-center rounded-md bg-surface-muted text-ink" aria-label="Scan receipt">
+            <Icon name="camera" size={18} />
+          </Link>
+          <Button size="icon-lg" className="rounded-md" onClick={() => setCreateOpen(true)} aria-label="Add transaction" disabled={accounts.length === 0}>
+            <Icon name="plus" size={18} />
+          </Button>
+        </div>
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-1">
@@ -185,6 +193,7 @@ export default function TransactionsListPage() {
         transaction={detailTxn}
         account={detailAccount}
         category={detailCategory}
+        attachment={detailAttachment}
         onEdit={() => setEditOpen(true)}
         onTrash={() => setTrashConfirmId(detailId)}
       />

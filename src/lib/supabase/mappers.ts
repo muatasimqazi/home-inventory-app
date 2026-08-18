@@ -40,6 +40,14 @@ import type {
   RecurringBill,
   RecurringBillFrequency,
   FinanceBillShare,
+  ReceiptScanBatch,
+  ReceiptScanBatchStatus,
+  ScannedTransactionDraft,
+  CategorySource,
+  ScannedTransactionDraftStatus,
+  BoundingBoxLike,
+  ScannedReceiptLineItem,
+  TransactionAttachment,
 } from "../types";
 
 export interface HouseholdRow {
@@ -872,5 +880,211 @@ export function accountBalanceSnapshotToInsertRow(s: AccountBalanceSnapshot): Ac
     as_of_date: s.asOfDate,
     source: s.source,
     created_at: s.createdAt,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Receipt scanning (supabase/migrations/0011_receipt_scanning.sql).
+// ---------------------------------------------------------------------------
+
+export interface ReceiptScanBatchRow {
+  id: string;
+  household_id: string;
+  source_image_paths: string[];
+  status: string;
+  detected_count: number;
+  confirmed_count: number;
+  created_by_user_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export function rowToReceiptScanBatch(row: ReceiptScanBatchRow): ReceiptScanBatch {
+  return {
+    id: row.id,
+    householdId: row.household_id,
+    sourceImagePaths: row.source_image_paths,
+    status: row.status as ReceiptScanBatchStatus,
+    detectedCount: row.detected_count,
+    confirmedCount: row.confirmed_count,
+    createdByUserId: row.created_by_user_id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function receiptScanBatchToInsertRow(b: ReceiptScanBatch): ReceiptScanBatchRow {
+  return {
+    id: b.id,
+    household_id: b.householdId,
+    source_image_paths: b.sourceImagePaths,
+    status: b.status,
+    detected_count: b.detectedCount,
+    confirmed_count: b.confirmedCount,
+    created_by_user_id: b.createdByUserId,
+    created_at: b.createdAt,
+    updated_at: b.updatedAt,
+  };
+}
+
+export interface ScannedTransactionDraftRow {
+  id: string;
+  household_id: string;
+  batch_id: string;
+  store: string | null;
+  suggested_date: string | null;
+  subtotal_cents: number | null;
+  tax_cents: number | null;
+  suggested_amount_cents: number | null;
+  suggested_category_id: string | null;
+  category_source: string | null;
+  confidence: number | null;
+  needs_review: boolean;
+  review_reason: string | null;
+  bounding_box: BoundingBoxLike | null;
+  photo_index: number;
+  status: string;
+  resulting_transaction_id: string | null;
+  account_id: string | null;
+}
+
+export function rowToScannedTransactionDraft(row: ScannedTransactionDraftRow): ScannedTransactionDraft {
+  return {
+    id: row.id,
+    householdId: row.household_id,
+    batchId: row.batch_id,
+    store: row.store,
+    suggestedDate: row.suggested_date,
+    subtotalCents: row.subtotal_cents,
+    taxCents: row.tax_cents,
+    suggestedAmountCents: row.suggested_amount_cents,
+    suggestedCategoryId: row.suggested_category_id,
+    categorySource: row.category_source as CategorySource | null,
+    confidence: row.confidence,
+    needsReview: row.needs_review,
+    reviewReason: row.review_reason,
+    boundingBox: row.bounding_box,
+    photoIndex: row.photo_index,
+    status: row.status as ScannedTransactionDraftStatus,
+    resultingTransactionId: row.resulting_transaction_id,
+    accountId: row.account_id,
+  };
+}
+
+export function scannedTransactionDraftToInsertRow(d: ScannedTransactionDraft): ScannedTransactionDraftRow {
+  return {
+    id: d.id,
+    household_id: d.householdId,
+    batch_id: d.batchId,
+    store: d.store,
+    suggested_date: d.suggestedDate,
+    subtotal_cents: d.subtotalCents,
+    tax_cents: d.taxCents,
+    suggested_amount_cents: d.suggestedAmountCents,
+    suggested_category_id: d.suggestedCategoryId,
+    category_source: d.categorySource,
+    confidence: d.confidence,
+    needs_review: d.needsReview,
+    review_reason: d.reviewReason,
+    bounding_box: d.boundingBox,
+    photo_index: d.photoIndex,
+    status: d.status,
+    resulting_transaction_id: d.resultingTransactionId,
+    account_id: d.accountId,
+  };
+}
+
+export interface ScannedReceiptLineItemRow {
+  id: string;
+  household_id: string;
+  draft_id: string;
+  transaction_id: string | null;
+  raw_item: string;
+  standard_name: string | null;
+  brand: string | null;
+  category_guess_id: string | null;
+  subcategory_guess_id: string | null;
+  subcategory_guess_text: string | null;
+  quantity: number;
+  unit_price_cents: number | null;
+  line_total_cents: number | null;
+  confidence: number | null;
+}
+
+export function rowToScannedReceiptLineItem(row: ScannedReceiptLineItemRow): ScannedReceiptLineItem {
+  return {
+    id: row.id,
+    householdId: row.household_id,
+    draftId: row.draft_id,
+    transactionId: row.transaction_id,
+    rawItem: row.raw_item,
+    standardName: row.standard_name,
+    brand: row.brand,
+    categoryGuessId: row.category_guess_id,
+    subcategoryGuessId: row.subcategory_guess_id,
+    subcategoryGuessText: row.subcategory_guess_text,
+    quantity: row.quantity,
+    unitPriceCents: row.unit_price_cents,
+    lineTotalCents: row.line_total_cents,
+    confidence: row.confidence,
+  };
+}
+
+export function scannedReceiptLineItemToInsertRow(li: ScannedReceiptLineItem): ScannedReceiptLineItemRow {
+  return {
+    id: li.id,
+    household_id: li.householdId,
+    draft_id: li.draftId,
+    transaction_id: li.transactionId,
+    raw_item: li.rawItem,
+    standard_name: li.standardName,
+    brand: li.brand,
+    category_guess_id: li.categoryGuessId,
+    subcategory_guess_id: li.subcategoryGuessId,
+    subcategory_guess_text: li.subcategoryGuessText,
+    quantity: li.quantity,
+    unit_price_cents: li.unitPriceCents,
+    line_total_cents: li.lineTotalCents,
+    confidence: li.confidence,
+  };
+}
+
+export interface TransactionAttachmentRow {
+  id: string;
+  household_id: string;
+  transaction_id: string;
+  storage_path: string;
+  content_type: string;
+  size_bytes: number;
+  source_draft_id: string | null;
+  created_by_user_id: string;
+  created_at: string;
+}
+
+export function rowToTransactionAttachment(row: TransactionAttachmentRow): TransactionAttachment {
+  return {
+    id: row.id,
+    householdId: row.household_id,
+    transactionId: row.transaction_id,
+    storagePath: row.storage_path,
+    contentType: row.content_type,
+    sizeBytes: row.size_bytes,
+    sourceDraftId: row.source_draft_id,
+    createdByUserId: row.created_by_user_id,
+    createdAt: row.created_at,
+  };
+}
+
+export function transactionAttachmentToInsertRow(a: TransactionAttachment): TransactionAttachmentRow {
+  return {
+    id: a.id,
+    household_id: a.householdId,
+    transaction_id: a.transactionId,
+    storage_path: a.storagePath,
+    content_type: a.contentType,
+    size_bytes: a.sizeBytes,
+    source_draft_id: a.sourceDraftId,
+    created_by_user_id: a.createdByUserId,
+    created_at: a.createdAt,
   };
 }

@@ -12,6 +12,7 @@ import { Icon, type IconName } from "@/components/icon";
  */
 const SECTIONS: { href: string; icon: IconName; label: string; description: string }[] = [
   { href: "/finance/dashboard", icon: "trendingUp", label: "Dashboard", description: "Net worth, cash flow, what needs attention" },
+  { href: "/finance/scan", icon: "camera", label: "Scan Receipt", description: "Photograph a receipt to auto-fill a transaction" },
   { href: "/finance/transactions", icon: "receipt", label: "Transactions", description: "Every transaction across your accounts" },
   { href: "/finance/accounts", icon: "wallet", label: "Accounts", description: "Checking, savings, cards, loans & investments" },
   { href: "/finance/categories", icon: "pieChart", label: "Categories & Rules", description: "Organize spending, automate categorization" },

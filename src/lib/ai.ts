@@ -27,8 +27,49 @@ export interface DetectedItem {
   boundingBox: BoundingBox | null;
 }
 
+// ---------------------------------------------------------------------------
+// Receipt scanning (docs/Receipt Scanning Addendum.md §4) — extends
+// VisionProvider with a second method, same provider, same reliability
+// engineering (AI Gateway routing, bounded timeouts, fallback model).
+//
+// The extraction prompt is adopted verbatim from an already-proven iOS
+// Shortcuts flow doing this exact task today — these interfaces
+// deliberately keep the model's own snake_case field names (raw_item,
+// standard_name, ...) rather than renaming to camelCase, per the
+// Addendum: "The LLM's raw output stays exactly this snake_case shape...
+// The TypeScript layer maps it on the way in" — the mapping into the
+// app's normal camelCase domain shapes (ScannedTransactionDraft,
+// ScannedReceiptLineItem) happens one layer up, in
+// receipt-scan-session-store.ts, not here.
+// ---------------------------------------------------------------------------
+
+export interface ReceiptLineItemExtraction {
+  raw_item: string;
+  standard_name: string;
+  brand: string;
+  category_guess: string;
+  subcategory_guess: string;
+  quantity: number;
+  unit_price: number;
+  line_total: number;
+  confidence: number; // 0-1 — same REVIEW_THRESHOLD applies, now per item too
+}
+
+export interface ReceiptExtraction {
+  store: string;
+  date: string; // ISO date, extracted
+  subtotal: number; // dollars, as given by the model — converted to *_cents at the DB boundary
+  tax: number;
+  total: number;
+  /** Last 4 digits printed on the receipt, empty string if not present/legible — added beyond the original proven prompt (Addendum §6), drives account auto-matching. */
+  card_last_four: string;
+  items: ReceiptLineItemExtraction[];
+}
+
 export interface VisionProvider {
   detectItems(photos: string[]): Promise<DetectedItem[]>;
+  /** One scan batch (a statement, a stack of receipts) can contain multiple receipts — array, not a single result. */
+  extractReceipts(photos: string[]): Promise<ReceiptExtraction[]>;
 }
 
 /** Thrown by a VisionProvider on failure — `retryable` tells the UI whether "Try again" is a reasonable next step (true for anything transient, e.g. Gemini overload) vs. something that won't fix itself. */
@@ -74,6 +115,50 @@ export function withReview(candidate: Omit<DetectedItem, "needsReview" | "review
   };
 }
 
+// One canned receipt per source photo — a single photo is "I scanned one
+// receipt," several photos is "I scanned a stack/statement" (Addendum
+// §2's two modes), same one-item-or-one-per-photo shape MockVisionProvider
+// already uses for detectItems above.
+const CANNED_RECEIPTS: ReceiptExtraction[] = [
+  {
+    store: "Whole Foods Market",
+    date: new Date().toISOString().slice(0, 10),
+    subtotal: 80.0,
+    tax: 6.4,
+    total: 86.4,
+    card_last_four: "4821",
+    items: [
+      { raw_item: "ORG BANANA", standard_name: "Organic Bananas", brand: "", category_guess: "Groceries", subcategory_guess: "Produce", quantity: 3, unit_price: 0.79, line_total: 2.37, confidence: 0.88 },
+      { raw_item: "WHL MILK GAL", standard_name: "Whole Milk (1 gal)", brand: "365", category_guess: "Groceries", subcategory_guess: "Dairy", quantity: 1, unit_price: 4.49, line_total: 4.49, confidence: 0.93 },
+      { raw_item: "SRDN BREAD", standard_name: "Sourdough Bread", brand: "", category_guess: "Groceries", subcategory_guess: "Bakery", quantity: 1, unit_price: 5.99, line_total: 5.99, confidence: 0.72 },
+    ],
+  },
+  {
+    store: "Costco Wholesale",
+    date: new Date().toISOString().slice(0, 10),
+    subtotal: 212.47,
+    tax: 0,
+    total: 212.47,
+    card_last_four: "1029",
+    items: [
+      { raw_item: "KS PAPER TWL", standard_name: "Kirkland Signature Paper Towels", brand: "Kirkland Signature", category_guess: "Household", subcategory_guess: "Paper Goods", quantity: 1, unit_price: 24.99, line_total: 24.99, confidence: 0.85 },
+      { raw_item: "ROTIS CHKN", standard_name: "Rotisserie Chicken", brand: "", category_guess: "Groceries", subcategory_guess: "Prepared Foods", quantity: 2, unit_price: 4.99, line_total: 9.98, confidence: 0.9 },
+      { raw_item: "TIRE SET", standard_name: "Tire Set (4)", brand: "", category_guess: "Auto", subcategory_guess: "", quantity: 1, unit_price: 177.5, line_total: 177.5, confidence: 0.58 },
+    ],
+  },
+  {
+    store: "Shell",
+    date: new Date().toISOString().slice(0, 10),
+    subtotal: 42.15,
+    tax: 0,
+    total: 42.15,
+    card_last_four: "",
+    items: [
+      { raw_item: "UNL GAS", standard_name: "Unleaded Gasoline", brand: "", category_guess: "Auto", subcategory_guess: "Fuel", quantity: 1, unit_price: 42.15, line_total: 42.15, confidence: 0.81 },
+    ],
+  },
+];
+
 export class MockVisionProvider implements VisionProvider {
   async detectItems(photos: string[]): Promise<DetectedItem[]> {
     await new Promise((resolve) => setTimeout(resolve, 1100));
@@ -86,6 +171,13 @@ export class MockVisionProvider implements VisionProvider {
     const shuffled = [...CANNED_POOL].sort(() => Math.random() - 0.5);
     const picked = shuffled.slice(0, Math.min(totalCount, CANNED_POOL.length));
     return picked.map((candidate, i) => withReview({ ...candidate, photoIndex: photos.length === 1 ? 0 : i }));
+  }
+
+  async extractReceipts(photos: string[]): Promise<ReceiptExtraction[]> {
+    await new Promise((resolve) => setTimeout(resolve, 1400));
+    const shuffled = [...CANNED_RECEIPTS].sort(() => Math.random() - 0.5);
+    const count = Math.max(1, Math.min(photos.length, CANNED_RECEIPTS.length));
+    return shuffled.slice(0, count);
   }
 }
 
@@ -125,6 +217,25 @@ export class HttpVisionProvider implements VisionProvider {
     }
     const { items } = (await res.json()) as { items: DetectedItem[] };
     return items;
+  }
+
+  async extractReceipts(photos: string[]): Promise<ReceiptExtraction[]> {
+    let res: Response;
+    try {
+      res = await fetch("/api/v1/vision/extract-receipts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ photos }),
+      });
+    } catch {
+      throw new VisionDetectionError("Couldn't reach the server. Check your connection and try again.", true);
+    }
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new VisionDetectionError(body?.error ?? `Receipt extraction failed (${res.status}).`, body?.retryable ?? true);
+    }
+    const { receipts } = (await res.json()) as { receipts: ReceiptExtraction[] };
+    return receipts;
   }
 }
 

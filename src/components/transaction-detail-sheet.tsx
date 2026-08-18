@@ -1,11 +1,14 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/icon";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { rowToScannedReceiptLineItem, type ScannedReceiptLineItemRow } from "@/lib/supabase/mappers";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { Account, FinanceCategory, Transaction } from "@/lib/types";
+import type { Account, FinanceCategory, ScannedReceiptLineItem, Transaction, TransactionAttachment } from "@/lib/types";
 
 interface TransactionDetailSheetProps {
   open: boolean;
@@ -13,6 +16,8 @@ interface TransactionDetailSheetProps {
   transaction: Transaction | null;
   account: Account | undefined;
   category: FinanceCategory | undefined;
+  /** Present when this transaction has a permanently-retained receipt image (Receipt Scanning Addendum §6). */
+  attachment: TransactionAttachment | undefined;
   onEdit: () => void;
   onTrash: () => void;
 }
@@ -24,7 +29,48 @@ const SOURCE_LABEL: Record<Transaction["source"], string> = {
 };
 
 /** Right-side drawer, not a route — docs/Personal Finance PRD.md §35: "Transactions list (+ add/edit form) ... list; detail opens as a drawer, not a route." */
-export function TransactionDetailSheet({ open, onOpenChange, transaction, account, category, onEdit, onTrash }: TransactionDetailSheetProps) {
+export function TransactionDetailSheet({ open, onOpenChange, transaction, account, category, attachment, onEdit, onTrash }: TransactionDetailSheetProps) {
+  const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
+  const [lineItems, setLineItems] = useState<ScannedReceiptLineItem[]>([]);
+
+  // Both fetched on demand, not kept in the global store: a signed URL is
+  // deliberately short-lived (private bucket, same pattern
+  // item-attachments.tsx already uses), and scanned_receipt_line_items —
+  // while permanent, queryable structure per the Addendum — is detail
+  // only this one drawer needs, not something every transaction-list
+  // render should carry.
+  useEffect(() => {
+    let cancelled = false;
+    async function run() {
+      if (!open || !attachment) {
+        if (!cancelled) setReceiptUrl(null);
+        return;
+      }
+      const { data } = await getSupabaseBrowserClient().storage.from("attachments").createSignedUrl(attachment.storagePath, 300);
+      if (!cancelled) setReceiptUrl(data?.signedUrl ?? null);
+    }
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, attachment]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function run() {
+      if (!open || !transaction || transaction.source !== "receipt_scan") {
+        if (!cancelled) setLineItems([]);
+        return;
+      }
+      const { data } = await getSupabaseBrowserClient().from("scanned_receipt_line_items").select("*").eq("transaction_id", transaction.id);
+      if (!cancelled) setLineItems(((data ?? []) as ScannedReceiptLineItemRow[]).map(rowToScannedReceiptLineItem));
+    }
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, transaction]);
+
   if (!transaction) return null;
 
   return (
@@ -82,6 +128,35 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
           )}
           {transaction.linkedTransactionId && (
             <p className="text-caption text-muted-foreground">Linked to another leg of a transfer/payment.</p>
+          )}
+
+          {receiptUrl && (
+            <div>
+              <p className="mb-1.5 text-caption text-muted-foreground">Receipt</p>
+              <a href={receiptUrl} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-2xl border border-border">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={receiptUrl} alt="Scanned receipt" className="max-h-64 w-full object-cover" />
+              </a>
+            </div>
+          )}
+
+          {lineItems.length > 0 && (
+            <div>
+              <p className="mb-1.5 text-caption text-muted-foreground">Items ({lineItems.length})</p>
+              <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white">
+                {lineItems.map((li) => (
+                  <div key={li.id} className="flex items-center gap-3 px-3 py-2.5">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-caption font-medium text-ink">{li.standardName || li.rawItem}</p>
+                      <p className="truncate text-micro text-muted-foreground">Qty {li.quantity}</p>
+                    </div>
+                    <span className="shrink-0 text-caption font-medium text-ink">
+                      {li.lineTotalCents !== null ? formatCurrency(li.lineTotalCents / 100) : "—"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
 
           <div className="flex gap-2">

@@ -390,3 +390,89 @@ export interface CsvImportBatch {
   createdByUserId: string;
   createdAt: string;
 }
+
+// ---------------------------------------------------------------------------
+// Receipt scanning (docs/Receipt Scanning Addendum.md §3,
+// supabase/migrations/0011_receipt_scanning.sql). Batches/drafts/line-items
+// are review-stage only — plain household-membership visibility, not the
+// account-privacy predicate accounts/transactions get (see the migration's
+// own comment for why). TransactionAttachment inherits real privacy
+// through its transaction once a draft is confirmed.
+// ---------------------------------------------------------------------------
+
+export type ReceiptScanBatchStatus = "processing" | "ready_for_review" | "confirmed" | "failed";
+
+export interface ReceiptScanBatch {
+  id: string;
+  householdId: string;
+  sourceImagePaths: string[];
+  status: ReceiptScanBatchStatus;
+  detectedCount: number;
+  confirmedCount: number;
+  createdByUserId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CategorySource = "rule_match" | "ai_suggestion" | "user_corrected";
+export type ScannedTransactionDraftStatus = "pending" | "confirmed" | "dismissed";
+
+export interface ScannedTransactionDraft {
+  id: string;
+  householdId: string;
+  batchId: string;
+  store: string | null;
+  suggestedDate: string | null;
+  /** Dollars-and-cents fields stay integer cents at this review stage (Addendum §3) — converted to numeric dollars only once, at confirmation. */
+  subtotalCents: number | null;
+  taxCents: number | null;
+  suggestedAmountCents: number | null;
+  suggestedCategoryId: string | null;
+  categorySource: CategorySource | null;
+  confidence: number | null;
+  needsReview: boolean;
+  reviewReason: string | null;
+  boundingBox: BoundingBoxLike | null;
+  photoIndex: number;
+  status: ScannedTransactionDraftStatus;
+  resultingTransactionId: string | null;
+  /** Nullable until resolved via card_last_four match or picked during review (Addendum §6). */
+  accountId: string | null;
+}
+
+/** Matches lib/ai.ts's BoundingBox shape without importing a client-facing AI module into the shared domain types file. */
+export interface BoundingBoxLike {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface ScannedReceiptLineItem {
+  id: string;
+  householdId: string;
+  draftId: string;
+  transactionId: string | null;
+  rawItem: string;
+  standardName: string | null;
+  brand: string | null;
+  categoryGuessId: string | null;
+  subcategoryGuessId: string | null;
+  subcategoryGuessText: string | null;
+  quantity: number;
+  unitPriceCents: number | null;
+  lineTotalCents: number | null;
+  confidence: number | null;
+}
+
+export interface TransactionAttachment {
+  id: string;
+  householdId: string;
+  transactionId: string;
+  storagePath: string;
+  contentType: string;
+  sizeBytes: number;
+  sourceDraftId: string | null;
+  createdByUserId: string;
+  createdAt: string;
+}

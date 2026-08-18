@@ -47,6 +47,9 @@ import {
   financeBillShareToInsertRow,
   rowToAccountBalanceSnapshot,
   accountBalanceSnapshotToInsertRow,
+  rowToTransactionAttachment,
+  transactionAttachmentToInsertRow,
+  type TransactionAttachmentRow,
   type HouseholdRow,
   type MemberRow,
   type InviteRow,
@@ -98,6 +101,7 @@ import type {
   RecurringBillFrequency,
   Tag,
   Transaction,
+  TransactionAttachment,
   TransactionType,
 } from "./types";
 import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
@@ -217,6 +221,8 @@ interface InventoryState {
   financeBillShares: FinanceBillShare[];
   /** No Realtime subscription (rarely changes, not needed for live sync) — fetched once at hydration like everything else. */
   accountBalanceSnapshots: AccountBalanceSnapshot[];
+  /** Permanently-retained receipt images (docs/Receipt Scanning Addendum.md §6) — unlike receipt_scan_batches/scanned_transaction_drafts/scanned_receipt_line_items (review-stage only, fetched on-demand by receipt-scan-session-store.ts, not part of this bundle), attachments are real permanent records shown on Transaction Detail, so they hydrate here like everything else. */
+  transactionAttachments: TransactionAttachment[];
   currentUserId: string;
   currentUserEmail: string;
   lastUsedDestination: { locationId: string | null; containerId: string | null } | null;
@@ -351,6 +357,12 @@ interface InventoryState {
   unshareRecurringBill: (billId: string, withUserId: string) => void;
   /** Manually records today's balance for every active account as one AccountBalanceSnapshot batch (source: 'manual') — real usable history without waiting on the nightly scheduled job (PRD §30) this pass doesn't set up. */
   recordNetWorthSnapshot: () => void;
+  /** Uploads a receipt image to the shared "attachments" Storage bucket and links it to a transaction. Real, awaited: same reasoning as addAttachment — a file has to actually finish uploading before there's anything to show. `sourceDraftId` is set when this comes from confirming a scanned receipt, omitted for a manually-attached one. */
+  addTransactionAttachment: (transactionId: string, input: { file: File; sourceDraftId?: string | null }) => Promise<{ ok: boolean; error?: string; attachment?: TransactionAttachment }>;
+  /** Registers a row for an image that's *already* in Storage — confirming a scanned receipt reuses the photo receipt-scan-session-store.ts uploaded during extraction rather than uploading it a second time. Real, awaited: same "don't show it as attached before the row actually exists" reasoning as addTransactionAttachment. */
+  linkTransactionAttachment: (transactionId: string, input: { storagePath: string; contentType: string; sizeBytes: number; sourceDraftId: string }) => Promise<{ ok: boolean; error?: string; attachment?: TransactionAttachment }>;
+  /** Deletes a permanently-retained receipt image (not part of the normal trash lifecycle — same "created and deleted, never edited in place" shape as inventory's own attachments). */
+  deleteTransactionAttachment: (attachmentId: string) => void;
 
   // Favorites
   toggleFavorite: (itemId: string) => void;
@@ -420,6 +432,7 @@ interface HouseholdBundle {
   recurringBills: RecurringBill[];
   financeBillShares: FinanceBillShare[];
   accountBalanceSnapshots: AccountBalanceSnapshot[];
+  transactionAttachments: TransactionAttachment[];
   lastUsedDestination: { locationId: string | null; containerId: string | null } | null;
 }
 
@@ -445,6 +458,7 @@ function snapshotBundle(state: InventoryState): HouseholdBundle {
     recurringBills: state.recurringBills,
     financeBillShares: state.financeBillShares,
     accountBalanceSnapshots: state.accountBalanceSnapshots,
+    transactionAttachments: state.transactionAttachments,
     lastUsedDestination: state.lastUsedDestination,
   };
 }
@@ -475,6 +489,7 @@ async function fetchHouseholdBundle(
     categoryRulesRes,
     recurringBillsRes,
     financeBillSharesRes,
+    transactionAttachmentsRes,
   ] = await Promise.all([
     supabase.from("members").select("*").eq("household_id", householdId),
     supabase.from("invites").select("*").eq("household_id", householdId),
@@ -507,12 +522,14 @@ async function fetchHouseholdBundle(
     supabase.from("category_rules").select("*").eq("household_id", householdId),
     supabase.from("recurring_bills").select("*").eq("household_id", householdId),
     supabase.from("finance_bill_shares").select("*").eq("household_id", householdId),
+    supabase.from("transaction_attachments").select("*").eq("household_id", householdId),
   ]);
 
   const firstError =
     membersRes.error ?? invitesRes.error ?? locationsRes.error ?? containersRes.error ?? itemsRes.error ?? tagsRes.error ?? favoritesRes.error ?? activityRes.error ??
     attachmentsRes.error ?? labelBatchesRes.error ?? labelBatchEntriesRes.error ?? normalizationRulesRes.error ??
-    accountsRes.error ?? financeAccountSharesRes.error ?? transactionsRes.error ?? financeCategoriesRes.error ?? categoryRulesRes.error ?? recurringBillsRes.error ?? financeBillSharesRes.error;
+    accountsRes.error ?? financeAccountSharesRes.error ?? transactionsRes.error ?? financeCategoriesRes.error ?? categoryRulesRes.error ?? recurringBillsRes.error ?? financeBillSharesRes.error ??
+    transactionAttachmentsRes.error;
   if (firstError) throw new Error(firstError.message);
 
   // account_balance_snapshots has no household_id column of its own
@@ -550,6 +567,7 @@ async function fetchHouseholdBundle(
     recurringBills: ((recurringBillsRes.data ?? []) as RecurringBillRow[]).map(rowToRecurringBill),
     financeBillShares: ((financeBillSharesRes.data ?? []) as FinanceBillShareRow[]).map(rowToFinanceBillShare),
     accountBalanceSnapshots: ((snapshotsRes.data ?? []) as AccountBalanceSnapshotRow[]).map(rowToAccountBalanceSnapshot),
+    transactionAttachments: ((transactionAttachmentsRes.data ?? []) as TransactionAttachmentRow[]).map(rowToTransactionAttachment),
     lastUsedDestination: null,
   };
 }
@@ -670,6 +688,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
   recurringBills: [],
   financeBillShares: [],
   accountBalanceSnapshots: [],
+  transactionAttachments: [],
   currentUserId: "",
   currentUserEmail: "",
   lastUsedDestination: null,
@@ -761,7 +780,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
         | "members" | "invites" | "locations" | "containers" | "tags" | "activity" | "attachments"
         | "labelBatches" | "labelBatchEntries" | "normalizationRules"
         | "accounts" | "financeAccountShares" | "transactions" | "financeCategories" | "categoryRules"
-        | "recurringBills" | "financeBillShares"
+        | "recurringBills" | "financeBillShares" | "transactionAttachments"
     ) {
       const handler = arrayMergeHandler<TRow, TDomain>(mapper, keyOf, rowKeyOf, (updater) =>
         set((s) => ({ [stateKey]: updater(s[stateKey] as unknown as TDomain[]) }) as Partial<InventoryState>)
@@ -810,6 +829,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     // system defaults are effectively static after seeding, unlike every
     // other table this store subscribes to.
     bind<FinanceCategoryRow, FinanceCategory>("categories", householdFilter, rowToFinanceCategory, (c) => c.id, (r) => r.id as string, "financeCategories");
+    bind<TransactionAttachmentRow, TransactionAttachment>("transaction_attachments", householdFilter, rowToTransactionAttachment, (a) => a.id, (r) => r.id as string, "transactionAttachments");
 
     // items: bespoke, since tagIds is derived from item_tags, not a column
     // on this row — a bare replace-by-id would wipe it back to [] on every
@@ -2324,6 +2344,84 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       supabase.from("account_balance_snapshots").insert(created.map(accountBalanceSnapshotToInsertRow)),
       () => set((s) => ({ accountBalanceSnapshots: s.accountBalanceSnapshots.filter((snap) => !created.some((c) => c.id === snap.id)) })),
       "Couldn't record snapshot"
+    );
+  },
+
+  addTransactionAttachment: async (transactionId, input) => {
+    const { file, sourceDraftId } = input;
+    const contentType = file.type || "application/octet-stream";
+    if (file.size > ATTACHMENT_MAX_SIZE_BYTES) {
+      return { ok: false, error: `File is too large — max ${ATTACHMENT_MAX_SIZE_LABEL}.` };
+    }
+    if (!isAttachmentTypeAllowed(contentType)) {
+      return { ok: false, error: "Only images and PDFs can be attached." };
+    }
+
+    const supabase = getSupabaseBrowserClient();
+    const householdId = get().currentHouseholdId;
+    const attachmentId = newId();
+    // Same private "attachments" bucket item attachments already use
+    // (0011_receipt_scanning.sql's own comment on transaction_attachments)
+    // — one more consumer of an already-generic household-scoped-path
+    // Storage pattern, not a new bucket.
+    const storagePath = `${householdId}/${attachmentId}`;
+
+    const { error: uploadError } = await supabase.storage.from("attachments").upload(storagePath, file, { contentType });
+    if (uploadError) return { ok: false, error: uploadError.message };
+
+    const created: TransactionAttachment = {
+      id: attachmentId,
+      householdId,
+      transactionId,
+      storagePath,
+      contentType,
+      sizeBytes: file.size,
+      sourceDraftId: sourceDraftId ?? null,
+      createdByUserId: get().currentUserId,
+      createdAt: nowIso(),
+    };
+
+    const { error: insertError } = await supabase.from("transaction_attachments").insert(transactionAttachmentToInsertRow(created));
+    if (insertError) {
+      await supabase.storage.from("attachments").remove([storagePath]);
+      return { ok: false, error: insertError.message };
+    }
+
+    set((s) => ({ transactionAttachments: [...s.transactionAttachments, created] }));
+    return { ok: true, attachment: created };
+  },
+
+  linkTransactionAttachment: async (transactionId, input) => {
+    const supabase = getSupabaseBrowserClient();
+    const created: TransactionAttachment = {
+      id: newId(),
+      householdId: get().currentHouseholdId,
+      transactionId,
+      storagePath: input.storagePath,
+      contentType: input.contentType,
+      sizeBytes: input.sizeBytes,
+      sourceDraftId: input.sourceDraftId,
+      createdByUserId: get().currentUserId,
+      createdAt: nowIso(),
+    };
+    const { error } = await supabase.from("transaction_attachments").insert(transactionAttachmentToInsertRow(created));
+    if (error) return { ok: false, error: error.message };
+    set((s) => ({ transactionAttachments: [...s.transactionAttachments, created] }));
+    return { ok: true, attachment: created };
+  },
+
+  deleteTransactionAttachment: (attachmentId) => {
+    const supabase = getSupabaseBrowserClient();
+    const previous = get().transactionAttachments.find((a) => a.id === attachmentId);
+    set((s) => ({ transactionAttachments: s.transactionAttachments.filter((a) => a.id !== attachmentId) }));
+    if (!previous) return;
+    supabase.storage.from("attachments").remove([previous.storagePath]).then(({ error }) => {
+      if (error) console.error("Failed to remove transaction attachment from storage:", error.message);
+    });
+    persistOrRevert(
+      supabase.from("transaction_attachments").delete().eq("id", attachmentId),
+      () => set((s) => ({ transactionAttachments: [...s.transactionAttachments, previous] })),
+      "Couldn't delete attachment"
     );
   },
 
