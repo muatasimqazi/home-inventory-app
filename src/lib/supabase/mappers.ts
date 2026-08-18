@@ -29,6 +29,7 @@ import type {
   AccountType,
   FinanceLifecycleStatus,
   FinanceAccountShare,
+  AccountBalanceSnapshot,
   Transaction,
   TransactionType,
   TransactionStatus,
@@ -839,6 +840,37 @@ export function financeBillShareToInsertRow(s: FinanceBillShare): FinanceBillSha
     bill_id: s.billId,
     shared_with_user_id: s.sharedWithUserId,
     shared_by_user_id: s.sharedByUserId,
+    created_at: s.createdAt,
+  };
+}
+
+export interface AccountBalanceSnapshotRow {
+  id: string;
+  account_id: string;
+  balance: number;
+  as_of_date: string;
+  source: string;
+  created_at: string;
+}
+
+export function rowToAccountBalanceSnapshot(row: AccountBalanceSnapshotRow): AccountBalanceSnapshot {
+  return {
+    id: row.id,
+    accountId: row.account_id,
+    balance: row.balance,
+    asOfDate: row.as_of_date,
+    source: row.source as AccountBalanceSnapshot["source"],
+    createdAt: row.created_at,
+  };
+}
+
+export function accountBalanceSnapshotToInsertRow(s: AccountBalanceSnapshot): AccountBalanceSnapshotRow {
+  return {
+    id: s.id,
+    account_id: s.accountId,
+    balance: s.balance,
+    as_of_date: s.asOfDate,
+    source: s.source,
     created_at: s.createdAt,
   };
 }

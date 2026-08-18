@@ -198,10 +198,10 @@ export default function FinanceDashboardPage() {
       </div>
 
       <Link
-        href="/finance/accounts"
+        href="/finance"
         className="flex items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-white py-3 text-caption font-medium text-muted-foreground"
       >
-        <Icon name="plus" size={16} />
+        <Icon name="grid" size={16} />
         Manage accounts, transactions & more
       </Link>
     </div>

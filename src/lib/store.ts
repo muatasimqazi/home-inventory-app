@@ -45,6 +45,8 @@ import {
   recurringBillToInsertRow,
   rowToFinanceBillShare,
   financeBillShareToInsertRow,
+  rowToAccountBalanceSnapshot,
+  accountBalanceSnapshotToInsertRow,
   type HouseholdRow,
   type MemberRow,
   type InviteRow,
@@ -65,9 +67,11 @@ import {
   type TransactionRow,
   type RecurringBillRow,
   type FinanceBillShareRow,
+  type AccountBalanceSnapshotRow,
 } from "./supabase/mappers";
 import type {
   Account,
+  AccountBalanceSnapshot,
   AccountType,
   ActivityAction,
   ActivityEntityType,
@@ -211,6 +215,8 @@ interface InventoryState {
   categoryRules: CategoryRule[];
   recurringBills: RecurringBill[];
   financeBillShares: FinanceBillShare[];
+  /** No Realtime subscription (rarely changes, not needed for live sync) — fetched once at hydration like everything else. */
+  accountBalanceSnapshots: AccountBalanceSnapshot[];
   currentUserId: string;
   currentUserEmail: string;
   lastUsedDestination: { locationId: string | null; containerId: string | null } | null;
@@ -343,6 +349,8 @@ interface InventoryState {
   permanentlyDeleteRecurringBill: (billId: string) => void;
   shareRecurringBill: (billId: string, withUserId: string) => void;
   unshareRecurringBill: (billId: string, withUserId: string) => void;
+  /** Manually records today's balance for every active account as one AccountBalanceSnapshot batch (source: 'manual') — real usable history without waiting on the nightly scheduled job (PRD §30) this pass doesn't set up. */
+  recordNetWorthSnapshot: () => void;
 
   // Favorites
   toggleFavorite: (itemId: string) => void;
@@ -411,6 +419,7 @@ interface HouseholdBundle {
   categoryRules: CategoryRule[];
   recurringBills: RecurringBill[];
   financeBillShares: FinanceBillShare[];
+  accountBalanceSnapshots: AccountBalanceSnapshot[];
   lastUsedDestination: { locationId: string | null; containerId: string | null } | null;
 }
 
@@ -435,6 +444,7 @@ function snapshotBundle(state: InventoryState): HouseholdBundle {
     categoryRules: state.categoryRules,
     recurringBills: state.recurringBills,
     financeBillShares: state.financeBillShares,
+    accountBalanceSnapshots: state.accountBalanceSnapshots,
     lastUsedDestination: state.lastUsedDestination,
   };
 }
@@ -505,6 +515,18 @@ async function fetchHouseholdBundle(
     accountsRes.error ?? financeAccountSharesRes.error ?? transactionsRes.error ?? financeCategoriesRes.error ?? categoryRulesRes.error ?? recurringBillsRes.error ?? financeBillSharesRes.error;
   if (firstError) throw new Error(firstError.message);
 
+  // account_balance_snapshots has no household_id column of its own
+  // (visibility inherited via account_id, same as transactions) — can't
+  // be filtered by household in the Promise.all batch above the way
+  // every other table is, since there's nothing to filter *on* until the
+  // account ids are known. Fetched as a second, sequential step instead of
+  // breaking the parallel-fetch pattern for every other table.
+  const accountIds = ((accountsRes.data ?? []) as AccountRow[]).map((a) => a.id);
+  const snapshotsRes = accountIds.length > 0
+    ? await supabase.from("account_balance_snapshots").select("*").in("account_id", accountIds)
+    : { data: [], error: null };
+  if (snapshotsRes.error) throw new Error(snapshotsRes.error.message);
+
   type ItemRowWithTags = ItemRow & { item_tags: { tag_id: string }[] | null };
 
   return {
@@ -527,6 +549,7 @@ async function fetchHouseholdBundle(
     categoryRules: ((categoryRulesRes.data ?? []) as CategoryRuleRow[]).map(rowToCategoryRule),
     recurringBills: ((recurringBillsRes.data ?? []) as RecurringBillRow[]).map(rowToRecurringBill),
     financeBillShares: ((financeBillSharesRes.data ?? []) as FinanceBillShareRow[]).map(rowToFinanceBillShare),
+    accountBalanceSnapshots: ((snapshotsRes.data ?? []) as AccountBalanceSnapshotRow[]).map(rowToAccountBalanceSnapshot),
     lastUsedDestination: null,
   };
 }
@@ -646,6 +669,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
   categoryRules: [],
   recurringBills: [],
   financeBillShares: [],
+  accountBalanceSnapshots: [],
   currentUserId: "",
   currentUserEmail: "",
   lastUsedDestination: null,
@@ -2279,6 +2303,27 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       supabase.from("finance_bill_shares").delete().eq("bill_id", billId).eq("shared_with_user_id", withUserId),
       () => set({ financeBillShares: previous }),
       "Couldn't revoke sharing"
+    );
+  },
+
+  recordNetWorthSnapshot: () => {
+    const supabase = getSupabaseBrowserClient();
+    const today = new Date().toISOString().slice(0, 10);
+    const activeAccounts = get().accounts.filter((a) => a.status === "active");
+    if (activeAccounts.length === 0) return;
+    const created: AccountBalanceSnapshot[] = activeAccounts.map((a) => ({
+      id: newId(),
+      accountId: a.id,
+      balance: a.currentBalance,
+      asOfDate: today,
+      source: "manual",
+      createdAt: nowIso(),
+    }));
+    set((s) => ({ accountBalanceSnapshots: [...s.accountBalanceSnapshots, ...created] }));
+    persistOrRevert(
+      supabase.from("account_balance_snapshots").insert(created.map(accountBalanceSnapshotToInsertRow)),
+      () => set((s) => ({ accountBalanceSnapshots: s.accountBalanceSnapshots.filter((snap) => !created.some((c) => c.id === snap.id)) })),
+      "Couldn't record snapshot"
     );
   },
 

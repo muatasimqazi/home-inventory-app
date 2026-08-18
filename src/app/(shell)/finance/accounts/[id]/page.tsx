@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -97,7 +98,12 @@ export default function AccountDetailPage() {
       </div>
 
       <div>
-        <h2 className="mb-2 text-item-title font-semibold text-ink">Transactions</h2>
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="text-item-title font-semibold text-ink">Transactions</h2>
+          <Link href={`/finance/transactions?open=new&accountId=${account.id}`} className="text-caption font-medium text-yellow">
+            + Add
+          </Link>
+        </div>
         {accountTransactions.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-border bg-white p-4 text-center text-caption text-muted-foreground">No transactions yet.</p>
         ) : (
