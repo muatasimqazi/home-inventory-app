@@ -45,44 +45,9 @@ export default function SettingsPage() {
   return (
     <div className="flex flex-col gap-5">
       <div>
-        <h1 className="text-screen-title font-semibold text-ink">More</h1>
-        <p className="mt-0.5 text-caption text-muted-foreground">Finance, household settings, and data.</p>
+        <h1 className="text-screen-title font-semibold text-ink">Settings</h1>
+        <p className="mt-0.5 text-caption text-muted-foreground">Household, members, and data.</p>
       </div>
-
-      {/* Locations lost its own bottom-nav tab in the 2026-08-18 nav
-          revision (it had one-tap access Finance's equivalent, Accounts,
-          never got — an inconsistency, not a deliberate privilege) — given
-          a peer entry card here instead, matching Finance's, rather than
-          being folded into an ordinary settings row below. Home's own
-          dashboard still links to it too ("Storage containers → View
-          all"); this is the second, More-reachable path, not the only one. */}
-      <Link
-        href="/locations"
-        className="tap-target flex items-center gap-3 rounded-2xl border border-border bg-white p-4 shadow-sm"
-      >
-        <span className="flex size-12 shrink-0 items-center justify-center rounded-[10px] bg-ink text-white">
-          <Icon name="box" size={22} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-body font-semibold text-ink">Locations</p>
-          <p className="truncate text-caption text-muted-foreground">Storage areas, containers & items</p>
-        </div>
-        <Icon name="chevronRight" size={16} className="shrink-0 text-muted-foreground" />
-      </Link>
-
-      <Link
-        href="/finance/dashboard"
-        className="tap-target flex items-center gap-3 rounded-2xl border border-border bg-white p-4 shadow-sm"
-      >
-        <span className="flex size-12 shrink-0 items-center justify-center rounded-[10px] bg-yellow text-white">
-          <Icon name="trendingUp" size={22} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-body font-semibold text-ink">Finance</p>
-          <p className="truncate text-caption text-muted-foreground">Accounts, transactions, budgets & bills</p>
-        </div>
-        <Icon name="chevronRight" size={16} className="shrink-0 text-muted-foreground" />
-      </Link>
 
       <button
         type="button"

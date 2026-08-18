@@ -17,15 +17,24 @@ import { cn } from "@/lib/utils";
 // domain's other screens don't have, while Finance's equivalent (Accounts)
 // sits two taps deep in More, an inconsistency raised directly and fixed
 // here. Home's own dashboard already links to Locations ("Storage
-// containers → View all"), and More/Settings also lists it explicitly now
-// — so nothing becomes harder to reach, it just no longer gets a uniquely
+// containers → View all"), and More also lists it explicitly now — so
+// nothing becomes harder to reach, it just no longer gets a uniquely
 // privileged slot relative to Finance.
 const LEFT_TABS: { href: string; icon: IconName; label: string }[] = [
   { href: "/", icon: "home", label: "Home" },
   { href: "/search", icon: "search", label: "Search" },
 ];
 
-const RIGHT_TABS: { href: string; icon: IconName; label: string }[] = [{ href: "/settings", icon: "grid", label: "More" }];
+// More and Settings were one combined page/tab until 2026-08-18, doubling
+// as a domain switcher (Locations/Finance cards) *and* the real household
+// Settings content underneath — Settings had no visible tab of its own.
+// Split into two genuine tabs: More stays the domain switcher (/more),
+// Settings gets its own slot back (/settings), restoring a symmetric
+// 2-left/2-right layout around the Scan FAB.
+const RIGHT_TABS: { href: string; icon: IconName; label: string }[] = [
+  { href: "/settings", icon: "settings", label: "Settings" },
+  { href: "/more", icon: "grid", label: "More" },
+];
 
 export function BottomNav() {
   const pathname = usePathname();
