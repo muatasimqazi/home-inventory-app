@@ -158,7 +158,11 @@ export type ActivityEntityType =
   | "container"
   | "location"
   | "household"
-  | "member";
+  | "member"
+  | "account"
+  | "transaction"
+  | "category"
+  | "recurring_bill";
 
 export type ActivityAction =
   | "created"
@@ -228,4 +232,161 @@ export interface Breadcrumb {
   locationId: string | null;
   locationName: string | null;
   containerPath: { id: string; name: string }[];
+}
+
+// ---------------------------------------------------------------------------
+// Finance domain (supabase/migrations/0010_finance_schema.sql, docs/Personal
+// Finance PRD.md, docs/Personal Finance Addendum.md "Privacy model").
+//
+// Privacy model, load-bearing for every screen that lists/renders these:
+// `ownerUserId: null` = joint/household, visible to everyone. Set = personal,
+// private by default to that member — RLS already filters what actually
+// comes back from Supabase, so client code never re-implements the
+// visibility check; it only needs to know a row *can* be personal, to
+// render the right badge/sharing UI.
+// ---------------------------------------------------------------------------
+
+export type AccountType = "checking" | "savings" | "credit_card" | "cash" | "loan" | "mortgage" | "investment";
+export type FinanceLifecycleStatus = "active" | "archived" | "trashed";
+
+export interface Account {
+  id: string;
+  householdId: string;
+  name: string;
+  type: AccountType;
+  institutionName: string | null;
+  /** Denormalized, kept live by a Postgres trigger on `transactions` — never write this directly from a balance-editing form. */
+  currentBalance: number;
+  /** Manual (credit cards, etc.) — never auto-overwritten by the balance trigger (PRD §14). */
+  availableBalance: number | null;
+  startingBalance: number;
+  /** Receipt Scanning Addendum §6 — drives receipt→account auto-matching. */
+  cardLastFour: string | null;
+  /** null = joint/household account. Set = personal, private by default to this member. */
+  ownerUserId: string | null;
+  status: FinanceLifecycleStatus;
+  openedAt: string | null;
+  trashedAt: string | null;
+  permanentlyDeleteAfter: string | null;
+}
+
+/** Explicit per-member opt-in grant onto a personal account. No row = not shared with that member. */
+export interface FinanceAccountShare {
+  id: string;
+  householdId: string;
+  accountId: string;
+  sharedWithUserId: string;
+  sharedByUserId: string;
+  createdAt: string;
+}
+
+export interface AccountBalanceSnapshot {
+  id: string;
+  accountId: string;
+  balance: number;
+  asOfDate: string;
+  source: "scheduled" | "manual";
+  createdAt: string;
+}
+
+export type FinanceCategoryStatus = "active" | "archived" | "trashed";
+
+/** Named `FinanceCategory` (not `Category`) to avoid colliding with the existing item-category union above — a full household-editable entity, not a fixed string literal set. Household-wide, no privacy (Addendum: "a shared categorization taxonomy isn't the kind of thing that needs privacy"). */
+export interface FinanceCategory {
+  id: string;
+  /** null = system default category, shared/read-only across every household. */
+  householdId: string | null;
+  name: string;
+  parentCategoryId: string | null;
+  isDefault: boolean;
+  status: FinanceCategoryStatus;
+  trashedAt: string | null;
+  permanentlyDeleteAfter: string | null;
+}
+
+export interface CategoryRule {
+  id: string;
+  householdId: string;
+  matchField: "merchant" | "description";
+  matchType: "contains" | "exact";
+  matchValue: string;
+  categoryId: string;
+  /** Forward-only (PRD §16/§32.1) — never applied retroactively. */
+  appliesFrom: string;
+  createdAt: string;
+}
+
+export type TransactionType = "expense" | "income" | "transfer" | "payment" | "refund";
+export type TransactionStatus = "pending" | "posted";
+export type TransactionSource = "manual" | "csv_import" | "receipt_scan";
+
+export interface Transaction {
+  id: string;
+  householdId: string;
+  accountId: string;
+  occurredAt: string;
+  postedAt: string | null;
+  /** Signed: negative = money out, positive = money in. */
+  amount: number;
+  type: TransactionType;
+  categoryId: string | null;
+  merchant: string | null;
+  description: string | null;
+  notes: string;
+  /** Bank posting state — distinct from the trash lifecycle below. */
+  status: TransactionStatus;
+  excludedFromReports: boolean;
+  /** Self-referencing — both legs of a transfer/payment point at each other. */
+  linkedTransactionId: string | null;
+  source: TransactionSource;
+  importBatchId: string | null;
+  createdByUserId: string;
+  createdAt: string;
+  updatedAt: string;
+  trashedAt: string | null;
+  permanentlyDeleteAfter: string | null;
+}
+
+export type RecurringBillFrequency = "weekly" | "biweekly" | "monthly" | "quarterly" | "yearly";
+
+export interface RecurringBill {
+  id: string;
+  householdId: string;
+  name: string;
+  expectedAmount: number;
+  frequency: RecurringBillFrequency;
+  nextDueDate: string;
+  categoryId: string | null;
+  accountId: string | null;
+  /** Same nullable joint-vs-personal shape as Account.ownerUserId. */
+  ownerUserId: string | null;
+  /** Paused/resumed — distinct from the trash lifecycle below. */
+  isActive: boolean;
+  trashedAt: string | null;
+  permanentlyDeleteAfter: string | null;
+}
+
+export interface FinanceBillShare {
+  id: string;
+  householdId: string;
+  billId: string;
+  sharedWithUserId: string;
+  sharedByUserId: string;
+  createdAt: string;
+}
+
+export type CsvImportBatchStatus = "pending" | "imported" | "failed";
+
+export interface CsvImportBatch {
+  id: string;
+  householdId: string;
+  accountId: string;
+  fileName: string;
+  columnMapping: Record<string, string>;
+  importedAt: string | null;
+  rowCount: number;
+  duplicateCount: number;
+  status: CsvImportBatchStatus;
+  createdByUserId: string;
+  createdAt: string;
 }

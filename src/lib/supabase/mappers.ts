@@ -25,6 +25,20 @@ import type {
   LabelBatchEntryStatus,
   NormalizationRule,
   NormalizationSource,
+  Account,
+  AccountType,
+  FinanceLifecycleStatus,
+  FinanceAccountShare,
+  Transaction,
+  TransactionType,
+  TransactionStatus,
+  TransactionSource,
+  FinanceCategory,
+  FinanceCategoryStatus,
+  CategoryRule,
+  RecurringBill,
+  RecurringBillFrequency,
+  FinanceBillShare,
 } from "../types";
 
 export interface HouseholdRow {
@@ -503,5 +517,328 @@ export function normalizationRuleToInsertRow(rule: NormalizationRule): Normaliza
     usage_count: rule.usageCount,
     created_at: rule.createdAt,
     updated_at: rule.updatedAt,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Finance domain (supabase/migrations/0010_finance_schema.sql). Money
+// columns are Postgres `numeric` — PostgREST serializes those as plain JSON
+// numbers (unlike `bigint`, which comes back as a string), so `number` here
+// is a direct, no-parsing mapping, not an assumption layered on top.
+// ---------------------------------------------------------------------------
+
+export interface AccountRow {
+  id: string;
+  household_id: string;
+  name: string;
+  type: string;
+  institution_name: string | null;
+  current_balance: number;
+  available_balance: number | null;
+  starting_balance: number;
+  card_last_four: string | null;
+  owner_user_id: string | null;
+  status: string;
+  opened_at: string | null;
+  trashed_at: string | null;
+  permanently_delete_after: string | null;
+}
+
+export function rowToAccount(row: AccountRow): Account {
+  return {
+    id: row.id,
+    householdId: row.household_id,
+    name: row.name,
+    type: row.type as AccountType,
+    institutionName: row.institution_name,
+    currentBalance: row.current_balance,
+    availableBalance: row.available_balance,
+    startingBalance: row.starting_balance,
+    cardLastFour: row.card_last_four,
+    ownerUserId: row.owner_user_id,
+    status: row.status as FinanceLifecycleStatus,
+    openedAt: row.opened_at,
+    trashedAt: row.trashed_at,
+    permanentlyDeleteAfter: row.permanently_delete_after,
+  };
+}
+
+/** Omits current_balance — that column is trigger-owned (recompute_account_balance() in 0010_finance_schema.sql); a client write to it would just be overwritten server-side on the next transaction change, so insert/update rows never include it. */
+export function accountToInsertRow(a: Account): Omit<AccountRow, "current_balance"> {
+  return {
+    id: a.id,
+    household_id: a.householdId,
+    name: a.name,
+    type: a.type,
+    institution_name: a.institutionName,
+    available_balance: a.availableBalance,
+    starting_balance: a.startingBalance,
+    card_last_four: a.cardLastFour,
+    owner_user_id: a.ownerUserId,
+    status: a.status,
+    opened_at: a.openedAt,
+    trashed_at: a.trashedAt,
+    permanently_delete_after: a.permanentlyDeleteAfter,
+  };
+}
+
+export interface FinanceAccountShareRow {
+  id: string;
+  household_id: string;
+  account_id: string;
+  shared_with_user_id: string;
+  shared_by_user_id: string;
+  created_at: string;
+}
+
+export function rowToFinanceAccountShare(row: FinanceAccountShareRow): FinanceAccountShare {
+  return {
+    id: row.id,
+    householdId: row.household_id,
+    accountId: row.account_id,
+    sharedWithUserId: row.shared_with_user_id,
+    sharedByUserId: row.shared_by_user_id,
+    createdAt: row.created_at,
+  };
+}
+
+export function financeAccountShareToInsertRow(s: FinanceAccountShare): FinanceAccountShareRow {
+  return {
+    id: s.id,
+    household_id: s.householdId,
+    account_id: s.accountId,
+    shared_with_user_id: s.sharedWithUserId,
+    shared_by_user_id: s.sharedByUserId,
+    created_at: s.createdAt,
+  };
+}
+
+export interface FinanceCategoryRow {
+  id: string;
+  household_id: string | null;
+  name: string;
+  parent_category_id: string | null;
+  is_default: boolean;
+  status: string;
+  trashed_at: string | null;
+  permanently_delete_after: string | null;
+}
+
+export function rowToFinanceCategory(row: FinanceCategoryRow): FinanceCategory {
+  return {
+    id: row.id,
+    householdId: row.household_id,
+    name: row.name,
+    parentCategoryId: row.parent_category_id,
+    isDefault: row.is_default,
+    status: row.status as FinanceCategoryStatus,
+    trashedAt: row.trashed_at,
+    permanentlyDeleteAfter: row.permanently_delete_after,
+  };
+}
+
+export function financeCategoryToInsertRow(c: FinanceCategory): FinanceCategoryRow {
+  return {
+    id: c.id,
+    household_id: c.householdId,
+    name: c.name,
+    parent_category_id: c.parentCategoryId,
+    is_default: c.isDefault,
+    status: c.status,
+    trashed_at: c.trashedAt,
+    permanently_delete_after: c.permanentlyDeleteAfter,
+  };
+}
+
+export interface CategoryRuleRow {
+  id: string;
+  household_id: string;
+  match_field: string;
+  match_type: string;
+  match_value: string;
+  category_id: string;
+  applies_from: string;
+  created_at: string;
+}
+
+export function rowToCategoryRule(row: CategoryRuleRow): CategoryRule {
+  return {
+    id: row.id,
+    householdId: row.household_id,
+    matchField: row.match_field as CategoryRule["matchField"],
+    matchType: row.match_type as CategoryRule["matchType"],
+    matchValue: row.match_value,
+    categoryId: row.category_id,
+    appliesFrom: row.applies_from,
+    createdAt: row.created_at,
+  };
+}
+
+export function categoryRuleToInsertRow(r: CategoryRule): CategoryRuleRow {
+  return {
+    id: r.id,
+    household_id: r.householdId,
+    match_field: r.matchField,
+    match_type: r.matchType,
+    match_value: r.matchValue,
+    category_id: r.categoryId,
+    applies_from: r.appliesFrom,
+    created_at: r.createdAt,
+  };
+}
+
+export interface TransactionRow {
+  id: string;
+  household_id: string;
+  account_id: string;
+  occurred_at: string;
+  posted_at: string | null;
+  amount: number;
+  type: string;
+  category_id: string | null;
+  merchant: string | null;
+  description: string | null;
+  notes: string;
+  status: string;
+  excluded_from_reports: boolean;
+  linked_transaction_id: string | null;
+  source: string;
+  import_batch_id: string | null;
+  created_by_user_id: string;
+  created_at: string;
+  updated_at: string;
+  trashed_at: string | null;
+  permanently_delete_after: string | null;
+}
+
+export function rowToTransaction(row: TransactionRow): Transaction {
+  return {
+    id: row.id,
+    householdId: row.household_id,
+    accountId: row.account_id,
+    occurredAt: row.occurred_at,
+    postedAt: row.posted_at,
+    amount: row.amount,
+    type: row.type as TransactionType,
+    categoryId: row.category_id,
+    merchant: row.merchant,
+    description: row.description,
+    notes: row.notes,
+    status: row.status as TransactionStatus,
+    excludedFromReports: row.excluded_from_reports,
+    linkedTransactionId: row.linked_transaction_id,
+    source: row.source as TransactionSource,
+    importBatchId: row.import_batch_id,
+    createdByUserId: row.created_by_user_id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    trashedAt: row.trashed_at,
+    permanentlyDeleteAfter: row.permanently_delete_after,
+  };
+}
+
+export function transactionToInsertRow(t: Transaction): TransactionRow {
+  return {
+    id: t.id,
+    household_id: t.householdId,
+    account_id: t.accountId,
+    occurred_at: t.occurredAt,
+    posted_at: t.postedAt,
+    amount: t.amount,
+    type: t.type,
+    category_id: t.categoryId,
+    merchant: t.merchant,
+    description: t.description,
+    notes: t.notes,
+    status: t.status,
+    excluded_from_reports: t.excludedFromReports,
+    linked_transaction_id: t.linkedTransactionId,
+    source: t.source,
+    import_batch_id: t.importBatchId,
+    created_by_user_id: t.createdByUserId,
+    created_at: t.createdAt,
+    updated_at: t.updatedAt,
+    trashed_at: t.trashedAt,
+    permanently_delete_after: t.permanentlyDeleteAfter,
+  };
+}
+
+export interface RecurringBillRow {
+  id: string;
+  household_id: string;
+  name: string;
+  expected_amount: number;
+  frequency: string;
+  next_due_date: string;
+  category_id: string | null;
+  account_id: string | null;
+  owner_user_id: string | null;
+  is_active: boolean;
+  trashed_at: string | null;
+  permanently_delete_after: string | null;
+}
+
+export function rowToRecurringBill(row: RecurringBillRow): RecurringBill {
+  return {
+    id: row.id,
+    householdId: row.household_id,
+    name: row.name,
+    expectedAmount: row.expected_amount,
+    frequency: row.frequency as RecurringBillFrequency,
+    nextDueDate: row.next_due_date,
+    categoryId: row.category_id,
+    accountId: row.account_id,
+    ownerUserId: row.owner_user_id,
+    isActive: row.is_active,
+    trashedAt: row.trashed_at,
+    permanentlyDeleteAfter: row.permanently_delete_after,
+  };
+}
+
+export function recurringBillToInsertRow(b: RecurringBill): RecurringBillRow {
+  return {
+    id: b.id,
+    household_id: b.householdId,
+    name: b.name,
+    expected_amount: b.expectedAmount,
+    frequency: b.frequency,
+    next_due_date: b.nextDueDate,
+    category_id: b.categoryId,
+    account_id: b.accountId,
+    owner_user_id: b.ownerUserId,
+    is_active: b.isActive,
+    trashed_at: b.trashedAt,
+    permanently_delete_after: b.permanentlyDeleteAfter,
+  };
+}
+
+export interface FinanceBillShareRow {
+  id: string;
+  household_id: string;
+  bill_id: string;
+  shared_with_user_id: string;
+  shared_by_user_id: string;
+  created_at: string;
+}
+
+export function rowToFinanceBillShare(row: FinanceBillShareRow): FinanceBillShare {
+  return {
+    id: row.id,
+    householdId: row.household_id,
+    billId: row.bill_id,
+    sharedWithUserId: row.shared_with_user_id,
+    sharedByUserId: row.shared_by_user_id,
+    createdAt: row.created_at,
+  };
+}
+
+export function financeBillShareToInsertRow(s: FinanceBillShare): FinanceBillShareRow {
+  return {
+    id: s.id,
+    household_id: s.householdId,
+    bill_id: s.billId,
+    shared_with_user_id: s.sharedWithUserId,
+    shared_by_user_id: s.sharedByUserId,
+    created_at: s.createdAt,
   };
 }
