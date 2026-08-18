@@ -8,7 +8,9 @@ import { Icon } from "@/components/icon";
 import { LineItemFormSheet } from "@/components/line-item-form-sheet";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { rowToScannedReceiptLineItem, type ScannedReceiptLineItemRow } from "@/lib/supabase/mappers";
-import { updateScannedReceiptLineItem } from "@/lib/receipt-line-items";
+import { updateScannedReceiptLineItem, linkLineItemRefund, unlinkLineItemRefund } from "@/lib/receipt-line-items";
+import { createAndLinkRefundTransaction } from "@/lib/receipt-refunds";
+import { useInventoryStore } from "@/lib/store";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Account, FinanceCategory, ScannedReceiptLineItem, Transaction, TransactionAttachment } from "@/lib/types";
@@ -36,6 +38,14 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
   const [lineItems, setLineItems] = useState<ScannedReceiptLineItem[]>([]);
   const [editingLineItem, setEditingLineItem] = useState<ScannedReceiptLineItem | null>(null);
+
+  // Reaches into the store directly (not threaded down as props from
+  // transactions/page.tsx) for the same reason this component already
+  // does its own Supabase fetches above — it's not a fully "pure props"
+  // component to begin with, and selecting the household's transactions
+  // here (for refund-transaction options) is cheap vs. prop-drilling
+  // through the one real caller.
+  const allTransactions = useInventoryStore((s) => s.transactions);
 
   // Both fetched on demand, not kept in the global store: a signed URL is
   // deliberately short-lived (private bucket, same pattern
@@ -92,7 +102,61 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
     toast.success("Item updated");
   }
 
+  // Doesn't also setEditingLineItem(updated) — the confirm-return flow
+  // closes the sheet right after, which already nulls editingLineItem via
+  // onOpenChange; see the identical comment on the Transactions list's own
+  // copy of this pattern.
+  function patchLineItemInList(updated: ScannedReceiptLineItem) {
+    setLineItems((prev) => prev.map((li) => (li.id === updated.id ? updated : li)));
+  }
+
+  async function handleCreateAndLinkRefund(values: { amount: number; occurredAt: string }) {
+    if (!editingLineItem || !transaction) return;
+    const result = await createAndLinkRefundTransaction(editingLineItem, {
+      accountId: transaction.accountId,
+      occurredAt: values.occurredAt,
+      amount: values.amount,
+      merchant: transaction.merchant,
+      description: `Refund: ${editingLineItem.standardName ?? editingLineItem.rawItem}`,
+    });
+    if (!result.ok) {
+      toast.error(`Couldn't record the refund: ${result.error}`);
+      return;
+    }
+    patchLineItemInList(result.item);
+    toast.success("Item marked as returned");
+  }
+
+  async function handleLinkExistingRefund(refundTransactionId: string, refundedAmountCents: number) {
+    if (!editingLineItem) return;
+    const result = await linkLineItemRefund(editingLineItem, refundTransactionId, refundedAmountCents);
+    if (!result.ok) {
+      toast.error(`Couldn't link the refund: ${result.error}`);
+      return;
+    }
+    patchLineItemInList(result.item);
+    toast.success("Item marked as returned");
+  }
+
+  async function handleUndoReturn() {
+    if (!editingLineItem) return;
+    const result = await unlinkLineItemRefund(editingLineItem);
+    if (!result.ok) {
+      toast.error(`Couldn't undo the return: ${result.error}`);
+      return;
+    }
+    patchLineItemInList(result.item);
+    toast.success("Return undone");
+  }
+
   if (!transaction) return null;
+
+  const refundOptions = allTransactions
+    .filter((t) => t.type === "refund" && !t.trashedAt && t.accountId === transaction.accountId)
+    .sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
+  const linkedRefundTxn = editingLineItem?.refundTransactionId
+    ? (allTransactions.find((t) => t.id === editingLineItem.refundTransactionId) ?? null)
+    : null;
 
   return (
     <>
@@ -178,12 +242,19 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
                 {lineItems.map((li) => (
                   <button key={li.id} type="button" onClick={() => setEditingLineItem(li)} className="flex items-center gap-3 px-3 py-2.5 text-left">
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-caption font-medium text-ink">{li.standardName || li.rawItem}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="truncate text-caption font-medium text-ink">{li.standardName || li.rawItem}</p>
+                        {li.refundTransactionId && (
+                          <span className="shrink-0 rounded-full bg-badge-green-bg px-1.5 py-0.5 text-micro font-medium text-badge-green-text">
+                            Returned
+                          </span>
+                        )}
+                      </div>
                       <p className="truncate text-micro text-muted-foreground">
                         {li.brand ? `${li.brand} · ` : ""}Qty {li.quantity}
                       </p>
                     </div>
-                    <span className="shrink-0 text-caption font-medium text-ink">
+                    <span className={cn("shrink-0 text-caption font-medium", li.refundTransactionId ? "text-muted-foreground line-through" : "text-ink")}>
                       {li.lineTotalCents !== null ? formatCurrency(li.lineTotalCents / 100) : "—"}
                     </span>
                     <Icon name="edit" size={13} className="shrink-0 text-muted-foreground" />
@@ -210,6 +281,11 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
       onOpenChange={(open) => !open && setEditingLineItem(null)}
       lineItem={editingLineItem}
       onSubmit={handleSaveLineItem}
+      refundOptions={refundOptions}
+      refundTransaction={linkedRefundTxn}
+      onCreateAndLinkRefund={handleCreateAndLinkRefund}
+      onLinkExistingRefund={handleLinkExistingRefund}
+      onUndoReturn={handleUndoReturn}
     />
     </>
   );

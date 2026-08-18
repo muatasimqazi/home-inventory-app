@@ -125,8 +125,11 @@ export function TransactionFormSheet({
       return;
     }
 
-    // expense/refund store a negative signed amount, income a positive one.
-    const signedAmount = type === "income" ? parsedAmount : -parsedAmount;
+    // A refund is money coming back to you (Discovery Brief groups
+    // "Refunds and reimbursements" as an inflow alongside Income) — signed
+    // positive, same as income. Only expense stays negative among the
+    // remaining single-leg types.
+    const signedAmount = type === "income" || type === "refund" ? parsedAmount : -parsedAmount;
     onSubmitSingle({
       accountId,
       occurredAt: occurredAtIso,

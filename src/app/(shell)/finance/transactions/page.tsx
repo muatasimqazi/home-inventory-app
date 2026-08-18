@@ -13,7 +13,8 @@ import { LineItemFormSheet } from "@/components/line-item-form-sheet";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { rowToScannedReceiptLineItem, type ScannedReceiptLineItemRow } from "@/lib/supabase/mappers";
-import { updateScannedReceiptLineItem } from "@/lib/receipt-line-items";
+import { updateScannedReceiptLineItem, linkLineItemRefund, unlinkLineItemRefund } from "@/lib/receipt-line-items";
+import { createAndLinkRefundTransaction } from "@/lib/receipt-refunds";
 import { useInventoryStore } from "@/lib/store";
 import { displayCodeBadgeClasses } from "@/lib/badge-color";
 import { formatCurrency } from "@/lib/format";
@@ -129,6 +130,61 @@ export default function TransactionsListPage() {
     toast.success("Item updated");
   }
 
+  // Only patches the list's own bulk-fetched copy — doesn't also call
+  // setEditingLineItem(updated). The confirm-return flow (like the plain
+  // edit save) closes the sheet right after this fires, which already
+  // nulls editingLineItem via onOpenChange; resurrecting it here with a
+  // non-null value right as that unmount is in flight risks the same kind
+  // of race the Bulk Statement Review loadBatch bug hit.
+  function patchLineItemInList(updated: ScannedReceiptLineItem) {
+    if (!updated.transactionId) return;
+    setLineItemsByTransaction((prev) => ({
+      ...prev,
+      [updated.transactionId!]: (prev[updated.transactionId!] ?? []).map((li) => (li.id === updated.id ? updated : li)),
+    }));
+  }
+
+  async function handleCreateAndLinkRefund(values: { amount: number; occurredAt: string }) {
+    if (!editingLineItem) return;
+    const originalTxn = transactions.find((t) => t.id === editingLineItem.transactionId);
+    if (!originalTxn) return;
+    const result = await createAndLinkRefundTransaction(editingLineItem, {
+      accountId: originalTxn.accountId,
+      occurredAt: values.occurredAt,
+      amount: values.amount,
+      merchant: originalTxn.merchant,
+      description: `Refund: ${editingLineItem.standardName ?? editingLineItem.rawItem}`,
+    });
+    if (!result.ok) {
+      toast.error(`Couldn't record the refund: ${result.error}`);
+      return;
+    }
+    patchLineItemInList(result.item);
+    toast.success("Item marked as returned");
+  }
+
+  async function handleLinkExistingRefund(refundTransactionId: string, refundedAmountCents: number) {
+    if (!editingLineItem) return;
+    const result = await linkLineItemRefund(editingLineItem, refundTransactionId, refundedAmountCents);
+    if (!result.ok) {
+      toast.error(`Couldn't link the refund: ${result.error}`);
+      return;
+    }
+    patchLineItemInList(result.item);
+    toast.success("Item marked as returned");
+  }
+
+  async function handleUndoReturn() {
+    if (!editingLineItem) return;
+    const result = await unlinkLineItemRefund(editingLineItem);
+    if (!result.ok) {
+      toast.error(`Couldn't undo the return: ${result.error}`);
+      return;
+    }
+    patchLineItemInList(result.item);
+    toast.success("Return undone");
+  }
+
   const active = transactions.filter((t) => !t.trashedAt);
   const now = new Date();
   const filtered =
@@ -147,6 +203,14 @@ export default function TransactionsListPage() {
   const detailAccount = accounts.find((a) => a.id === detailTxn?.accountId);
   const detailCategory = financeCategories.find((c) => c.id === detailTxn?.categoryId);
   const detailAttachment = transactionAttachments.find((a) => a.transactionId === detailTxn?.id);
+
+  const editingLineItemTxn = editingLineItem ? transactions.find((t) => t.id === editingLineItem.transactionId) : undefined;
+  const refundOptionsForEditingItem = editingLineItemTxn
+    ? transactions
+        .filter((t) => t.type === "refund" && !t.trashedAt && t.accountId === editingLineItemTxn.accountId)
+        .sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime())
+    : [];
+  const linkedRefundTxn = editingLineItem?.refundTransactionId ? (transactions.find((t) => t.id === editingLineItem.refundTransactionId) ?? null) : null;
 
   return (
     <div className="flex flex-col gap-4">
@@ -248,12 +312,24 @@ export default function TransactionsListPage() {
                               className="flex items-center gap-3 py-2 pr-4 text-left"
                             >
                               <div className="min-w-0 flex-1">
-                                <p className="truncate text-caption font-medium text-ink">{li.standardName || li.rawItem}</p>
+                                <div className="flex items-center gap-1.5">
+                                  <p className="truncate text-caption font-medium text-ink">{li.standardName || li.rawItem}</p>
+                                  {li.refundTransactionId && (
+                                    <span className="shrink-0 rounded-full bg-badge-green-bg px-1.5 py-0.5 text-micro font-medium text-badge-green-text">
+                                      Returned
+                                    </span>
+                                  )}
+                                </div>
                                 <p className="truncate text-micro text-muted-foreground">
                                   {li.brand ? `${li.brand} · ` : ""}Qty {li.quantity}
                                 </p>
                               </div>
-                              <span className="shrink-0 text-caption font-medium text-ink">
+                              <span
+                                className={cn(
+                                  "shrink-0 text-caption font-medium",
+                                  li.refundTransactionId ? "text-muted-foreground line-through" : "text-ink"
+                                )}
+                              >
                                 {li.lineTotalCents !== null ? formatCurrency(li.lineTotalCents / 100) : "—"}
                               </span>
                               <Icon name="edit" size={13} className="shrink-0 text-muted-foreground" />
@@ -317,6 +393,11 @@ export default function TransactionsListPage() {
         onOpenChange={(open) => !open && setEditingLineItem(null)}
         lineItem={editingLineItem}
         onSubmit={handleSaveLineItem}
+        refundOptions={refundOptionsForEditingItem}
+        refundTransaction={linkedRefundTxn}
+        onCreateAndLinkRefund={handleCreateAndLinkRefund}
+        onLinkExistingRefund={handleLinkExistingRefund}
+        onUndoReturn={handleUndoReturn}
       />
 
       <ConfirmDialog

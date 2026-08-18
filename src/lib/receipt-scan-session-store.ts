@@ -151,6 +151,8 @@ export const useReceiptScanSession = create<ReceiptScanSessionState>()((set, get
             unitPriceCents: toCents(it.unit_price),
             lineTotalCents: toCents(it.line_total),
             confidence: round2(it.confidence),
+            refundTransactionId: null,
+            refundedAmountCents: null,
           };
         });
 

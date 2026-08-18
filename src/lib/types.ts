@@ -463,6 +463,10 @@ export interface ScannedReceiptLineItem {
   unitPriceCents: number | null;
   lineTotalCents: number | null;
   confidence: number | null;
+  /** Set together, both or neither (DB constraint) — "returned" is derived from this being non-null, not tracked as a separate status. */
+  refundTransactionId: string | null;
+  /** This item's own share of the linked refund transaction's total — can differ from lineTotalCents (restocking fee, or one refund covering several items). */
+  refundedAmountCents: number | null;
 }
 
 export interface TransactionAttachment {

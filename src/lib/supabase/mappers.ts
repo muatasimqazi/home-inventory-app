@@ -1011,6 +1011,8 @@ export interface ScannedReceiptLineItemRow {
   unit_price_cents: number | null;
   line_total_cents: number | null;
   confidence: number | null;
+  refund_transaction_id: string | null;
+  refunded_amount_cents: number | null;
 }
 
 export function rowToScannedReceiptLineItem(row: ScannedReceiptLineItemRow): ScannedReceiptLineItem {
@@ -1029,6 +1031,8 @@ export function rowToScannedReceiptLineItem(row: ScannedReceiptLineItemRow): Sca
     unitPriceCents: row.unit_price_cents,
     lineTotalCents: row.line_total_cents,
     confidence: row.confidence,
+    refundTransactionId: row.refund_transaction_id,
+    refundedAmountCents: row.refunded_amount_cents,
   };
 }
 
@@ -1048,6 +1052,8 @@ export function scannedReceiptLineItemToInsertRow(li: ScannedReceiptLineItem): S
     unit_price_cents: li.unitPriceCents,
     line_total_cents: li.lineTotalCents,
     confidence: li.confidence,
+    refund_transaction_id: li.refundTransactionId,
+    refunded_amount_cents: li.refundedAmountCents,
   };
 }
 
