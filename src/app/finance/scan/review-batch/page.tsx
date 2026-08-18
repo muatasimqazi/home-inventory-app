@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
 import { Button } from "@/components/ui/button";
@@ -18,13 +18,23 @@ import { cn } from "@/lib/utils";
  * editable, removable list of every draft the batch produced, not N
  * single-review screens shown in sequence (the same BulkReviewList
  * precedent inventory's own multi-item detection already established).
+ *
+ * Reachable two ways: straight from the camera flow (session store is
+ * already populated by runExtraction), or via `?batchId=` for a batch that
+ * already exists in Supabase but this tab never produced itself — a bulk
+ * historical import seeding drafts directly, or resuming a batch abandoned
+ * mid-review in another tab. loadBatch() is the counterpart to
+ * runExtraction for that second path.
  */
 export default function BulkStatementReviewPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const batchIdParam = searchParams.get("batchId");
   const batch = useReceiptScanSession((s) => s.batch);
   const drafts = useReceiptScanSession((s) => s.drafts);
   const updateDraft = useReceiptScanSession((s) => s.updateDraft);
   const reset = useReceiptScanSession((s) => s.reset);
+  const loadBatch = useReceiptScanSession((s) => s.loadBatch);
 
   const accounts = useInventoryStore((s) => s.accounts);
   const financeCategories = useInventoryStore((s) => s.financeCategories);
@@ -32,9 +42,54 @@ export default function BulkStatementReviewPage() {
 
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [confirmingAll, setConfirmingAll] = useState(false);
+  const [loadingBatch, setLoadingBatch] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!batchIdParam) return;
+    let cancelled = false;
+    async function run() {
+      // Read the store directly rather than depending on `batch?.id` in
+      // this effect's own dep array — `batch` is this effect's *output*,
+      // not an input; including it created a self-cancelling race (the
+      // effect tore itself down the instant loadBatch succeeded, cancelling
+      // a still-in-flight StrictMode-duplicate call before it could ever
+      // clear the loading state).
+      if (useReceiptScanSession.getState().batch?.id === batchIdParam) return;
+      setLoadingBatch(true);
+      setLoadError(null);
+      const result = await loadBatch(batchIdParam!);
+      if (cancelled) return;
+      setLoadingBatch(false);
+      if (!result.ok) setLoadError(result.error ?? "Couldn't load that batch.");
+    }
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [batchIdParam, loadBatch]);
 
   const activeCategories = financeCategories.filter((c) => c.status === "active");
   const pending = (drafts ?? []).filter((d) => d.status === "pending");
+
+  if (loadingBatch) {
+    return (
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-background px-8 text-center">
+        <Icon name="spinner" size={24} className="animate-spin text-muted-foreground" />
+        <p className="text-caption text-muted-foreground">Loading batch…</p>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-background px-8 text-center">
+        <p className="text-body font-medium text-ink">Couldn&apos;t load that batch</p>
+        <p className="text-caption text-muted-foreground">{loadError}</p>
+        <Button onClick={() => router.replace("/finance/transactions")}>Go to Transactions</Button>
+      </div>
+    );
+  }
 
   if (!drafts || !batch || pending.length === 0) {
     return (

@@ -9,6 +9,9 @@ import {
   receiptScanBatchToInsertRow,
   scannedTransactionDraftToInsertRow,
   scannedReceiptLineItemToInsertRow,
+  rowToReceiptScanBatch,
+  rowToScannedTransactionDraft,
+  rowToScannedReceiptLineItem,
 } from "./supabase/mappers";
 import type { Account, CategoryRule, FinanceCategory, ReceiptScanBatch, ScannedTransactionDraft, ScannedReceiptLineItem } from "./types";
 
@@ -32,6 +35,16 @@ interface ReceiptScanSessionState {
   removePhoto: (index: number) => void;
   /** Extracts every receipt across the captured photos, resolves category/account per Addendum §5/§6, and persists batch + drafts + line items to Supabase immediately — a review session is real, resumable, reviewable-by-anyone-in-the-household data from the moment extraction succeeds, not something held only in this tab's memory. */
   runExtraction: (input: { householdId: string; userId: string; categories: FinanceCategory[]; categoryRules: CategoryRule[]; accounts: Account[] }) => Promise<void>;
+  /**
+   * Hydrates this session from a batch that already exists in Supabase —
+   * the counterpart to runExtraction's "camera just produced this" path.
+   * Lets Bulk Statement Review resume any pending batch by ID (e.g. one a
+   * bulk historical-CSV import seeded directly, or one abandoned mid-review
+   * in an earlier tab), not just whatever this tab's own camera flow just
+   * created. Only pending drafts are loaded — confirmed/dismissed ones have
+   * nothing left to review.
+   */
+  loadBatch: (batchId: string) => Promise<{ ok: boolean; error?: string }>;
   updateDraft: (draftId: string, patch: Partial<ScannedTransactionDraft>) => void;
   updateLineItem: (lineItemId: string, patch: Partial<ScannedReceiptLineItem>) => void;
   dismissDraft: (draftId: string) => void;
@@ -162,6 +175,40 @@ export const useReceiptScanSession = create<ReceiptScanSessionState>()((set, get
       const message = error instanceof Error ? error.message : "Couldn't save the scanned receipt.";
       set({ extracting: false, extractError: { message, retryable: true } });
     }
+  },
+
+  loadBatch: async (batchId) => {
+    const supabase = getSupabaseBrowserClient();
+
+    const { data: batchRow, error: batchError } = await supabase
+      .from("receipt_scan_batches")
+      .select("*")
+      .eq("id", batchId)
+      .single();
+    if (batchError || !batchRow) return { ok: false, error: batchError?.message ?? "Batch not found." };
+
+    const { data: draftRows, error: draftsError } = await supabase
+      .from("scanned_transaction_drafts")
+      .select("*")
+      .eq("batch_id", batchId)
+      .eq("status", "pending");
+    if (draftsError) return { ok: false, error: draftsError.message };
+
+    const draftIds = (draftRows ?? []).map((d) => d.id);
+    const { data: lineItemRows, error: lineItemsError } =
+      draftIds.length > 0
+        ? await supabase.from("scanned_receipt_line_items").select("*").in("draft_id", draftIds)
+        : { data: [], error: null };
+    if (lineItemsError) return { ok: false, error: lineItemsError.message };
+
+    const drafts: DraftRow[] = (draftRows ?? []).map((row) => {
+      const draft = rowToScannedTransactionDraft(row);
+      const lineItems = (lineItemRows ?? []).filter((li) => li.draft_id === draft.id).map(rowToScannedReceiptLineItem);
+      return { ...draft, lineItems };
+    });
+
+    set({ batch: rowToReceiptScanBatch(batchRow), drafts, photos: [] });
+    return { ok: true };
   },
 
   updateDraft: (draftId, patch) => {
