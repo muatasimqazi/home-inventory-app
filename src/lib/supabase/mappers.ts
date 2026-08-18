@@ -48,6 +48,8 @@ import type {
   BoundingBoxLike,
   ScannedReceiptLineItem,
   TransactionAttachment,
+  CsvImportBatch,
+  CsvImportBatchStatus,
 } from "../types";
 
 export interface HouseholdRow {
@@ -1086,5 +1088,51 @@ export function transactionAttachmentToInsertRow(a: TransactionAttachment): Tran
     source_draft_id: a.sourceDraftId,
     created_by_user_id: a.createdByUserId,
     created_at: a.createdAt,
+  };
+}
+
+export interface CsvImportBatchRow {
+  id: string;
+  household_id: string;
+  account_id: string;
+  file_name: string;
+  column_mapping: Record<string, string>;
+  imported_at: string | null;
+  row_count: number;
+  duplicate_count: number;
+  status: string;
+  created_by_user_id: string;
+  created_at: string;
+}
+
+export function rowToCsvImportBatch(row: CsvImportBatchRow): CsvImportBatch {
+  return {
+    id: row.id,
+    householdId: row.household_id,
+    accountId: row.account_id,
+    fileName: row.file_name,
+    columnMapping: row.column_mapping,
+    importedAt: row.imported_at,
+    rowCount: row.row_count,
+    duplicateCount: row.duplicate_count,
+    status: row.status as CsvImportBatchStatus,
+    createdByUserId: row.created_by_user_id,
+    createdAt: row.created_at,
+  };
+}
+
+export function csvImportBatchToInsertRow(b: CsvImportBatch): CsvImportBatchRow {
+  return {
+    id: b.id,
+    household_id: b.householdId,
+    account_id: b.accountId,
+    file_name: b.fileName,
+    column_mapping: b.columnMapping,
+    imported_at: b.importedAt,
+    row_count: b.rowCount,
+    duplicate_count: b.duplicateCount,
+    status: b.status,
+    created_by_user_id: b.createdByUserId,
+    created_at: b.createdAt,
   };
 }

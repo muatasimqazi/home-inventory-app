@@ -18,6 +18,7 @@ const SECTIONS: { href: string; icon: IconName; label: string; description: stri
   { href: "/finance/categories", icon: "pieChart", label: "Categories & Rules", description: "Organize spending, automate categorization" },
   { href: "/finance/recurring", icon: "repeat", label: "Recurring Bills", description: "Mortgage, subscriptions, and other regular bills" },
   { href: "/finance/net-worth", icon: "trendingUp", label: "Net Worth", description: "Trend over time" },
+  { href: "/finance/import", icon: "upload", label: "Import from CSV", description: "Bring in transactions from a bank export" },
   { href: "/finance/activity", icon: "activity", label: "Activity", description: "Who did what, and when" },
   { href: "/finance/trash", icon: "trash", label: "Trash", description: "Restore or permanently delete" },
 ];

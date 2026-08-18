@@ -49,6 +49,7 @@ import {
   accountBalanceSnapshotToInsertRow,
   rowToTransactionAttachment,
   transactionAttachmentToInsertRow,
+  csvImportBatchToInsertRow,
   type TransactionAttachmentRow,
   type HouseholdRow,
   type MemberRow,
@@ -103,6 +104,7 @@ import type {
   Transaction,
   TransactionAttachment,
   TransactionType,
+  CsvImportBatch,
 } from "./types";
 import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
 
@@ -363,6 +365,8 @@ interface InventoryState {
   linkTransactionAttachment: (transactionId: string, input: { storagePath: string; contentType: string; sizeBytes: number; sourceDraftId: string }) => Promise<{ ok: boolean; error?: string; attachment?: TransactionAttachment }>;
   /** Deletes a permanently-retained receipt image (not part of the normal trash lifecycle — same "created and deleted, never edited in place" shape as inventory's own attachments). */
   deleteTransactionAttachment: (attachmentId: string) => void;
+  /** Records one completed CSV import run as an audit row (PRD §10) — write-once, not part of the hydrated bundle/Realtime like every other Finance table, since nothing in the UI reads it back yet (no import-history screen this pass). Real, awaited: the caller wants the real row back to show in the wizard's "complete" summary. */
+  recordCsvImportBatch: (input: { accountId: string; fileName: string; columnMapping: Record<string, string>; rowCount: number; duplicateCount: number }) => Promise<CsvImportBatch>;
 
   // Favorites
   toggleFavorite: (itemId: string) => void;
@@ -2423,6 +2427,26 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       () => set((s) => ({ transactionAttachments: [...s.transactionAttachments, previous] })),
       "Couldn't delete attachment"
     );
+  },
+
+  recordCsvImportBatch: async (input) => {
+    const supabase = getSupabaseBrowserClient();
+    const batch: CsvImportBatch = {
+      id: newId(),
+      householdId: get().currentHouseholdId,
+      accountId: input.accountId,
+      fileName: input.fileName,
+      columnMapping: input.columnMapping,
+      importedAt: nowIso(),
+      rowCount: input.rowCount,
+      duplicateCount: input.duplicateCount,
+      status: "imported",
+      createdByUserId: get().currentUserId,
+      createdAt: nowIso(),
+    };
+    const { error } = await supabase.from("csv_import_batches").insert(csvImportBatchToInsertRow(batch));
+    if (error) throw new Error(error.message);
+    return batch;
   },
 
   toggleFavorite: (itemId) => {

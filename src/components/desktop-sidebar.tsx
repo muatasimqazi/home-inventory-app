@@ -72,6 +72,7 @@ export function DesktopSidebar() {
         <SidebarLink href="/finance/recurring" icon="repeat" label="Recurring Bills" pathname={pathname} />
         <SidebarLink href="/finance/net-worth" icon="trendingUp" label="Net Worth" pathname={pathname} />
         <SidebarLink href="/finance/activity" icon="activity" label="Activity" pathname={pathname} />
+        <SidebarLink href="/finance/import" icon="upload" label="Import CSV" pathname={pathname} />
         <SidebarLink href="/finance/trash" icon="trash" label="Trash" pathname={pathname} />
         <Link
           href="/finance/scan"
