@@ -50,6 +50,15 @@
   --color-badge-blue-border: #c4d6ec;
   --color-badge-blue-text: #1a4a80;
 
+  /* Finance domain (docs/Personal Finance Design Alignment.md §1) —
+     positive amounts reuse --color-badge-green-* verbatim (no new token,
+     "good number" already means the same thing there). Negative is new:
+     deliberately distinct from --color-danger so an ordinary expense
+     amount never borrows the one token reserved for irreversible actions. */
+  --color-money-negative-bg: #fbeee7;
+  --color-money-negative-border: #f0d2bc;
+  --color-money-negative-text: #9c4221;
+
   /* shadcn semantic slots, mapped onto the Shohaz palette */
   --color-background: #faf8f6; /* neutral-50 */
   --color-foreground: var(--color-ink);

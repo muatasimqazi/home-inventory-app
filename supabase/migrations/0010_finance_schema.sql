@@ -304,6 +304,37 @@ create trigger transactions_balance_trigger
   after insert or delete or update of amount, account_id, trashed_at on transactions
   for each row execute function transactions_recompute_balance();
 
+-- The trigger above only fires on writes to `transactions` — a brand-new
+-- account with a non-zero starting_balance and zero transactions would
+-- otherwise sit at current_balance's bare column default (0) forever,
+-- since nothing ever touches `transactions` to fire a recompute. Real bug,
+-- caught live: a Playwright smoke test created an account with a $500
+-- starting balance and its detail page showed "$0.00". Fixes it at the
+-- source (BEFORE, so it lands in the same row the client sees back) rather
+-- than papering over it with a client-side "starting balance until the
+-- first transaction" special case. Fires on INSERT (no transactions can
+-- reference a not-yet-existing account id, so this reduces to current_balance
+-- = starting_balance) and on UPDATE OF starting_balance (recomputes
+-- including whatever transactions already exist, so editing a starting
+-- balance after the fact reconciles rather than silently overwriting —
+-- PRD §14).
+create function set_account_current_balance()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.current_balance := new.starting_balance + coalesce((
+    select sum(amount) from transactions
+    where account_id = new.id and trashed_at is null
+  ), 0);
+  return new;
+end;
+$$;
+
+create trigger accounts_set_current_balance
+  before insert or update of starting_balance on accounts
+  for each row execute function set_account_current_balance();
+
 -- Linked transfer/payment pairs trash together (PRD §33) — trashing one
 -- leg trashes its counterpart. The "and trashed_at is null" guard on the
 -- nested UPDATE is what stops this from recursing infinitely: by the time

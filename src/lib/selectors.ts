@@ -1,4 +1,4 @@
-import type { Container, Item, Location, Tag } from "./types";
+import type { Account, AccountType, Container, Item, Location, RecurringBill, Tag, Transaction } from "./types";
 
 export interface BreadcrumbSegment {
   id: string;
@@ -163,3 +163,112 @@ export function daysUntil(dateIso: string): number {
   const diff = new Date(dateIso).getTime() - Date.now();
   return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
 }
+
+// ---------------------------------------------------------------------------
+// Finance domain (docs/Personal Finance PRD.md §13 Dashboard Requirements).
+// No visibility filtering happens here — RLS already scoped `accounts`/
+// `transactions`/`recurringBills` in the store to what the caller can see
+// (Personal Finance Addendum, "Privacy model") before these selectors ever
+// run; they only decide *ordering/grouping* of an already-correct set.
+// ---------------------------------------------------------------------------
+
+export function activeAccounts(accounts: Account[]): Account[] {
+  return accounts.filter((a) => a.status === "active");
+}
+
+const ACCOUNT_TYPE_GROUP: Record<AccountType, string> = {
+  checking: "Checking & Savings",
+  savings: "Checking & Savings",
+  credit_card: "Credit Cards",
+  cash: "Checking & Savings",
+  loan: "Loans & Mortgage",
+  mortgage: "Loans & Mortgage",
+  investment: "Investment",
+};
+
+const ACCOUNT_GROUP_ORDER = ["Checking & Savings", "Credit Cards", "Loans & Mortgage", "Investment"];
+
+export interface AccountGroup {
+  label: string;
+  accounts: Account[];
+}
+
+/** Groups active accounts the same way the Accounts List screen does (PRD §35) — Checking & Savings, Credit Cards, Loans & Mortgage, Investment, in that fixed order, empty groups omitted. */
+export function groupAccountsByType(accounts: Account[]): AccountGroup[] {
+  const active = activeAccounts(accounts);
+  return ACCOUNT_GROUP_ORDER.map((label) => ({
+    label,
+    accounts: active.filter((a) => ACCOUNT_TYPE_GROUP[a.type] === label),
+  })).filter((g) => g.accounts.length > 0);
+}
+
+/** Sum of every active account's current balance. Liability accounts (credit_card/loan/mortgage) already carry a negative current_balance once they have any spend on them, so this is a plain sum, not assets-minus-liabilities computed separately. */
+export function netWorth(accounts: Account[]): number {
+  return activeAccounts(accounts).reduce((sum, a) => sum + a.currentBalance, 0);
+}
+
+export interface CashFlow {
+  income: number;
+  spend: number;
+  net: number;
+}
+
+/** Income vs. expense for the given month (year/month from a Date, local time). Transfers/payments are deliberately excluded — moving money between your own accounts isn't income or spend, just a shuffle (PRD §15). */
+export function cashFlowForMonth(transactions: Transaction[], month: Date): CashFlow {
+  const y = month.getFullYear();
+  const m = month.getMonth();
+  const inMonth = transactions.filter((t) => {
+    if (t.trashedAt || t.excludedFromReports) return false;
+    const d = new Date(t.occurredAt);
+    return d.getFullYear() === y && d.getMonth() === m;
+  });
+  const income = inMonth.filter((t) => t.type === "income").reduce((sum, t) => sum + t.amount, 0);
+  const spend = inMonth.filter((t) => t.type === "expense").reduce((sum, t) => sum + Math.abs(t.amount), 0);
+  return { income, spend, net: income - spend };
+}
+
+/** Active, non-trashed transactions for one account, most recent first. */
+export function transactionsForAccount(transactions: Transaction[], accountId: string): Transaction[] {
+  return transactions
+    .filter((t) => t.accountId === accountId && !t.trashedAt)
+    .sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
+}
+
+export function recentTransactions(transactions: Transaction[], limit: number): Transaction[] {
+  return transactions
+    .filter((t) => !t.trashedAt)
+    .sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime())
+    .slice(0, limit);
+}
+
+/** Active (not paused, not trashed) recurring bills, soonest-due first. */
+export function upcomingRecurringBills(bills: RecurringBill[], limit?: number): RecurringBill[] {
+  const active = bills
+    .filter((b) => b.isActive && !b.trashedAt)
+    .sort((a, b) => new Date(a.nextDueDate).getTime() - new Date(b.nextDueDate).getTime());
+  return limit ? active.slice(0, limit) : active;
+}
+
+const ACCOUNT_TYPE_ICON: Record<AccountType, "landmark" | "wallet" | "creditCard" | "cash" | "trendingUp"> = {
+  checking: "landmark",
+  savings: "wallet",
+  credit_card: "creditCard",
+  cash: "cash",
+  loan: "landmark",
+  mortgage: "landmark",
+  investment: "trendingUp",
+};
+
+export function accountTypeIcon(type: AccountType) {
+  return ACCOUNT_TYPE_ICON[type];
+}
+
+export const ACCOUNT_TYPE_LABEL: Record<AccountType, string> = {
+  checking: "Checking",
+  savings: "Savings",
+  credit_card: "Credit Card",
+  cash: "Cash",
+  loan: "Loan",
+  mortgage: "Mortgage",
+  investment: "Investment",
+};
