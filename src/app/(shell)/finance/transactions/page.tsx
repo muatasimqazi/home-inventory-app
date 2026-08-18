@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useSearchParams } from "next/navigation";
@@ -10,11 +10,13 @@ import { EmptyState } from "@/components/empty-state";
 import { TransactionFormSheet } from "@/components/transaction-form-sheet";
 import { TransactionDetailSheet } from "@/components/transaction-detail-sheet";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { rowToScannedReceiptLineItem, type ScannedReceiptLineItemRow } from "@/lib/supabase/mappers";
 import { useInventoryStore } from "@/lib/store";
 import { displayCodeBadgeClasses } from "@/lib/badge-color";
 import { formatCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { Transaction } from "@/lib/types";
+import type { ScannedReceiptLineItem, Transaction } from "@/lib/types";
 
 type Filter = "all" | "month" | "uncategorized";
 
@@ -61,6 +63,45 @@ export default function TransactionsListPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [trashConfirmId, setTrashConfirmId] = useState<string | null>(null);
+  const [lineItemsByTransaction, setLineItemsByTransaction] = useState<Record<string, ScannedReceiptLineItem[]>>({});
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  // Line items nested right in the list (not only behind the detail
+  // drawer) — one bulk fetch scoped to every receipt-sourced transaction
+  // currently loaded, grouped client-side, so expand/collapse is instant
+  // with no per-row spinner. Depends on the store's own `transactions`
+  // reference (stable unless the underlying data actually changed), not
+  // the locally re-sorted/filtered array, so this only refetches when
+  // real data changes — e.g. after confirming more drafts elsewhere.
+  useEffect(() => {
+    let cancelled = false;
+    async function run() {
+      const receiptScanIds = transactions.filter((t) => t.source === "receipt_scan" && !t.trashedAt).map((t) => t.id);
+      const grouped: Record<string, ScannedReceiptLineItem[]> = {};
+      if (receiptScanIds.length > 0) {
+        const { data } = await getSupabaseBrowserClient().from("scanned_receipt_line_items").select("*").in("transaction_id", receiptScanIds);
+        for (const row of (data ?? []) as ScannedReceiptLineItemRow[]) {
+          const item = rowToScannedReceiptLineItem(row);
+          if (!item.transactionId) continue;
+          (grouped[item.transactionId] ??= []).push(item);
+        }
+      }
+      if (!cancelled) setLineItemsByTransaction(grouped);
+    }
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [transactions]);
+
+  function toggleExpanded(id: string) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   const active = transactions.filter((t) => !t.trashedAt);
   const now = new Date();
@@ -130,24 +171,65 @@ export default function TransactionsListPage() {
               <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
                 {entries.map((t) => {
                   const category = financeCategories.find((c) => c.id === t.categoryId);
+                  const items = lineItemsByTransaction[t.id];
+                  const hasItems = t.source === "receipt_scan" && !!items && items.length > 0;
+                  const isExpanded = hasItems && expandedIds.has(t.id);
                   return (
-                    <button key={t.id} type="button" onClick={() => setDetailId(t.id)} className="flex items-center gap-3 px-4 py-3 text-left">
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-body font-medium text-ink">{t.merchant ?? t.description ?? "Transaction"}</p>
-                        <div className="mt-0.5 flex items-center gap-1.5">
-                          {category ? (
-                            <span className={cn("rounded-full border px-1.5 py-0.5 text-micro font-medium", displayCodeBadgeClasses(category.id))}>
-                              {category.name}
-                            </span>
-                          ) : (
-                            <span className="text-caption text-muted-foreground">Uncategorized</span>
-                          )}
-                        </div>
+                    <div key={t.id}>
+                      <div className="flex items-center gap-1 pr-2">
+                        <button type="button" onClick={() => setDetailId(t.id)} className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left">
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-body font-medium text-ink">{t.merchant ?? t.description ?? "Transaction"}</p>
+                            <div className="mt-0.5 flex items-center gap-1.5">
+                              {category ? (
+                                <span className={cn("rounded-full border px-1.5 py-0.5 text-micro font-medium", displayCodeBadgeClasses(category.id))}>
+                                  {category.name}
+                                </span>
+                              ) : (
+                                <span className="text-caption text-muted-foreground">Uncategorized</span>
+                              )}
+                              {hasItems && (
+                                <span className="text-micro text-muted-foreground">
+                                  · {items!.length} item{items!.length === 1 ? "" : "s"}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <span className={cn("shrink-0 text-body font-semibold", t.amount < 0 ? "text-money-negative-text" : "text-badge-green-text")}>
+                            {formatCurrency(t.amount, { showPositiveSign: true })}
+                          </span>
+                        </button>
+                        {hasItems && (
+                          <button
+                            type="button"
+                            onClick={() => toggleExpanded(t.id)}
+                            aria-label={isExpanded ? "Hide items" : "Show items"}
+                            aria-expanded={isExpanded}
+                            className="tap-target flex size-8 shrink-0 items-center justify-center text-muted-foreground"
+                          >
+                            <Icon name="chevronRight" size={16} className={cn("transition-transform", isExpanded && "rotate-90")} />
+                          </button>
+                        )}
                       </div>
-                      <span className={cn("shrink-0 text-body font-semibold", t.amount < 0 ? "text-money-negative-text" : "text-badge-green-text")}>
-                        {formatCurrency(t.amount, { showPositiveSign: true })}
-                      </span>
-                    </button>
+
+                      {isExpanded && (
+                        <div className="flex flex-col divide-y divide-border border-t border-border bg-surface-muted/50 pl-8">
+                          {items!.map((li) => (
+                            <div key={li.id} className="flex items-center gap-3 py-2 pr-4">
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-caption font-medium text-ink">{li.standardName || li.rawItem}</p>
+                                <p className="truncate text-micro text-muted-foreground">
+                                  {li.brand ? `${li.brand} · ` : ""}Qty {li.quantity}
+                                </p>
+                              </div>
+                              <span className="shrink-0 text-caption font-medium text-ink">
+                                {li.lineTotalCents !== null ? formatCurrency(li.lineTotalCents / 100) : "—"}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
               </div>
