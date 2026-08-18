@@ -2,29 +2,47 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import { Icon, type IconName } from "@/components/icon";
 import { ReviewBadge } from "@/components/review-badge";
+import { ScanChooserSheet } from "@/components/scan-chooser-sheet";
 import { useInventoryStore, useCurrentHousehold } from "@/lib/store";
 import { computeHouseholdSummary, contextualCaptureHref } from "@/lib/selectors";
 import { cn } from "@/lib/utils";
 
-// Every one of these is inventory-scoped (search/favorites/activity all
-// operate on items; the desktop-only tools manage inventory specifically) —
-// previously split across three separate blocks (a "primary" nav matching
-// Figma's original list, an unlabeled "More" nav, and a catch-all bottom
-// block that also had Settings mixed into it). Consolidated into one real
-// "Home inventory" section so the sidebar reads as two domain sections
-// (this + Finance) plus one standalone cross-cutting Settings link, not
-// three-plus loosely-related groups. Order: Figma's original primary set
-// first (Dashboard/Locations/Needs Review/Tags/Trash), then the rest.
+// Genuinely inventory-only — nothing here is shared with Finance.
 const INVENTORY_LINKS: { href: string; icon: IconName; label: string }[] = [
   { href: "/search", icon: "search", label: "Search" },
   { href: "/favorites", icon: "heart", label: "Favorites" },
-  { href: "/activity?domain=inventory", icon: "activity", label: "Activity" },
   { href: "/desktop", icon: "activity", label: "Activity Dashboard" },
   { href: "/desktop/manage", icon: "box", label: "Manage" },
   { href: "/desktop/labels", icon: "tag", label: "Label Printing" },
-  { href: "/settings/import", icon: "upload", label: "Import CSV" },
+];
+
+// Genuinely Finance-only.
+const FINANCE_LINKS: { href: string; icon: IconName; label: string }[] = [
+  { href: "/finance/dashboard", icon: "trendingUp", label: "Dashboard" },
+  { href: "/finance/accounts", icon: "wallet", label: "Accounts" },
+  { href: "/finance/transactions", icon: "receipt", label: "Transactions" },
+  { href: "/finance/categories", icon: "pieChart", label: "Categories & Rules" },
+  { href: "/finance/recurring", icon: "repeat", label: "Recurring Bills" },
+  { href: "/finance/net-worth", icon: "trendingUp", label: "Net Worth" },
+];
+
+// Activity/Trash/Import CSV were each already merged into one shared page
+// (docs note: Trash keeps two tabbed panels, Activity a real combined
+// feed) — but the sidebar was still listing all three *twice*, once
+// inside each domain section, just pointed at the same shared route with
+// a different query param. That's not two features, it's one feature
+// with a duplicated nav entry, which is exactly the kind of "shared item
+// living in both domains" the Trash/Activity/Import consolidation was
+// supposed to fix — the page merge didn't fully land until the nav
+// stopped re-duplicating it too. Pulled out into their own neutral
+// section, same reasoning that already moved Settings out on its own.
+const SHARED_LINKS: { href: string; icon: IconName; label: string }[] = [
+  { href: "/activity", icon: "activity", label: "Activity" },
+  { href: "/trash", icon: "trash", label: "Trash" },
+  { href: "/import", icon: "upload", label: "Import CSV" },
 ];
 
 export function DesktopSidebar() {
@@ -35,6 +53,7 @@ export function DesktopSidebar() {
   const containers = useInventoryStore((s) => s.containers);
   const summary = computeHouseholdSummary(items, locations);
   const scanHref = contextualCaptureHref(pathname, containers);
+  const [chooserOpen, setChooserOpen] = useState(false);
 
   return (
     <aside className="hidden md:flex md:w-64 md:shrink-0 md:flex-col md:gap-6 md:border-r md:border-border md:bg-white md:px-4 md:py-6">
@@ -65,55 +84,55 @@ export function DesktopSidebar() {
               <ReviewBadge count={summary.needsReviewCount} />
             </Link>
             <SidebarLink href="/tags" icon="tag" label="Tags" pathname={pathname} />
-            <SidebarLink href="/trash" icon="trash" label="Trash" pathname={pathname} />
             {INVENTORY_LINKS.map((link) => (
               <SidebarLink key={link.href} {...link} pathname={pathname} />
-          ))}
-            <Link
-              href={scanHref}
-              className="tap-target mt-1 flex items-center justify-center gap-2 rounded-md bg-yellow px-4 py-2.5 text-caption font-medium text-white"
-            >
-              <Icon name="camera" size={16} />
-              Scan
-            </Link>
+            ))}
           </nav>
         </div>
 
         {/* Finance domain — 2026-08-18 nav cutover (Household Hub Addendum §6,
             Platform Foundation Addendum's "desktop shows every domain as a
-            sidebar section, not a mobile-style switcher" recommendation).
-            Self-contained, same shape as Home inventory above. */}
+            sidebar section, not a mobile-style switcher" recommendation). */}
         <div>
           <p className="px-3 pb-1 text-micro font-semibold tracking-wide text-muted-foreground uppercase">Finance</p>
           <nav className="flex flex-col gap-1" aria-label="Finance">
-            <SidebarLink href="/finance/dashboard" icon="trendingUp" label="Dashboard" pathname={pathname} />
-            <SidebarLink href="/finance/accounts" icon="wallet" label="Accounts" pathname={pathname} />
-            <SidebarLink href="/finance/transactions" icon="receipt" label="Transactions" pathname={pathname} />
-            <SidebarLink href="/finance/categories" icon="pieChart" label="Categories & Rules" pathname={pathname} />
-            <SidebarLink href="/finance/recurring" icon="repeat" label="Recurring Bills" pathname={pathname} />
-            <SidebarLink href="/finance/net-worth" icon="trendingUp" label="Net Worth" pathname={pathname} />
-            <SidebarLink href="/activity?domain=finance" icon="activity" label="Activity" pathname={pathname} />
-            <SidebarLink href="/finance/import" icon="upload" label="Import CSV" pathname={pathname} />
-            <SidebarLink href="/trash?tab=finance" icon="trash" label="Trash" pathname={pathname} />
-            <Link
-              href="/finance/scan"
+            {FINANCE_LINKS.map((link) => (
+              <SidebarLink key={link.href} {...link} pathname={pathname} />
+            ))}
+          </nav>
+        </div>
+
+        {/* Shared across both domains — one Scan trigger (opens the same
+            item-vs-receipt chooser the mobile FAB uses, replacing two
+            separate "Scan"/"Scan Receipt" buttons) plus the already-merged
+            Activity/Trash/Import CSV pages. */}
+        <div>
+          <p className="px-3 pb-1 text-micro font-semibold tracking-wide text-muted-foreground uppercase">Shared</p>
+          <nav className="flex flex-col gap-1" aria-label="Shared">
+            {SHARED_LINKS.map((link) => (
+              <SidebarLink key={link.href} {...link} pathname={pathname} />
+            ))}
+            <button
+              type="button"
+              onClick={() => setChooserOpen(true)}
               className="tap-target mt-1 flex items-center justify-center gap-2 rounded-md bg-yellow px-4 py-2.5 text-caption font-medium text-white"
             >
               <Icon name="camera" size={16} />
-              Scan Receipt
-            </Link>
+              Scan
+            </button>
           </nav>
         </div>
       </div>
 
-      {/* Settings governs the household as a whole (members, billing-free
-          household admin, sign-out) — cross-cutting, not owned by either
-          domain, so it stands alone rather than being clustered into
-          either section above (or, as it was before, into an unlabeled
-          bottom block that also held inventory-only tools). */}
+      {/* Settings governs the household as a whole (members, household
+          admin, sign-out) — cross-cutting, but distinct in kind from the
+          Shared section above (a settings surface, not a shared action/
+          view), so it keeps its own standalone slot below a divider. */}
       <div className="border-t border-border pt-4">
         <SidebarLink href="/settings" icon="settings" label="Settings" pathname={pathname} />
       </div>
+
+      <ScanChooserSheet open={chooserOpen} onOpenChange={setChooserOpen} itemScanHref={scanHref} />
     </aside>
   );
 }
