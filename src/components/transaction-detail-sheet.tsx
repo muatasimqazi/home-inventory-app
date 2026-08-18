@@ -101,7 +101,16 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
         <SheetHeader>
           <SheetTitle className="text-section-title font-medium text-ink">{transaction.merchant ?? transaction.description ?? "Transaction"}</SheetTitle>
         </SheetHeader>
-        <div className="flex flex-col gap-4 px-4 pb-6">
+        {/* SheetContent for side="right"/"left" is a fixed h-full flex
+            column (see components/ui/sheet.tsx) — unlike bottom sheets,
+            nothing bounds this div's height by default, so it silently
+            clips instead of scrolling once content (now: line items,
+            receipt image, edit affordances) exceeds the viewport.
+            flex-1 min-h-0 lets it actually take the remaining height
+            below SheetHeader (a flex sibling), overflow-y-auto makes
+            that remainder scroll — same fix every bottom-sheet consumer
+            in this codebase already applies to its own body div. */}
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pb-6">
           <p className={cn("text-3xl font-semibold", transaction.amount < 0 ? "text-money-negative-text" : "text-badge-green-text")}>
             {formatCurrency(transaction.amount, { showPositiveSign: true })}
           </p>
