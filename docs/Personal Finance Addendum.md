@@ -10,11 +10,28 @@ Companion to the [Product Requirements Document](Product%20Requirements%20Docume
 2. **There is no "merge time" anymore.** No second deploy, no second auth system, no data migration to plan for later — it's one additive build.
 3. **Navigation has to be decided now, as a real product call, not deferred to a hypothetical future merge** — see below; this was already flagged as the single largest open item when the plan was still "build separately, merge later."
 
-## Correcting this addendum's own v1 — read this before building anything
+## Privacy model — re-reversed 2026-08-18, for real this time, with an actual design
 
-v1 proposed a private-by-default, per-record visibility model (a `finance_shares` table, a `VisibilityToggle` component, an Owner role that couldn't see private member data). That was invented without the source PRD in hand. **The source PRD's actual, independently-considered decision is the opposite:** Owner and Member share full, identical read/write access to *all* financial data — no per-record privacy layer, no "my view vs. your view." Household administration (invite/remove member, transfer ownership) stays Owner-only, exactly matching Shohaz's existing pattern. This is a real simplification — no `finance_shares` table, no visibility enum, no new sharing UI.
+This has now flip-flopped twice, which is worth being honest about rather than smoothing over: v1 of this addendum proposed real per-record privacy (invented without the source PRD in hand). v2 reversed to the source PRD's fully-shared model ("Owner and Member share full, identical access") since that PRD was independently "confirmed via discovery." **Now reversed again, deliberately, after direct confirmation that real privacy is the actual intent** — individuals genuinely need some finance details hidden from other household members by default, with explicit sharing as the opt-in, not the reverse.
 
-**This directly reverses a decision made last turn** — worth a deliberate check, not a silent swap, since the source PRD was "confirmed via discovery" independently of that decision. If individual financial privacy was actually the intent, that needs to be reconciled with the source PRD (and probably re-discussed there too, since it's foundational to that document's whole model, e.g. Journey 5 "read the dashboard," §12's cross-cutting requirements, and §22's role description).
+This is *not* a return to v1's design verbatim — it's designed properly this time, informed by everything decided since (including checking whether Shohaz's existing `Item.ownerUserId` pattern would cover it — it doesn't: that field is informational/attributional only, every item stays fully visible to the household regardless of owner, which is the wrong shape for genuine privacy).
+
+**Concrete model:**
+- `accounts` and `recurring_bills` (the two entities a person actually thinks of as "mine") gain `owner_user_id` (nullable). `NULL` = joint/household account or bill — visible to everyone, exactly like today's default, zero change to the common case (a shared checking account, the household internet bill). **Set** = personal, private by default to that one member.
+- A new table, `finance_account_shares` (and the equivalent for bills), records explicit grants — a member sharing a specific private account with specific other members, not an all-or-nothing household toggle:
+  ```sql
+  finance_account_shares (
+    id, household_id, account_id,
+    shared_with_user_id, shared_by_user_id, created_at
+  )
+  -- same shape for recurring_bills: finance_bill_shares
+  ```
+- `transactions`, `account_balance_snapshots`, and `csv_import_batches` get **no visibility field of their own** — they inherit their parent account's visibility transitively via `account_id`. Seeing "a transaction" without the account it belongs to doesn't mean anything; privacy lives at the account level, not scattered across every table that references one.
+- `categories`/`category_rules` stay household-wide, unchanged — a shared categorization taxonomy isn't the kind of thing that needs privacy, and keeping it shared means "Groceries" means the same thing on everyone's private and joint accounts alike.
+- **The household Owner role still does not imply visibility into private data** — restating this explicitly since it's the one part of v1's original reasoning that was correct all along and shouldn't get lost in the back-and-forth: Owner governs household administration (invite/remove/transfer ownership), not an automatic window into every member's private accounts.
+- **"My Dashboard" vs. "Household Dashboard"**, now a real distinction, not just a filter: My Dashboard shows everything I have access to (my private accounts + joint accounts + anything shared with me). Household Dashboard shows **only joint/shared accounts** — it does not attempt to show an aggregate net-worth figure that quietly sums in anyone's private balances, even anonymized. This resolves the addendum's own previously-open question ("can a household aggregate ever show a summed total derived from private accounts") with a firm no — private means private, including in aggregate, not just in the line-item view.
+
+RLS changes accordingly — see the updated data model below.
 
 ## Scope (MVP), per source PRD §5 / §27 / §28 — adopted verbatim
 
@@ -30,26 +47,52 @@ Condensed from source PRD §10/§31 — read there for full field lists and rati
 accounts (
   id, household_id, name, type,  -- checking|savings|credit_card|cash|loan|mortgage|investment
   institution_name, current_balance, available_balance, starting_balance,
+  card_last_four,                -- added by the Receipt Scanning Addendum §6
+  owner_user_id,                 -- nullable; null = joint/household, set = personal (private by default)
   status, opened_at, archived_at, trashed_at, permanently_delete_after
 )
 
-account_balance_snapshots (id, account_id, balance, as_of_date, source)
+finance_account_shares (id, household_id, account_id, shared_with_user_id, shared_by_user_id, created_at)
+
+account_balance_snapshots (id, account_id, balance, as_of_date, source)  -- visibility inherited via account_id
 
 transactions (
   id, household_id, account_id, occurred_at, posted_at, amount, type,  -- expense|income|transfer|payment|refund
   category_id, merchant, description, notes,
   status,  -- pending|posted (bank posting state, distinct from trash lifecycle)
   excluded_from_reports, linked_transaction_id,  -- self-FK, both legs of a transfer/payment point to each other
-  source, import_batch_id, trashed_at, permanently_delete_after
+  source,  -- manual|csv_import|receipt_scan
+  import_batch_id, trashed_at, permanently_delete_after
+  -- no visibility field — inherited from accounts via account_id
 )
 
-categories (id, household_id, name, parent_category_id, is_default, is_archived, trashed_at, permanently_delete_after)
-category_rules (id, household_id, match_field, match_type, match_value, category_id, applies_from)  -- forward-only
-recurring_bills (id, household_id, name, expected_amount, frequency, next_due_date, category_id, account_id, is_active, trashed_at, permanently_delete_after)
-csv_import_batches (id, household_id, account_id, file_name, column_mapping, imported_at, row_count, duplicate_count, status)
+categories (id, household_id, name, parent_category_id, is_default, is_archived, trashed_at, permanently_delete_after)  -- household-wide, no privacy
+category_rules (id, household_id, match_field, match_type, match_value, category_id, applies_from)  -- forward-only, household-wide
+recurring_bills (id, household_id, name, expected_amount, frequency, next_due_date, category_id, account_id, owner_user_id, is_active, trashed_at, permanently_delete_after)
+finance_bill_shares (id, household_id, bill_id, shared_with_user_id, shared_by_user_id, created_at)
+csv_import_batches (id, household_id, account_id, file_name, column_mapping, imported_at, row_count, duplicate_count, status)  -- visibility inherited via account_id
 ```
 
-No new RLS pattern needed — same `EXISTS (household_members WHERE household_id = row.household_id AND user_id = auth.uid())` check Shohaz already uses everywhere (PRD §27), with no additional visibility predicate (per the privacy-model correction above).
+**RLS updated from the plain household-membership check** (still the base layer, PRD §27) to add a visibility predicate on `accounts` and `recurring_bills`, with everything else inheriting via `account_id`/`bill_id`:
+
+```sql
+-- accounts (and recurring_bills, same shape):
+EXISTS (household_members WHERE household_id = accounts.household_id AND user_id = auth.uid())
+AND (
+  accounts.owner_user_id IS NULL                                                    -- joint/household
+  OR accounts.owner_user_id = auth.uid()                                            -- mine
+  OR EXISTS (finance_account_shares WHERE account_id = accounts.id AND shared_with_user_id = auth.uid())  -- shared with me
+)
+
+-- transactions (and account_balance_snapshots, csv_import_batches — same pattern, joined through account_id):
+EXISTS (household_members WHERE household_id = transactions.household_id AND user_id = auth.uid())
+AND EXISTS (
+  SELECT 1 FROM accounts a WHERE a.id = transactions.account_id AND (
+    a.owner_user_id IS NULL OR a.owner_user_id = auth.uid()
+    OR EXISTS (finance_account_shares WHERE account_id = a.id AND shared_with_user_id = auth.uid())
+  )
+)
+```
 
 **Open engineering decision** (source PRD §30/§32, unresolved there too): balance-computation strategy — denormalized `current_balance` on `accounts`, kept consistent via a Postgres trigger on transaction change vs. scheduled recompute, source of truth being `starting_balance + Σ(transactions)`.
 

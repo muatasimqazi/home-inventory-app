@@ -32,7 +32,22 @@ Adopt verbatim, same names, same hex — no finance-specific reason to diverge o
 |---|---|---|
 | **Positive / negative amount color** | Inventory has no "good/bad number" — nothing in Shohaz's palette was built for a debit/credit distinction. | A new semantic pair drawn from the *same* warm-neutral family so it doesn't read as a foreign accent dropped into a taupe world: a muted forest/olive green for positive (income, credit, net-worth-up) and a muted brick/rust red for negative (expense, debit, net-worth-down). **Explicitly not `danger`** — that token is reserved for irreversible actions per Shohaz's own rule, and reusing it for ordinary expense amounts would dilute the one place it's supposed to mean something serious. |
 | **Category-accent hue count** | Shohaz's category-accent trio (`#C9974B` / `#C1774A` / `#B06B79`, hashed) was sized for a small, mostly-fixed item-category list. Finance's category set (defaults + household customs + subcategories) will plausibly run to 10–15+ distinct categories. | Keep the *mechanism* (deterministic hash → accent, never a manual lookup table) but extend the hue set to 5–6 values in the same taupe/warm family, to reduce visible repeats on a longer category list. Same hashing function, larger palette. |
-| **Chart colors** (net-worth trend, cash-flow bars, category breakdown) | Shohaz has zero charts — inventory has no dataviz surface at all. | Derive from what already exists rather than a new rainbow palette: `brand-700`/`yellow` for single-series lines (net worth trend), the new positive/negative pair for cash-flow (income vs. expense bars), and the extended category-accent set for the category-breakdown chart. Validate against the `dataviz` skill's contrast checks when charts are actually built — not resolved here. |
+| **Chart colors** (net-worth trend, cash-flow bars, category breakdown) | Shohaz has zero charts — inventory has no dataviz surface at all. | Derive from what already exists rather than a new rainbow palette: `brand-700`/`yellow` for single-series lines (net worth trend), the new positive/negative pair for cash-flow (income vs. expense bars), and the extended category-accent set for the category-breakdown chart. |
+
+**Contrast check actually run, 2026-08-18 (this was deferred through the whole build — done now, before implementation, not left as a hope):** the 6 category-accent hues (`#C9974B`, `#C1774A`, `#B06B79`, `#8B9574`, `#7C93A8`, `#9B7B95`) were used as **text color** on category badges throughout the built screens (Transactions List, Categories & Rules, Category Breakdown legends). Computed WCAG contrast ratios against white/near-white badge backgrounds: **all six fail** — ranging ~2.5:1 to ~3.1:1 against the 4.5:1 AA minimum for normal text. This is exactly the failure mode the `dataviz` skill's own guidance warned about ("mid-brightness tones pass as a fill, fail as text") — confirmed true, not hypothetical.
+
+**Fix: a second, darker "text-safe" variant per hue**, mirroring the pattern Shohaz's own badge palette already uses (pale `-bg` + separately-darkened `-text`, e.g. `badge-green-bg #e8f2e9` / `badge-green-text #1b5e20` in `globals.css`) — the category-accent trio/set never got this treatment when extended, only the original inventory badge colors did:
+
+| Fill/dot (unchanged) | Text-safe variant (new) | Contrast vs. white |
+|---|---|---|
+| `#C9974B` | `#8F6B2E` | 5.1:1 |
+| `#C1774A` | `#8A4F2A` | 6.6:1 |
+| `#B06B79` | `#7D3F4A` | 7.9:1 |
+| `#8B9574` | `#5C6449` | 6.0:1 |
+| `#7C93A8` | `#4F6274` | 6.1:1 |
+| `#9B7B95` | `#6B4F63` | 7.2:1 |
+
+All six now clear AA comfortably. **Rule going forward: category-accent hues are for dots/bars/fills only; any place the category name/label itself is colored text uses the text-safe variant, never the fill hex directly.** Applied to the two most-referenced instances (Category Breakdown chart, Transactions List) as the corrected standard; the same substitution needs to be applied mechanically to the remaining badge instances (desktop Transactions, Categories & Rules dots-as-text if any, other Category Breakdown copies) during implementation — noting this explicitly rather than silently claiming every instance was hand-fixed.
 
 ---
 
@@ -68,7 +83,7 @@ Adopt Shohaz's 5-token scale verbatim: `sm` 8px, `md` 12px, `lg` 16px, `xl` 24px
 | Inputs, filter chips | `sm`/`md` | Matches recessed-surface convention |
 | Buttons | `lg` *(proposed — flagged below)* | |
 
-**Judgment call:** the reference doc doesn't state button radius explicitly. Proposing `lg` (16px) as consistent with the card family; **confirm against Shohaz's real `Button` component source now that this lives in the same codebase** — cheap to check directly rather than guessing further, unlike when this was written against a separate repo with no access to Shohaz's actual source.
+**Resolved 2026-08-17** — checked directly against the real `Button.tsx` source once this lived in the same codebase: `rounded-lg` → `--radius-lg` = 16px, exactly as proposed. No longer a guess.
 
 ## 4. Shadow
 
@@ -104,7 +119,7 @@ Dashboard/Home, Search, Wallet or Landmark (accounts), List (transactions), Tag 
 
 ---
 
-## 7. Navigation shape — open decision, not resolved here
+## 7. Navigation shape — resolved below (§ ends with the 2026-08-17 resolution note; kept the original reasoning above it as the record of how it got there)
 
 Shohaz: 4-tab bottom nav (**Home, Search, Locations, Settings**) + a 5th raised circular camera FAB, docked flush to the bottom edge.
 
@@ -116,6 +131,11 @@ This app's PRD (§35, written before this alignment pass) currently specs: **Das
 **The real question this raises, per your own instruction not to force a mismatch:** if these two apps merge into one, a naive concatenation doesn't fit — Shohaz already uses all 4 tab slots plus the FAB slot. A merged app needs either (a) a mode-switcher above the bottom nav (Home/Finance toggle, each keeping its own sub-nav), or (b) a genuinely unified nav with destinations drawn from both domains, which would mean *both* products' information architectures change, not just this one being bent to match Shohaz's current shape. That's a product decision for both PRDs, not something to resolve unilaterally in this document — flagging it here as the single largest open item this alignment pass surfaced.
 
 *(Superseded framing note, added at relocation: "if these two apps merge" is no longer hypothetical — see the Personal Finance Addendum for the current decision to build this domain directly inside Shohaz. This section's actual recommendation — a mode-switcher — still stands as the live open question, just no longer contingent on a future merge event.)*
+
+**Resolved, 2026-08-17, during the actual design pass — both open items above are now settled, one of them reversed:**
+
+- **The mode-switcher won.** Household Hub Addendum §6 settled this: Shohaz's global nav is Home/Search/Scan/**More**, where More is a domain switcher into Inventory/Finance/Tasks, "each keeping its own sub-navigation once entered." Finance's own internal nav is exactly what point 1 above already specified (Dashboard/Transactions/Accounts/[catch-all]) — just renamed **Manage** (not More) to avoid two nested "More" tabs once you're inside Finance via the global one.
+- **Point 2's "no FAB" call is reversed, not just revisited.** It was reasoned specifically on "this app has no dominant, instant, photo-based capture flow." The Receipt Scanning Addendum (written after this document) built exactly that flow — scan a receipt, AI extracts it, review, confirm — deliberately modeled on Shohaz's own capture pattern. The objection this section raised no longer holds, so Finance's mobile nav now gets a camera FAB (receipt scan) in the same position as Shohaz's, docked flush the same way. This is why "revisit the PRD when downstream decisions change the premise of an earlier one" matters — the original call wasn't wrong when made, it was made before information that later invalidated its own reasoning existed.
 
 ---
 
