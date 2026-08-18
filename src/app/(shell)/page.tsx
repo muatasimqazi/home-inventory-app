@@ -2,25 +2,49 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { SearchBar } from "@/components/search-bar";
 import { ContainerCarousel } from "@/components/container-carousel";
 import { Icon } from "@/components/icon";
+import { IconChip } from "@/components/icon-chip";
+import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/empty-state";
 import { useInventoryStore, useCurrentHousehold } from "@/lib/store";
 import {
+  accountTypeIcon,
   activeContainers,
   activeLocations,
-  buildBreadcrumb,
   breadcrumbLabel,
+  buildBreadcrumb,
+  cashFlowForMonth,
   computeHouseholdSummary,
   containerStatusFlags,
+  daysUntil,
   genericPhotoItemCount,
+  groupAccountsByType,
   looseItemCount,
+  netWorth,
+  recentTransactions,
+  upcomingRecurringBills,
 } from "@/lib/selectors";
+import { formatCurrency, formatShortDate } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 const ONBOARDING_THRESHOLD = 5;
+const BILLS_DUE_SOON_DAYS = 7;
 
-export default function DashboardPage() {
+/**
+ * The former Home page was an inventory-only dashboard living at "/" —
+ * fine while Shohaz had one domain, but a household-hub home needs to
+ * represent every domain, not lead with one. This is that: a cross-domain
+ * Overview (Household Hub Addendum §6's "what needs attention" view) with
+ * a stat row pulling one headline number from each domain, a Home
+ * Inventory section (the old Home page's content, now scoped under its
+ * own heading), and a Finance section alongside it. Desktop sidebar gained
+ * a matching standalone "Overview" nav entry above the per-domain
+ * sections; mobile's bottom-nav "Home" tab still points here unchanged.
+ */
+export default function OverviewPage() {
   const router = useRouter();
   const household = useCurrentHousehold();
   const items = useInventoryStore((s) => s.items);
@@ -28,6 +52,11 @@ export default function DashboardPage() {
   const locations = activeLocations(useInventoryStore((s) => s.locations));
   const activity = useInventoryStore((s) => s.activity);
   const members = useInventoryStore((s) => s.members);
+  const accounts = useInventoryStore((s) => s.accounts);
+  const transactions = useInventoryStore((s) => s.transactions);
+  const recurringBills = useInventoryStore((s) => s.recurringBills);
+
+  const [view, setView] = useState<"mine" | "household">("mine");
 
   const activeItems = items.filter((it) => it.status === "active");
   const activeContainerList = activeContainers(containers);
@@ -38,17 +67,29 @@ export default function DashboardPage() {
   const latestActivity = activity[0];
   const actor = latestActivity ? members.find((m) => m.userId === latestActivity.actorUserId) : null;
 
+  // Same My Dashboard/Household split as the Finance Dashboard itself
+  // (Personal Finance Addendum, "Privacy model") — Household never
+  // aggregates a private balance into a household total, even here.
+  // Inventory has no per-record privacy model, so the toggle only
+  // affects the Finance numbers below.
+  const scopedAccounts = view === "household" ? accounts.filter((a) => a.ownerUserId === null) : accounts;
+  const scopedTransactions =
+    view === "household" ? transactions.filter((t) => scopedAccounts.some((a) => a.id === t.accountId)) : transactions;
+  const scopedBills = view === "household" ? recurringBills.filter((b) => b.ownerUserId === null) : recurringBills;
+
+  const worth = netWorth(scopedAccounts);
+  const thisMonth = cashFlowForMonth(scopedTransactions, new Date());
+  const accountGroups = groupAccountsByType(scopedAccounts);
+  const recentTxns = recentTransactions(scopedTransactions, 4);
+  const upcomingBills = upcomingRecurringBills(scopedBills, 3);
+  const billsDueSoonCount = upcomingRecurringBills(scopedBills).filter((b) => daysUntil(b.nextDueDate) <= BILLS_DUE_SOON_DAYS).length;
+
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-[10px] bg-brand-100">
-            <Icon name="home" size={22} className="text-yellow" />
-          </span>
-          <div>
-            <p className="text-caption font-medium text-muted-foreground">Household</p>
-            <p className="text-screen-title font-semibold text-ink">{household.name}</p>
-          </div>
+    <div className="flex flex-col gap-6">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">Overview</p>
+          <h1 className="mt-0.5 text-screen-title font-semibold text-ink">{household.name}</h1>
         </div>
         <div className="flex items-center gap-2">
           <Link href="/add" aria-label="Add item" className="tap-target flex size-11 items-center justify-center rounded-md bg-yellow text-white shadow-lg">
@@ -60,95 +101,256 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <SearchBar value="" onChange={() => {}} onFocus={() => router.push("/search")} />
+      <SearchBar value="" onChange={() => {}} onFocus={() => router.push("/search")} className="md:hidden" />
 
-      <div className="flex h-11 items-center justify-between rounded-[10px] border border-border bg-white px-4 text-caption font-semibold">
-        <span className="text-muted-foreground">
-          {summary.totalActiveItems} item{summary.totalActiveItems === 1 ? "" : "s"}
-        </span>
-        <span className="text-ink">
-          {activeContainerList.length} container{activeContainerList.length === 1 ? "" : "s"}
-        </span>
-        <span className="text-ink">
-          {summary.needsReviewCount} review
-        </span>
+      <div className="flex gap-0.5 rounded-lg bg-surface-muted p-0.75 md:w-80">
+        <button
+          type="button"
+          onClick={() => setView("mine")}
+          className={cn(
+            "flex-1 rounded-md py-2 text-caption font-semibold transition-colors",
+            view === "mine" ? "bg-white text-yellow shadow-sm" : "text-muted-foreground"
+          )}
+        >
+          My Dashboard
+        </button>
+        <button
+          type="button"
+          onClick={() => setView("household")}
+          className={cn(
+            "flex-1 rounded-md py-2 text-caption font-semibold transition-colors",
+            view === "household" ? "bg-white text-yellow shadow-sm" : "text-muted-foreground"
+          )}
+        >
+          Household
+        </button>
       </div>
 
-      <div className="flex flex-col gap-3 rounded-2xl border border-border bg-white p-4 shadow-lg">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">Next up</p>
-            <p className="mt-1 text-item-title font-semibold text-ink">Action queue</p>
-            <p className="mt-1 text-caption text-muted-foreground">Quick checks that keep the inventory accurate.</p>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
+          <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">Inventory</p>
+          <p className="mt-1 text-item-title font-semibold text-ink">
+            {summary.totalActiveItems} item{summary.totalActiveItems === 1 ? "" : "s"}
+          </p>
+          <p className="mt-0.5 text-caption text-muted-foreground">
+            {activeContainerList.length} container{activeContainerList.length === 1 ? "" : "s"}
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
+          <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">Net Worth</p>
+          <p className="mt-1 text-item-title font-semibold text-ink">{formatCurrency(worth)}</p>
+          <p className="mt-0.5 text-caption text-muted-foreground">Trend needs a few weeks</p>
+        </div>
+
+        <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
+          <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">Cash Flow · This Month</p>
+          <div className="mt-1.5 flex items-center gap-4">
+            <div>
+              <p className="text-caption text-muted-foreground">Income</p>
+              <p className="text-body font-semibold text-badge-green-text">{formatCurrency(thisMonth.income, { showPositiveSign: true })}</p>
+            </div>
+            <div>
+              <p className="text-caption text-muted-foreground">Spend</p>
+              <p className="text-body font-semibold text-money-negative-text">{formatCurrency(-thisMonth.spend)}</p>
+            </div>
           </div>
-          <Link
-            href="/review"
-            className="tap-target flex h-11 shrink-0 items-center justify-center rounded-md bg-yellow px-5 text-caption font-semibold text-white"
-          >
-            Open
-          </Link>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <ActionChip label="Review" count={summary.needsReviewCount} tone="purple" />
-          <ActionChip label="Photos" count={genericPhotos} tone="green" />
-          <ActionChip label="Loose" count={loose} tone="orange" href="/unassigned" />
+
+        <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
+          <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">Needs Attention</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <ActionChip label="Review" count={summary.needsReviewCount} tone="purple" href="/review" />
+            <ActionChip label="Photos" count={genericPhotos} tone="green" />
+            <ActionChip label="Bills" count={billsDueSoonCount} tone="orange" href="/finance/recurring" />
+          </div>
         </div>
       </div>
 
-      <section aria-label="Storage containers" className="flex flex-col gap-3">
+      <section aria-label="Home Inventory" className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-section-title font-semibold text-ink">Storage containers</h2>
-          <Link href="/locations" className="text-caption font-semibold text-ink">
-            View all
+          <h2 className="text-section-title font-semibold text-ink">Home Inventory</h2>
+          <Link href="/desktop" className="text-caption font-semibold text-ink">
+            Open full dashboard
           </Link>
         </div>
 
-        {recentContainers.length === 0 ? (
-          <EmptyState
-            icon="camera"
-            title="Start cataloging your home"
-            description="Capture a few items and Shohaz will remember exactly where they live."
-            action={
-              <Link
-                href="/capture"
-                className="tap-target inline-flex h-11 items-center justify-center rounded-full bg-yellow px-6 text-body font-medium text-white"
-              >
-                Scan item
-              </Link>
-            }
-          />
-        ) : (
-          <ContainerCarousel
-            entries={recentContainers.map((container) => {
-              const flags = containerStatusFlags(items, containers, container.id);
-              const itemCount = items.filter((it) => it.status === "active" && it.containerId === container.id).length;
-              const status = flags.needsReview
-                ? { label: "Review", dotClassName: "bg-badge-purple-text" }
-                : flags.genericPhoto
-                  ? { label: "Photo", dotClassName: "bg-yellow" }
-                  : null;
-              return {
-                container,
-                itemCount,
-                breadcrumbLabel: breadcrumbLabel(buildBreadcrumb(container.locationId, container.parentContainerId ?? null, locations, containers)),
-                status,
-              };
-            })}
-          />
-        )}
+        <div className="flex flex-col gap-3 rounded-2xl border border-border bg-white p-4 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">Next up</p>
+              <p className="mt-1 text-item-title font-semibold text-ink">Action queue</p>
+              <p className="mt-1 text-caption text-muted-foreground">Quick checks that keep the inventory accurate.</p>
+            </div>
+            <Link
+              href="/review"
+              className="tap-target flex h-11 shrink-0 items-center justify-center rounded-md bg-yellow px-5 text-caption font-semibold text-white"
+            >
+              Open
+            </Link>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <ActionChip label="Review" count={summary.needsReviewCount} tone="purple" />
+            <ActionChip label="Photos" count={genericPhotos} tone="green" />
+            <ActionChip label="Loose" count={loose} tone="orange" href="/unassigned" />
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-item-title font-semibold text-ink">Storage containers</h3>
+            <Link href="/locations" className="text-caption font-semibold text-ink">
+              View all
+            </Link>
+          </div>
+
+          {recentContainers.length === 0 ? (
+            <EmptyState
+              icon="camera"
+              title="Start cataloging your home"
+              description="Capture a few items and Shohaz will remember exactly where they live."
+              action={
+                <Link
+                  href="/capture"
+                  className="tap-target inline-flex h-11 items-center justify-center rounded-full bg-yellow px-6 text-body font-medium text-white"
+                >
+                  Scan item
+                </Link>
+              }
+            />
+          ) : (
+            <ContainerCarousel
+              entries={recentContainers.map((container) => {
+                const flags = containerStatusFlags(items, containers, container.id);
+                const itemCount = items.filter((it) => it.status === "active" && it.containerId === container.id).length;
+                const status = flags.needsReview
+                  ? { label: "Review", dotClassName: "bg-badge-purple-text" }
+                  : flags.genericPhoto
+                    ? { label: "Photo", dotClassName: "bg-yellow" }
+                    : null;
+                return {
+                  container,
+                  itemCount,
+                  breadcrumbLabel: breadcrumbLabel(buildBreadcrumb(container.locationId, container.parentContainerId ?? null, locations, containers)),
+                  status,
+                };
+              })}
+            />
+          )}
+        </div>
+
+        {activeItems.length >= ONBOARDING_THRESHOLD && latestActivity ? (
+          <Link
+            href="/activity"
+            className="flex items-center justify-between rounded-[10px] border border-border bg-white px-4 py-3 text-caption"
+          >
+            <span className="truncate text-muted-foreground">
+              {actor?.displayName ?? "Someone"} {latestActivity.action} {latestActivity.entityName}
+            </span>
+            <span className="shrink-0 font-semibold text-ink">View</span>
+          </Link>
+        ) : null}
       </section>
 
-      {activeItems.length < ONBOARDING_THRESHOLD ? null : latestActivity ? (
-        <Link
-          href="/activity"
-          className="flex items-center justify-between rounded-[10px] border border-border bg-white px-4 py-3 text-caption"
-        >
-          <span className="truncate text-muted-foreground">
-            {actor?.displayName ?? "Someone"} {latestActivity.action} {latestActivity.entityName}
-          </span>
-          <span className="shrink-0 font-semibold text-ink">View</span>
-        </Link>
-      ) : null}
+      <section aria-label="Finance" className="flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-section-title font-semibold text-ink">Finance</h2>
+          <Link href="/finance/dashboard" className="text-caption font-semibold text-ink">
+            Open full dashboard
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_320px]">
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-item-title font-semibold text-ink">Accounts</h3>
+              <Link href="/finance/accounts" className="text-caption font-medium text-yellow">
+                View all
+              </Link>
+            </div>
+            {accountGroups.length === 0 ? (
+              <p className="rounded-2xl border border-dashed border-border bg-white p-4 text-center text-caption text-muted-foreground">
+                No accounts yet — add one from Finance.
+              </p>
+            ) : (
+              <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
+                {accountGroups
+                  .flatMap((g) => g.accounts)
+                  .slice(0, 3)
+                  .map((a) => (
+                    <Link key={a.id} href={`/finance/accounts/${a.id}`} className="flex items-center gap-3 px-4 py-3">
+                      <IconChip icon={accountTypeIcon(a.type)} tone="muted" size="sm" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <p className="truncate text-body font-medium text-ink">{a.name}</p>
+                          {a.ownerUserId !== null && <Badge className="bg-badge-purple-bg text-badge-purple-text">Personal</Badge>}
+                        </div>
+                        <p className="truncate text-caption text-muted-foreground">
+                          {a.institutionName}
+                          {a.cardLastFour ? ` · ...${a.cardLastFour}` : ""}
+                        </p>
+                      </div>
+                      <span className={cn("shrink-0 text-body font-semibold", a.currentBalance < 0 ? "text-money-negative-text" : "text-ink")}>
+                        {formatCurrency(a.currentBalance)}
+                      </span>
+                    </Link>
+                  ))}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-item-title font-semibold text-ink">Upcoming bills</h3>
+              <Link href="/finance/recurring" className="text-caption font-medium text-yellow">
+                View all
+              </Link>
+            </div>
+            {upcomingBills.length === 0 ? (
+              <p className="rounded-2xl border border-dashed border-border bg-white p-4 text-center text-caption text-muted-foreground">Nothing due soon.</p>
+            ) : (
+              <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
+                {upcomingBills.map((b) => (
+                  <div key={b.id} className="flex items-center gap-3 px-4 py-3">
+                    <IconChip icon="repeat" tone="muted" size="sm" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-body font-medium text-ink">{b.name}</p>
+                      <p className="truncate text-caption text-muted-foreground">Due {formatShortDate(b.nextDueDate)}</p>
+                    </div>
+                    <span className="shrink-0 text-body font-semibold text-ink">{formatCurrency(b.expectedAmount)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-item-title font-semibold text-ink">Recent transactions</h3>
+            <Link href="/finance/transactions" className="text-caption font-medium text-yellow">
+              View all
+            </Link>
+          </div>
+          {recentTxns.length === 0 ? (
+            <p className="rounded-2xl border border-dashed border-border bg-white p-4 text-center text-caption text-muted-foreground">No transactions yet.</p>
+          ) : (
+            <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
+              {recentTxns.map((t) => (
+                <div key={t.id} className="flex items-center gap-3 px-4 py-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-body font-medium text-ink">{t.merchant ?? t.description ?? "Transaction"}</p>
+                    <p className="truncate text-caption text-muted-foreground">{formatShortDate(t.occurredAt)}</p>
+                  </div>
+                  <span className={cn("shrink-0 text-body font-semibold", t.amount < 0 ? "text-money-negative-text" : "text-badge-green-text")}>
+                    {formatCurrency(t.amount, { showPositiveSign: true })}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
     </div>
   );
 }

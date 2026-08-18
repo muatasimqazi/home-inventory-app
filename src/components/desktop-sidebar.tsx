@@ -67,10 +67,19 @@ export function DesktopSidebar() {
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto">
+        {/* Cross-domain landing page (see src/app/(shell)/page.tsx) — its
+            own top-level section, same reasoning as Settings living below
+            the divider: it isn't part of either domain, it sits above both. */}
+        <div>
+          <p className="px-3 pb-1 text-micro font-semibold tracking-wide text-muted-foreground uppercase">Overview</p>
+          <nav className="flex flex-col gap-1" aria-label="Overview">
+            <SidebarLink href="/" icon="home" label="Overview" pathname={pathname} exact />
+          </nav>
+        </div>
+
         <div>
           <p className="px-3 pb-1 text-micro font-semibold tracking-wide text-muted-foreground uppercase">Home inventory</p>
           <nav className="flex flex-col gap-1" aria-label="Home inventory">
-            <SidebarLink href="/" icon="home" label="Dashboard" pathname={pathname} exact />
             <SidebarLink href="/locations" icon="box" label="Locations" pathname={pathname} />
             <Link
               href="/review"
