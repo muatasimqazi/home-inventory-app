@@ -2,39 +2,36 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import { Icon, type IconName } from "@/components/icon";
+import { ScanChooserSheet } from "@/components/scan-chooser-sheet";
 import { useInventoryStore } from "@/lib/store";
 import { contextualCaptureHref } from "@/lib/selectors";
 import { cn } from "@/lib/utils";
 
-// Tab set matches Figma v2 Dashboard (node 198:76): Home, Search,
-// [Scan FAB], Locations. The 4th tab was "Settings" until the 2026-08-18
-// Finance nav cutover (Household Hub Addendum §6) — relabeled "More" so
-// Finance has a one-tap-away home in the global nav, without inventing a
-// second hub page: /settings already serves as "everything else" (household,
-// members, tags, activity, trash, sign out), so this is the same screen
-// with a Finance entry card added at its top, not a new route. Locations
-// deliberately stays a persistent top-level tab rather than moving under
-// "More" too, unlike the Household Hub Addendum's literal 4-tab mock
-// (Home/Search/FAB/More only) — existing users' one-tap access to their
-// most-used inventory screen shouldn't regress as the cost of adding
-// Finance; a fuller Home/nav redesign (cross-domain attention cards, an
-// Inventory-internal sub-nav to match Finance's own) stays a deliberately
-// deferred, separate, larger effort, not bundled into this cutover.
+// Household Hub Addendum §6's originally-decided shape (Home, Search,
+// [Scan FAB], More), landed on for real 2026-08-18 after a first attempt
+// (the 2026-08-18 nav cutover) kept Locations as its own persistent tab to
+// avoid disrupting existing muscle memory — which turned out to just be a
+// different kind of confusing: Locations got one-tap access its own
+// domain's other screens don't have, while Finance's equivalent (Accounts)
+// sits two taps deep in More, an inconsistency raised directly and fixed
+// here. Home's own dashboard already links to Locations ("Storage
+// containers → View all"), and More/Settings also lists it explicitly now
+// — so nothing becomes harder to reach, it just no longer gets a uniquely
+// privileged slot relative to Finance.
 const LEFT_TABS: { href: string; icon: IconName; label: string }[] = [
   { href: "/", icon: "home", label: "Home" },
   { href: "/search", icon: "search", label: "Search" },
 ];
 
-const RIGHT_TABS: { href: string; icon: IconName; label: string }[] = [
-  { href: "/locations", icon: "box", label: "Locations" },
-  { href: "/settings", icon: "grid", label: "More" },
-];
+const RIGHT_TABS: { href: string; icon: IconName; label: string }[] = [{ href: "/settings", icon: "grid", label: "More" }];
 
 export function BottomNav() {
   const pathname = usePathname();
   const containers = useInventoryStore((s) => s.containers);
   const scanHref = contextualCaptureHref(pathname, containers);
+  const [chooserOpen, setChooserOpen] = useState(false);
 
   function renderTab(tab: (typeof LEFT_TABS)[number]) {
     const active = tab.href === "/" ? pathname === "/" : pathname.startsWith(tab.href);
@@ -55,32 +52,44 @@ export function BottomNav() {
   }
 
   return (
-    <nav
-      aria-label="Primary"
-      // Was a floating rounded pill inset from every edge (Figma v2's
-      // literal spec) — reads as a card sitting *on* the page rather than
-      // the OS's own chrome, which is what actually made it feel
-      // un-app-like once the page was full-bleed in standalone mode.
-      // Docked to a real native iOS tab bar instead: full-width, flush to
-      // the bottom edge, square corners, a top hairline instead of a
-      // shadow. min-h (not h) + padding-bottom keeps the icon row itself
-      // at its original full height and just appends a same-color strip
-      // below for the safe area, rather than the safe area eating into
-      // the tap targets — that's also why the inset moved from the
-      // outer edge (bottom-*) to inner padding here.
-      className="fixed inset-x-0 bottom-0 z-40 flex min-h-17.5 items-center justify-around border-t border-border bg-white px-2 pb-[env(safe-area-inset-bottom)] md:hidden"
-    >
-      {LEFT_TABS.map(renderTab)}
-
-      <Link
-        href={scanHref}
-        aria-label="Scan item"
-        className="tap-target -mt-8 flex size-16 shrink-0 items-center justify-center rounded-full bg-yellow text-white shadow-lg"
+    <>
+      <nav
+        aria-label="Primary"
+        // Was a floating rounded pill inset from every edge (Figma v2's
+        // literal spec) — reads as a card sitting *on* the page rather than
+        // the OS's own chrome, which is what actually made it feel
+        // un-app-like once the page was full-bleed in standalone mode.
+        // Docked to a real native iOS tab bar instead: full-width, flush to
+        // the bottom edge, square corners, a top hairline instead of a
+        // shadow. min-h (not h) + padding-bottom keeps the icon row itself
+        // at its original full height and just appends a same-color strip
+        // below for the safe area, rather than the safe area eating into
+        // the tap targets — that's also why the inset moved from the
+        // outer edge (bottom-*) to inner padding here.
+        //
+        // Left/right groups are each their own flex-1 justify-around
+        // region (rather than every tab + the FAB sharing one flat
+        // justify-around row, the pre-2026-08-18 approach) specifically so
+        // the FAB stays visually centered even with an unequal tab count
+        // on each side (2 left, 1 right) — a flat row would put it at the
+        // 3rd-of-4 position, off-center.
+        className="fixed inset-x-0 bottom-0 z-40 flex min-h-17.5 items-center border-t border-border bg-white px-2 pb-[env(safe-area-inset-bottom)] md:hidden"
       >
-        <Icon name="camera" size={24} />
-      </Link>
+        <div className="flex flex-1 items-center justify-around">{LEFT_TABS.map(renderTab)}</div>
 
-      {RIGHT_TABS.map(renderTab)}
-    </nav>
+        <button
+          type="button"
+          onClick={() => setChooserOpen(true)}
+          aria-label="Scan"
+          className="tap-target -mt-8 flex size-16 shrink-0 items-center justify-center rounded-full bg-yellow text-white shadow-lg"
+        >
+          <Icon name="camera" size={24} />
+        </button>
+
+        <div className="flex flex-1 items-center justify-around">{RIGHT_TABS.map(renderTab)}</div>
+      </nav>
+
+      <ScanChooserSheet open={chooserOpen} onOpenChange={setChooserOpen} itemScanHref={scanHref} />
+    </>
   );
 }
