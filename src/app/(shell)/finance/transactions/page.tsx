@@ -9,9 +9,11 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
 import { TransactionFormSheet } from "@/components/transaction-form-sheet";
 import { TransactionDetailSheet } from "@/components/transaction-detail-sheet";
+import { LineItemFormSheet } from "@/components/line-item-form-sheet";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { rowToScannedReceiptLineItem, type ScannedReceiptLineItemRow } from "@/lib/supabase/mappers";
+import { updateScannedReceiptLineItem } from "@/lib/receipt-line-items";
 import { useInventoryStore } from "@/lib/store";
 import { displayCodeBadgeClasses } from "@/lib/badge-color";
 import { formatCurrency } from "@/lib/format";
@@ -65,6 +67,7 @@ export default function TransactionsListPage() {
   const [trashConfirmId, setTrashConfirmId] = useState<string | null>(null);
   const [lineItemsByTransaction, setLineItemsByTransaction] = useState<Record<string, ScannedReceiptLineItem[]>>({});
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [editingLineItem, setEditingLineItem] = useState<ScannedReceiptLineItem | null>(null);
 
   // Line items nested right in the list (not only behind the detail
   // drawer) — one bulk fetch scoped to every receipt-sourced transaction
@@ -101,6 +104,29 @@ export default function TransactionsListPage() {
       else next.add(id);
       return next;
     });
+  }
+
+  async function handleSaveLineItem(patch: {
+    standardName: string | null;
+    brand: string | null;
+    quantity: number;
+    unitPriceCents: number | null;
+    lineTotalCents: number | null;
+  }) {
+    if (!editingLineItem) return;
+    const result = await updateScannedReceiptLineItem(editingLineItem, patch);
+    if (!result.ok) {
+      toast.error(`Couldn't save: ${result.error}`);
+      return;
+    }
+    const transactionId = result.item.transactionId;
+    if (transactionId) {
+      setLineItemsByTransaction((prev) => ({
+        ...prev,
+        [transactionId]: (prev[transactionId] ?? []).map((li) => (li.id === result.item.id ? result.item : li)),
+      }));
+    }
+    toast.success("Item updated");
   }
 
   const active = transactions.filter((t) => !t.trashedAt);
@@ -215,7 +241,12 @@ export default function TransactionsListPage() {
                       {isExpanded && (
                         <div className="flex flex-col divide-y divide-border border-t border-border bg-surface-muted/50 pl-8">
                           {items!.map((li) => (
-                            <div key={li.id} className="flex items-center gap-3 py-2 pr-4">
+                            <button
+                              key={li.id}
+                              type="button"
+                              onClick={() => setEditingLineItem(li)}
+                              className="flex items-center gap-3 py-2 pr-4 text-left"
+                            >
                               <div className="min-w-0 flex-1">
                                 <p className="truncate text-caption font-medium text-ink">{li.standardName || li.rawItem}</p>
                                 <p className="truncate text-micro text-muted-foreground">
@@ -225,7 +256,8 @@ export default function TransactionsListPage() {
                               <span className="shrink-0 text-caption font-medium text-ink">
                                 {li.lineTotalCents !== null ? formatCurrency(li.lineTotalCents / 100) : "—"}
                               </span>
-                            </div>
+                              <Icon name="edit" size={13} className="shrink-0 text-muted-foreground" />
+                            </button>
                           ))}
                         </div>
                       )}
@@ -278,6 +310,13 @@ export default function TransactionsListPage() {
         attachment={detailAttachment}
         onEdit={() => setEditOpen(true)}
         onTrash={() => setTrashConfirmId(detailId)}
+      />
+
+      <LineItemFormSheet
+        open={!!editingLineItem}
+        onOpenChange={(open) => !open && setEditingLineItem(null)}
+        lineItem={editingLineItem}
+        onSubmit={handleSaveLineItem}
       />
 
       <ConfirmDialog

@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/icon";
+import { LineItemFormSheet } from "@/components/line-item-form-sheet";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { rowToScannedReceiptLineItem, type ScannedReceiptLineItemRow } from "@/lib/supabase/mappers";
+import { updateScannedReceiptLineItem } from "@/lib/receipt-line-items";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Account, FinanceCategory, ScannedReceiptLineItem, Transaction, TransactionAttachment } from "@/lib/types";
@@ -32,6 +35,7 @@ const SOURCE_LABEL: Record<Transaction["source"], string> = {
 export function TransactionDetailSheet({ open, onOpenChange, transaction, account, category, attachment, onEdit, onTrash }: TransactionDetailSheetProps) {
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
   const [lineItems, setLineItems] = useState<ScannedReceiptLineItem[]>([]);
+  const [editingLineItem, setEditingLineItem] = useState<ScannedReceiptLineItem | null>(null);
 
   // Both fetched on demand, not kept in the global store: a signed URL is
   // deliberately short-lived (private bucket, same pattern
@@ -71,9 +75,27 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
     };
   }, [open, transaction]);
 
+  async function handleSaveLineItem(patch: {
+    standardName: string | null;
+    brand: string | null;
+    quantity: number;
+    unitPriceCents: number | null;
+    lineTotalCents: number | null;
+  }) {
+    if (!editingLineItem) return;
+    const result = await updateScannedReceiptLineItem(editingLineItem, patch);
+    if (!result.ok) {
+      toast.error(`Couldn't save: ${result.error}`);
+      return;
+    }
+    setLineItems((prev) => prev.map((li) => (li.id === result.item.id ? result.item : li)));
+    toast.success("Item updated");
+  }
+
   if (!transaction) return null;
 
   return (
+    <>
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-md">
         <SheetHeader>
@@ -145,15 +167,18 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
               <p className="mb-1.5 text-caption text-muted-foreground">Items ({lineItems.length})</p>
               <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white">
                 {lineItems.map((li) => (
-                  <div key={li.id} className="flex items-center gap-3 px-3 py-2.5">
+                  <button key={li.id} type="button" onClick={() => setEditingLineItem(li)} className="flex items-center gap-3 px-3 py-2.5 text-left">
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-caption font-medium text-ink">{li.standardName || li.rawItem}</p>
-                      <p className="truncate text-micro text-muted-foreground">Qty {li.quantity}</p>
+                      <p className="truncate text-micro text-muted-foreground">
+                        {li.brand ? `${li.brand} · ` : ""}Qty {li.quantity}
+                      </p>
                     </div>
                     <span className="shrink-0 text-caption font-medium text-ink">
                       {li.lineTotalCents !== null ? formatCurrency(li.lineTotalCents / 100) : "—"}
                     </span>
-                  </div>
+                    <Icon name="edit" size={13} className="shrink-0 text-muted-foreground" />
+                  </button>
                 ))}
               </div>
             </div>
@@ -170,5 +195,13 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
         </div>
       </SheetContent>
     </Sheet>
+
+    <LineItemFormSheet
+      open={!!editingLineItem}
+      onOpenChange={(open) => !open && setEditingLineItem(null)}
+      lineItem={editingLineItem}
+      onSubmit={handleSaveLineItem}
+    />
+    </>
   );
 }
