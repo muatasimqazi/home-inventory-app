@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { APICallError, RetryError } from "ai";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
-import { askFinanceQuestion } from "@/lib/finance-ask/ask";
+import { askQuestion } from "@/lib/ask/ask";
 
 /** Same unwrap as /api/v1/vision/detect — a (possibly retry-wrapped) AI SDK error down to a real HTTP status code from the provider, if there is one. */
 function upstreamStatusCode(error: unknown): number | undefined {
@@ -17,13 +17,17 @@ function upstreamStatusCode(error: unknown): number | undefined {
 
 export const runtime = "nodejs";
 
-// AI Q&A over the household's own finance data ("how much did I spend at
-// Costco last month?", "when did I last buy milk?"). Auth is the session
-// cookie via getSupabaseServerClient() — every tool call the model makes
-// (lib/finance-ask/tools.ts) runs through that same session-bound client,
-// so RLS scopes every answer to what the asking user can actually see
-// (private accounts included) without this route doing any manual
-// household/privacy filtering itself.
+// AI Q&A over the household's own data — both finances ("how much did I
+// spend at Costco last month?") and physical inventory ("where did I keep
+// my measuring tape?"). Shared across both domains on purpose (see the
+// Ask floating widget in components/ask-fab.tsx, mounted once in
+// AppShell rather than living under /finance) — a household doesn't stop
+// being able to ask about its stuff just because it's on a Finance screen.
+// Auth is the session cookie via getSupabaseServerClient() — every tool
+// call the model makes (lib/ask/tools.ts) runs through that same
+// session-bound client, so RLS scopes every answer to what the asking
+// user can actually see (private accounts included) without this route
+// doing any manual household/privacy filtering itself.
 export async function POST(request: Request) {
   let body: unknown;
   try {
@@ -49,10 +53,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    const answer = await askFinanceQuestion(question.trim(), supabase, householdId);
-    return NextResponse.json({ answer });
+    const { text, references } = await askQuestion(question.trim(), supabase, householdId);
+    return NextResponse.json({ answer: text, references });
   } catch (error) {
-    console.error("Finance ask failed:", error);
+    console.error("Ask failed:", error);
     const status = upstreamStatusCode(error);
     if (status === 503 || status === 429) {
       return NextResponse.json(

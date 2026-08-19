@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { DesktopSidebar } from "@/components/desktop-sidebar";
 import { BottomNav } from "@/components/bottom-nav";
+import { AskFab } from "@/components/ask-fab";
 
 export function AppShell({ children }: { children: ReactNode }) {
   return (
@@ -20,6 +21,12 @@ export function AppShell({ children }: { children: ReactNode }) {
         </main>
       </div>
       <BottomNav />
+      {/* Mounted once here, not under any one domain's routes — Ask covers
+          both Finance and Inventory, and AppShell doesn't remount on
+          navigation within the shell route group, so the floating widget
+          (and its conversation) persists across pages the same way
+          BottomNav/DesktopSidebar already do. */}
+      <AskFab />
     </div>
   );
 }
