@@ -28,6 +28,7 @@ import {
   LogOut,
   type LucideProps,
   MapPin,
+  MapPinOff,
   MoreVertical,
   Move,
   Nfc,
@@ -109,6 +110,7 @@ const ICONS = {
   smartphone: Smartphone,
   grid: LayoutGrid,
   list: List,
+  mapPinOff: MapPinOff,
   // Finance domain (docs/Personal Finance PRD.md §35 "Major components")
   wallet: Wallet,
   landmark: Landmark,
