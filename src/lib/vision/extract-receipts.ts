@@ -103,6 +103,24 @@ function buildMessages(photos: string[]): ModelMessage[] {
 const CALL_TIMEOUT_MS = 90_000;
 const CALL_MAX_RETRIES = 0;
 
+// Raising CALL_TIMEOUT_MS fixed the receipt timing out, but the *same*
+// 35-item receipt then failed a second, different way: AI_NoObjectGenerated
+// Error — the response's own visible text trailed off mid-item, unclosed
+// brackets, not valid JSON. That's output-token truncation, not a timing
+// problem: with no maxOutputTokens set, generateText fell back to
+// whichever default the provider applies, and 9 fields × dozens of items
+// (each ~70-100 tokens of JSON) plus receipt-level fields comfortably
+// exceeds a modest default. Set explicitly and generously — 16k tokens
+// covers a genuinely large receipt (80+ items) or a multi-receipt batch
+// scan (the schema's `receipts` is an array) with real margin, and an AI
+// Gateway call is billed by tokens actually generated, not this ceiling,
+// so there's no cost downside to leaving headroom. Applies to both models
+// — gpt-5-nano's own default reasoning behavior (see lib/vision/detect.ts's
+// comment on it) can eat into a *low* ceiling before any real JSON output
+// happens at all, so the fallback needs the same generous budget as the
+// primary, not less.
+const MAX_OUTPUT_TOKENS = 16_000;
+
 async function runExtraction(model: LanguageModel, photos: string[]): Promise<VisionReceiptExtraction[]> {
   const { output } = await generateText({
     model,
@@ -110,6 +128,7 @@ async function runExtraction(model: LanguageModel, photos: string[]): Promise<Vi
     messages: buildMessages(photos),
     timeout: CALL_TIMEOUT_MS,
     maxRetries: CALL_MAX_RETRIES,
+    maxOutputTokens: MAX_OUTPUT_TOKENS,
   });
   return output.receipts;
 }
