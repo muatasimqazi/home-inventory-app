@@ -66,10 +66,31 @@ export interface ReceiptExtraction {
   items: ReceiptLineItemExtraction[];
 }
 
+// ---------------------------------------------------------------------------
+// Statement import (bank/card statement upload -> recurring-bill detection).
+// Separate model task from receipt extraction — a statement is text-dense
+// and often several pages, not a single itemized purchase — but the same
+// "extract structured transactions from a document photo/file" shape, so it
+// gets the same reliability engineering (AI Gateway, primary+fallback,
+// bounded timeout) rather than a bespoke pipeline. Detection of *which*
+// extracted transactions are actually recurring happens entirely
+// client-side afterward (lib/recurring-detection.ts) — this layer's only
+// job is turning the statement into a flat transaction list.
+// ---------------------------------------------------------------------------
+
+export interface StatementTransactionExtraction {
+  date: string; // ISO date, extracted
+  merchant: string; // exactly as printed on the statement
+  /** Signed, same convention as Transaction.amount: negative = charge/debit, positive = payment/credit/refund. */
+  amount: number;
+}
+
 export interface VisionProvider {
   detectItems(photos: string[]): Promise<DetectedItem[]>;
   /** One scan batch (a statement, a stack of receipts) can contain multiple receipts — array, not a single result. */
   extractReceipts(photos: string[]): Promise<ReceiptExtraction[]>;
+  /** One PDF statement -> every transaction line found across all its pages. */
+  extractStatement(fileDataUrl: string): Promise<StatementTransactionExtraction[]>;
 }
 
 /** Thrown by a VisionProvider on failure — `retryable` tells the UI whether "Try again" is a reasonable next step (true for anything transient, e.g. Gemini overload) vs. something that won't fix itself. */
@@ -179,7 +200,29 @@ export class MockVisionProvider implements VisionProvider {
     const count = Math.max(1, Math.min(photos.length, CANNED_RECEIPTS.length));
     return shuffled.slice(0, count);
   }
+
+  async extractStatement(): Promise<StatementTransactionExtraction[]> {
+    await new Promise((resolve) => setTimeout(resolve, 1800));
+    // Deliberately includes two clear recurring patterns (Netflix monthly,
+    // gym biweekly-ish) alongside one-off purchases — exercises the
+    // detection heuristic end-to-end without a live model call.
+    return CANNED_STATEMENT_TRANSACTIONS;
+  }
 }
+
+const CANNED_STATEMENT_TRANSACTIONS: StatementTransactionExtraction[] = [
+  { date: "2026-05-14", merchant: "NETFLIX.COM", amount: -15.49 },
+  { date: "2026-05-18", merchant: "Trader Joe's", amount: -62.14 },
+  { date: "2026-06-01", merchant: "Shell Gas Station", amount: -41.02 },
+  { date: "2026-06-14", merchant: "NETFLIX.COM", amount: -15.49 },
+  { date: "2026-06-20", merchant: "Amazon.com", amount: -28.37 },
+  { date: "2026-06-15", merchant: "24 Hour Fitness", amount: -34.99 },
+  { date: "2026-07-14", merchant: "NETFLIX.COM", amount: -15.49 },
+  { date: "2026-07-16", merchant: "24 Hour Fitness", amount: -34.99 },
+  { date: "2026-08-01", merchant: "Whole Foods Market", amount: -78.22 },
+  { date: "2026-08-14", merchant: "NETFLIX.COM", amount: -16.49 },
+  { date: "2026-08-15", merchant: "24 Hour Fitness", amount: -34.99 },
+];
 
 /** Mostly single-item captures (the primary flow), occasionally a small batch. */
 function weightedSingleOrFew(): number {
@@ -236,6 +279,25 @@ export class HttpVisionProvider implements VisionProvider {
     }
     const { receipts } = (await res.json()) as { receipts: ReceiptExtraction[] };
     return receipts;
+  }
+
+  async extractStatement(fileDataUrl: string): Promise<StatementTransactionExtraction[]> {
+    let res: Response;
+    try {
+      res = await fetch("/api/v1/vision/extract-statement", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file: fileDataUrl }),
+      });
+    } catch {
+      throw new VisionDetectionError("Couldn't reach the server. Check your connection and try again.", true);
+    }
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new VisionDetectionError(body?.error ?? `Statement extraction failed (${res.status}).`, body?.retryable ?? true);
+    }
+    const { transactions } = (await res.json()) as { transactions: StatementTransactionExtraction[] };
+    return transactions;
   }
 }
 

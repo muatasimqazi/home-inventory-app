@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
@@ -57,11 +58,20 @@ export default function RecurringBillsPage() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-screen-title font-semibold text-ink">Recurring Bills</h1>
-          <p className="mt-0.5 text-caption text-muted-foreground">Manual only — no automatic detection.</p>
+          <p className="mt-0.5 text-caption text-muted-foreground">Add manually, or detect subscriptions from a statement.</p>
         </div>
-        <Button size="icon-lg" className="rounded-md" onClick={() => setCreateOpen(true)} aria-label="Add recurring bill">
-          <Icon name="plus" size={18} />
-        </Button>
+        <div className="flex shrink-0 items-center gap-2">
+          <Link
+            href="/finance/recurring/import"
+            aria-label="Import from statement"
+            className="tap-target flex size-11 items-center justify-center rounded-md border border-border bg-white text-ink"
+          >
+            <Icon name="upload" size={18} />
+          </Link>
+          <Button size="icon-lg" className="rounded-md" onClick={() => setCreateOpen(true)} aria-label="Add recurring bill">
+            <Icon name="plus" size={18} />
+          </Button>
+        </div>
       </div>
 
       {bills.length === 0 ? (
