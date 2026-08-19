@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import { useSearchParams } from "next/navigation";
 import { Icon } from "@/components/icon";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { SearchBar } from "@/components/search-bar";
 import { EmptyState } from "@/components/empty-state";
 import { TransactionFormSheet } from "@/components/transaction-form-sheet";
 import { TransactionDetailSheet } from "@/components/transaction-detail-sheet";
@@ -13,7 +15,7 @@ import { LineItemFormSheet } from "@/components/line-item-form-sheet";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { rowToScannedReceiptLineItem, type ScannedReceiptLineItemRow } from "@/lib/supabase/mappers";
-import { updateScannedReceiptLineItem, linkLineItemRefund, unlinkLineItemRefund } from "@/lib/receipt-line-items";
+import { updateScannedReceiptLineItem, linkLineItemRefund, unlinkLineItemRefund, deleteScannedReceiptLineItem } from "@/lib/receipt-line-items";
 import { createAndLinkRefundTransaction } from "@/lib/receipt-refunds";
 import { useInventoryStore } from "@/lib/store";
 import { displayCodeBadgeClasses } from "@/lib/badge-color";
@@ -21,7 +23,7 @@ import { formatCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { ScannedReceiptLineItem, Transaction } from "@/lib/types";
 
-type Filter = "all" | "month" | "uncategorized";
+type DateScope = "all" | "month" | "custom";
 
 function groupByDay(transactions: Transaction[]): [string, Transaction[]][] {
   const today = new Date().toDateString();
@@ -55,7 +57,20 @@ export default function TransactionsListPage() {
   const searchParams = useSearchParams();
   const defaultAccountId = searchParams.get("accountId") ?? undefined;
 
-  const [filter, setFilter] = useState<Filter>("all");
+  // Filters are three independent dimensions, not one flat exclusive
+  // choice — you can search "milk" AND restrict to this month AND
+  // uncategorized-only all at once. Each reads its initial value once from
+  // the URL (same lazy-initializer, read-only-on-mount convention already
+  // used for ?open=new below and elsewhere in this app — e.g. Trash's
+  // ?tab=, Activity's ?domain= — not live two-way sync).
+  const [query, setQuery] = useState(() => searchParams.get("q") ?? "");
+  const [dateScope, setDateScope] = useState<DateScope>(() => {
+    const scope = searchParams.get("dateScope");
+    return scope === "month" || scope === "custom" ? scope : "all";
+  });
+  const [customFrom, setCustomFrom] = useState(() => searchParams.get("from") ?? "");
+  const [customTo, setCustomTo] = useState(() => searchParams.get("to") ?? "");
+  const [uncategorizedOnly, setUncategorizedOnly] = useState(() => searchParams.get("uncategorized") === "1");
   // Deep-link from Account Detail's "Add transaction" (?open=new&accountId=...)
   // — starts the create sheet already open, pre-filled with that account,
   // rather than landing on a list and requiring a second click to find
@@ -69,6 +84,7 @@ export default function TransactionsListPage() {
   const [lineItemsByTransaction, setLineItemsByTransaction] = useState<Record<string, ScannedReceiptLineItem[]>>({});
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [editingLineItem, setEditingLineItem] = useState<ScannedReceiptLineItem | null>(null);
+  const [deleteLineItemConfirm, setDeleteLineItemConfirm] = useState<ScannedReceiptLineItem | null>(null);
 
   // Line items nested right in the list (not only behind the detail
   // drawer) — one bulk fetch scoped to every receipt-sourced transaction
@@ -185,17 +201,55 @@ export default function TransactionsListPage() {
     toast.success("Return undone");
   }
 
+  async function handleDeleteLineItem() {
+    if (!deleteLineItemConfirm) return;
+    const result = await deleteScannedReceiptLineItem(deleteLineItemConfirm.id);
+    if (!result.ok) {
+      toast.error(`Couldn't delete: ${result.error}`);
+      return;
+    }
+    const transactionId = deleteLineItemConfirm.transactionId;
+    if (transactionId) {
+      setLineItemsByTransaction((prev) => ({
+        ...prev,
+        [transactionId]: (prev[transactionId] ?? []).filter((li) => li.id !== deleteLineItemConfirm.id),
+      }));
+    }
+    setEditingLineItem(null);
+    toast.success("Item deleted");
+  }
+
   const active = transactions.filter((t) => !t.trashedAt);
   const now = new Date();
-  const filtered =
-    filter === "month"
-      ? active.filter((t) => {
-          const d = new Date(t.occurredAt);
-          return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
-        })
-      : filter === "uncategorized"
-        ? active.filter((t) => !t.categoryId && (t.type === "expense" || t.type === "income" || t.type === "refund"))
-        : active;
+  const fromTime = dateScope === "custom" && customFrom ? new Date(`${customFrom}T00:00:00`).getTime() : null;
+  const toTime = dateScope === "custom" && customTo ? new Date(`${customTo}T23:59:59`).getTime() : null;
+  const trimmedQuery = query.trim().toLowerCase();
+
+  const filtered = active.filter((t) => {
+    if (dateScope === "month") {
+      const d = new Date(t.occurredAt);
+      if (d.getFullYear() !== now.getFullYear() || d.getMonth() !== now.getMonth()) return false;
+    } else if (dateScope === "custom") {
+      const occurred = new Date(t.occurredAt).getTime();
+      if (fromTime !== null && occurred < fromTime) return false;
+      if (toTime !== null && occurred > toTime) return false;
+    }
+
+    if (uncategorizedOnly && (t.categoryId || (t.type !== "expense" && t.type !== "income" && t.type !== "refund"))) return false;
+
+    if (trimmedQuery) {
+      const merchantMatch = t.merchant?.toLowerCase().includes(trimmedQuery) || t.description?.toLowerCase().includes(trimmedQuery);
+      const itemMatch = (lineItemsByTransaction[t.id] ?? []).some(
+        (li) =>
+          li.standardName?.toLowerCase().includes(trimmedQuery) ||
+          li.rawItem.toLowerCase().includes(trimmedQuery) ||
+          li.brand?.toLowerCase().includes(trimmedQuery)
+      );
+      if (!merchantMatch && !itemMatch) return false;
+    }
+
+    return true;
+  });
 
   const sorted = [...filtered].sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
   const groups = groupByDay(sorted);
@@ -229,30 +283,40 @@ export default function TransactionsListPage() {
         </div>
       </div>
 
+      <SearchBar value={query} onChange={setQuery} placeholder="Search by vendor or item…" />
+
       <div className="flex gap-2 overflow-x-auto pb-1">
         {([
           ["all", "All"],
           ["month", "This month"],
-          ["uncategorized", "Uncategorized"],
-        ] as [Filter, string][]).map(([value, label]) => (
-          <button
-            key={value}
-            type="button"
-            onClick={() => setFilter(value)}
-            className={cn(
-              "tap-target shrink-0 rounded-full border px-3 py-1.5 text-caption font-medium",
-              filter === value ? "border-ink bg-ink text-white" : "border-border bg-white text-ink"
-            )}
-          >
-            {label}
-          </button>
+          ["custom", "Custom dates"],
+        ] as [DateScope, string][]).map(([value, label]) => (
+          <FilterChip key={value} label={label} active={dateScope === value} onClick={() => setDateScope(value)} />
         ))}
+        <FilterChip label="Uncategorized" active={uncategorizedOnly} onClick={() => setUncategorizedOnly((v) => !v)} />
       </div>
+
+      {dateScope === "custom" && (
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1 block text-caption text-muted-foreground">From</label>
+            <Input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="h-11" />
+          </div>
+          <div>
+            <label className="mb-1 block text-caption text-muted-foreground">To</label>
+            <Input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="h-11" />
+          </div>
+        </div>
+      )}
 
       {accounts.length === 0 ? (
         <EmptyState icon="receipt" title="Add an account first" description="Transactions belong to an account — add one from the Accounts tab to get started." />
       ) : sorted.length === 0 ? (
-        <EmptyState icon="receipt" title="No transactions" description="Nothing matches this filter yet." />
+        <EmptyState
+          icon="receipt"
+          title="No transactions"
+          description={trimmedQuery || dateScope !== "all" || uncategorizedOnly ? "Nothing matches these filters yet." : "Nothing here yet."}
+        />
       ) : (
         <div className="flex flex-col gap-4">
           {groups.map(([day, entries]) => (
@@ -398,6 +462,7 @@ export default function TransactionsListPage() {
         onCreateAndLinkRefund={handleCreateAndLinkRefund}
         onLinkExistingRefund={handleLinkExistingRefund}
         onUndoReturn={handleUndoReturn}
+        onRequestDelete={() => setDeleteLineItemConfirm(editingLineItem)}
       />
 
       <ConfirmDialog
@@ -414,6 +479,32 @@ export default function TransactionsListPage() {
           }
         }}
       />
+
+      <ConfirmDialog
+        open={!!deleteLineItemConfirm}
+        onOpenChange={(open) => !open && setDeleteLineItemConfirm(null)}
+        title="Delete this item?"
+        description="Permanently removes it from this receipt's itemized breakdown. This can't be undone, and doesn't affect the transaction's total or any linked refund."
+        confirmLabel="Delete Item"
+        tone="danger"
+        icon="trash"
+        onConfirm={handleDeleteLineItem}
+      />
     </div>
+  );
+}
+
+function FilterChip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "tap-target shrink-0 rounded-full border px-3 py-1.5 text-caption font-medium",
+        active ? "border-ink bg-ink text-white" : "border-border bg-white text-ink"
+      )}
+    >
+      {label}
+    </button>
   );
 }

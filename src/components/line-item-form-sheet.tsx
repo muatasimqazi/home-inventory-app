@@ -28,6 +28,8 @@ interface LineItemFormSheetProps {
   onCreateAndLinkRefund: (values: { amount: number; occurredAt: string }) => void;
   onLinkExistingRefund: (refundTransactionId: string, refundedAmountCents: number) => void;
   onUndoReturn: () => void;
+  /** Just requests confirmation — the parent owns the actual delete + its own ConfirmDialog, same pattern as TransactionDetailSheet's onTrash. */
+  onRequestDelete: () => void;
 }
 
 function centsToInput(cents: number | null): string {
@@ -83,6 +85,7 @@ function LineItemFormSheetInner({
   onCreateAndLinkRefund,
   onLinkExistingRefund,
   onUndoReturn,
+  onRequestDelete,
 }: LineItemFormSheetProps & { lineItem: ScannedReceiptLineItem }) {
   const [standardName, setStandardName] = useState(lineItem.standardName ?? lineItem.rawItem);
   const [brand, setBrand] = useState(lineItem.brand ?? "");
@@ -322,6 +325,10 @@ function LineItemFormSheetInner({
               </div>
             )}
           </div>
+
+          <Button variant="outline" className="border-danger/30 text-danger" onClick={onRequestDelete}>
+            <Icon name="trash" size={16} /> Delete Item
+          </Button>
         </div>
       </SheetContent>
     </Sheet>

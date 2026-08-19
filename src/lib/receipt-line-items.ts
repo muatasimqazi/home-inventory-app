@@ -47,3 +47,21 @@ export function linkLineItemRefund(current: ScannedReceiptLineItem, refundTransa
 export function unlinkLineItemRefund(current: ScannedReceiptLineItem) {
   return updateScannedReceiptLineItem(current, { refundTransactionId: null, refundedAmountCents: null });
 }
+
+/**
+ * Permanently removes one line item — not a soft delete. Unlike Item/
+ * Container/Transaction, scanned_receipt_line_items has no trash lifecycle
+ * of its own (0011_receipt_scanning.sql never gave it trashed_at); it's
+ * supplementary itemization detail, not a first-class trashable entity,
+ * and the parent transaction's own `amount` is independent of it
+ * (confirm_scanned_transaction_draft() sets amount from the receipt's own
+ * total, never by summing line items) — deleting a line item is pure
+ * cleanup of a duplicate/mis-scanned entry, never a money event, so it
+ * never touches the transaction. A linked refund (if any) is untouched
+ * too, same reasoning unlinkLineItemRefund never deletes it.
+ */
+export async function deleteScannedReceiptLineItem(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { error } = await getSupabaseBrowserClient().from("scanned_receipt_line_items").delete().eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}

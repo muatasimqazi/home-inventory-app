@@ -6,9 +6,10 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/icon";
 import { LineItemFormSheet } from "@/components/line-item-form-sheet";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { rowToScannedReceiptLineItem, type ScannedReceiptLineItemRow } from "@/lib/supabase/mappers";
-import { updateScannedReceiptLineItem, linkLineItemRefund, unlinkLineItemRefund } from "@/lib/receipt-line-items";
+import { updateScannedReceiptLineItem, linkLineItemRefund, unlinkLineItemRefund, deleteScannedReceiptLineItem } from "@/lib/receipt-line-items";
 import { createAndLinkRefundTransaction } from "@/lib/receipt-refunds";
 import { useInventoryStore } from "@/lib/store";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -38,6 +39,7 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
   const [lineItems, setLineItems] = useState<ScannedReceiptLineItem[]>([]);
   const [editingLineItem, setEditingLineItem] = useState<ScannedReceiptLineItem | null>(null);
+  const [deleteLineItemConfirm, setDeleteLineItemConfirm] = useState<ScannedReceiptLineItem | null>(null);
 
   // Reaches into the store directly (not threaded down as props from
   // transactions/page.tsx) for the same reason this component already
@@ -147,6 +149,18 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
     }
     patchLineItemInList(result.item);
     toast.success("Return undone");
+  }
+
+  async function handleDeleteLineItem() {
+    if (!deleteLineItemConfirm) return;
+    const result = await deleteScannedReceiptLineItem(deleteLineItemConfirm.id);
+    if (!result.ok) {
+      toast.error(`Couldn't delete: ${result.error}`);
+      return;
+    }
+    setLineItems((prev) => prev.filter((li) => li.id !== deleteLineItemConfirm.id));
+    setEditingLineItem(null);
+    toast.success("Item deleted");
   }
 
   if (!transaction) return null;
@@ -286,6 +300,18 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
       onCreateAndLinkRefund={handleCreateAndLinkRefund}
       onLinkExistingRefund={handleLinkExistingRefund}
       onUndoReturn={handleUndoReturn}
+      onRequestDelete={() => setDeleteLineItemConfirm(editingLineItem)}
+    />
+
+    <ConfirmDialog
+      open={!!deleteLineItemConfirm}
+      onOpenChange={(open) => !open && setDeleteLineItemConfirm(null)}
+      title="Delete this item?"
+      description="Permanently removes it from this receipt's itemized breakdown. This can't be undone, and doesn't affect the transaction's total or any linked refund."
+      confirmLabel="Delete Item"
+      tone="danger"
+      icon="trash"
+      onConfirm={handleDeleteLineItem}
     />
     </>
   );
