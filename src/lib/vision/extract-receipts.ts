@@ -88,7 +88,19 @@ function buildMessages(photos: string[]): ModelMessage[] {
   ];
 }
 
-const CALL_TIMEOUT_MS = 30_000;
+// 3x lib/vision/detect.ts's 30s budget, deliberately — that number was
+// tuned for "identify a handful of physical items in a photo," a
+// fundamentally smaller generation task than itemizing a receipt. Output
+// size here scales with the number of line items (9 fields each: raw_item,
+// standard_name, brand, category_guess, subcategory_guess, quantity,
+// unit_price, line_total, confidence), and a real 35-item receipt hit
+// exactly this: it timed out entirely on retry after 30s, whereas the
+// first attempt against it had (barely) finished in time but with zero
+// items extracted — the same underlying "this receipt is a lot of output"
+// problem showing up two different ways. Worst case across both attempts
+// is still 2x this (180s), comfortably under Vercel's 300s function
+// ceiling for this route (Node.js runtime, no maxDuration override needed).
+const CALL_TIMEOUT_MS = 90_000;
 const CALL_MAX_RETRIES = 0;
 
 async function runExtraction(model: LanguageModel, photos: string[]): Promise<VisionReceiptExtraction[]> {

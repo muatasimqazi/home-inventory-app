@@ -34,6 +34,14 @@ export default function ReceiptCapturePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [mode, setMode] = useState<Mode>("requesting");
+  // A long/detailed receipt (many line items) can legitimately take up to
+  // CALL_TIMEOUT_MS (lib/vision/extract-receipts.ts) per model attempt —
+  // without this, the plain spinner looks identical whether it's 3 seconds
+  // in or 60, and a user watching it can reasonably conclude the app is
+  // frozen. Shown after a delay, not immediately, so a normal few-second
+  // scan never sees it at all.
+  const [showLongWaitHint, setShowLongWaitHint] = useState(false);
+  const longWaitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const photos = useReceiptScanSession((s) => s.photos);
   const addPhoto = useReceiptScanSession((s) => s.addPhoto);
@@ -116,12 +124,22 @@ export default function ReceiptCapturePage() {
   async function handleAnalyze() {
     if (photos.length === 0 || !currentHouseholdId) return;
     setMode("analyzing");
+    setShowLongWaitHint(false);
+    if (longWaitTimerRef.current) clearTimeout(longWaitTimerRef.current);
+    longWaitTimerRef.current = setTimeout(() => setShowLongWaitHint(true), 8000);
     await runExtraction({ householdId: currentHouseholdId, userId: currentUserId, categories: financeCategories, categoryRules, accounts });
+    if (longWaitTimerRef.current) clearTimeout(longWaitTimerRef.current);
     const { drafts, extractError: err } = useReceiptScanSession.getState();
     if (err || !drafts) return;
     const pendingCount = drafts.filter((d) => d.status === "pending").length;
     router.replace(pendingCount > 1 ? "/finance/scan/review-batch" : "/finance/scan/review");
   }
+
+  useEffect(() => {
+    return () => {
+      if (longWaitTimerRef.current) clearTimeout(longWaitTimerRef.current);
+    };
+  }, []);
 
   const dark = mode === "live";
 
@@ -230,7 +248,9 @@ export default function ReceiptCapturePage() {
               <>
                 <Icon name="spinner" size={32} className="animate-spin text-ink" />
                 <p className="text-body font-medium text-ink">Analyzing your receipt…</p>
-                <p className="text-caption text-muted-foreground">Reading store, items, and total.</p>
+                <p className="text-caption text-muted-foreground">
+                  {showLongWaitHint ? "Long or detailed receipts can take a little longer — hang tight." : "Reading store, items, and total."}
+                </p>
               </>
             )}
           </div>
