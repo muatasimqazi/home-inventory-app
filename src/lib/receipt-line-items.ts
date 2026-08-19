@@ -1,5 +1,6 @@
 import { getSupabaseBrowserClient } from "./supabase/client";
 import { scannedReceiptLineItemToInsertRow } from "./supabase/mappers";
+import { newId } from "./id";
 import type { ScannedReceiptLineItem } from "./types";
 
 /**
@@ -64,4 +65,45 @@ export async function deleteScannedReceiptLineItem(id: string): Promise<{ ok: tr
   const { error } = await getSupabaseBrowserClient().from("scanned_receipt_line_items").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
   return { ok: true };
+}
+
+/**
+ * Adds a line item straight to an already-confirmed transaction — no
+ * draft, no AI extraction involved (0013_manual_line_items.sql made
+ * draft_id nullable specifically for this). The real gap this closes: a
+ * receipt scan can legitimately extract a transaction's store/date/total
+ * correctly while returning zero line items (a real one did — see
+ * draftNeedsReview's "No items could be identified" reason), and until
+ * this existed the only way to add the missing itemization was a full
+ * re-scan. rawItem is set equal to standardName (there's no original
+ * scanned/imported text for a hand-typed item — LineItemFormSheet's
+ * "Originally captured as ..." hint only shows when the two differ, so
+ * this naturally shows nothing for a manual item, which is correct).
+ */
+export async function createManualLineItem(
+  householdId: string,
+  transactionId: string,
+  values: { standardName: string; brand: string | null; quantity: number; unitPriceCents: number | null; lineTotalCents: number | null }
+): Promise<{ ok: true; item: ScannedReceiptLineItem } | { ok: false; error: string }> {
+  const item: ScannedReceiptLineItem = {
+    id: newId(),
+    householdId,
+    draftId: null,
+    transactionId,
+    rawItem: values.standardName,
+    standardName: values.standardName,
+    brand: values.brand,
+    categoryGuessId: null,
+    subcategoryGuessId: null,
+    subcategoryGuessText: null,
+    quantity: values.quantity,
+    unitPriceCents: values.unitPriceCents,
+    lineTotalCents: values.lineTotalCents,
+    confidence: null,
+    refundTransactionId: null,
+    refundedAmountCents: null,
+  };
+  const { error } = await getSupabaseBrowserClient().from("scanned_receipt_line_items").insert(scannedReceiptLineItemToInsertRow(item));
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, item };
 }

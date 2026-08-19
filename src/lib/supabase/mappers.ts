@@ -999,7 +999,7 @@ export function scannedTransactionDraftToInsertRow(d: ScannedTransactionDraft): 
 export interface ScannedReceiptLineItemRow {
   id: string;
   household_id: string;
-  draft_id: string;
+  draft_id: string | null;
   transaction_id: string | null;
   raw_item: string;
   standard_name: string | null;

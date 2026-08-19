@@ -9,7 +9,13 @@ import { LineItemFormSheet } from "@/components/line-item-form-sheet";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { rowToScannedReceiptLineItem, type ScannedReceiptLineItemRow } from "@/lib/supabase/mappers";
-import { updateScannedReceiptLineItem, linkLineItemRefund, unlinkLineItemRefund, deleteScannedReceiptLineItem } from "@/lib/receipt-line-items";
+import {
+  updateScannedReceiptLineItem,
+  linkLineItemRefund,
+  unlinkLineItemRefund,
+  deleteScannedReceiptLineItem,
+  createManualLineItem,
+} from "@/lib/receipt-line-items";
 import { createAndLinkRefundTransaction } from "@/lib/receipt-refunds";
 import { useInventoryStore } from "@/lib/store";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -40,6 +46,7 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
   const [lineItems, setLineItems] = useState<ScannedReceiptLineItem[]>([]);
   const [editingLineItem, setEditingLineItem] = useState<ScannedReceiptLineItem | null>(null);
   const [deleteLineItemConfirm, setDeleteLineItemConfirm] = useState<ScannedReceiptLineItem | null>(null);
+  const [addingItem, setAddingItem] = useState(false);
 
   // Reaches into the store directly (not threaded down as props from
   // transactions/page.tsx) for the same reason this component already
@@ -48,6 +55,7 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
   // here (for refund-transaction options) is cheap vs. prop-drilling
   // through the one real caller.
   const allTransactions = useInventoryStore((s) => s.transactions);
+  const currentHouseholdId = useInventoryStore((s) => s.currentHouseholdId);
 
   // Both fetched on demand, not kept in the global store: a signed URL is
   // deliberately short-lived (private bucket, same pattern
@@ -163,6 +171,23 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
     toast.success("Item deleted");
   }
 
+  async function handleCreateLineItem(values: {
+    standardName: string;
+    brand: string | null;
+    quantity: number;
+    unitPriceCents: number | null;
+    lineTotalCents: number | null;
+  }) {
+    if (!transaction) return;
+    const result = await createManualLineItem(currentHouseholdId, transaction.id, values);
+    if (!result.ok) {
+      toast.error(`Couldn't add item: ${result.error}`);
+      return;
+    }
+    setLineItems((prev) => [...prev, result.item]);
+    toast.success("Item added");
+  }
+
   if (!transaction) return null;
 
   const refundOptions = allTransactions
@@ -249,32 +274,43 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
             </div>
           )}
 
-          {lineItems.length > 0 && (
+          {transaction.source === "receipt_scan" && (
             <div>
-              <p className="mb-1.5 text-caption text-muted-foreground">Items ({lineItems.length})</p>
-              <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white">
-                {lineItems.map((li) => (
-                  <button key={li.id} type="button" onClick={() => setEditingLineItem(li)} className="flex items-center gap-3 px-3 py-2.5 text-left">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <p className="truncate text-caption font-medium text-ink">{li.standardName || li.rawItem}</p>
-                        {li.refundTransactionId && (
-                          <span className="shrink-0 rounded-full bg-badge-green-bg px-1.5 py-0.5 text-micro font-medium text-badge-green-text">
-                            Returned
-                          </span>
-                        )}
-                      </div>
-                      <p className="truncate text-micro text-muted-foreground">
-                        {li.brand ? `${li.brand} · ` : ""}Qty {li.quantity}
-                      </p>
-                    </div>
-                    <span className={cn("shrink-0 text-caption font-medium", li.refundTransactionId ? "text-muted-foreground line-through" : "text-ink")}>
-                      {li.lineTotalCents !== null ? formatCurrency(li.lineTotalCents / 100) : "—"}
-                    </span>
-                    <Icon name="edit" size={13} className="shrink-0 text-muted-foreground" />
-                  </button>
-                ))}
+              <div className="mb-1.5 flex items-center justify-between">
+                <p className="text-caption text-muted-foreground">{lineItems.length > 0 ? `Items (${lineItems.length})` : "Items"}</p>
+                <button type="button" onClick={() => setAddingItem(true)} className="flex items-center gap-1 text-caption font-medium text-yellow">
+                  <Icon name="plus" size={13} /> Add Item
+                </button>
               </div>
+              {lineItems.length === 0 ? (
+                <p className="rounded-2xl border border-dashed border-border bg-white p-4 text-center text-caption text-muted-foreground">
+                  No items recorded for this receipt yet.
+                </p>
+              ) : (
+                <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white">
+                  {lineItems.map((li) => (
+                    <button key={li.id} type="button" onClick={() => setEditingLineItem(li)} className="flex items-center gap-3 px-3 py-2.5 text-left">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <p className="truncate text-caption font-medium text-ink">{li.standardName || li.rawItem}</p>
+                          {li.refundTransactionId && (
+                            <span className="shrink-0 rounded-full bg-badge-green-bg px-1.5 py-0.5 text-micro font-medium text-badge-green-text">
+                              Returned
+                            </span>
+                          )}
+                        </div>
+                        <p className="truncate text-micro text-muted-foreground">
+                          {li.brand ? `${li.brand} · ` : ""}Qty {li.quantity}
+                        </p>
+                      </div>
+                      <span className={cn("shrink-0 text-caption font-medium", li.refundTransactionId ? "text-muted-foreground line-through" : "text-ink")}>
+                        {li.lineTotalCents !== null ? formatCurrency(li.lineTotalCents / 100) : "—"}
+                      </span>
+                      <Icon name="edit" size={13} className="shrink-0 text-muted-foreground" />
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -291,10 +327,17 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
     </Sheet>
 
     <LineItemFormSheet
-      open={!!editingLineItem}
-      onOpenChange={(open) => !open && setEditingLineItem(null)}
+      open={!!editingLineItem || addingItem}
+      onOpenChange={(open) => {
+        if (!open) {
+          setEditingLineItem(null);
+          setAddingItem(false);
+        }
+      }}
       lineItem={editingLineItem}
+      createForTransactionId={addingItem ? transaction.id : null}
       onSubmit={handleSaveLineItem}
+      onCreate={handleCreateLineItem}
       refundOptions={refundOptions}
       refundTransaction={linkedRefundTxn}
       onCreateAndLinkRefund={handleCreateAndLinkRefund}

@@ -451,7 +451,8 @@ export interface BoundingBoxLike {
 export interface ScannedReceiptLineItem {
   id: string;
   householdId: string;
-  draftId: string;
+  /** Null for an item added manually straight onto a transaction (0013_manual_line_items.sql) — no AI-extraction review session produced it, so there's no draft to point at. At least one of draftId/transactionId is always set. */
+  draftId: string | null;
   transactionId: string | null;
   rawItem: string;
   standardName: string | null;

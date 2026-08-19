@@ -15,7 +15,13 @@ import { LineItemFormSheet } from "@/components/line-item-form-sheet";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { rowToScannedReceiptLineItem, type ScannedReceiptLineItemRow } from "@/lib/supabase/mappers";
-import { updateScannedReceiptLineItem, linkLineItemRefund, unlinkLineItemRefund, deleteScannedReceiptLineItem } from "@/lib/receipt-line-items";
+import {
+  updateScannedReceiptLineItem,
+  linkLineItemRefund,
+  unlinkLineItemRefund,
+  deleteScannedReceiptLineItem,
+  createManualLineItem,
+} from "@/lib/receipt-line-items";
 import { createAndLinkRefundTransaction } from "@/lib/receipt-refunds";
 import { useInventoryStore } from "@/lib/store";
 import { displayCodeBadgeClasses } from "@/lib/badge-color";
@@ -45,6 +51,7 @@ function groupByDay(transactions: Transaction[]): [string, Transaction[]][] {
 }
 
 export default function TransactionsListPage() {
+  const currentHouseholdId = useInventoryStore((s) => s.currentHouseholdId);
   const accounts = useInventoryStore((s) => s.accounts);
   const transactions = useInventoryStore((s) => s.transactions);
   const financeCategories = useInventoryStore((s) => s.financeCategories);
@@ -85,6 +92,7 @@ export default function TransactionsListPage() {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [editingLineItem, setEditingLineItem] = useState<ScannedReceiptLineItem | null>(null);
   const [deleteLineItemConfirm, setDeleteLineItemConfirm] = useState<ScannedReceiptLineItem | null>(null);
+  const [addingItemForTransactionId, setAddingItemForTransactionId] = useState<string | null>(null);
 
   // Line items nested right in the list (not only behind the detail
   // drawer) — one bulk fetch scoped to every receipt-sourced transaction
@@ -219,6 +227,27 @@ export default function TransactionsListPage() {
     toast.success("Item deleted");
   }
 
+  async function handleCreateLineItem(values: {
+    standardName: string;
+    brand: string | null;
+    quantity: number;
+    unitPriceCents: number | null;
+    lineTotalCents: number | null;
+  }) {
+    if (!addingItemForTransactionId) return;
+    const result = await createManualLineItem(currentHouseholdId, addingItemForTransactionId, values);
+    if (!result.ok) {
+      toast.error(`Couldn't add item: ${result.error}`);
+      return;
+    }
+    setLineItemsByTransaction((prev) => ({
+      ...prev,
+      [addingItemForTransactionId]: [...(prev[addingItemForTransactionId] ?? []), result.item],
+    }));
+    setExpandedIds((prev) => new Set(prev).add(addingItemForTransactionId));
+    toast.success("Item added");
+  }
+
   const active = transactions.filter((t) => !t.trashedAt);
   const now = new Date();
   const fromTime = dateScope === "custom" && customFrom ? new Date(`${customFrom}T00:00:00`).getTime() : null;
@@ -325,9 +354,14 @@ export default function TransactionsListPage() {
               <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
                 {entries.map((t) => {
                   const category = financeCategories.find((c) => c.id === t.categoryId);
-                  const items = lineItemsByTransaction[t.id];
-                  const hasItems = t.source === "receipt_scan" && !!items && items.length > 0;
-                  const isExpanded = hasItems && expandedIds.has(t.id);
+                  const items = lineItemsByTransaction[t.id] ?? [];
+                  // Every receipt-scan transaction can expand — not just
+                  // ones that already have items. A real Costco receipt
+                  // extracted its total correctly but zero line items; the
+                  // old hasItems-only gate meant there was no way to reach
+                  // "Add Item" for it short of a full re-scan.
+                  const isScanSourced = t.source === "receipt_scan";
+                  const isExpanded = isScanSourced && expandedIds.has(t.id);
                   return (
                     <div key={t.id}>
                       <div className="flex items-center gap-1 pr-2">
@@ -342,9 +376,9 @@ export default function TransactionsListPage() {
                               ) : (
                                 <span className="text-caption text-muted-foreground">Uncategorized</span>
                               )}
-                              {hasItems && (
+                              {items.length > 0 && (
                                 <span className="text-micro text-muted-foreground">
-                                  · {items!.length} item{items!.length === 1 ? "" : "s"}
+                                  · {items.length} item{items.length === 1 ? "" : "s"}
                                 </span>
                               )}
                             </div>
@@ -353,7 +387,7 @@ export default function TransactionsListPage() {
                             {formatCurrency(t.amount, { showPositiveSign: true })}
                           </span>
                         </button>
-                        {hasItems && (
+                        {isScanSourced && (
                           <button
                             type="button"
                             onClick={() => toggleExpanded(t.id)}
@@ -368,7 +402,10 @@ export default function TransactionsListPage() {
 
                       {isExpanded && (
                         <div className="flex flex-col divide-y divide-border border-t border-border bg-surface-muted/50 pl-8">
-                          {items!.map((li) => (
+                          {items.length === 0 && (
+                            <p className="py-3 pr-4 text-caption text-muted-foreground">No items recorded for this receipt yet.</p>
+                          )}
+                          {items.map((li) => (
                             <button
                               key={li.id}
                               type="button"
@@ -399,6 +436,13 @@ export default function TransactionsListPage() {
                               <Icon name="edit" size={13} className="shrink-0 text-muted-foreground" />
                             </button>
                           ))}
+                          <button
+                            type="button"
+                            onClick={() => setAddingItemForTransactionId(t.id)}
+                            className="flex items-center gap-1.5 py-2 pr-4 text-left text-caption font-medium text-yellow"
+                          >
+                            <Icon name="plus" size={13} /> Add Item
+                          </button>
                         </div>
                       )}
                     </div>
@@ -453,10 +497,17 @@ export default function TransactionsListPage() {
       />
 
       <LineItemFormSheet
-        open={!!editingLineItem}
-        onOpenChange={(open) => !open && setEditingLineItem(null)}
+        open={!!editingLineItem || !!addingItemForTransactionId}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingLineItem(null);
+            setAddingItemForTransactionId(null);
+          }
+        }}
         lineItem={editingLineItem}
+        createForTransactionId={addingItemForTransactionId}
         onSubmit={handleSaveLineItem}
+        onCreate={handleCreateLineItem}
         refundOptions={refundOptionsForEditingItem}
         refundTransaction={linkedRefundTxn}
         onCreateAndLinkRefund={handleCreateAndLinkRefund}

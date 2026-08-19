@@ -111,7 +111,7 @@ export const useReceiptScanSession = create<ReceiptScanSessionState>()((set, get
         const category = resolveCategory(receipt.store, "merchant", categoryRules, categories);
         const account = resolveAccountByCardLastFour(receipt.card_last_four, accounts);
         const receiptConfidence = receipt.items.length > 0 ? avg(receipt.items.map((it) => it.confidence)) : 0.7;
-        const { needsReview, reviewReason } = draftNeedsReview(receiptConfidence, category, account);
+        const { needsReview, reviewReason } = draftNeedsReview(receiptConfidence, category, account, receipt.items.length);
 
         const draft: ScannedTransactionDraft = {
           id: newId(),

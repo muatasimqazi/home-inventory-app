@@ -10,25 +10,31 @@ import { formatCurrency, formatShortDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { ScannedReceiptLineItem, Transaction } from "@/lib/types";
 
+interface LineItemFormValues {
+  standardName: string;
+  brand: string | null;
+  quantity: number;
+  unitPriceCents: number | null;
+  lineTotalCents: number | null;
+}
+
 interface LineItemFormSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Editing an existing item. Set this XOR `createForTransactionId` — the caller closes one before opening the other, never both at once. */
   lineItem: ScannedReceiptLineItem | null;
-  onSubmit: (patch: {
-    standardName: string | null;
-    brand: string | null;
-    quantity: number;
-    unitPriceCents: number | null;
-    lineTotalCents: number | null;
-  }) => void;
-  /** Existing refund-type transactions on that same account, most recent first — offered as "link instead of creating a new one." */
+  /** Adding a brand-new item straight onto an already-confirmed transaction (0013_manual_line_items.sql) — no draft/AI extraction involved. */
+  createForTransactionId: string | null;
+  onSubmit: (patch: LineItemFormValues) => void;
+  onCreate: (values: LineItemFormValues) => void;
+  /** Existing refund-type transactions on that same account, most recent first — offered as "link instead of creating a new one." Irrelevant in create mode. */
   refundOptions: Transaction[];
-  /** The refund transaction this item is currently linked to, if any (drives the "already returned" display). */
+  /** The refund transaction this item is currently linked to, if any (drives the "already returned" display). Irrelevant in create mode. */
   refundTransaction: Transaction | null;
   onCreateAndLinkRefund: (values: { amount: number; occurredAt: string }) => void;
   onLinkExistingRefund: (refundTransactionId: string, refundedAmountCents: number) => void;
   onUndoReturn: () => void;
-  /** Just requests confirmation — the parent owns the actual delete + its own ConfirmDialog, same pattern as TransactionDetailSheet's onTrash. */
+  /** Just requests confirmation — the parent owns the actual delete + its own ConfirmDialog, same pattern as TransactionDetailSheet's onTrash. Irrelevant in create mode — a not-yet-saved item has nothing to delete. */
   onRequestDelete: () => void;
 }
 
@@ -47,10 +53,15 @@ function todayInputValue(): string {
 }
 
 /**
- * Edits one already-persisted receipt line item, and separately handles
- * marking it returned/refunded — reachable both from the Transactions
- * list's nested items and from TransactionDetailSheet's item list (see
- * lib/receipt-line-items.ts, the shared write path both use).
+ * Edits an existing receipt line item, or (createForTransactionId set
+ * instead of lineItem) adds a brand-new one straight onto an already-
+ * confirmed transaction — reachable both from the Transactions list's
+ * nested items and from TransactionDetailSheet's item list (see
+ * lib/receipt-line-items.ts, the shared write path both use). Create mode
+ * exists because a receipt scan can legitimately extract a transaction's
+ * totals correctly while returning zero line items (a real one did — see
+ * draftNeedsReview's "No items could be identified" reason) — without it,
+ * the only way to add the missing itemization was a full re-scan.
  *
  * "Returned" is a real linked refund transaction (0012_line_item_returns.sql,
  * decided directly rather than assumed: a return is a separate dated money
@@ -60,7 +71,8 @@ function todayInputValue(): string {
  * point at one that was already entered. Deliberately its own section
  * with its own confirm action, not folded into the name/brand/qty/price
  * Save button above — editing an item's description and recording a real
- * money movement are different kinds of actions.
+ * money movement are different kinds of actions. Not shown in create mode
+ * — a not-yet-saved item can't be returned or deleted yet.
  *
  * Fields are seeded via lazy useState initializers, not a reseed effect —
  * matching TransactionFormSheet's own convention. Radix's SheetContent
@@ -68,10 +80,12 @@ function todayInputValue(): string {
  * fresh instance — and fresh initializer read of whatever `lineItem` is
  * current at that moment — is created each time the sheet reopens for a
  * different item. Relies on the caller fully closing before reopening for
- * a different item, which is how both call sites already work.
+ * a different item (or switching modes), which is how both call sites
+ * already work — `open` is computed from `lineItem`/`createForTransactionId`
+ * together, and both are cleared together on close.
  */
-export function LineItemFormSheet({ lineItem, onOpenChange, ...rest }: LineItemFormSheetProps) {
-  if (!lineItem) return null;
+export function LineItemFormSheet({ lineItem, createForTransactionId, onOpenChange, ...rest }: LineItemFormSheetProps) {
+  if (!lineItem && !createForTransactionId) return null;
   return <LineItemFormSheetInner lineItem={lineItem} onOpenChange={onOpenChange} {...rest} />;
 }
 
@@ -80,23 +94,25 @@ function LineItemFormSheetInner({
   onOpenChange,
   lineItem,
   onSubmit,
+  onCreate,
   refundOptions,
   refundTransaction,
   onCreateAndLinkRefund,
   onLinkExistingRefund,
   onUndoReturn,
   onRequestDelete,
-}: LineItemFormSheetProps & { lineItem: ScannedReceiptLineItem }) {
-  const [standardName, setStandardName] = useState(lineItem.standardName ?? lineItem.rawItem);
-  const [brand, setBrand] = useState(lineItem.brand ?? "");
-  const [quantity, setQuantity] = useState(String(lineItem.quantity));
-  const [unitPrice, setUnitPrice] = useState(centsToInput(lineItem.unitPriceCents));
-  const [lineTotal, setLineTotal] = useState(centsToInput(lineItem.lineTotalCents));
+}: Omit<LineItemFormSheetProps, "createForTransactionId">) {
+  const isCreate = !lineItem;
+  const [standardName, setStandardName] = useState(lineItem ? (lineItem.standardName ?? lineItem.rawItem) : "");
+  const [brand, setBrand] = useState(lineItem?.brand ?? "");
+  const [quantity, setQuantity] = useState(lineItem ? String(lineItem.quantity) : "1");
+  const [unitPrice, setUnitPrice] = useState(lineItem ? centsToInput(lineItem.unitPriceCents) : "");
+  const [lineTotal, setLineTotal] = useState(lineItem ? centsToInput(lineItem.lineTotalCents) : "");
   const [error, setError] = useState<string | null>(null);
 
   const [showReturnForm, setShowReturnForm] = useState(false);
   const [returnMode, setReturnMode] = useState<"new" | "existing">("new");
-  const [refundAmount, setRefundAmount] = useState(centsToInput(lineItem.lineTotalCents));
+  const [refundAmount, setRefundAmount] = useState(lineItem ? centsToInput(lineItem.lineTotalCents) : "");
   const [refundDate, setRefundDate] = useState(todayInputValue());
   const [existingRefundId, setExistingRefundId] = useState(refundOptions[0]?.id ?? "");
   const [existingRefundShare, setExistingRefundShare] = useState(refundOptions[0] ? String(Math.abs(refundOptions[0].amount)) : "");
@@ -112,13 +128,15 @@ function LineItemFormSheetInner({
       setError("Enter a quantity greater than 0.");
       return;
     }
-    onSubmit({
+    const values: LineItemFormValues = {
       standardName: standardName.trim(),
       brand: brand.trim() || null,
       quantity: parsedQuantity,
       unitPriceCents: inputToCents(unitPrice),
       lineTotalCents: inputToCents(lineTotal),
-    });
+    };
+    if (isCreate) onCreate(values);
+    else onSubmit(values);
     onOpenChange(false);
   }
 
@@ -149,10 +167,10 @@ function LineItemFormSheetInner({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="rounded-t-3xl">
         <SheetHeader>
-          <SheetTitle className="text-section-title font-medium text-ink">Edit Item</SheetTitle>
+          <SheetTitle className="text-section-title font-medium text-ink">{isCreate ? "Add Item" : "Edit Item"}</SheetTitle>
         </SheetHeader>
         <div className="flex max-h-[70vh] flex-col gap-4 overflow-y-auto px-4 pb-6">
-          {lineItem.rawItem && lineItem.rawItem !== standardName && (
+          {lineItem && lineItem.rawItem && lineItem.rawItem !== standardName && (
             <p className="text-caption text-muted-foreground">Originally captured as &ldquo;{lineItem.rawItem}&rdquo;.</p>
           )}
 
@@ -200,9 +218,10 @@ function LineItemFormSheetInner({
           {error && <p className="text-caption text-danger">{error}</p>}
 
           <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={handleSubmit}>
-            Save
+            {isCreate ? "Add Item" : "Save"}
           </Button>
 
+          {!isCreate && lineItem && (
           <div className="border-t border-border pt-4">
             {refundTransaction ? (
               <div className="flex flex-col gap-2 rounded-2xl border border-border bg-surface-muted p-3">
@@ -325,10 +344,13 @@ function LineItemFormSheetInner({
               </div>
             )}
           </div>
+          )}
 
-          <Button variant="outline" className="border-danger/30 text-danger" onClick={onRequestDelete}>
-            <Icon name="trash" size={16} /> Delete Item
-          </Button>
+          {!isCreate && (
+            <Button variant="outline" className="border-danger/30 text-danger" onClick={onRequestDelete}>
+              <Icon name="trash" size={16} /> Delete Item
+            </Button>
+          )}
         </div>
       </SheetContent>
     </Sheet>

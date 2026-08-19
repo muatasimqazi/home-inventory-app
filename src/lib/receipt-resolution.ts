@@ -84,9 +84,34 @@ export function resolveAccountByCardLastFour(cardLastFour: string, accounts: Acc
   return { accountId: null, matchState: "ambiguous" };
 }
 
-/** A receipt-level draft needs_review if either the receipt's own extraction confidence or its resolved category confidence is low, or the account couldn't be resolved unambiguously — matches DetectedItem's withReview() pattern in lib/ai.ts, generalized to the extra signals a receipt has that an inventory item doesn't. */
-export function draftNeedsReview(receiptConfidence: number, category: CategoryResolution, account: AccountResolution): { needsReview: boolean; reviewReason?: string } {
+/**
+ * A receipt-level draft needs_review if either the receipt's own
+ * extraction confidence or its resolved category confidence is low, the
+ * account couldn't be resolved unambiguously, or no line items were
+ * extracted at all — matches DetectedItem's withReview() pattern in
+ * lib/ai.ts, generalized to the extra signals a receipt has that an
+ * inventory item doesn't.
+ *
+ * `itemCount === 0` gets its own explicit, named reason rather than
+ * relying on the confidence check alone — a real receipt hit this: the
+ * model correctly read store/date/subtotal/tax/total but returned zero
+ * line items, and the resulting draft's confidence (runExtraction()'s own
+ * 0.7 fallback for that exact case) happened to fall under
+ * REVIEW_THRESHOLD, so it *did* get flagged, but with "Extraction
+ * confidence 0.70 is below 0.75" as the only stated reason — true, but
+ * useless for telling a household member what's actually wrong or what to
+ * do about it (nothing said "no items," and nothing suggested adding them
+ * manually, which is the real fix once "Add Item" exists on a confirmed
+ * transaction).
+ */
+export function draftNeedsReview(
+  receiptConfidence: number,
+  category: CategoryResolution,
+  account: AccountResolution,
+  itemCount: number
+): { needsReview: boolean; reviewReason?: string } {
   const reasons: string[] = [];
+  if (itemCount === 0) reasons.push("No items could be identified on this receipt — you can add them manually after confirming.");
   if (receiptConfidence < REVIEW_THRESHOLD) reasons.push(`Extraction confidence ${receiptConfidence.toFixed(2)} is below ${REVIEW_THRESHOLD}.`);
   if (category.categoryId === null) reasons.push("No category could be resolved.");
   if (account.matchState === "ambiguous") reasons.push("Card matches more than one account — pick one.");
