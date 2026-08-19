@@ -8,7 +8,13 @@ import { NextResponse, type NextRequest } from "next/server";
 // routes authenticate the request themselves via a cryptographic
 // signature check (Svix/webhookSecret), not a Supabase session, so they'd
 // otherwise get redirected to /sign-in before ever reaching route code.
-const PUBLIC_PATHS = ["/sign-in", "/auth/callback", "/api/v1/webhooks"];
+// /api/v1/plaid/sync-all is the same shape for the same reason: Vercel's
+// cron scheduler calls it with a `CRON_SECRET` bearer token, not a
+// browser session — confirmed live in production that omitting it here
+// meant the nightly sync silently 307'd to /sign-in before the route's
+// own CRON_SECRET check ever ran, i.e. the cron fallback never actually
+// fired.
+const PUBLIC_PATHS = ["/sign-in", "/auth/callback", "/api/v1/webhooks", "/api/v1/plaid/sync-all"];
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
