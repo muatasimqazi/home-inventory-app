@@ -47,7 +47,9 @@ function systemPrompt(): string {
     "match — never add up only the transactions listed, since the list can be capped short of the true total. " +
     "Keep answers short and direct: state the number, date, or location first, then at most one sentence of " +
     "relevant context. No preamble, no restating the question — the specific item/transaction you found is shown " +
-    "separately below your answer, so don't re-describe it in exhaustive detail either."
+    "separately below your answer, so don't re-describe it in exhaustive detail either. " +
+    "Respond in plain prose only — this renders in a plain-text chat bubble, not a markdown viewer, so never use " +
+    "**bold**, *italics*, `code`, bullet/numbered lists, or headings; write it the way you'd say it out loud."
   );
 }
 
