@@ -110,8 +110,13 @@ export const useReceiptScanSession = create<ReceiptScanSessionState>()((set, get
       const draftRows: DraftRow[] = extracted.map((receipt, photoIndex) => {
         const category = resolveCategory(receipt.store, "merchant", categoryRules, categories);
         const account = resolveAccountByCardLastFour(receipt.card_last_four, accounts);
-        const receiptConfidence = receipt.items.length > 0 ? avg(receipt.items.map((it) => it.confidence)) : 0.7;
-        const { needsReview, reviewReason } = draftNeedsReview(receiptConfidence, category, account, receipt.items.length);
+        // Fold discount/instant-savings lines into their item *before* any
+        // of this receipt's item-derived signals are computed, so a
+        // discount line never counts toward itemCount or dilutes the
+        // confidence average — it isn't a real item.
+        const items = foldDiscountLines(receipt.items);
+        const receiptConfidence = items.length > 0 ? avg(items.map((it) => it.confidence)) : 0.7;
+        const { needsReview, reviewReason } = draftNeedsReview(receiptConfidence, category, account, items.length);
 
         const draft: ScannedTransactionDraft = {
           id: newId(),
@@ -134,7 +139,7 @@ export const useReceiptScanSession = create<ReceiptScanSessionState>()((set, get
           accountId: account.accountId,
         };
 
-        const lineItems: ScannedReceiptLineItem[] = receipt.items.map((it) => {
+        const lineItems: ScannedReceiptLineItem[] = items.map((it) => {
           const itemCategory = resolveCategory(it.category_guess, "description", categoryRules, categories);
           return {
             id: newId(),
@@ -274,4 +279,41 @@ function round2(n: number): number {
 
 function avg(nums: number[]): number {
   return nums.reduce((a, b) => a + b, 0) / nums.length;
+}
+
+/**
+ * Folds discount/instant-savings lines (Costco's per-item markdowns, same
+ * pattern on other warehouse-club receipts) into the product line they
+ * apply to, instead of letting them become their own line item. Extract
+ * still needs to see and return these — lib/vision/extract-receipts.ts's
+ * schema deliberately allows negative unit_price/line_total, because
+ * rejecting them was what broke extraction on real receipts entirely
+ * (see that file's comments). This is the next, separate step: a
+ * discount isn't something you bought, so it shouldn't show up as a
+ * purchasable "item" for the user to review, categorize, or later look up
+ * in inventory — it should just reduce what the preceding item cost.
+ *
+ * Negative line_total is the signal (a real purchase can never be
+ * negative — returns are a distinct transaction-level flow, not a
+ * negative line on the original purchase). Only line_total is adjusted;
+ * unit_price is left as the originally-printed per-unit price rather than
+ * recomputed, so "what did this cost per unit before the discount" stays
+ * visible instead of being silently overwritten.
+ */
+function foldDiscountLines(items: ReceiptExtraction["items"]): ReceiptExtraction["items"] {
+  const folded: ReceiptExtraction["items"] = [];
+  for (const item of items) {
+    if (item.line_total < 0 && folded.length > 0) {
+      folded[folded.length - 1] = {
+        ...folded[folded.length - 1],
+        line_total: round2(folded[folded.length - 1].line_total + item.line_total),
+      };
+      continue;
+    }
+    // No preceding item to fold into (shouldn't normally happen — a
+    // discount line always follows the item it discounts) — keep it
+    // rather than silently drop real dollar amounts off the receipt.
+    folded.push(item);
+  }
+  return folded;
 }
