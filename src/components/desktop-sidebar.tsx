@@ -22,6 +22,7 @@ const INVENTORY_LINKS: { href: string; icon: IconName; label: string }[] = [
 // Genuinely Finance-only.
 const FINANCE_LINKS: { href: string; icon: IconName; label: string }[] = [
   { href: "/finance/dashboard", icon: "trendingUp", label: "Dashboard" },
+  { href: "/finance/ask", icon: "ai", label: "Ask" },
   { href: "/finance/accounts", icon: "wallet", label: "Accounts" },
   { href: "/finance/transactions", icon: "receipt", label: "Transactions" },
   { href: "/finance/categories", icon: "pieChart", label: "Categories & Rules" },
