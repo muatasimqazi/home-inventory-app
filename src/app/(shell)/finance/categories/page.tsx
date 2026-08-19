@@ -11,6 +11,7 @@ import { RuleFormDialog } from "@/components/rule-form-dialog";
 import { useInventoryStore } from "@/lib/store";
 import { displayCodeBadgeClasses } from "@/lib/badge-color";
 import { cn } from "@/lib/utils";
+import { useRemountKey } from "@/hooks/use-remount-key";
 
 export default function CategoriesAndRulesPage() {
   const financeCategories = useInventoryStore((s) => s.financeCategories);
@@ -21,7 +22,9 @@ export default function CategoriesAndRulesPage() {
   const deleteCategoryRule = useInventoryStore((s) => s.deleteCategoryRule);
 
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [categoryDialogKey, bumpCategoryDialogKey] = useRemountKey();
   const [ruleDialogOpen, setRuleDialogOpen] = useState(false);
+  const [ruleDialogKey, bumpRuleDialogKey] = useRemountKey();
   const [trashConfirmId, setTrashConfirmId] = useState<string | null>(null);
 
   const activeCategories = financeCategories.filter((c) => c.status === "active");
@@ -45,7 +48,7 @@ export default function CategoriesAndRulesPage() {
       <div>
         <div className="mb-2 flex items-center justify-between">
           <h2 className="text-item-title font-semibold text-ink">Categories</h2>
-          <Button size="sm" variant="outline" onClick={() => setCategoryDialogOpen(true)}>
+          <Button size="sm" variant="outline" onClick={() => { bumpCategoryDialogKey(); setCategoryDialogOpen(true); }}>
             <Icon name="plus" size={14} /> Add
           </Button>
         </div>
@@ -78,7 +81,7 @@ export default function CategoriesAndRulesPage() {
       <div>
         <div className="mb-2 flex items-center justify-between">
           <h2 className="text-item-title font-semibold text-ink">Rules</h2>
-          <Button size="sm" variant="outline" onClick={() => setRuleDialogOpen(true)} disabled={activeCategories.length === 0}>
+          <Button size="sm" variant="outline" onClick={() => { bumpRuleDialogKey(); setRuleDialogOpen(true); }} disabled={activeCategories.length === 0}>
             <Icon name="plus" size={14} /> Add
           </Button>
         </div>
@@ -105,6 +108,7 @@ export default function CategoriesAndRulesPage() {
       </div>
 
       <CategoryFormDialog
+        key={categoryDialogKey}
         open={categoryDialogOpen}
         onOpenChange={setCategoryDialogOpen}
         onSubmit={(name) => {
@@ -114,6 +118,7 @@ export default function CategoriesAndRulesPage() {
       />
 
       <RuleFormDialog
+        key={ruleDialogKey}
         open={ruleDialogOpen}
         onOpenChange={setRuleDialogOpen}
         categories={financeCategories}

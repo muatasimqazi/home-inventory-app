@@ -40,7 +40,18 @@ export default function HouseholdMembersPage() {
           <p className="mt-0.5 text-caption text-muted-foreground">Invite family or roommates.</p>
         </div>
         {isOwner && (
-          <Button size="sm" onClick={() => setInviteOpen(true)}>
+          <Button
+            size="sm"
+            onClick={() => {
+              // Resets whatever was left over from a previous invite attempt
+              // that got cancelled instead of sent — email lives as plain
+              // page-level state (this sheet is inline JSX, not a separate
+              // component with its own useState(initial...) to key/remount),
+              // so nothing else would ever clear it between opens.
+              setEmail("");
+              setInviteOpen(true);
+            }}
+          >
             <Icon name="plus" size={14} /> Invite
           </Button>
         )}

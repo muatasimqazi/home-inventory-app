@@ -19,6 +19,7 @@ import { useInventoryStore } from "@/lib/store";
 import { coverPhotoUrl } from "@/lib/cover-photo";
 import { rotateStoredPhoto } from "@/lib/crop-image";
 import { activeItemCountForContainer, buildBreadcrumb, breadcrumbLabel, directChildContainers, itemsIn } from "@/lib/selectors";
+import { useRemountKey } from "@/hooks/use-remount-key";
 
 export default function LocationDetailPage() {
   const params = useParams<{ id: string }>();
@@ -34,6 +35,7 @@ export default function LocationDetailPage() {
   const removeLocationCoverPhoto = useInventoryStore((s) => s.removeLocationCoverPhoto);
 
   const [addContainerOpen, setAddContainerOpen] = useState(false);
+  const [addContainerKey, bumpAddContainerKey] = useRemountKey();
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [view, setView] = useState<ViewMode>("grid");
@@ -148,7 +150,7 @@ export default function LocationDetailPage() {
         </Link>
       </div>
 
-      <Button variant="secondary" size="lg" onClick={() => setAddContainerOpen(true)}>
+      <Button variant="secondary" size="lg" onClick={() => { bumpAddContainerKey(); setAddContainerOpen(true); }}>
         <Icon name="plus" size={16} /> Add Container
       </Button>
 
@@ -225,6 +227,7 @@ export default function LocationDetailPage() {
       )}
 
       <EntityFormSheet
+        key={addContainerKey}
         open={addContainerOpen}
         onOpenChange={setAddContainerOpen}
         title="Add Container"

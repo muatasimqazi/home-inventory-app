@@ -18,6 +18,7 @@ import { MoveSheet } from "@/components/move-sheet";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { DisplayCodeSheet } from "@/components/display-code-sheet";
 import { Button } from "@/components/ui/button";
+import { useRemountKey } from "@/hooks/use-remount-key";
 import { useInventoryStore } from "@/lib/store";
 import { coverPhotoUrl } from "@/lib/cover-photo";
 import { rotateStoredPhoto } from "@/lib/crop-image";
@@ -47,6 +48,7 @@ export default function ContainerDetailPage() {
   const removeContainerCoverPhoto = useInventoryStore((s) => s.removeContainerCoverPhoto);
 
   const [addSubOpen, setAddSubOpen] = useState(false);
+  const [addSubKey, bumpAddSubKey] = useRemountKey();
   const [editOpen, setEditOpen] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -211,7 +213,7 @@ export default function ContainerDetailPage() {
         <Button variant="secondary" size="lg" onClick={() => setMoveOpen(true)}>
           <Icon name="move" size={16} /> Move
         </Button>
-        <Button variant="outline" size="lg" onClick={() => setAddSubOpen(true)}>
+        <Button variant="outline" size="lg" onClick={() => { bumpAddSubKey(); setAddSubOpen(true); }}>
           <Icon name="plus" size={16} /> Sub-container
         </Button>
       </div>
@@ -327,6 +329,7 @@ export default function ContainerDetailPage() {
       )}
 
       <EntityFormSheet
+        key={addSubKey}
         open={addSubOpen}
         onOpenChange={setAddSubOpen}
         title="Add Sub-container"

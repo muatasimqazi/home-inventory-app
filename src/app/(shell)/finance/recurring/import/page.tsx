@@ -12,6 +12,7 @@ import { visionProvider, VisionDetectionError } from "@/lib/ai";
 import { detectRecurringCandidates, type RecurringCandidate } from "@/lib/recurring-detection";
 import { resolveCategory } from "@/lib/receipt-resolution";
 import { formatShortDate } from "@/lib/format";
+import { sortByLabel } from "@/lib/selectors";
 import { cn } from "@/lib/utils";
 import type { RecurringBillFrequency } from "@/lib/types";
 
@@ -52,7 +53,7 @@ function fileToDataUrl(file: File): Promise<string> {
  */
 export default function StatementImportPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const accounts = useInventoryStore((s) => s.accounts);
+  const accounts = sortByLabel(useInventoryStore((s) => s.accounts), (a) => a.name);
   const financeCategories = useInventoryStore((s) => s.financeCategories);
   const categoryRules = useInventoryStore((s) => s.categoryRules);
   const recurringBills = useInventoryStore((s) => s.recurringBills);
@@ -68,7 +69,10 @@ export default function StatementImportPage() {
   const [progress, setProgress] = useState(0);
   const [summary, setSummary] = useState<{ created: number; skipped: number } | null>(null);
 
-  const activeCategories = financeCategories.filter((c) => c.status === "active");
+  const activeCategories = sortByLabel(
+    financeCategories.filter((c) => c.status === "active"),
+    (c) => c.name
+  );
 
   async function handleFile(file: File) {
     setFileName(file.name);

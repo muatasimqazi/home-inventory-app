@@ -11,6 +11,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useInventoryStore } from "@/lib/store";
 import { useReceiptScanSession } from "@/lib/receipt-scan-session-store";
 import { formatCurrency } from "@/lib/format";
+import { sortByLabel } from "@/lib/selectors";
 import { cn } from "@/lib/utils";
 
 function centsToDisplay(cents: number | null): string {
@@ -33,14 +34,17 @@ export default function SingleReceiptReviewPage() {
   const updateDraft = useReceiptScanSession((s) => s.updateDraft);
   const reset = useReceiptScanSession((s) => s.reset);
 
-  const accounts = useInventoryStore((s) => s.accounts);
+  const accounts = sortByLabel(useInventoryStore((s) => s.accounts), (a) => a.name);
   const financeCategories = useInventoryStore((s) => s.financeCategories);
   const linkTransactionAttachment = useInventoryStore((s) => s.linkTransactionAttachment);
 
   const [confirming, setConfirming] = useState(false);
 
   const draft = (drafts ?? []).find((d) => d.status === "pending");
-  const activeCategories = financeCategories.filter((c) => c.status === "active");
+  const activeCategories = sortByLabel(
+    financeCategories.filter((c) => c.status === "active"),
+    (c) => c.name
+  );
 
   if (!draft || !batch) {
     return (

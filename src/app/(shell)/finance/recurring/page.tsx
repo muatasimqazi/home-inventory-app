@@ -14,6 +14,7 @@ import { RecurringBillFormSheet } from "@/components/recurring-bill-form-sheet";
 import { useInventoryStore } from "@/lib/store";
 import { upcomingRecurringBills, daysUntil } from "@/lib/selectors";
 import { formatCurrency } from "@/lib/format";
+import { useRemountKey } from "@/hooks/use-remount-key";
 
 export default function RecurringBillsPage() {
   const recurringBills = useInventoryStore((s) => s.recurringBills);
@@ -31,6 +32,7 @@ export default function RecurringBillsPage() {
   const searchParams = useSearchParams();
 
   const [createOpen, setCreateOpen] = useState(false);
+  const [createKey, bumpCreateKey] = useRemountKey();
   // Deep-link from the Home/Finance dashboard's "Upcoming bills" widget
   // (?billId=...) — same read-once-via-lazy-initializer convention as
   // Transactions' own ?transactionId= deep link.
@@ -68,7 +70,7 @@ export default function RecurringBillsPage() {
           >
             <Icon name="upload" size={18} />
           </Link>
-          <Button size="icon-lg" className="rounded-md" onClick={() => setCreateOpen(true)} aria-label="Add recurring bill">
+          <Button size="icon-lg" className="rounded-md" onClick={() => { bumpCreateKey(); setCreateOpen(true); }} aria-label="Add recurring bill">
             <Icon name="plus" size={18} />
           </Button>
         </div>
@@ -102,6 +104,7 @@ export default function RecurringBillsPage() {
       )}
 
       <RecurringBillFormSheet
+        key={createKey}
         open={createOpen}
         onOpenChange={setCreateOpen}
         accounts={accounts}

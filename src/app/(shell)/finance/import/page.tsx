@@ -11,6 +11,7 @@ import { useInventoryStore } from "@/lib/store";
 import { parseCsv } from "@/lib/csv";
 import { findDuplicateTransaction } from "@/lib/csv-import-resolution";
 import { formatCurrency } from "@/lib/format";
+import { sortByLabel } from "@/lib/selectors";
 import { cn } from "@/lib/utils";
 import type { Transaction } from "@/lib/types";
 
@@ -71,6 +72,7 @@ function parseDate(raw: string): string | null {
 export default function FinanceCsvImportPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const accounts = useInventoryStore((s) => s.accounts);
+  const sortedAccounts = sortByLabel(accounts, (a) => a.name);
   const transactions = useInventoryStore((s) => s.transactions);
   const createTransaction = useInventoryStore((s) => s.createTransaction);
   const recordCsvImportBatch = useInventoryStore((s) => s.recordCsvImportBatch);
@@ -79,7 +81,7 @@ export default function FinanceCsvImportPage() {
   const [fileName, setFileName] = useState("");
   const [headers, setHeaders] = useState<string[]>([]);
   const [rows, setRows] = useState<string[][]>([]);
-  const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
+  const [accountId, setAccountId] = useState(sortedAccounts[0]?.id ?? "");
   const [mapping, setMapping] = useState<Record<FieldKey, string>>({ date: "", amount: "", description: "" });
   const [candidates, setCandidates] = useState<CandidateRow[]>([]);
   const [progress, setProgress] = useState(0);
@@ -233,7 +235,7 @@ export default function FinanceCsvImportPage() {
                     <SelectValue placeholder="Choose an account" />
                   </SelectTrigger>
                   <SelectContent>
-                    {accounts.map((a) => (
+                    {sortedAccounts.map((a) => (
                       <SelectItem key={a.id} value={a.id}>
                         {a.name}
                       </SelectItem>

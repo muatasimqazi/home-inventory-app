@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useInventoryStore } from "@/lib/store";
-import { CATEGORIES } from "@/lib/types";
+import { SORTED_CATEGORIES } from "@/lib/types";
 
 export default function NeedsReviewPage() {
   const items = useInventoryStore((s) => s.items);
@@ -96,7 +96,7 @@ export default function NeedsReviewPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {CATEGORIES.map((c) => (
+                      {SORTED_CATEGORIES.map((c) => (
                         <SelectItem key={c} value={c}>
                           {c}
                         </SelectItem>

@@ -91,6 +91,9 @@ export const CATEGORIES = [
 
 export type Category = (typeof CATEGORIES)[number];
 
+/** Alphabetical, for every category dropdown — CATEGORIES itself stays in its original (arbitrary, not meaningfully ordered) declaration order since nothing about the type depends on it, but a picker rendering it directly was exactly the kind of "dropdown not sorted" a user actually notices. Computed once at module load, not per-render, since the source array is static. */
+export const SORTED_CATEGORIES = [...CATEGORIES].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+
 export interface Item {
   id: string;
   householdId: string;

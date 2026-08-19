@@ -1,5 +1,10 @@
 import type { Account, AccountType, Container, FinanceCategory, Item, Location, RecurringBill, Tag, Transaction } from "./types";
 
+/** Case-insensitive alphabetical sort by whatever label a caller extracts — the shared ordering every dropdown of accounts/categories/members/etc. should use instead of rendering the raw store/DB order (usually creation order, not remotely alphabetical, and different again after every edit). Copies rather than sorting in place — callers almost always feed this a store array directly. */
+export function sortByLabel<T>(items: T[], getLabel: (item: T) => string): T[] {
+  return [...items].sort((a, b) => getLabel(a).localeCompare(getLabel(b), undefined, { sensitivity: "base" }));
+}
+
 export interface BreadcrumbSegment {
   id: string;
   name: string;

@@ -12,6 +12,7 @@ import { useInventoryStore } from "@/lib/store";
 import { accountTypeIcon, groupAccountsByType } from "@/lib/selectors";
 import { formatCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { useRemountKey } from "@/hooks/use-remount-key";
 
 export default function AccountsListPage() {
   const accounts = useInventoryStore((s) => s.accounts);
@@ -20,6 +21,12 @@ export default function AccountsListPage() {
   const createAccount = useInventoryStore((s) => s.createAccount);
   const shareAccount = useInventoryStore((s) => s.shareAccount);
   const [createOpen, setCreateOpen] = useState(false);
+  const [createKey, bumpCreateKey] = useRemountKey();
+
+  function openCreate() {
+    bumpCreateKey();
+    setCreateOpen(true);
+  }
 
   const groups = groupAccountsByType(accounts);
   const otherMembers = members.filter((m) => m.userId !== currentUserId);
@@ -31,7 +38,7 @@ export default function AccountsListPage() {
           <h1 className="text-screen-title font-semibold text-ink">Accounts</h1>
           <p className="mt-0.5 text-caption text-muted-foreground">Checking, savings, cards, loans & investments.</p>
         </div>
-        <Button size="icon-lg" className="rounded-md" onClick={() => setCreateOpen(true)} aria-label="Add account">
+        <Button size="icon-lg" className="rounded-md" onClick={openCreate} aria-label="Add account">
           <Icon name="plus" size={18} />
         </Button>
       </div>
@@ -42,7 +49,7 @@ export default function AccountsListPage() {
           title="No accounts yet"
           description="Add your first account — checking, savings, a credit card, whatever you want to track."
           action={
-            <Button size="lg" onClick={() => setCreateOpen(true)}>
+            <Button size="lg" onClick={openCreate}>
               Add an account
             </Button>
           }
@@ -78,6 +85,7 @@ export default function AccountsListPage() {
       )}
 
       <AccountFormSheet
+        key={createKey}
         open={createOpen}
         onOpenChange={setCreateOpen}
         otherMembers={otherMembers}

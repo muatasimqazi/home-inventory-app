@@ -13,6 +13,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { rowToReceiptScanBatch, rowToScannedTransactionDraft, rowToScannedReceiptLineItem } from "@/lib/supabase/mappers";
 import { useInventoryStore } from "@/lib/store";
 import { formatCurrency, formatShortDate } from "@/lib/format";
+import { sortByLabel } from "@/lib/selectors";
 import type { ReceiptScanBatch, ScannedTransactionDraft, ScannedReceiptLineItem } from "@/lib/types";
 
 interface PendingGroup {
@@ -38,7 +39,7 @@ interface PendingGroup {
 export default function PendingReceiptsPage() {
   const router = useRouter();
   const currentHouseholdId = useInventoryStore((s) => s.currentHouseholdId);
-  const accounts = useInventoryStore((s) => s.accounts);
+  const accounts = sortByLabel(useInventoryStore((s) => s.accounts), (a) => a.name);
 
   const [groups, setGroups] = useState<PendingGroup[] | null>(null);
   const [selectedAccountId, setSelectedAccountId] = useState<Record<string, string>>({});

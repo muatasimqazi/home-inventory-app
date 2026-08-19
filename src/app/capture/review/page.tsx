@@ -15,7 +15,7 @@ import { useInventoryStore, type NewItemInput } from "@/lib/store";
 import { stopCameraStream } from "@/lib/camera-stream";
 import { cropToItem, dataUrlToFile } from "@/lib/crop-image";
 import { buildBreadcrumb } from "@/lib/selectors";
-import { CATEGORIES } from "@/lib/types";
+import { SORTED_CATEGORIES } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 // A low-confidence AI suggestion (row.needsReview) left completely
@@ -306,7 +306,7 @@ function SingleReviewForm({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {CATEGORIES.map((c) => (
+            {SORTED_CATEGORIES.map((c) => (
               <SelectItem key={c} value={c}>
                 {c}
               </SelectItem>
@@ -389,7 +389,7 @@ function BulkRow({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {CATEGORIES.map((c) => (
+                {SORTED_CATEGORIES.map((c) => (
                   <SelectItem key={c} value={c}>
                     {c}
                   </SelectItem>

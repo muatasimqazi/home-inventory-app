@@ -60,6 +60,35 @@ export function resolveCategory(
   return { categoryId: null, source: null, confidence: 0 };
 }
 
+/**
+ * "User corrects a category -> offer 'always categorize [merchant] as
+ * [category]'" (Addendum §5, point 3) — this is the decision half; the
+ * caller owns the actual createCategoryRule/deleteCategoryRule calls
+ * (this file stays a pure, store-free layer per its own header comment).
+ * Pure so the "should I write anything at all" question — including the
+ * no-op case, which matters: re-saving a transaction whose category
+ * already matches its own rule shouldn't spawn a duplicate — is testable
+ * without a store.
+ */
+export type CategoryRuleLearnAction =
+  | { kind: "none" } // nothing to learn: no merchant, no category, or an existing rule already resolves to this exact category
+  | { kind: "create" }
+  | { kind: "replace"; staleRuleId: string }; // an existing merchant rule points somewhere else — this correction supersedes it, not adds beside it
+
+export function decideCategoryRuleLearnAction(merchant: string, categoryId: string, existingRules: CategoryRule[]): CategoryRuleLearnAction {
+  const normalized = merchant.trim().toLowerCase();
+  if (!normalized || !categoryId) return { kind: "none" };
+
+  const existing = existingRules.find((r) => {
+    if (r.matchField !== "merchant") return false;
+    const value = r.matchValue.trim().toLowerCase();
+    return r.matchType === "exact" ? normalized === value : normalized.includes(value);
+  });
+  if (!existing) return { kind: "create" };
+  if (existing.categoryId === categoryId) return { kind: "none" };
+  return { kind: "replace", staleRuleId: existing.id };
+}
+
 export type AccountMatchState = "matched" | "none" | "ambiguous";
 
 export interface AccountResolution {

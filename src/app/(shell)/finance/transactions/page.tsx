@@ -23,10 +23,12 @@ import {
   createManualLineItem,
 } from "@/lib/receipt-line-items";
 import { createAndLinkRefundTransaction } from "@/lib/receipt-refunds";
+import { decideCategoryRuleLearnAction } from "@/lib/receipt-resolution";
 import { useInventoryStore } from "@/lib/store";
 import { displayCodeBadgeClasses } from "@/lib/badge-color";
 import { formatCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { useRemountKey } from "@/hooks/use-remount-key";
 import type { ScannedReceiptLineItem, Transaction } from "@/lib/types";
 
 type DateScope = "all" | "month" | "custom";
@@ -55,11 +57,14 @@ export default function TransactionsListPage() {
   const accounts = useInventoryStore((s) => s.accounts);
   const transactions = useInventoryStore((s) => s.transactions);
   const financeCategories = useInventoryStore((s) => s.financeCategories);
+  const categoryRules = useInventoryStore((s) => s.categoryRules);
   const transactionAttachments = useInventoryStore((s) => s.transactionAttachments);
   const createTransaction = useInventoryStore((s) => s.createTransaction);
   const createLinkedTransactionPair = useInventoryStore((s) => s.createLinkedTransactionPair);
   const updateTransaction = useInventoryStore((s) => s.updateTransaction);
   const trashTransaction = useInventoryStore((s) => s.trashTransaction);
+  const createCategoryRule = useInventoryStore((s) => s.createCategoryRule);
+  const deleteCategoryRule = useInventoryStore((s) => s.deleteCategoryRule);
 
   const searchParams = useSearchParams();
   const defaultAccountId = searchParams.get("accountId") ?? undefined;
@@ -85,6 +90,7 @@ export default function TransactionsListPage() {
   // effect + setState, which would cost an extra render for no benefit
   // here — the query param never changes without a full navigation).
   const [createOpen, setCreateOpen] = useState(() => searchParams.get("open") === "new");
+  const [createKey, bumpCreateKey] = useRemountKey();
   const [editOpen, setEditOpen] = useState(false);
   // Deep-link from a search result (?transactionId=...) — opens straight to
   // that transaction's detail drawer instead of landing on the bare list.
@@ -297,6 +303,16 @@ export default function TransactionsListPage() {
     : [];
   const linkedRefundTxn = editingLineItem?.refundTransactionId ? (transactions.find((t) => t.id === editingLineItem.refundTransactionId) ?? null) : null;
 
+  /** "Remember this category" from TransactionFormSheet — decides create/replace/no-op (decideCategoryRuleLearnAction), then makes the actual write. Shared by both the create and edit onSubmitSingle handlers below rather than duplicated. */
+  function applyCategoryRuleLearning(merchant: string | null, categoryId: string | null) {
+    if (!merchant || !categoryId) return;
+    const action = decideCategoryRuleLearnAction(merchant, categoryId, categoryRules);
+    if (action.kind === "none") return;
+    if (action.kind === "replace") deleteCategoryRule(action.staleRuleId);
+    createCategoryRule({ matchField: "merchant", matchType: "contains", matchValue: merchant, categoryId });
+    toast.success(`Future "${merchant}" transactions will be categorized automatically`, { duration: 3000 });
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-start justify-between">
@@ -308,7 +324,7 @@ export default function TransactionsListPage() {
           <Link href="/finance/scan" className="tap-target flex size-11 items-center justify-center rounded-md bg-surface-muted text-ink" aria-label="Scan receipt">
             <Icon name="camera" size={18} />
           </Link>
-          <Button size="icon-lg" className="rounded-md" onClick={() => setCreateOpen(true)} aria-label="Add transaction" disabled={accounts.length === 0}>
+          <Button size="icon-lg" className="rounded-md" onClick={() => { bumpCreateKey(); setCreateOpen(true); }} aria-label="Add transaction" disabled={accounts.length === 0}>
             <Icon name="plus" size={18} />
           </Button>
         </div>
@@ -457,13 +473,16 @@ export default function TransactionsListPage() {
       )}
 
       <TransactionFormSheet
+        key={createKey}
         open={createOpen}
         onOpenChange={setCreateOpen}
         accounts={accounts}
         categories={financeCategories}
+        categoryRules={categoryRules}
         defaultAccountId={defaultAccountId}
         onSubmitSingle={(values) => {
           createTransaction(values);
+          if (values.rememberCategory) applyCategoryRuleLearning(values.merchant, values.categoryId);
           toast.success("Transaction added");
         }}
         onSubmitTransfer={(values) => {
@@ -484,9 +503,11 @@ export default function TransactionsListPage() {
         onOpenChange={setEditOpen}
         accounts={accounts}
         categories={financeCategories}
+        categoryRules={categoryRules}
         initial={detailTxn ?? undefined}
         onSubmitSingle={(values) => {
           if (detailTxn) updateTransaction(detailTxn.id, values);
+          if (values.rememberCategory) applyCategoryRuleLearning(values.merchant, values.categoryId);
           toast.success("Transaction updated");
         }}
         onSubmitTransfer={() => {

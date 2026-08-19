@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useInventoryStore } from "@/lib/store";
-import { CATEGORIES } from "@/lib/types";
+import { sortByLabel } from "@/lib/selectors";
+import { SORTED_CATEGORIES } from "@/lib/types";
 import { extraFieldsForCategory } from "@/lib/category";
 
 const SHARED_OWNER_VALUE = "shared";
@@ -18,7 +19,7 @@ export default function EditItemPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const items = useInventoryStore((s) => s.items);
-  const members = useInventoryStore((s) => s.members);
+  const members = sortByLabel(useInventoryStore((s) => s.members), (m) => m.displayName);
   const updateItem = useInventoryStore((s) => s.updateItem);
 
   const item = items.find((it) => it.id === params.id);
@@ -115,7 +116,7 @@ function EditItemForm({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {CATEGORIES.map((c) => (
+              {SORTED_CATEGORIES.map((c) => (
                 <SelectItem key={c} value={c}>
                   {c}
                 </SelectItem>

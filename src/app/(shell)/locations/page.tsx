@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useInventoryStore } from "@/lib/store";
 import { activeItemCountForLocation, activeLocations } from "@/lib/selectors";
+import { useRemountKey } from "@/hooks/use-remount-key";
 
 export default function LocationsListPage() {
   const locations = activeLocations(useInventoryStore((s) => s.locations));
@@ -20,8 +21,14 @@ export default function LocationsListPage() {
   const createLocation = useInventoryStore((s) => s.createLocation);
   const setLocationCoverPhoto = useInventoryStore((s) => s.setLocationCoverPhoto);
   const [createOpen, setCreateOpen] = useState(false);
+  const [createKey, bumpCreateKey] = useRemountKey();
   const [openLocationId, setOpenLocationId] = useState<string | null>(null);
   const [openContainerIds, setOpenContainerIds] = useState<Set<string>>(new Set());
+
+  function openCreate() {
+    bumpCreateKey();
+    setCreateOpen(true);
+  }
 
   function toggleContainer(id: string) {
     setOpenContainerIds((s) => {
@@ -39,7 +46,7 @@ export default function LocationsListPage() {
           <h1 className="text-screen-title font-semibold text-ink">Locations</h1>
           <p className="mt-0.5 text-caption text-muted-foreground">Browse household storage areas.</p>
         </div>
-        <Button size="icon-lg" className="rounded-md" onClick={() => setCreateOpen(true)} aria-label="Add location">
+        <Button size="icon-lg" className="rounded-md" onClick={openCreate} aria-label="Add location">
           <Icon name="plus" size={18} />
         </Button>
       </div>
@@ -50,7 +57,7 @@ export default function LocationsListPage() {
           title="No locations yet"
           description="Locations are the top-level places you store things — Garage, Attic, Office."
           action={
-            <Button size="lg" onClick={() => setCreateOpen(true)}>
+            <Button size="lg" onClick={openCreate}>
               Add a location
             </Button>
           }
@@ -111,6 +118,7 @@ export default function LocationsListPage() {
       )}
 
       <EntityFormSheet
+        key={createKey}
         open={createOpen}
         onOpenChange={setCreateOpen}
         title="Add Location"

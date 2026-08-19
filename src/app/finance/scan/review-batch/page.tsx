@@ -10,6 +10,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useInventoryStore } from "@/lib/store";
 import { useReceiptScanSession, type DraftRow } from "@/lib/receipt-scan-session-store";
 import { formatCurrency, formatShortDate } from "@/lib/format";
+import { sortByLabel } from "@/lib/selectors";
 import { cn } from "@/lib/utils";
 
 /**
@@ -36,7 +37,7 @@ export default function BulkStatementReviewPage() {
   const reset = useReceiptScanSession((s) => s.reset);
   const loadBatch = useReceiptScanSession((s) => s.loadBatch);
 
-  const accounts = useInventoryStore((s) => s.accounts);
+  const accounts = sortByLabel(useInventoryStore((s) => s.accounts), (a) => a.name);
   const financeCategories = useInventoryStore((s) => s.financeCategories);
   const linkTransactionAttachment = useInventoryStore((s) => s.linkTransactionAttachment);
 
@@ -69,7 +70,10 @@ export default function BulkStatementReviewPage() {
     };
   }, [batchIdParam, loadBatch]);
 
-  const activeCategories = financeCategories.filter((c) => c.status === "active");
+  const activeCategories = sortByLabel(
+    financeCategories.filter((c) => c.status === "active"),
+    (c) => c.name
+  );
   const pending = (drafts ?? []).filter((d) => d.status === "pending");
 
   if (loadingBatch) {

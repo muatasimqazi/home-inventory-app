@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { sortByLabel } from "@/lib/selectors";
 import type { FinanceCategory } from "@/lib/types";
 
 interface RuleFormDialogProps {
@@ -18,10 +19,12 @@ interface RuleFormDialogProps {
 export function RuleFormDialog({ open, onOpenChange, categories, onSubmit }: RuleFormDialogProps) {
   const [matchField, setMatchField] = useState<"merchant" | "description">("merchant");
   const [matchValue, setMatchValue] = useState("");
-  const [categoryId, setCategoryId] = useState(categories[0]?.id ?? "");
+  const activeCategories = sortByLabel(
+    categories.filter((c) => c.status === "active"),
+    (c) => c.name
+  );
+  const [categoryId, setCategoryId] = useState(activeCategories[0]?.id ?? "");
   const [error, setError] = useState<string | null>(null);
-
-  const activeCategories = categories.filter((c) => c.status === "active");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

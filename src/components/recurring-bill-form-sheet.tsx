@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
+import { sortByLabel } from "@/lib/selectors";
 import type { Account, FinanceCategory, Member, RecurringBill, RecurringBillFrequency } from "@/lib/types";
 
 const FREQUENCIES: { value: RecurringBillFrequency; label: string }[] = [
@@ -74,7 +75,11 @@ export function RecurringBillFormSheet({
   const [sharedWithUserIds, setSharedWithUserIds] = useState<string[]>(initialSharedWithUserIds);
   const [error, setError] = useState<string | null>(null);
 
-  const activeCategories = categories.filter((c) => c.status === "active");
+  const activeCategories = sortByLabel(
+    categories.filter((c) => c.status === "active"),
+    (c) => c.name
+  );
+  const sortedAccounts = sortByLabel(accounts, (a) => a.name);
 
   function toggleShare(userId: string) {
     setSharedWithUserIds((cur) => (cur.includes(userId) ? cur.filter((id) => id !== userId) : [...cur, userId]));
@@ -171,7 +176,7 @@ export function RecurringBillFormSheet({
                   <SelectValue placeholder="None" />
                 </SelectTrigger>
                 <SelectContent>
-                  {accounts.map((a) => (
+                  {sortedAccounts.map((a) => (
                     <SelectItem key={a.id} value={a.id}>
                       {a.name}
                     </SelectItem>

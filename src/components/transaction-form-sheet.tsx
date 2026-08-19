@@ -7,7 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import type { Account, FinanceCategory, Transaction, TransactionType } from "@/lib/types";
+import { sortByLabel } from "@/lib/selectors";
+import { resolveCategory } from "@/lib/receipt-resolution";
+import type { Account, CategoryRule, FinanceCategory, Transaction, TransactionType } from "@/lib/types";
 
 const TYPES: { value: TransactionType; label: string }[] = [
   { value: "expense", label: "Expense" },
@@ -29,6 +31,8 @@ interface TransactionFormSheetProps {
   onOpenChange: (open: boolean) => void;
   accounts: Account[];
   categories: FinanceCategory[];
+  /** Powers live category auto-suggestion as the merchant field is typed — see the Merchant input's onChange below. Optional/defaults to empty so any caller that hasn't threaded this through yet still works, just without the suggestion. */
+  categoryRules?: CategoryRule[];
   initial?: Transaction;
   /** Pre-selects an account (e.g. opened from an Account Detail page) — ignored when editing. */
   defaultAccountId?: string;
@@ -42,6 +46,8 @@ interface TransactionFormSheetProps {
     description: string | null;
     notes: string;
     excludedFromReports: boolean;
+    /** True when "Remember this category" was checked — the caller (which owns categoryRules) decides whether that means creating a new rule or replacing a stale one; this form only reports the user's intent. */
+    rememberCategory: boolean;
   }) => void;
   onSubmitTransfer: (values: {
     fromAccountId: string;
@@ -75,6 +81,7 @@ export function TransactionFormSheet({
   onOpenChange,
   accounts,
   categories,
+  categoryRules = [],
   initial,
   defaultAccountId,
   onSubmitSingle,
@@ -90,10 +97,23 @@ export function TransactionFormSheet({
   const [description, setDescription] = useState(initial?.description ?? "");
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [excludedFromReports, setExcludedFromReports] = useState(initial?.excludedFromReports ?? false);
+  // Defaults on — Receipt Scanning Addendum §5's "user corrects a category
+  // during review -> offer 'always categorize [merchant] as [category]'"
+  // was speced but never actually wired up for the general transaction
+  // form (only the standalone Categories & Rules page could create a
+  // rule, and only by typing the merchant out again by hand). Checked by
+  // default so picking a category "just works" the way a user would
+  // expect, per-transaction opt-out (not a separate required step) keeps
+  // it user-correctable rather than silently automated.
+  const [rememberCategory, setRememberCategory] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const needsSecondAccount = NEEDS_SECOND_ACCOUNT.includes(type) && !initial;
-  const activeCategories = categories.filter((c) => c.status === "active");
+  const sortedAccounts = sortByLabel(accounts, (a) => a.name);
+  const activeCategories = sortByLabel(
+    categories.filter((c) => c.status === "active"),
+    (c) => c.name
+  );
 
   function handleSubmit() {
     const parsedAmount = Number(amount);
@@ -140,6 +160,7 @@ export function TransactionFormSheet({
       description: description.trim() || null,
       notes: notes.trim(),
       excludedFromReports,
+      rememberCategory,
     });
     onOpenChange(false);
   }
@@ -171,7 +192,7 @@ export function TransactionFormSheet({
                 <SelectValue placeholder="Choose an account" />
               </SelectTrigger>
               <SelectContent>
-                {accounts.map((a) => (
+                {sortedAccounts.map((a) => (
                   <SelectItem key={a.id} value={a.id}>
                     {a.name}
                   </SelectItem>
@@ -188,7 +209,7 @@ export function TransactionFormSheet({
                   <SelectValue placeholder="Choose an account" />
                 </SelectTrigger>
                 <SelectContent>
-                  {accounts
+                  {sortedAccounts
                     .filter((a) => a.id !== accountId)
                     .map((a) => (
                       <SelectItem key={a.id} value={a.id}>
@@ -222,7 +243,27 @@ export function TransactionFormSheet({
 
           <div>
             <label className="mb-1 block text-caption text-muted-foreground">Merchant</label>
-            <Input value={merchant} onChange={(e) => setMerchant(e.target.value)} placeholder="e.g. Whole Foods" className="h-11" />
+            <Input
+              value={merchant}
+              onChange={(e) => {
+                const nextMerchant = e.target.value;
+                setMerchant(nextMerchant);
+                // Live rule lookup, not an effect — only fires on the
+                // actual keystroke that could change the answer, and only
+                // fills in a category the user hasn't already chosen
+                // themselves (never overwrites an explicit pick). This is
+                // the "future Figma transactions get Technology
+                // automatically" loop actually closing for manual entry,
+                // not just AI-driven flows that already called
+                // resolveCategory() on their own.
+                if (!categoryId) {
+                  const resolved = resolveCategory(nextMerchant, "merchant", categoryRules, categories);
+                  if (resolved.source === "rule_match" && resolved.categoryId) setCategoryId(resolved.categoryId);
+                }
+              }}
+              placeholder="e.g. Whole Foods"
+              className="h-11"
+            />
           </div>
 
           {!needsSecondAccount && (
@@ -240,6 +281,12 @@ export function TransactionFormSheet({
                   ))}
                 </SelectContent>
               </Select>
+              {merchant.trim() && categoryId && (
+                <label className="mt-2 flex items-start gap-2 text-caption text-ink">
+                  <input type="checkbox" checked={rememberCategory} onChange={(e) => setRememberCategory(e.target.checked)} className="mt-0.5 size-4" />
+                  Always categorize &ldquo;{merchant.trim()}&rdquo; as {activeCategories.find((c) => c.id === categoryId)?.name ?? "this"} from now on
+                </label>
+              )}
             </div>
           )}
 

@@ -12,8 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useInventoryStore } from "@/lib/store";
-import { buildBreadcrumb } from "@/lib/selectors";
-import { CATEGORIES } from "@/lib/types";
+import { buildBreadcrumb, sortByLabel } from "@/lib/selectors";
+import { SORTED_CATEGORIES } from "@/lib/types";
 import { extraFieldsForCategory } from "@/lib/category";
 import { cn } from "@/lib/utils";
 
@@ -46,7 +46,7 @@ function ManualAddItemInner() {
   const searchParams = useSearchParams();
   const locations = useInventoryStore((s) => s.locations);
   const containers = useInventoryStore((s) => s.containers);
-  const members = useInventoryStore((s) => s.members);
+  const members = sortByLabel(useInventoryStore((s) => s.members), (m) => m.displayName);
   const createItem = useInventoryStore((s) => s.createItem);
   const setItemCoverPhoto = useInventoryStore((s) => s.setItemCoverPhoto);
   const getOrCreateTag = useInventoryStore((s) => s.getOrCreateTag);
@@ -56,7 +56,7 @@ function ManualAddItemInner() {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
   const [name, setName] = useState("");
-  const [category, setCategory] = useState<string>(CATEGORIES[0]);
+  const [category, setCategory] = useState<string>(SORTED_CATEGORIES[0]);
   const [quantity, setQuantity] = useState("1");
   const [notes, setNotes] = useState("");
   const [tagInput, setTagInput] = useState("");
@@ -189,7 +189,7 @@ function ManualAddItemInner() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {CATEGORIES.map((c) => (
+              {SORTED_CATEGORIES.map((c) => (
                 <SelectItem key={c} value={c}>
                   {c}
                 </SelectItem>
