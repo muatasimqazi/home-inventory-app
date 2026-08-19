@@ -131,6 +131,10 @@ export default function AccountDetailPage() {
       </Button>
 
       <AccountFormSheet
+        // Always mounted (open is just a prop here) — key on the record so
+        // a rename-then-reopen-edit within the same page session reseeds
+        // instead of showing the pre-edit values from first mount.
+        key={account.id}
         open={editOpen}
         onOpenChange={setEditOpen}
         initial={account}

@@ -240,6 +240,10 @@ export default function LocationDetailPage() {
       />
 
       <EntityFormSheet
+        // Always mounted (open is just a prop here) — key on the record so
+        // a rename-then-reopen-edit within the same page session reseeds
+        // instead of showing the pre-rename values from first mount.
+        key={location.id}
         open={editOpen}
         onOpenChange={setEditOpen}
         title="Edit Location"

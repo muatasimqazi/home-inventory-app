@@ -473,6 +473,13 @@ export default function TransactionsListPage() {
       />
 
       <TransactionFormSheet
+        // Remounts whenever the target transaction changes so the form's
+        // internal useState(initial...) fields actually reseed — this
+        // sheet stays mounted across the whole page's lifetime (open is
+        // just a prop, not a conditional render), so without a key every
+        // edit after the first showed stale (or, before any edit, blank)
+        // fields instead of the clicked transaction's real values.
+        key={detailTxn?.id ?? "none"}
         open={editOpen}
         onOpenChange={setEditOpen}
         accounts={accounts}
@@ -499,6 +506,11 @@ export default function TransactionsListPage() {
       />
 
       <LineItemFormSheet
+        // Same always-mounted-with-open-prop pattern as TransactionFormSheet
+        // above — needs a key tied to which item/transaction is targeted so
+        // the form remounts (and reseeds) between different items instead
+        // of reusing whatever the first-ever edit/add happened to seed.
+        key={editingLineItem?.id ?? addingItemForTransactionId ?? "none"}
         open={!!editingLineItem || !!addingItemForTransactionId}
         onOpenChange={(open) => {
           if (!open) {

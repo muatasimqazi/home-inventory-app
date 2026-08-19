@@ -33,8 +33,13 @@ export function EntityFormSheet({
   initialCoverPhotoEmoji = "📦",
   onSubmit,
 }: EntityFormSheetProps) {
-  // Radix's Sheet unmounts its content while closed, so these reset to the
-  // latest initial* props each time it reopens — no effect-based sync needed.
+  // Lazy-seeded from initial* props, not reseeded via an effect — this only
+  // stays correct because every caller mounts this component behind a
+  // `key` tied to the record being edited (see locations/[id],
+  // containers/[id]), forcing a real remount (and a fresh initializer run)
+  // whenever the target record changes. Radix's Sheet only controls
+  // *visibility*, not whether this outer component itself is mounted, so
+  // without that key these would silently go stale after the first edit.
   const [name, setName] = useState(initialName);
   const [description, setDescription] = useState(initialDescription);
   const [error, setError] = useState<string | null>(null);

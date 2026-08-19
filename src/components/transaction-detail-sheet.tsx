@@ -327,6 +327,11 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
     </Sheet>
 
     <LineItemFormSheet
+      // Same always-mounted-with-open-prop pattern as the transactions list
+      // page's copy of this sheet — key on the target item/transaction so
+      // the form remounts and reseeds instead of reusing stale state from
+      // whichever item was edited/added first in this drawer's lifetime.
+      key={editingLineItem?.id ?? (addingItem ? transaction.id : "none")}
       open={!!editingLineItem || addingItem}
       onOpenChange={(open) => {
         if (!open) {

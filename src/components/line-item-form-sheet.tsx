@@ -74,15 +74,18 @@ function todayInputValue(): string {
  * money movement are different kinds of actions. Not shown in create mode
  * — a not-yet-saved item can't be returned or deleted yet.
  *
- * Fields are seeded via lazy useState initializers, not a reseed effect —
- * matching TransactionFormSheet's own convention. Radix's SheetContent
- * unmounts its children when `open` goes false (no forceMount here), so a
- * fresh instance — and fresh initializer read of whatever `lineItem` is
- * current at that moment — is created each time the sheet reopens for a
- * different item. Relies on the caller fully closing before reopening for
- * a different item (or switching modes), which is how both call sites
- * already work — `open` is computed from `lineItem`/`createForTransactionId`
- * together, and both are cleared together on close.
+ * Fields are seeded via lazy useState initializers, not a reseed effect.
+ * The fresh-per-item read actually comes from *this file's own*
+ * `if (!lineItem && !createForTransactionId) return null` guard below —
+ * not from Radix (SheetContent unmounting its portal content while
+ * closed says nothing about whether this outer component, which owns the
+ * hooks, is mounted). When a caller clears both props to null/false on
+ * close, this wrapper renders null, genuinely unmounting
+ * LineItemFormSheetInner; reopening for a different item is then a real
+ * first mount with fresh props. Both call sites also now pass an explicit
+ * `key` on top of this as a second, more direct guarantee — see
+ * TransactionFormSheet, which lacked any equivalent guard and was
+ * shipping stale/blank fields on every edit after the first as a result.
  */
 export function LineItemFormSheet({ lineItem, createForTransactionId, onOpenChange, ...rest }: LineItemFormSheetProps) {
   if (!lineItem && !createForTransactionId) return null;
