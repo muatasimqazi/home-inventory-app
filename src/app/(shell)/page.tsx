@@ -311,14 +311,14 @@ export default function OverviewPage() {
             ) : (
               <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
                 {upcomingBills.map((b) => (
-                  <div key={b.id} className="flex items-center gap-3 px-4 py-3">
+                  <Link key={b.id} href={`/finance/recurring?billId=${b.id}`} className="flex items-center gap-3 px-4 py-3">
                     <IconChip icon="repeat" tone="muted" size="sm" />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-body font-medium text-ink">{b.name}</p>
                       <p className="truncate text-caption text-muted-foreground">Due {formatShortDate(b.nextDueDate)}</p>
                     </div>
                     <span className="shrink-0 text-body font-semibold text-ink">{formatCurrency(b.expectedAmount)}</span>
-                  </div>
+                  </Link>
                 ))}
               </div>
             )}
@@ -337,7 +337,7 @@ export default function OverviewPage() {
           ) : (
             <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
               {recentTxns.map((t) => (
-                <div key={t.id} className="flex items-center gap-3 px-4 py-3">
+                <Link key={t.id} href={`/finance/transactions?transactionId=${t.id}`} className="flex items-center gap-3 px-4 py-3">
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-body font-medium text-ink">{t.merchant ?? t.description ?? "Transaction"}</p>
                     <p className="truncate text-caption text-muted-foreground">{formatShortDate(t.occurredAt)}</p>
@@ -345,7 +345,7 @@ export default function OverviewPage() {
                   <span className={cn("shrink-0 text-body font-semibold", t.amount < 0 ? "text-money-negative-text" : "text-badge-green-text")}>
                     {formatCurrency(t.amount, { showPositiveSign: true })}
                   </span>
-                </div>
+                </Link>
               ))}
             </div>
           )}

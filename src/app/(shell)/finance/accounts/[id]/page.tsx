@@ -109,7 +109,7 @@ export default function AccountDetailPage() {
         ) : (
           <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
             {accountTransactions.map((t) => (
-              <div key={t.id} className="flex items-center gap-3 px-4 py-3">
+              <Link key={t.id} href={`/finance/transactions?transactionId=${t.id}`} className="flex items-center gap-3 px-4 py-3">
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-body font-medium text-ink">{t.merchant ?? t.description ?? "Transaction"}</p>
                   <p className="truncate text-caption text-muted-foreground">
@@ -119,7 +119,7 @@ export default function AccountDetailPage() {
                 <span className={cn("shrink-0 text-body font-semibold", t.amount < 0 ? "text-money-negative-text" : "text-badge-green-text")}>
                   {formatCurrency(t.amount, { showPositiveSign: true })}
                 </span>
-              </div>
+              </Link>
             ))}
           </div>
         )}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
 import { IconChip } from "@/components/icon-chip";
@@ -26,8 +27,13 @@ export default function RecurringBillsPage() {
   const shareRecurringBill = useInventoryStore((s) => s.shareRecurringBill);
   const unshareRecurringBill = useInventoryStore((s) => s.unshareRecurringBill);
 
+  const searchParams = useSearchParams();
+
   const [createOpen, setCreateOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  // Deep-link from the Home/Finance dashboard's "Upcoming bills" widget
+  // (?billId=...) — same read-once-via-lazy-initializer convention as
+  // Transactions' own ?transactionId= deep link.
+  const [editingId, setEditingId] = useState<string | null>(() => searchParams.get("billId"));
   const [trashConfirmId, setTrashConfirmId] = useState<string | null>(null);
 
   const bills = upcomingRecurringBills(recurringBills);
