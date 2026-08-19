@@ -4,17 +4,22 @@ import { toast } from "sonner";
 import { Icon } from "@/components/icon";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
+import { TrendLineChart } from "@/components/charts/trend-line-chart";
 import { useInventoryStore } from "@/lib/store";
 import { activeAccounts, netWorth } from "@/lib/selectors";
 import { formatCurrency, formatShortDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /**
- * Net Worth Trend (docs/Personal Finance PRD.md §35). Real trend data
- * needs AccountBalanceSnapshot history, normally populated by a nightly
- * scheduled job (PRD §30) this pass doesn't set up (pg_cron, deferred).
- * "Record snapshot" lets a household start building real history today
- * instead of showing a fake chart or staying permanently empty.
+ * Net Worth Trend (docs/Personal Finance PRD.md §35 — "Balance-trend
+ * chart (line)"). Real trend data needs AccountBalanceSnapshot history,
+ * normally populated by a nightly scheduled job (PRD §30) this pass
+ * doesn't set up (pg_cron, deferred). "Record snapshot" lets a household
+ * start building real history today instead of showing a fake chart or
+ * staying permanently empty. The line chart itself was a later addition
+ * (Figma audit found the PRD asks for "line," the original build shipped
+ * a horizontal-bar-per-date list instead) — real snapshot data, just a
+ * different visualization; the per-date list stays underneath as detail.
  */
 export default function NetWorthTrendPage() {
   const accounts = useInventoryStore((s) => s.accounts);
@@ -70,19 +75,22 @@ export default function NetWorthTrendPage() {
             description="Record a snapshot to start tracking net worth over time. This normally happens automatically each night."
           />
         ) : (
-          <div className="flex flex-col gap-2 rounded-2xl border border-border bg-white p-4 shadow-sm">
-            {trend.map(([date, value]) => (
-              <div key={date} className="flex items-center gap-3">
-                <span className="w-16 shrink-0 text-caption text-muted-foreground">{formatShortDate(new Date(date).toISOString())}</span>
-                <div className="h-2 flex-1 overflow-hidden rounded-full bg-surface-muted">
-                  <div
-                    className={cn("h-full rounded-full", value < 0 ? "bg-money-negative-text" : "bg-yellow")}
-                    style={{ width: `${Math.max(4, (Math.abs(value) / maxAbs) * 100)}%` }}
-                  />
+          <div className="flex flex-col gap-4 rounded-2xl border border-border bg-white p-4 shadow-sm">
+            <TrendLineChart points={trend.map(([date, value]) => ({ label: formatShortDate(new Date(date).toISOString()), value }))} />
+            <div className="flex flex-col gap-2 border-t border-border pt-3">
+              {trend.map(([date, value]) => (
+                <div key={date} className="flex items-center gap-3">
+                  <span className="w-16 shrink-0 text-caption text-muted-foreground">{formatShortDate(new Date(date).toISOString())}</span>
+                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-surface-muted">
+                    <div
+                      className={cn("h-full rounded-full", value < 0 ? "bg-money-negative-text" : "bg-yellow")}
+                      style={{ width: `${Math.max(4, (Math.abs(value) / maxAbs) * 100)}%` }}
+                    />
+                  </div>
+                  <span className="w-24 shrink-0 text-right text-caption font-medium text-ink">{formatCurrency(value)}</span>
                 </div>
-                <span className="w-24 shrink-0 text-right text-caption font-medium text-ink">{formatCurrency(value)}</span>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         )}
       </div>

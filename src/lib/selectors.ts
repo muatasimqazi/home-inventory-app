@@ -1,4 +1,4 @@
-import type { Account, AccountType, Container, Item, Location, RecurringBill, Tag, Transaction } from "./types";
+import type { Account, AccountType, Container, FinanceCategory, Item, Location, RecurringBill, Tag, Transaction } from "./types";
 
 export interface BreadcrumbSegment {
   id: string;
@@ -225,6 +225,52 @@ export function cashFlowForMonth(transactions: Transaction[], month: Date): Cash
   const income = inMonth.filter((t) => t.type === "income").reduce((sum, t) => sum + t.amount, 0);
   const spend = inMonth.filter((t) => t.type === "expense").reduce((sum, t) => sum + Math.abs(t.amount), 0);
   return { income, spend, net: income - spend };
+}
+
+export interface CashFlowMonth extends CashFlow {
+  /** Short label for a chart axis, e.g. "Mar". */
+  label: string;
+  /** First-of-month Date this point represents — for a caller that needs more than the short label. */
+  month: Date;
+}
+
+/** cashFlowForMonth() run over the last `monthsBack` months (this month included, oldest first) — the per-month income/expense series PRD §35's "Cash flow — income vs. expense, per month" chart needs, not just a single period's snapshot. */
+export function cashFlowTrend(transactions: Transaction[], monthsBack: number, now: Date = new Date()): CashFlowMonth[] {
+  const months: CashFlowMonth[] = [];
+  for (let i = monthsBack - 1; i >= 0; i--) {
+    const month = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const flow = cashFlowForMonth(transactions, month);
+    months.push({ ...flow, label: month.toLocaleDateString(undefined, { month: "short" }), month });
+  }
+  return months;
+}
+
+export interface CategorySpend {
+  categoryId: string | null;
+  name: string;
+  amount: number;
+}
+
+/** Expense-only spend for the given month, grouped by category and ranked descending — PRD §35's "Category breakdown — ranked by spend" chart. Income/transfer/refund transactions don't count toward "spend" any more than they do in cashFlowForMonth above; a category with zero spend this month is simply omitted rather than shown as a zero-width bar. */
+export function categoryBreakdownForMonth(transactions: Transaction[], categories: FinanceCategory[], month: Date, limit = 8): CategorySpend[] {
+  const y = month.getFullYear();
+  const m = month.getMonth();
+  const nameById = new Map(categories.map((c) => [c.id, c.name]));
+
+  const totals = new Map<string | null, number>();
+  for (const t of transactions) {
+    if (t.trashedAt || t.excludedFromReports || t.type !== "expense") continue;
+    const d = new Date(t.occurredAt);
+    if (d.getFullYear() !== y || d.getMonth() !== m) continue;
+    const key = t.categoryId;
+    totals.set(key, (totals.get(key) ?? 0) + Math.abs(t.amount));
+  }
+
+  return Array.from(totals.entries())
+    .map(([categoryId, amount]) => ({ categoryId, name: categoryId ? (nameById.get(categoryId) ?? "Uncategorized") : "Uncategorized", amount }))
+    .filter((c) => c.amount > 0) // a $0 total (e.g. a receipt whose amount never got parsed) isn't meaningful as a spend-ranked bar
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, limit);
 }
 
 /** Active, non-trashed transactions for one account, most recent first. */

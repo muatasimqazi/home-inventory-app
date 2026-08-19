@@ -5,10 +5,13 @@ import { useState } from "react";
 import { Icon } from "@/components/icon";
 import { IconChip } from "@/components/icon-chip";
 import { Badge } from "@/components/ui/badge";
+import { CashFlowChart } from "@/components/charts/cash-flow-chart";
 import { useInventoryStore } from "@/lib/store";
 import {
   accountTypeIcon,
   cashFlowForMonth,
+  cashFlowTrend,
+  categoryBreakdownForMonth,
   groupAccountsByType,
   netWorth,
   recentTransactions,
@@ -35,6 +38,7 @@ export default function FinanceDashboardPage() {
   const accounts = useInventoryStore((s) => s.accounts);
   const transactions = useInventoryStore((s) => s.transactions);
   const recurringBills = useInventoryStore((s) => s.recurringBills);
+  const financeCategories = useInventoryStore((s) => s.financeCategories);
   const [view, setView] = useState<"mine" | "household">("mine");
 
   const scopedAccounts = view === "household" ? accounts.filter((a) => a.ownerUserId === null) : accounts;
@@ -48,6 +52,9 @@ export default function FinanceDashboardPage() {
   const groups = groupAccountsByType(scopedAccounts);
   const recent = recentTransactions(scopedTransactions, 3);
   const bills = upcomingRecurringBills(recurringBills, 1);
+  const flowTrend = cashFlowTrend(scopedTransactions, 6);
+  const categorySpend = categoryBreakdownForMonth(scopedTransactions, financeCategories, new Date());
+  const maxCategorySpend = Math.max(1, ...categorySpend.map((c) => c.amount));
 
   return (
     <div className="flex flex-col gap-5">
@@ -104,7 +111,29 @@ export default function FinanceDashboardPage() {
             </p>
           </div>
         </div>
+        {/* PRD §35 "Cash flow — income vs. expense, per month" — the tile
+            above is a single-period snapshot; this is the actual trend. */}
+        <div className="mt-4 border-t border-border pt-4">
+          <CashFlowChart months={flowTrend} />
+        </div>
       </div>
+
+      {categorySpend.length > 0 && (
+        <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
+          <p className="mb-3 text-caption font-medium tracking-wide text-muted-foreground uppercase">Spending by Category · This Month</p>
+          <div className="flex flex-col gap-2.5">
+            {categorySpend.map((c) => (
+              <div key={c.categoryId ?? "uncategorized"} className="flex items-center gap-3">
+                <span className="w-28 shrink-0 truncate text-caption text-ink">{c.name}</span>
+                <div className="h-2 flex-1 overflow-hidden rounded-full bg-surface-muted">
+                  <div className="h-full rounded-full bg-yellow" style={{ width: `${Math.max(4, (c.amount / maxCategorySpend) * 100)}%` }} />
+                </div>
+                <span className="w-20 shrink-0 text-right text-caption font-medium text-ink">{formatCurrency(c.amount)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div>
         <div className="mb-2 flex items-center justify-between">
