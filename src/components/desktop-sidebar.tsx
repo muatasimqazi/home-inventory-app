@@ -8,48 +8,8 @@ import { ReviewBadge } from "@/components/review-badge";
 import { ScanChooserSheet } from "@/components/scan-chooser-sheet";
 import { useInventoryStore, useCurrentHousehold } from "@/lib/store";
 import { computeHouseholdSummary, contextualCaptureHref } from "@/lib/selectors";
+import { INVENTORY_LINKS, FINANCE_LINKS, SHARED_LINKS } from "@/lib/nav-links";
 import { cn } from "@/lib/utils";
-
-// Genuinely inventory-only — nothing here is shared with Finance.
-const INVENTORY_LINKS: { href: string; icon: IconName; label: string }[] = [
-  { href: "/favorites", icon: "heart", label: "Favorites" },
-  { href: "/desktop", icon: "activity", label: "Activity Dashboard" },
-  { href: "/desktop/manage", icon: "box", label: "Manage" },
-  { href: "/desktop/labels", icon: "tag", label: "Label Printing" },
-];
-
-// Genuinely Finance-only.
-const FINANCE_LINKS: { href: string; icon: IconName; label: string }[] = [
-  { href: "/finance/dashboard", icon: "trendingUp", label: "Dashboard" },
-  { href: "/finance/accounts", icon: "wallet", label: "Accounts" },
-  { href: "/finance/transactions", icon: "receipt", label: "Transactions" },
-  { href: "/finance/categories", icon: "pieChart", label: "Categories & Rules" },
-  { href: "/finance/recurring", icon: "repeat", label: "Recurring Bills" },
-  { href: "/finance/net-worth", icon: "trendingUp", label: "Net Worth" },
-];
-
-// Activity/Trash/Import CSV were each already merged into one shared page
-// (docs note: Trash keeps two tabbed panels, Activity a real combined
-// feed) — but the sidebar was still listing all three *twice*, once
-// inside each domain section, just pointed at the same shared route with
-// a different query param. That's not two features, it's one feature
-// with a duplicated nav entry, which is exactly the kind of "shared item
-// living in both domains" the Trash/Activity/Import consolidation was
-// supposed to fix — the page merge didn't fully land until the nav
-// stopped re-duplicating it too. Pulled out into their own neutral
-// section, same reasoning that already moved Settings out on its own.
-//
-// Search joined this section for the same reason, later — it used to sit
-// under Home inventory, quietly searching only Inventory data (a real
-// reported gap: "search is wired to only inventory") despite being one of
-// 4 slots in the mobile bottom nav and clearly meant to be universal.
-// lib/search.ts now covers Finance (transactions, accounts) too.
-const SHARED_LINKS: { href: string; icon: IconName; label: string }[] = [
-  { href: "/search", icon: "search", label: "Search" },
-  { href: "/activity", icon: "activity", label: "Activity" },
-  { href: "/trash", icon: "trash", label: "Trash" },
-  { href: "/import", icon: "upload", label: "Import CSV" },
-];
 
 export function DesktopSidebar() {
   const pathname = usePathname();
