@@ -107,6 +107,7 @@ import type {
   TransactionType,
   CsvImportBatch,
 } from "./types";
+import { TRASH_RETENTION_DAYS } from "./types";
 import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
 
 // Supabase-backed data layer — households, members, invites, locations,
@@ -126,7 +127,6 @@ import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
 // properly async/awaited instead. addAttachment is also awaited: a file
 // has to actually finish uploading before there's anything to show.
 
-const TRASH_RETENTION_DAYS = 30;
 const REVIEW_LOW_CONFIDENCE = 0.75;
 
 export interface NewItemInput {
@@ -1878,6 +1878,12 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       openedAt: input.openedAt ?? null,
       trashedAt: null,
       permanentlyDeleteAfter: null,
+      // Never set through this manual-create path — a Plaid-linked account
+      // is only ever created by the server-side exchange-public-token
+      // route (Bank Sync Addendum §5), which writes plaid_item_id/
+      // plaid_account_id directly via the admin client.
+      plaidItemId: null,
+      plaidAccountId: null,
     };
     set((s) => ({ accounts: [...s.accounts, created] }));
     persistOrRevert(
@@ -2006,6 +2012,12 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       updatedAt: timestamp,
       trashedAt: null,
       permanentlyDeleteAfter: null,
+      // This is the client-side manual/CSV/receipt-scan create path — a
+      // Plaid-sourced transaction is only ever written server-side by the
+      // sync route (Bank Sync Addendum §6), which inserts/adopts rows
+      // directly via the admin client, not through this store method.
+      plaidTransactionId: null,
+      userEdited: false,
     };
     set((s) => ({ transactions: [created, ...s.transactions] }));
     persistOrRevert(
@@ -2044,6 +2056,8 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       updatedAt: timestamp,
       trashedAt: null,
       permanentlyDeleteAfter: null,
+      plaidTransactionId: null,
+      userEdited: false,
     };
     const toTxn: Transaction = {
       ...fromTxn,
@@ -2066,7 +2080,14 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     const supabase = getSupabaseBrowserClient();
     const previous = get().transactions.find((t) => t.id === transactionId);
     if (!previous) return;
-    const merged: Transaction = { ...previous, ...patch, updatedAt: nowIso() };
+    // Bank Sync Addendum §7 — any human edit to one of the fields a Plaid
+    // `modified` sync would otherwise refresh flips userEdited so that
+    // future sync event leaves it alone. Applied here, once, rather than
+    // requiring every call site to remember it — a plain field-level
+    // patch, not a dedicated action, is exactly how every other edit path
+    // (transaction form, detail sheet inline edits) already calls this.
+    const touchesProtectedField = ["categoryId", "merchant", "description", "notes"].some((k) => k in patch);
+    const merged: Transaction = { ...previous, ...patch, userEdited: touchesProtectedField ? true : previous.userEdited, updatedAt: nowIso() };
     set((s) => ({ transactions: s.transactions.map((t) => (t.id === transactionId ? merged : t)) }));
     persistOrRevert(
       supabase.from("transactions").update(transactionToInsertRow(merged)).eq("id", transactionId),

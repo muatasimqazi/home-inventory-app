@@ -32,7 +32,7 @@ A central, trustworthy financial dashboard for a household: one place to see wha
 
 ## 5. Non-Goals (MVP)
 
-Bank sync (Plaid) · budgets · financial goals · debt payoff strategy tooling · AI features · split transactions · receipt attachments · proactive notifications/alerts (upcoming-bill or unusual-spending pushes — distinct from the in-app Activity Feed, which *is* MVP, §22) · investment holdings/lot-level detail · natural-language search · multi-currency · multi-household membership per user.
+~~Bank sync (Plaid)~~ **built 2026-08-19** (see `docs/Bank Sync Addendum.md`) · budgets · financial goals · debt payoff strategy tooling · AI features · split transactions · receipt attachments · proactive notifications/alerts (upcoming-bill or unusual-spending pushes — distinct from the in-app Activity Feed, which *is* MVP, §22) · investment holdings/lot-level detail · natural-language search · multi-currency · multi-household membership per user.
 
 ## 6. Target Users
 
@@ -166,7 +166,7 @@ Expressed as *Requirement → User value → Behavior/edge cases* where useful; 
 
 - **Manual entry** and **CSV import** only in MVP.
 - CSV import is a guided flow: upload → map columns → review flagged duplicates → confirm — the same shape as Shohaz's CSV import (§34), sharing the pattern (and, at merge time, likely the component) even though the field targets differ.
-- Bank sync (Plaid or alternatives) is explicitly deferred to Phase 2 — it introduces cost, compliance surface, and a hard external dependency that shouldn't gate validating the core ledger model.
+- ~~Bank sync (Plaid or alternatives) is explicitly deferred to Phase 2 — it introduces cost, compliance surface, and a hard external dependency that shouldn't gate validating the core ledger model.~~ **Reopened and built 2026-08-19**, once the core ledger model was validated — see `docs/Bank Sync Addendum.md`. Coexists with manual entry/CSV import rather than replacing them for a linked account (reconciled via the same duplicate-detection heuristic as CSV import, §32.3).
 
 ## 21. Notifications & Alerts
 
@@ -213,7 +213,7 @@ Auth & household (Owner/Member roles, single-owner invariant, email-bound invite
 
 ## 28. Phase 2 / Future Scope
 
-Bank sync (Plaid) · budgets · financial goals · debt payoff tooling · split transactions · receipt attachments · light AI-assisted categorization (suggest, not auto-apply) · proactive push/in-app notifications (bill reminders, unusual spending) · optimistic-concurrency conflict surfacing (adoptable from Shohaz at merge time, §34).
+~~Bank sync (Plaid)~~ **built 2026-08-19**, see `docs/Bank Sync Addendum.md` · budgets · financial goals · debt payoff tooling · split transactions · receipt attachments · light AI-assisted categorization (suggest, not auto-apply) · proactive push/in-app notifications (bill reminders, unusual spending) · optimistic-concurrency conflict surfacing (adoptable from Shohaz at merge time, §34).
 
 **Longer-term:** natural-language financial queries (**built 2026-08-18 as the shared Ask feature** — see `docs/v2-checklist.md`) · investment holdings/lots + performance tracking · saved/advanced reports · unusual-spending detection · the actual Shohaz merge itself (§34). ~~Automatic recurring-bill detection~~ **built 2026-08-19** (statement upload, see the RecurringBill row above).
 

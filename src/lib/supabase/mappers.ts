@@ -50,6 +50,8 @@ import type {
   TransactionAttachment,
   CsvImportBatch,
   CsvImportBatchStatus,
+  PlaidItem,
+  PlaidItemStatus,
 } from "../types";
 
 export interface HouseholdRow {
@@ -554,6 +556,8 @@ export interface AccountRow {
   opened_at: string | null;
   trashed_at: string | null;
   permanently_delete_after: string | null;
+  plaid_item_id: string | null;
+  plaid_account_id: string | null;
 }
 
 export function rowToAccount(row: AccountRow): Account {
@@ -572,6 +576,8 @@ export function rowToAccount(row: AccountRow): Account {
     openedAt: row.opened_at,
     trashedAt: row.trashed_at,
     permanentlyDeleteAfter: row.permanently_delete_after,
+    plaidItemId: row.plaid_item_id,
+    plaidAccountId: row.plaid_account_id,
   };
 }
 
@@ -591,6 +597,8 @@ export function accountToInsertRow(a: Account): Omit<AccountRow, "current_balanc
     opened_at: a.openedAt,
     trashed_at: a.trashedAt,
     permanently_delete_after: a.permanentlyDeleteAfter,
+    plaid_item_id: a.plaidItemId,
+    plaid_account_id: a.plaidAccountId,
   };
 }
 
@@ -721,6 +729,8 @@ export interface TransactionRow {
   updated_at: string;
   trashed_at: string | null;
   permanently_delete_after: string | null;
+  plaid_transaction_id: string | null;
+  user_edited: boolean;
 }
 
 export function rowToTransaction(row: TransactionRow): Transaction {
@@ -746,6 +756,8 @@ export function rowToTransaction(row: TransactionRow): Transaction {
     updatedAt: row.updated_at,
     trashedAt: row.trashed_at,
     permanentlyDeleteAfter: row.permanently_delete_after,
+    plaidTransactionId: row.plaid_transaction_id,
+    userEdited: row.user_edited,
   };
 }
 
@@ -772,6 +784,44 @@ export function transactionToInsertRow(t: Transaction): TransactionRow {
     updated_at: t.updatedAt,
     trashed_at: t.trashedAt,
     permanently_delete_after: t.permanentlyDeleteAfter,
+    plaid_transaction_id: t.plaidTransactionId,
+    user_edited: t.userEdited,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Bank sync (docs/Bank Sync Addendum.md §3/§4) — PlaidItemRow includes
+// access_token because it's the true shape of the DB row (only ever read
+// with the admin client, server-side); rowToPlaidItem() intentionally
+// does NOT map it onto PlaidItem, which is the access-token-stripped
+// shape actually returned to the client by GET /api/v1/plaid/items.
+// ---------------------------------------------------------------------------
+
+export interface PlaidItemRow {
+  id: string;
+  household_id: string;
+  plaid_item_id: string;
+  access_token: string;
+  institution_id: string | null;
+  institution_name: string | null;
+  cursor: string | null;
+  status: string;
+  error_code: string | null;
+  created_by_user_id: string;
+  created_at: string;
+  last_synced_at: string | null;
+}
+
+export function rowToPlaidItem(row: PlaidItemRow): PlaidItem {
+  return {
+    id: row.id,
+    householdId: row.household_id,
+    institutionId: row.institution_id,
+    institutionName: row.institution_name,
+    status: row.status as PlaidItemStatus,
+    errorCode: row.error_code,
+    createdAt: row.created_at,
+    lastSyncedAt: row.last_synced_at,
   };
 }
 

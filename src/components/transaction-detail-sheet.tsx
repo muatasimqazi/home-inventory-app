@@ -38,6 +38,7 @@ const SOURCE_LABEL: Record<Transaction["source"], string> = {
   manual: "Manual",
   csv_import: "CSV Import",
   receipt_scan: "Receipt Scan",
+  plaid: "Bank Sync",
 };
 
 /** Right-side drawer, not a route — docs/Personal Finance PRD.md §35: "Transactions list (+ add/edit form) ... list; detail opens as a drawer, not a route." */

@@ -54,6 +54,8 @@ export async function createAndLinkRefundTransaction(
     updatedAt: timestamp,
     trashedAt: null,
     permanentlyDeleteAfter: null,
+    plaidTransactionId: null,
+    userEdited: false,
   };
 
   const { error: insertError } = await getSupabaseBrowserClient().from("transactions").insert(transactionToInsertRow(transaction));

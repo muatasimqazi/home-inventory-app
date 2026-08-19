@@ -2,6 +2,9 @@
 // client-side types for now (mock data layer) so the shape survives the
 // later swap to a real Supabase-backed API.
 
+/** 30-day Trash retention (PRD §14) — shared by store.ts's client-side purgeAfter() and any server-side trash-writer (e.g. lib/plaid/sync.ts's removed-transaction handling, Bank Sync Addendum §6) that needs the identical purge horizon without importing the "use client" store module. */
+export const TRASH_RETENTION_DAYS = 30;
+
 export type Role = "owner" | "member";
 
 export interface Household {
@@ -265,7 +268,7 @@ export interface Account {
   /** Manual (credit cards, etc.) — never auto-overwritten by the balance trigger (PRD §14). */
   availableBalance: number | null;
   startingBalance: number;
-  /** Receipt Scanning Addendum §6 — drives receipt→account auto-matching. */
+  /** Receipt Scanning Addendum §6 — drives receipt→account auto-matching. Also populated from Plaid's account `mask` on link (Bank Sync Addendum §5), so a Plaid-linked account benefits from the same matching. */
   cardLastFour: string | null;
   /** null = joint/household account. Set = personal, private by default to this member. */
   ownerUserId: string | null;
@@ -273,6 +276,9 @@ export interface Account {
   openedAt: string | null;
   trashedAt: string | null;
   permanentlyDeleteAfter: string | null;
+  /** Bank Sync Addendum §3/§8 — null for every non-Plaid account. Set together: an account is either fully Plaid-linked (both set) or not (both null), never one without the other. */
+  plaidItemId: string | null;
+  plaidAccountId: string | null;
 }
 
 /** Explicit per-member opt-in grant onto a personal account. No row = not shared with that member. */
@@ -323,7 +329,7 @@ export interface CategoryRule {
 
 export type TransactionType = "expense" | "income" | "transfer" | "payment" | "refund";
 export type TransactionStatus = "pending" | "posted";
-export type TransactionSource = "manual" | "csv_import" | "receipt_scan";
+export type TransactionSource = "manual" | "csv_import" | "receipt_scan" | "plaid";
 
 export interface Transaction {
   id: string;
@@ -350,6 +356,10 @@ export interface Transaction {
   updatedAt: string;
   trashedAt: string | null;
   permanentlyDeleteAfter: string | null;
+  /** Bank Sync Addendum §3/§6/§7 — null unless this row came from (or was reconciled against) Plaid. Independent of `source`: a receipt-scanned or manually-entered row keeps its original `source` even after Plaid adopts it for reconciliation. */
+  plaidTransactionId: string | null;
+  /** Bank Sync Addendum §7 — once a household member edits category/merchant/description/notes on a Plaid-sourced (or Plaid-adopted) transaction, a later `modified` sync refreshes amount/date/status only and leaves these fields alone. */
+  userEdited: boolean;
 }
 
 export type RecurringBillFrequency = "weekly" | "biweekly" | "monthly" | "quarterly" | "yearly";
@@ -394,6 +404,26 @@ export interface CsvImportBatch {
   status: CsvImportBatchStatus;
   createdByUserId: string;
   createdAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// Bank sync (docs/Bank Sync Addendum.md §3/§4) — PlaidItem is the safe,
+// access-token-stripped projection returned by GET /api/v1/plaid/items;
+// the real row (with access_token) never reaches the client — see the
+// Addendum's security model.
+// ---------------------------------------------------------------------------
+
+export type PlaidItemStatus = "active" | "reauth_required" | "error";
+
+export interface PlaidItem {
+  id: string;
+  householdId: string;
+  institutionId: string | null;
+  institutionName: string | null;
+  status: PlaidItemStatus;
+  errorCode: string | null;
+  createdAt: string;
+  lastSyncedAt: string | null;
 }
 
 // ---------------------------------------------------------------------------

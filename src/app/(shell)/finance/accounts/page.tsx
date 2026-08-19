@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
 import { AccountFormSheet } from "@/components/account-form-sheet";
+import { LinkedBanksCard } from "@/components/linked-banks-card";
 import { useInventoryStore } from "@/lib/store";
 import { accountTypeIcon, groupAccountsByType } from "@/lib/selectors";
 import { formatCurrency } from "@/lib/format";
@@ -16,6 +17,7 @@ import { useRemountKey } from "@/hooks/use-remount-key";
 
 export default function AccountsListPage() {
   const accounts = useInventoryStore((s) => s.accounts);
+  const householdId = useInventoryStore((s) => s.currentHouseholdId);
   const members = useInventoryStore((s) => s.members);
   const currentUserId = useInventoryStore((s) => s.currentUserId);
   const createAccount = useInventoryStore((s) => s.createAccount);
@@ -83,6 +85,8 @@ export default function AccountsListPage() {
           ))}
         </div>
       )}
+
+      {householdId && <LinkedBanksCard householdId={householdId} />}
 
       <AccountFormSheet
         key={createKey}
