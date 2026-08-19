@@ -18,7 +18,13 @@ interface SearchBarProps {
 // `autoFocus` alone isn't reliable enough on iOS Safari after an SPA route
 // change) have something to focus() beyond just setting the prop.
 export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(function SearchBar(
-  { value, onChange, placeholder = "Search items, containers, locations...", autoFocus, className, onFocus },
+  // Default reflects /search's real cross-domain scope (lib/search.ts
+  // covers Finance transactions/accounts alongside Inventory items) — the
+  // Overview page's redirect-to-/search bar and /search's own input both
+  // rely on this default rather than setting their own. Callers scoped to
+  // one real domain on purpose (e.g. Trash's Inventory-tab-only search)
+  // still override it explicitly.
+  { value, onChange, placeholder = "Search items, transactions, accounts…", autoFocus, className, onFocus },
   ref
 ) {
   return (

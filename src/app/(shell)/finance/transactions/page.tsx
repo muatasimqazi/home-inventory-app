@@ -86,7 +86,9 @@ export default function TransactionsListPage() {
   // here — the query param never changes without a full navigation).
   const [createOpen, setCreateOpen] = useState(() => searchParams.get("open") === "new");
   const [editOpen, setEditOpen] = useState(false);
-  const [detailId, setDetailId] = useState<string | null>(null);
+  // Deep-link from a search result (?transactionId=...) — opens straight to
+  // that transaction's detail drawer instead of landing on the bare list.
+  const [detailId, setDetailId] = useState<string | null>(() => searchParams.get("transactionId"));
   const [trashConfirmId, setTrashConfirmId] = useState<string | null>(null);
   const [lineItemsByTransaction, setLineItemsByTransaction] = useState<Record<string, ScannedReceiptLineItem[]>>({});
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());

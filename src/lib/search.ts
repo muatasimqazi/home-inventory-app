@@ -1,16 +1,36 @@
 import { buildBreadcrumb, breadcrumbLabel } from "./selectors";
-import type { Container, Item, Location, Tag } from "./types";
+import type { Account, Container, FinanceCategory, Item, Location, ScannedReceiptLineItem, Tag, Transaction } from "./types";
 
-// Weighted, token-based ranking across items/containers/locations, in the
-// spirit of PRD §11 (typo-tolerant-ish, spans names/categories/tags/
-// breadcrumbs, ranked). Adapted from the scoring approach already proven in
-// the legacy Apps Script backend's searchInventory().
+// Weighted, token-based ranking, in the spirit of PRD §11 (typo-tolerant-ish,
+// spans names/categories/tags/breadcrumbs, ranked). Adapted from the scoring
+// approach already proven in the legacy Apps Script backend's
+// searchInventory() — and now genuinely cross-domain, not inventory-only:
+// Search sits in the most prominent nav slot in the app (one of 4
+// bottom-nav tabs), and only ever searching Inventory while Finance
+// silently didn't exist was a real, reported gap, not a stylistic choice.
 
-export interface SearchResult {
-  item: Item;
+export interface ItemSearchResult {
+  kind: "item";
   score: number;
+  item: Item;
   breadcrumbLabel: string;
 }
+
+export interface TransactionSearchResult {
+  kind: "transaction";
+  score: number;
+  transaction: Transaction;
+  /** Set when the match came from itemized receipt data rather than the transaction's own merchant/description/category — lets the result row say "Milk in this receipt" instead of just repeating the merchant name. */
+  matchedItemName: string | null;
+}
+
+export interface AccountSearchResult {
+  kind: "account";
+  score: number;
+  account: Account;
+}
+
+export type SearchResult = ItemSearchResult | TransactionSearchResult | AccountSearchResult;
 
 function tokenize(value: string): string[] {
   return value
@@ -20,18 +40,17 @@ function tokenize(value: string): string[] {
     .filter((t) => t.length >= 2);
 }
 
-export function searchItems(
-  query: string,
-  items: Item[],
-  containers: Container[],
-  locations: Location[],
-  tags: Tag[]
-): SearchResult[] {
+/** Every query word has to show up *somewhere* for a candidate to match at all — a query like "red mug" shouldn't surface a result that only contains "red", which plain per-token OR scoring alone would otherwise do. Shared by every searchX() below. */
+function matchesAllTokens(searchable: string, queryTokens: string[]): boolean {
+  return queryTokens.length === 0 || queryTokens.every((token) => searchable.includes(token));
+}
+
+export function searchInventory(query: string, items: Item[], containers: Container[], locations: Location[], tags: Tag[]): ItemSearchResult[] {
   const q = query.trim().toLowerCase();
   if (!q) return [];
   const queryTokens = tokenize(q);
 
-  const results = items
+  return items
     .filter((it) => it.status === "active")
     .map((it) => {
       const breadcrumb = buildBreadcrumb(it.locationId, it.containerId, locations, containers);
@@ -48,14 +67,9 @@ export function searchItems(
       const notes = it.notes.toLowerCase();
 
       const searchable = [name, original, category, notes, tagNames, breadcrumbText, displayCode].join(" ");
-      // Every query word has to show up *somewhere* for the item to match
-      // at all — a query like "red mug" shouldn't surface an item that
-      // only contains "red", which is what plain per-token OR scoring
-      // below would otherwise do.
-      const matchesAllTokens = queryTokens.length === 0 || queryTokens.every((token) => searchable.includes(token));
 
       let score = 0;
-      if (matchesAllTokens) {
+      if (matchesAllTokens(searchable, queryTokens)) {
         if (name === q) score += 100;
         if (name.includes(q)) score += 60;
         if (original.includes(q)) score += 45;
@@ -73,10 +87,95 @@ export function searchItems(
         }
       }
 
-      return { item: it, score, breadcrumbLabel: breadcrumbLabel(breadcrumb) };
+      return { kind: "item" as const, item: it, score, breadcrumbLabel: breadcrumbLabel(breadcrumb) };
     })
     .filter((r) => r.score > 0)
     .sort((a, b) => b.score - a.score || a.item.name.localeCompare(b.item.name));
+}
 
-  return results;
+/**
+ * Transactions + accounts. Recurring bills and categories are deliberately
+ * not their own searchable result kind here — a category isn't really a
+ * "thing you search for and open," it's an attribute results already match
+ * against, and recurring bills have no per-bill detail page to link a
+ * result to yet (just the /finance/recurring list).
+ *
+ * `lineItemsByTransaction` is optional and defaults to {} — Search works
+ * fine (matching merchant/description/notes/category) even before/without
+ * that bulk fetch landing; passing it in adds itemized-receipt-item
+ * matching on top, the same "search 'milk', find the receipt" value the
+ * Transactions list's own filter and the AI Q&A feature both already have.
+ */
+export function searchFinance(
+  query: string,
+  transactions: Transaction[],
+  accounts: Account[],
+  financeCategories: FinanceCategory[],
+  lineItemsByTransaction: Record<string, ScannedReceiptLineItem[]> = {}
+): (TransactionSearchResult | AccountSearchResult)[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  const queryTokens = tokenize(q);
+
+  const transactionResults: TransactionSearchResult[] = transactions
+    .filter((t) => !t.trashedAt)
+    .map((t) => {
+      const merchant = (t.merchant ?? "").toLowerCase();
+      const description = (t.description ?? "").toLowerCase();
+      const notes = t.notes.toLowerCase();
+      const category = (financeCategories.find((c) => c.id === t.categoryId)?.name ?? "").toLowerCase();
+      const items = lineItemsByTransaction[t.id] ?? [];
+      const itemSearchable = items.map((li) => `${li.standardName || li.rawItem} ${li.brand ?? ""}`.toLowerCase());
+      const searchable = [merchant, description, notes, category, ...itemSearchable].join(" ");
+
+      let score = 0;
+      let matchedItemName: string | null = null;
+      if (matchesAllTokens(searchable, queryTokens)) {
+        if (merchant === q) score += 100;
+        if (merchant.includes(q)) score += 60;
+        if (description.includes(q)) score += 30;
+        if (category.includes(q)) score += 20;
+        if (notes.includes(q)) score += 10;
+
+        const itemMatch = items.find((li) => `${li.standardName || li.rawItem} ${li.brand ?? ""}`.toLowerCase().includes(q));
+        if (itemMatch) {
+          score += 50;
+          matchedItemName = itemMatch.standardName || itemMatch.rawItem;
+        }
+
+        for (const token of queryTokens) {
+          if (merchant.includes(token)) score += 12;
+          if (searchable.includes(token)) score += 3;
+        }
+      }
+
+      return { kind: "transaction" as const, score, transaction: t, matchedItemName };
+    })
+    .filter((r) => r.score > 0);
+
+  const accountResults: AccountSearchResult[] = accounts
+    .filter((a) => a.status === "active")
+    .map((a) => {
+      const name = a.name.toLowerCase();
+      const institution = (a.institutionName ?? "").toLowerCase();
+      const cardLastFour = a.cardLastFour ?? "";
+      const searchable = [name, institution, cardLastFour].join(" ");
+
+      let score = 0;
+      if (matchesAllTokens(searchable, queryTokens)) {
+        if (name === q) score += 100;
+        if (name.includes(q)) score += 60;
+        if (institution.includes(q)) score += 30;
+        if (cardLastFour && cardLastFour === q) score += 80;
+        for (const token of queryTokens) {
+          if (name.includes(token)) score += 12;
+          if (searchable.includes(token)) score += 3;
+        }
+      }
+
+      return { kind: "account" as const, score, account: a };
+    })
+    .filter((r) => r.score > 0);
+
+  return [...transactionResults, ...accountResults];
 }
