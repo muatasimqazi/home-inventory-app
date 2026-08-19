@@ -7,7 +7,7 @@ import "react-image-crop/dist/ReactCrop.css";
 import { Icon } from "@/components/icon";
 import { useCaptureSession } from "@/lib/capture-session-store";
 import { useInventoryStore } from "@/lib/store";
-import { getCroppedImage, resizeImage, rotateImage, type PixelCrop } from "@/lib/crop-image";
+import { getCroppedImage, resizeImage, rotateImage, scaleCropToNatural } from "@/lib/crop-image";
 import { getSharedStream, setSharedStream, hasLiveTracks, stopCameraStream } from "@/lib/camera-stream";
 import { cn } from "@/lib/utils";
 
@@ -30,21 +30,6 @@ const CAMERA_CONSTRAINTS: MediaStreamConstraints = {
 // fixed-aspect pan-and-zoom, which could only ever select a region shaped
 // exactly like the source photo — never an arbitrary one.
 const FULL_CROP: Crop = { unit: "%", x: 0, y: 0, width: 100, height: 100 };
-
-// react-image-crop reports crop rectangles in on-screen *rendered* pixels,
-// not the photo's real resolution — has to be scaled by the ratio between
-// the two before it means anything to lib/crop-image.ts, which always works
-// in natural pixels.
-function scaleCropToNatural(crop: RICPixelCrop, img: HTMLImageElement): PixelCrop {
-  const scaleX = img.naturalWidth / img.width;
-  const scaleY = img.naturalHeight / img.height;
-  return {
-    x: Math.round(crop.x * scaleX),
-    y: Math.round(crop.y * scaleY),
-    width: Math.round(crop.width * scaleX),
-    height: Math.round(crop.height * scaleY),
-  };
-}
 
 export default function CameraCapturePage() {
   return (

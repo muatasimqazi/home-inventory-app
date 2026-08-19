@@ -2,14 +2,16 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import ReactCrop, { type Crop, type PixelCrop as RICPixelCrop } from "react-image-crop";
+import "react-image-crop/dist/ReactCrop.css";
 import { Icon } from "@/components/icon";
 import { useInventoryStore } from "@/lib/store";
 import { useReceiptScanSession } from "@/lib/receipt-scan-session-store";
 import { getSharedStream, setSharedStream, hasLiveTracks, stopCameraStream } from "@/lib/camera-stream";
-import { resizeImage } from "@/lib/crop-image";
+import { getCroppedImage, resizeImage, rotateImage, scaleCropToNatural } from "@/lib/crop-image";
 import { cn } from "@/lib/utils";
 
-type Mode = "requesting" | "live" | "analyzing" | "denied";
+type Mode = "requesting" | "live" | "preview" | "analyzing" | "denied";
 
 // Same "ask the browser to negotiate its real capability" reasoning as
 // /capture's own constraints (src/app/capture/page.tsx) — no explicit
@@ -19,21 +21,37 @@ const CAMERA_CONSTRAINTS: MediaStreamConstraints = {
   audio: false,
 };
 
+// Starts covering the whole photo, same as /capture's own FULL_CROP —
+// react-image-crop's handles are fully drag/resize-able from here.
+const FULL_CROP: Crop = { unit: "%", x: 0, y: 0, width: 100, height: 100 };
+
 /**
  * Receipt Capture (docs/Personal Finance PRD.md §35, Receipt Scanning
- * Addendum §2) — deliberately simpler than /capture's own camera screen:
- * a receipt is captured whole, no per-photo crop step (a receipt's edges
- * matter far less than an inventory item's tight bounding box). Multiple
- * photos in one session covers both scan modes: one photo = a single
- * receipt, several = a stack of receipts or a multi-page statement.
+ * Addendum §2). Originally shipped with no crop step at all ("a receipt's
+ * edges matter far less than an inventory item's tight bounding box") —
+ * revisited: a receipt photographed on a cluttered counter, next to other
+ * receipts, or at an angle that includes a lot of background can genuinely
+ * hurt extraction accuracy, and there was no way to exclude that background
+ * short of retaking the photo more carefully. Now shares /capture's own
+ * interactive crop step (react-image-crop, same rotate/retake/Use Photo
+ * pattern) — "let the camera scan/select just the area you need" — rather
+ * than reinventing it. Multiple photos in one session still covers both
+ * scan modes: one photo = a single receipt, several = a stack of receipts
+ * or a multi-page statement.
  */
 export default function ReceiptCapturePage() {
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
 
   const [mode, setMode] = useState<Mode>("requesting");
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [crop, setCrop] = useState<Crop>(FULL_CROP);
+  const [completedCrop, setCompletedCrop] = useState<RICPixelCrop>();
+  const [cropping, setCropping] = useState(false);
+  const [rotatingPreview, setRotatingPreview] = useState(false);
   // A long/detailed receipt (many line items) can legitimately take up to
   // CALL_TIMEOUT_MS (lib/vision/extract-receipts.ts) per model attempt —
   // without this, the plain spinner looks identical whether it's 3 seconds
@@ -95,7 +113,43 @@ export default function ReceiptCapturePage() {
     }
   }, [mode]);
 
-  const handleShutter = useCallback(async () => {
+  const resetCrop = useCallback(() => {
+    setCrop(FULL_CROP);
+    setCompletedCrop(undefined);
+  }, []);
+
+  // Same reasoning as /capture's own returnToLive: a native photo-picker
+  // sheet can suspend or fully stop the getUserMedia stream on iOS Safari,
+  // so reacquire only when actually needed rather than unconditionally
+  // re-prompting for permission every time preview mode closes.
+  const returnToLive = useCallback(async () => {
+    if (hasLiveTracks(streamRef.current)) {
+      setMode("live");
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia(CAMERA_CONSTRAINTS);
+      streamRef.current = stream;
+      setSharedStream(stream);
+      setMode("live");
+    } catch {
+      setMode("denied");
+    }
+  }, []);
+
+  async function handleRotatePreview() {
+    if (!previewUrl) return;
+    setRotatingPreview(true);
+    try {
+      const rotated = await rotateImage(previewUrl, 90);
+      setPreviewUrl(rotated);
+      resetCrop();
+    } finally {
+      setRotatingPreview(false);
+    }
+  }
+
+  const handleShutter = useCallback(() => {
     const video = videoRef.current;
     if (!video || video.videoWidth === 0) return;
     const canvas = document.createElement("canvas");
@@ -104,21 +158,46 @@ export default function ReceiptCapturePage() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.drawImage(video, 0, 0);
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
-    // Same downscale-always step /capture's handleUsePhoto uses — a raw
-    // camera frame is large enough on its own to matter for upload size.
-    addPhoto(await resizeImage(dataUrl));
-  }, [addPhoto]);
+    resetCrop();
+    setPreviewUrl(canvas.toDataURL("image/jpeg", 0.85));
+    setMode("preview");
+  }, [resetCrop]);
 
   function handleFilePicked(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = async () => {
-      addPhoto(await resizeImage(reader.result as string));
+    reader.onload = () => {
+      resetCrop();
+      setPreviewUrl(reader.result as string);
+      setMode("preview");
     };
     reader.readAsDataURL(file);
     e.target.value = "";
+  }
+
+  function handleRetake() {
+    setPreviewUrl(null);
+    returnToLive();
+  }
+
+  async function handleUsePhoto() {
+    if (!previewUrl) return;
+    setCropping(true);
+    try {
+      // Always goes through a downscale, whether or not the user actually
+      // touched the crop — same reasoning as /capture's handleUsePhoto.
+      const img = imgRef.current;
+      const finalPhoto =
+        completedCrop && img && completedCrop.width > 0 && completedCrop.height > 0
+          ? await getCroppedImage(previewUrl, scaleCropToNatural(completedCrop, img))
+          : await resizeImage(previewUrl);
+      addPhoto(finalPhoto);
+      setPreviewUrl(null);
+      await returnToLive();
+    } finally {
+      setCropping(false);
+    }
   }
 
   async function handleAnalyze() {
@@ -141,7 +220,7 @@ export default function ReceiptCapturePage() {
     };
   }, []);
 
-  const dark = mode === "live";
+  const dark = mode === "live" || mode === "preview";
 
   return (
     <div className={cn("fixed inset-0 z-50 flex flex-col", dark ? "bg-ink" : "bg-background")}>
@@ -257,6 +336,53 @@ export default function ReceiptCapturePage() {
         )}
 
         {mode === "live" && <video ref={videoRef} autoPlay playsInline muted className="size-full object-cover" />}
+
+        {mode === "preview" && previewUrl && (
+          <div className="flex h-full flex-col">
+            {/* p-5: react-image-crop's corner resize handles sit half-outside
+                the image's own edge — same padding fix as /capture's
+                identical crop step, verified live there that without it the
+                handles can get pushed out of the interactive area on a
+                landscape photo in a portrait viewport and stop receiving
+                pointer events entirely. */}
+            <div className="relative flex flex-1 items-center justify-center overflow-hidden bg-black p-5">
+              <ReactCrop crop={crop} onChange={(_, percentCrop) => setCrop(percentCrop)} onComplete={(c) => setCompletedCrop(c)} className="max-h-full">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img ref={imgRef} src={previewUrl} alt="Receipt to crop" className="max-h-[70vh] max-w-full object-contain" />
+              </ReactCrop>
+              <button
+                type="button"
+                onClick={handleRotatePreview}
+                disabled={rotatingPreview}
+                aria-label="Rotate photo 90 degrees"
+                className="tap-target absolute right-3 top-3 flex size-10 items-center justify-center rounded-full bg-black/50 text-white disabled:opacity-60"
+              >
+                {rotatingPreview ? <Icon name="spinner" size={18} className="animate-spin" /> : <Icon name="rotate" size={18} />}
+              </button>
+            </div>
+            <div className="flex flex-col gap-3 bg-ink px-6 py-4">
+              <p className="text-center text-caption text-white/60">Drag the corners to crop out everything but the receipt.</p>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={handleRetake}
+                  disabled={cropping}
+                  className="tap-target h-11 flex-1 rounded-full bg-white/10 text-body font-medium text-white disabled:opacity-60"
+                >
+                  Retake
+                </button>
+                <button
+                  type="button"
+                  onClick={handleUsePhoto}
+                  disabled={cropping}
+                  className="tap-target h-11 flex-1 rounded-full bg-yellow text-body font-medium text-white disabled:opacity-60"
+                >
+                  {cropping ? "Cropping…" : "Use Photo"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {mode === "live" && (

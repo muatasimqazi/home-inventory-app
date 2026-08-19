@@ -1,10 +1,29 @@
 import type { BoundingBox } from "@/lib/ai";
+import type { PixelCrop as RICPixelCrop } from "react-image-crop";
 
 export interface PixelCrop {
   x: number;
   y: number;
   width: number;
   height: number;
+}
+
+/**
+ * react-image-crop reports crop rectangles in on-screen *rendered* pixels,
+ * not the photo's real resolution — has to be scaled by the ratio between
+ * the two before it means anything to this module, which always works in
+ * natural pixels. Shared by every interactive crop step (capture, receipt
+ * scan) rather than each defining its own copy.
+ */
+export function scaleCropToNatural(crop: RICPixelCrop, img: HTMLImageElement): PixelCrop {
+  const scaleX = img.naturalWidth / img.width;
+  const scaleY = img.naturalHeight / img.height;
+  return {
+    x: Math.round(crop.x * scaleX),
+    y: Math.round(crop.y * scaleY),
+    width: Math.round(crop.width * scaleX),
+    height: Math.round(crop.height * scaleY),
+  };
 }
 
 // A library-picked photo comes through completely unresized (a modern
