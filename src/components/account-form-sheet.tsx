@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import type { Account, AccountType, Member } from "@/lib/types";
-import { ACCOUNT_TYPE_LABEL } from "@/lib/selectors";
+import { ACCOUNT_TYPE_LABEL, LIABILITY_ACCOUNT_TYPES, normalizeAccountBalance, displayAccountBalanceMagnitude } from "@/lib/selectors";
 
 const ACCOUNT_TYPES: AccountType[] = ["checking", "savings", "credit_card", "loan", "mortgage", "cash", "investment"];
 
@@ -62,10 +62,17 @@ export function AccountFormSheet({
   const [type, setType] = useState<AccountType>(initial?.type ?? "checking");
   const [institutionName, setInstitutionName] = useState(initial?.institutionName ?? "");
   const [cardLastFour, setCardLastFour] = useState(initial?.cardLastFour ?? "");
-  const [startingBalance, setStartingBalance] = useState(initial ? String(initial.startingBalance) : "0");
+  // Always shown/typed as the positive magnitude the user actually thinks
+  // in ("I owe $5,000" / "I have $5,000") — a liability's negative sign is
+  // an internal storage detail (see normalizeAccountBalance), not
+  // something to ask the user to type or to show back to them, which
+  // would just invite the exact sign confusion that caused real accounts
+  // to get counted as assets instead of debts in net worth.
+  const [startingBalance, setStartingBalance] = useState(initial ? String(displayAccountBalanceMagnitude(initial.type, initial.startingBalance)) : "0");
   const [isPersonal, setIsPersonal] = useState(initial ? initial.ownerUserId !== null : false);
   const [sharedWithUserIds, setSharedWithUserIds] = useState<string[]>(initialSharedWithUserIds);
   const [error, setError] = useState<string | null>(null);
+  const isLiability = LIABILITY_ACCOUNT_TYPES.includes(type);
 
   function toggleShare(userId: string) {
     setSharedWithUserIds((cur) => (cur.includes(userId) ? cur.filter((id) => id !== userId) : [...cur, userId]));
@@ -78,7 +85,7 @@ export function AccountFormSheet({
     }
     const parsedBalance = Number(startingBalance);
     if (Number.isNaN(parsedBalance)) {
-      setError("Starting balance must be a number.");
+      setError(isLiability ? "Amount owed must be a number." : "Starting balance must be a number.");
       return;
     }
     onSubmit({
@@ -86,7 +93,7 @@ export function AccountFormSheet({
       type,
       institutionName: institutionName.trim() || null,
       cardLastFour: cardLastFour.trim() || null,
-      startingBalance: parsedBalance,
+      startingBalance: normalizeAccountBalance(type, parsedBalance),
       isPersonal,
       sharedWithUserIds: isPersonal ? sharedWithUserIds : [],
     });
@@ -145,8 +152,13 @@ export function AccountFormSheet({
           )}
 
           <div>
-            <label className="mb-1 block text-caption text-muted-foreground">Starting balance</label>
+            <label className="mb-1 block text-caption text-muted-foreground">{isLiability ? "Amount owed" : "Starting balance"}</label>
             <Input value={startingBalance} onChange={(e) => setStartingBalance(e.target.value)} placeholder="$0.00" className="h-11" inputMode="decimal" />
+            {isLiability && (
+              <p className="mt-1 text-micro text-muted-foreground">
+                Enter what you owe as a positive number — it&apos;s counted against net worth automatically.
+              </p>
+            )}
           </div>
 
           <div>

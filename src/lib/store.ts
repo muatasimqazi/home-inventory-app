@@ -7,6 +7,7 @@ import { newId, tagToken } from "./id";
 import { isDisplayCodeTaken, nextDisplayCode, normalizeDisplayCode } from "./display-code";
 import { ATTACHMENT_MAX_SIZE_BYTES, ATTACHMENT_MAX_SIZE_LABEL, isAttachmentTypeAllowed } from "./attachment-limits";
 import { normalizeUploadedPhoto } from "./crop-image";
+import { normalizeAccountBalance } from "./selectors";
 import {
   rowToHousehold,
   rowToMember,
@@ -1853,15 +1854,24 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
 
   createAccount: (input) => {
     const supabase = getSupabaseBrowserClient();
+    // Defense in depth, not the primary fix — AccountFormSheet already
+    // normalizes before calling onSubmit (a real bug: liability accounts
+    // created with a plain positive "amount owed" got counted as assets
+    // in netWorth(), which just sums every account's currentBalance
+    // trusting the sign is already correct). Applied again here so any
+    // future caller of createAccount can't reintroduce the same bug —
+    // idempotent either way, normalizeAccountBalance on an already-correct
+    // negative value is a no-op.
+    const normalizedBalance = normalizeAccountBalance(input.type, input.startingBalance ?? 0);
     const created: Account = {
       id: newId(),
       householdId: get().currentHouseholdId,
       name: input.name,
       type: input.type,
       institutionName: input.institutionName ?? null,
-      currentBalance: input.startingBalance ?? 0,
+      currentBalance: normalizedBalance,
       availableBalance: input.availableBalance ?? null,
-      startingBalance: input.startingBalance ?? 0,
+      startingBalance: normalizedBalance,
       cardLastFour: input.cardLastFour ?? null,
       ownerUserId: input.ownerUserId ?? null,
       status: "active",

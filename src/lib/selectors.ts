@@ -318,3 +318,16 @@ export const ACCOUNT_TYPE_LABEL: Record<AccountType, string> = {
   mortgage: "Mortgage",
   investment: "Investment",
 };
+
+/** Types where currentBalance being negative *is* the correct, expected state — you owe on these, you don't hold a balance in them. netWorth() trusts every account's currentBalance is already signed correctly and just sums; the only place that sign can actually go wrong is user-entered input (starting balance), never transactions (their own amount sign is already correct per type — an expense is already negative). */
+export const LIABILITY_ACCOUNT_TYPES: readonly AccountType[] = ["credit_card", "loan", "mortgage"];
+
+/** Normalizes a user-entered balance magnitude against the account type it belongs to — a liability's starting balance always means "how much you owe," so it's always stored as a negative number regardless of the sign actually typed (a bare "5000" and a "-5000" both mean the same thing for a loan). Asset types are left exactly as entered, including negative (a checking account can be legitimately overdrawn). */
+export function normalizeAccountBalance(type: AccountType, amount: number): number {
+  return LIABILITY_ACCOUNT_TYPES.includes(type) ? -Math.abs(amount) : amount;
+}
+
+/** The inverse for display — an existing liability balance is stored negative; the form should still show it to the user as the positive "how much you owe" magnitude they'd naturally type. */
+export function displayAccountBalanceMagnitude(type: AccountType, storedBalance: number): number {
+  return LIABILITY_ACCOUNT_TYPES.includes(type) ? Math.abs(storedBalance) : storedBalance;
+}
