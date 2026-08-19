@@ -37,7 +37,12 @@ const lineItemSchema = z.object({
   confidence: z.number().min(0).max(1).describe("How confident you are in this line's extraction, 0-1."),
 });
 
-const receiptSchema = z.object({
+// Exported (not just extractionSchema below) so lib/vision/extract-email-
+// receipt.ts can build its own Output.object() against the exact same
+// shape — a forwarded email receipt needs the identical downstream data
+// (VisionReceiptExtraction), it's only the *input* (text, not a photo)
+// and prompt that differ enough to warrant a separate call site.
+export const receiptSchema = z.object({
   store: z.string().describe("The merchant/store name printed on the receipt."),
   date: z.string().describe("The transaction date in ISO format (YYYY-MM-DD)."),
   subtotal: z.number().min(0).describe("Subtotal before tax, in dollars."),

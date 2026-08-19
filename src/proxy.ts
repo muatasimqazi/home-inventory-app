@@ -2,8 +2,13 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 // Auth as a gate: every route except /sign-in and the OAuth callback
-// requires a real Supabase session.
-const PUBLIC_PATHS = ["/sign-in", "/auth/callback"];
+// requires a real Supabase session. /api/v1/webhooks/* is the one
+// deliberate exception beyond that — a webhook (Resend calling in on a
+// received email, e.g.) has no user session to present at all; those
+// routes authenticate the request themselves via a cryptographic
+// signature check (Svix/webhookSecret), not a Supabase session, so they'd
+// otherwise get redirected to /sign-in before ever reaching route code.
+const PUBLIC_PATHS = ["/sign-in", "/auth/callback", "/api/v1/webhooks"];
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });

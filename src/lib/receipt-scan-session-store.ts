@@ -103,6 +103,7 @@ export const useReceiptScanSession = create<ReceiptScanSessionState>()((set, get
         createdByUserId: userId,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        source: "scan",
       };
       const { error: batchError } = await supabase.from("receipt_scan_batches").insert(receiptScanBatchToInsertRow(batch));
       if (batchError) throw batchError;

@@ -198,6 +198,14 @@ export default function FinanceDashboardPage() {
       </div>
 
       <Link
+        href="/finance/pending-receipts"
+        className="flex items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-white py-3 text-caption font-medium text-muted-foreground"
+      >
+        <Icon name="receipt" size={16} />
+        Pending Receipts
+      </Link>
+
+      <Link
         href="/finance"
         className="flex items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-white py-3 text-caption font-medium text-muted-foreground"
       >

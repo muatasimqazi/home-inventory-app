@@ -8,6 +8,8 @@ export interface Household {
   id: string;
   name: string;
   createdAt: string;
+  /** Opaque local-part for this household's email-receipts forwarding address (token@receipts.<domain>) — never the household's own id, so the address itself doesn't leak it. */
+  receiptsToken: string;
 }
 
 export interface Member {
@@ -412,6 +414,8 @@ export interface ReceiptScanBatch {
   createdByUserId: string;
   createdAt: string;
   updatedAt: string;
+  /** How this batch originated — 'scan' (photo capture, the original/default path) or 'email' (forwarded to the household's receipts inbox, no photo at all). Shown in the review UI so a draft with no image never reads as a broken scan. */
+  source: "scan" | "email";
 }
 
 export type CategorySource = "rule_match" | "ai_suggestion" | "user_corrected";

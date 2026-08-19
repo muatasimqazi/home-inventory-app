@@ -56,10 +56,11 @@ export interface HouseholdRow {
   id: string;
   name: string;
   created_at: string;
+  receipts_token: string;
 }
 
 export function rowToHousehold(row: HouseholdRow): Household {
-  return { id: row.id, name: row.name, createdAt: row.created_at };
+  return { id: row.id, name: row.name, createdAt: row.created_at, receiptsToken: row.receipts_token };
 }
 
 export interface MemberRow {
@@ -899,6 +900,7 @@ export interface ReceiptScanBatchRow {
   created_by_user_id: string;
   created_at: string;
   updated_at: string;
+  source: string;
 }
 
 export function rowToReceiptScanBatch(row: ReceiptScanBatchRow): ReceiptScanBatch {
@@ -912,6 +914,7 @@ export function rowToReceiptScanBatch(row: ReceiptScanBatchRow): ReceiptScanBatc
     createdByUserId: row.created_by_user_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    source: row.source === "email" ? "email" : "scan",
   };
 }
 
@@ -926,6 +929,7 @@ export function receiptScanBatchToInsertRow(b: ReceiptScanBatch): ReceiptScanBat
     created_by_user_id: b.createdByUserId,
     created_at: b.createdAt,
     updated_at: b.updatedAt,
+    source: b.source,
   };
 }
 
