@@ -15,6 +15,16 @@ import { z } from "zod";
 const PRIMARY_MODEL: LanguageModel = "google/gemini-3.7-flash";
 const FALLBACK_MODEL: LanguageModel = "openai/gpt-5-nano";
 
+// unit_price/line_total deliberately have no .min(0) — that was the third
+// failure mode on the same real 35-item Costco receipt, after the timeout
+// and truncation fixes above both held. The primary model actually
+// extracted the receipt correctly, including negative amounts for
+// per-item member-savings/discount lines Costco prints inline with the
+// item — but the old `.min(0)` rejected those as schema violations,
+// throwing AI_NoObjectGeneratedError and forcing a fallback to gpt-5-nano,
+// which then failed to detect the receipt at all on a task this dense.
+// The bug was in the schema being stricter than real receipts are, not in
+// either model.
 const lineItemSchema = z.object({
   raw_item: z.string().describe("Exactly what appears on the receipt for this line — don't clean it up."),
   standard_name: z.string().describe("The most likely full product name. If unsure, repeat raw_item."),
@@ -22,8 +32,8 @@ const lineItemSchema = z.object({
   category_guess: z.string().describe("A short category guess for this item, e.g. 'Groceries', 'Household', 'Auto'."),
   subcategory_guess: z.string().describe("A more specific subcategory guess, e.g. 'Produce', 'Dairy'. Empty string if nothing fits."),
   quantity: z.number().min(0.01).describe("How many of this item — 3 identical units on one line is quantity 3, one line item, not three."),
-  unit_price: z.number().min(0).describe("Price per unit, in dollars."),
-  line_total: z.number().min(0).describe("This line's total, in dollars."),
+  unit_price: z.number().describe("Price per unit, in dollars. Negative for a discount, coupon, or instant-savings line (e.g. Costco's per-item markdowns) — don't drop these lines or clamp them to zero."),
+  line_total: z.number().describe("This line's total, in dollars. Negative for a discount, coupon, or instant-savings line — don't drop these lines or clamp them to zero."),
   confidence: z.number().min(0).max(1).describe("How confident you are in this line's extraction, 0-1."),
 });
 
