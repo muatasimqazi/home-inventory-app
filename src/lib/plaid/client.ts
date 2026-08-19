@@ -11,6 +11,12 @@ let plaidClient: PlaidApi | null = null;
 /** 'sandbox' | 'development' | 'production' — see docs/Bank Sync Addendum.md §1: development starts (and stays, for now) in Sandbox. */
 function resolveEnv(): keyof typeof PlaidEnvironments {
   const env = process.env.PLAID_ENV ?? "sandbox";
+  // "prod" is the natural shorthand to type and doesn't deserve to be a
+  // silent footgun — Plaid's SDK only recognizes the literal
+  // "production", so a plain "prod" would otherwise throw a confusing
+  // "no such environment" error deep in the SDK rather than something
+  // that actually explains the fix.
+  if (env === "prod") return "production";
   if (env !== "sandbox" && env !== "development" && env !== "production") {
     throw new Error(`PLAID_ENV must be "sandbox", "development", or "production" — got "${env}".`);
   }
