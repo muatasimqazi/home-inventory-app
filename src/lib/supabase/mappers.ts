@@ -48,6 +48,8 @@ import type {
   BoundingBoxLike,
   ScannedReceiptLineItem,
   TransactionAttachment,
+  ItemPurchase,
+  ItemPurchaseSource,
   CsvImportBatch,
   CsvImportBatchStatus,
   PlaidItem,
@@ -1150,6 +1152,43 @@ export function transactionAttachmentToInsertRow(a: TransactionAttachment): Tran
     source_draft_id: a.sourceDraftId,
     created_by_user_id: a.createdByUserId,
     created_at: a.createdAt,
+  };
+}
+
+export interface ItemPurchaseRow {
+  id: string;
+  household_id: string;
+  item_id: string;
+  transaction_id: string | null;
+  scanned_receipt_line_item_id: string | null;
+  source: string;
+  linked_by_user_id: string;
+  linked_at: string;
+}
+
+export function rowToItemPurchase(row: ItemPurchaseRow): ItemPurchase {
+  return {
+    id: row.id,
+    householdId: row.household_id,
+    itemId: row.item_id,
+    transactionId: row.transaction_id,
+    scannedReceiptLineItemId: row.scanned_receipt_line_item_id,
+    source: row.source as ItemPurchaseSource,
+    linkedByUserId: row.linked_by_user_id,
+    linkedAt: row.linked_at,
+  };
+}
+
+export function itemPurchaseToInsertRow(p: ItemPurchase): ItemPurchaseRow {
+  return {
+    id: p.id,
+    household_id: p.householdId,
+    item_id: p.itemId,
+    transaction_id: p.transactionId,
+    scanned_receipt_line_item_id: p.scannedReceiptLineItemId,
+    source: p.source,
+    linked_by_user_id: p.linkedByUserId,
+    linked_at: p.linkedAt,
   };
 }
 

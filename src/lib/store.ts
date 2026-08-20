@@ -50,8 +50,11 @@ import {
   accountBalanceSnapshotToInsertRow,
   rowToTransactionAttachment,
   transactionAttachmentToInsertRow,
+  rowToItemPurchase,
+  itemPurchaseToInsertRow,
   csvImportBatchToInsertRow,
   type TransactionAttachmentRow,
+  type ItemPurchaseRow,
   type HouseholdRow,
   type MemberRow,
   type InviteRow,
@@ -106,6 +109,8 @@ import type {
   TransactionAttachment,
   TransactionType,
   CsvImportBatch,
+  ItemPurchase,
+  ItemPurchaseSource,
 } from "./types";
 import { TRASH_RETENTION_DAYS } from "./types";
 import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
@@ -226,6 +231,8 @@ interface InventoryState {
   accountBalanceSnapshots: AccountBalanceSnapshot[];
   /** Permanently-retained receipt images (docs/Receipt Scanning Addendum.md §6) — unlike receipt_scan_batches/scanned_transaction_drafts/scanned_receipt_line_items (review-stage only, fetched on-demand by receipt-scan-session-store.ts, not part of this bundle), attachments are real permanent records shown on Transaction Detail, so they hydrate here like everything else. */
   transactionAttachments: TransactionAttachment[];
+  /** Item ↔ transaction links (0017_household_ledger_core.sql, PRD §25 "Physical Item ↔ Financial Transaction"). RLS is privacy-aware (a link into a private account's transaction is only visible to those who can see that account), so — like `accounts` — this array is already the complete set the caller should see, no client-side filtering needed. */
+  itemPurchases: ItemPurchase[];
   currentUserId: string;
   currentUserEmail: string;
   lastUsedDestination: { locationId: string | null; containerId: string | null } | null;
@@ -369,6 +376,21 @@ interface InventoryState {
   /** Records one completed CSV import run as an audit row (PRD §10) — write-once, not part of the hydrated bundle/Realtime like every other Finance table, since nothing in the UI reads it back yet (no import-history screen this pass). Real, awaited: the caller wants the real row back to show in the wizard's "complete" summary. */
   recordCsvImportBatch: (input: { accountId: string; fileName: string; columnMapping: Record<string, string>; rowCount: number; duplicateCount: number }) => Promise<CsvImportBatch>;
 
+  // Item ↔ transaction linking (0017_household_ledger_core.sql, PRD §25 —
+  // "the product's actual differentiator"). Always user-initiated: PRD §25
+  // is explicit that this is assisted/opportunistic matching with
+  // confirmation, never a silent automatic link, so every call site here
+  // is a direct response to a tap, never a background job.
+  /** Creates one item_purchases row. At least one of transactionId/scannedReceiptLineItemId must be set (mirrors the DB check constraint) — pass whichever the calling flow has: a confirmed transaction (Transaction Detail, Item Detail) or a not-yet-confirmed receipt line item (Receipt Review). */
+  linkItemPurchase: (input: {
+    itemId: string;
+    transactionId?: string | null;
+    scannedReceiptLineItemId?: string | null;
+    source: ItemPurchaseSource;
+  }) => Promise<{ ok: boolean; error?: string; purchase?: ItemPurchase }>;
+  /** Removes a link without touching the item, transaction, or line item it pointed at — undoing a mistaken/no-longer-wanted match, not a purchase record itself. */
+  unlinkItemPurchase: (purchaseId: string) => void;
+
   // Favorites
   toggleFavorite: (itemId: string) => void;
   isFavorite: (itemId: string) => boolean;
@@ -438,6 +460,7 @@ interface HouseholdBundle {
   financeBillShares: FinanceBillShare[];
   accountBalanceSnapshots: AccountBalanceSnapshot[];
   transactionAttachments: TransactionAttachment[];
+  itemPurchases: ItemPurchase[];
   lastUsedDestination: { locationId: string | null; containerId: string | null } | null;
 }
 
@@ -464,6 +487,7 @@ function snapshotBundle(state: InventoryState): HouseholdBundle {
     financeBillShares: state.financeBillShares,
     accountBalanceSnapshots: state.accountBalanceSnapshots,
     transactionAttachments: state.transactionAttachments,
+    itemPurchases: state.itemPurchases,
     lastUsedDestination: state.lastUsedDestination,
   };
 }
@@ -495,6 +519,7 @@ async function fetchHouseholdBundle(
     recurringBillsRes,
     financeBillSharesRes,
     transactionAttachmentsRes,
+    itemPurchasesRes,
   ] = await Promise.all([
     supabase.from("members").select("*").eq("household_id", householdId),
     supabase.from("invites").select("*").eq("household_id", householdId),
@@ -528,13 +553,14 @@ async function fetchHouseholdBundle(
     supabase.from("recurring_bills").select("*").eq("household_id", householdId),
     supabase.from("finance_bill_shares").select("*").eq("household_id", householdId),
     supabase.from("transaction_attachments").select("*").eq("household_id", householdId),
+    supabase.from("item_purchases").select("*").eq("household_id", householdId),
   ]);
 
   const firstError =
     membersRes.error ?? invitesRes.error ?? locationsRes.error ?? containersRes.error ?? itemsRes.error ?? tagsRes.error ?? favoritesRes.error ?? activityRes.error ??
     attachmentsRes.error ?? labelBatchesRes.error ?? labelBatchEntriesRes.error ?? normalizationRulesRes.error ??
     accountsRes.error ?? financeAccountSharesRes.error ?? transactionsRes.error ?? financeCategoriesRes.error ?? categoryRulesRes.error ?? recurringBillsRes.error ?? financeBillSharesRes.error ??
-    transactionAttachmentsRes.error;
+    transactionAttachmentsRes.error ?? itemPurchasesRes.error;
   if (firstError) throw new Error(firstError.message);
 
   // account_balance_snapshots has no household_id column of its own
@@ -573,6 +599,7 @@ async function fetchHouseholdBundle(
     financeBillShares: ((financeBillSharesRes.data ?? []) as FinanceBillShareRow[]).map(rowToFinanceBillShare),
     accountBalanceSnapshots: ((snapshotsRes.data ?? []) as AccountBalanceSnapshotRow[]).map(rowToAccountBalanceSnapshot),
     transactionAttachments: ((transactionAttachmentsRes.data ?? []) as TransactionAttachmentRow[]).map(rowToTransactionAttachment),
+    itemPurchases: ((itemPurchasesRes.data ?? []) as ItemPurchaseRow[]).map(rowToItemPurchase),
     lastUsedDestination: null,
   };
 }
@@ -694,6 +721,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
   financeBillShares: [],
   accountBalanceSnapshots: [],
   transactionAttachments: [],
+  itemPurchases: [],
   currentUserId: "",
   currentUserEmail: "",
   lastUsedDestination: null,
@@ -785,7 +813,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
         | "members" | "invites" | "locations" | "containers" | "tags" | "activity" | "attachments"
         | "labelBatches" | "labelBatchEntries" | "normalizationRules"
         | "accounts" | "financeAccountShares" | "transactions" | "financeCategories" | "categoryRules"
-        | "recurringBills" | "financeBillShares" | "transactionAttachments"
+        | "recurringBills" | "financeBillShares" | "transactionAttachments" | "itemPurchases"
     ) {
       const handler = arrayMergeHandler<TRow, TDomain>(mapper, keyOf, rowKeyOf, (updater) =>
         set((s) => ({ [stateKey]: updater(s[stateKey] as unknown as TDomain[]) }) as Partial<InventoryState>)
@@ -835,6 +863,11 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     // other table this store subscribes to.
     bind<FinanceCategoryRow, FinanceCategory>("categories", householdFilter, rowToFinanceCategory, (c) => c.id, (r) => r.id as string, "financeCategories");
     bind<TransactionAttachmentRow, TransactionAttachment>("transaction_attachments", householdFilter, rowToTransactionAttachment, (a) => a.id, (r) => r.id as string, "transactionAttachments");
+    // item_purchases (0017_household_ledger_core.sql, PRD §25) — same
+    // privacy-aware RLS as its own initial fetch above; a link into a
+    // private account's transaction only reaches subscribers who can see
+    // that account.
+    bind<ItemPurchaseRow, ItemPurchase>("item_purchases", householdFilter, rowToItemPurchase, (p) => p.id, (r) => r.id as string, "itemPurchases");
 
     // items: bespoke, since tagIds is derived from item_tags, not a column
     // on this row — a bare replace-by-id would wipe it back to [] on every
@@ -2478,6 +2511,42 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     const { error } = await supabase.from("csv_import_batches").insert(csvImportBatchToInsertRow(batch));
     if (error) throw new Error(error.message);
     return batch;
+  },
+
+  linkItemPurchase: async ({ itemId, transactionId, scannedReceiptLineItemId, source }) => {
+    if (!transactionId && !scannedReceiptLineItemId) {
+      return { ok: false, error: "Nothing to link — pick a transaction or receipt item." };
+    }
+    // Real, awaited (like addAttachment/addTransactionAttachment): the
+    // caller's UI treats a link as created only once the row actually
+    // exists, not optimistically ahead of the write.
+    const supabase = getSupabaseBrowserClient();
+    const purchase: ItemPurchase = {
+      id: newId(),
+      householdId: get().currentHouseholdId,
+      itemId,
+      transactionId: transactionId ?? null,
+      scannedReceiptLineItemId: scannedReceiptLineItemId ?? null,
+      source,
+      linkedByUserId: get().currentUserId,
+      linkedAt: nowIso(),
+    };
+    const { error } = await supabase.from("item_purchases").insert(itemPurchaseToInsertRow(purchase));
+    if (error) return { ok: false, error: error.message };
+    set((s) => ({ itemPurchases: [...s.itemPurchases, purchase] }));
+    return { ok: true, purchase };
+  },
+
+  unlinkItemPurchase: (purchaseId) => {
+    const supabase = getSupabaseBrowserClient();
+    const previous = get().itemPurchases.find((p) => p.id === purchaseId);
+    set((s) => ({ itemPurchases: s.itemPurchases.filter((p) => p.id !== purchaseId) }));
+    if (!previous) return;
+    persistOrRevert(
+      supabase.from("item_purchases").delete().eq("id", purchaseId),
+      () => set((s) => ({ itemPurchases: [...s.itemPurchases, previous] })),
+      "Couldn't remove that link"
+    );
   },
 
   toggleFavorite: (itemId) => {

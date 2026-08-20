@@ -519,6 +519,28 @@ export interface TransactionAttachment {
   createdAt: string;
 }
 
+/** How an item_purchases link was created — PRD (docs/v4 - Enhanced Features) §25: assisted/opportunistic matching with user confirmation, never fully automatic. 'manual' = the user picked a transaction/item themselves via free search; 'ai_suggested' = the user confirmed a heuristically-surfaced candidate (nearby purchase date) rather than searching; 'finance_nudge' = created via the Wave 2 finance-triggered capture flow (§26, not built by this workstream). */
+export type ItemPurchaseSource = "manual" | "ai_suggested" | "finance_nudge";
+
+/**
+ * The item ↔ transaction link (0017_household_ledger_core.sql, PRD §25 —
+ * "the product's actual differentiator"). At least one of transactionId /
+ * scannedReceiptLineItemId is always set: a link can point at a confirmed
+ * transaction, a not-yet-confirmed receipt-scan line item (review stage,
+ * before `confirm_scanned_transaction_draft` runs), or both once a draft
+ * resolves into a real transaction.
+ */
+export interface ItemPurchase {
+  id: string;
+  householdId: string;
+  itemId: string;
+  transactionId: string | null;
+  scannedReceiptLineItemId: string | null;
+  source: ItemPurchaseSource;
+  linkedByUserId: string;
+  linkedAt: string;
+}
+
 // ---------------------------------------------------------------------------
 // Push notifications (docs/Household Hub Addendum.md §5, generalized per
 // docs/Platform Foundation Addendum.md §2) — real Web Push infrastructure,
