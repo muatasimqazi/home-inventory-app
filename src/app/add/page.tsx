@@ -32,6 +32,7 @@ const CATEGORY_EMOJI: Record<string, string> = {
   Decor: "🖼️",
   Hardware: "🔩",
   Outdoor: "⛺",
+  Appliance: "🔌",
   Miscellaneous: "📦",
 };
 

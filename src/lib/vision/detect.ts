@@ -194,3 +194,90 @@ export async function detectItems(photos: string[]): Promise<VisionDetectedItem[
     }
   }
 }
+
+// ---------------------------------------------------------------------------
+// Appliance label OCR (Household Ledger PRD §27, Implementation Plan
+// Workstream 7) — a second, independent detection task on the same
+// PRIMARY_MODEL/FALLBACK_MODEL pair and the same reliability engineering
+// (Gateway routing, bounded timeout, single-retry-via-fallback) as
+// detectItems above. Deliberately a separate schema/prompt/function rather
+// than folding appliance fields into detectionSchema: detectItems reasons
+// about a whole scene ("what items are in this photo"), this reasons about
+// one manufacturer nameplate ("read this label") — different task, and
+// keeping it separate means this addition can't change detectItems' schema,
+// prompt, or behavior for the general item-capture flow.
+// ---------------------------------------------------------------------------
+
+const applianceLabelSchema = z.object({
+  suggestedName: z.string().describe("A concise, human-readable name for the appliance, e.g. 'Samsung Refrigerator' or 'LG Front-Load Washer'."),
+  photoEmoji: z.string().describe("A single emoji that best represents this appliance."),
+  manufacturer: z.string().describe("The brand/manufacturer printed on the label. Empty string if not legible."),
+  modelNumber: z.string().describe("The model number printed on the label (often labeled 'MODEL', 'MOD', or 'MODEL NO'). Empty string if not legible."),
+  serialNumber: z.string().describe("The serial number printed on the label (often labeled 'SERIAL', 'SER', or 'S/N'). Empty string if not legible."),
+  manufactureDate: z
+    .string()
+    .describe(
+      "The approximate manufacture date if printed or decodable from the label (a full date, a month/year, or just a year is fine — whatever precision the label actually supports). Empty string if there's nothing to go on. Never fabricate a date from a serial number format you're not confident about."
+    ),
+  confidence: z.number().min(0).max(1).describe("How confident you are in the reading overall — lower if the label is blurry, glare-obscured, or partially out of frame."),
+});
+
+export type ApplianceLabelDetection = z.infer<typeof applianceLabelSchema>;
+
+function buildApplianceLabelMessages(photos: string[]): ModelMessage[] {
+  const labeledPhotos = photos.flatMap((photo, i) => [
+    { type: "text" as const, text: `Photo ${i}:` },
+    { type: "file" as const, mediaType: "image" as const, data: photo },
+  ]);
+
+  return [
+    {
+      role: "user",
+      content: [
+        {
+          type: "text",
+          text:
+            "You are reading the manufacturer's nameplate/rating label on a home appliance (e.g. a refrigerator, " +
+            "washer, dryer, dishwasher, water heater, HVAC unit, microwave). These labels are usually a small " +
+            "sticker or metal plate on the appliance's interior edge, back, or side, printed with the brand, a " +
+            "model number, and a serial number, sometimes with a manufacture date or a date code. Read exactly " +
+            "what's printed — do not guess a plausible-looking model or serial number if the label is too blurry " +
+            "or obscured to actually read it; leave that field empty instead. Give an honest overall confidence " +
+            "score, lower for anything blurry, glare-obscured, or partially out of frame.",
+        },
+        ...labeledPhotos,
+      ],
+    },
+  ];
+}
+
+async function runApplianceLabelDetection(model: LanguageModel, photos: string[]): Promise<ApplianceLabelDetection> {
+  const { output } = await generateText({
+    model,
+    output: Output.object({ schema: applianceLabelSchema }),
+    messages: buildApplianceLabelMessages(photos),
+    timeout: CALL_TIMEOUT_MS,
+    maxRetries: CALL_MAX_RETRIES,
+  });
+  return output;
+}
+
+/**
+ * Reads a manufacturer's nameplate/rating label from one or more photos of
+ * it, extracting manufacturer, model number, serial number, and an
+ * approximate manufacture date when the label supports one. Same
+ * primary-then-fallback-model shape as detectItems.
+ */
+export async function detectApplianceLabel(photos: string[]): Promise<ApplianceLabelDetection> {
+  try {
+    return await runApplianceLabelDetection(PRIMARY_MODEL, photos);
+  } catch (primaryError) {
+    console.error("Primary vision model failed (appliance label), falling back to", FALLBACK_MODEL, primaryError);
+    try {
+      return await runApplianceLabelDetection(FALLBACK_MODEL, photos);
+    } catch (fallbackError) {
+      console.error(`Fallback model ${FALLBACK_MODEL} also failed (appliance label):`, fallbackError);
+      throw fallbackError;
+    }
+  }
+}

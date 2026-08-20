@@ -85,12 +85,33 @@ export interface StatementTransactionExtraction {
   amount: number;
 }
 
+// ---------------------------------------------------------------------------
+// Appliance label OCR (Household Ledger PRD §27) — extends VisionProvider
+// with a third method, same shape as extractReceipts/extractStatement
+// above: one appliance nameplate photo (or a couple, if one shot doesn't
+// capture the whole label) in, one structured reading out. See
+// lib/vision/detect.ts's detectApplianceLabel for the real implementation.
+// ---------------------------------------------------------------------------
+
+export interface ApplianceLabelDetection {
+  suggestedName: string;
+  photoEmoji: string;
+  manufacturer: string;
+  modelNumber: string;
+  serialNumber: string;
+  /** Freeform — a year, a month/year, or a full date, whatever precision the label supports. Empty string if not legible. */
+  manufactureDate: string;
+  confidence: number; // 0-1
+}
+
 export interface VisionProvider {
   detectItems(photos: string[]): Promise<DetectedItem[]>;
   /** One scan batch (a statement, a stack of receipts) can contain multiple receipts — array, not a single result. */
   extractReceipts(photos: string[]): Promise<ReceiptExtraction[]>;
   /** One PDF statement -> every transaction line found across all its pages. */
   extractStatement(fileDataUrl: string): Promise<StatementTransactionExtraction[]>;
+  /** Reads a manufacturer's nameplate/rating label off an appliance photo. */
+  detectApplianceLabel(photos: string[]): Promise<ApplianceLabelDetection>;
 }
 
 /** Thrown by a VisionProvider on failure — `retryable` tells the UI whether "Try again" is a reasonable next step (true for anything transient, e.g. Gemini overload) vs. something that won't fix itself. */
@@ -208,7 +229,20 @@ export class MockVisionProvider implements VisionProvider {
     // detection heuristic end-to-end without a live model call.
     return CANNED_STATEMENT_TRANSACTIONS;
   }
+
+  async detectApplianceLabel(): Promise<ApplianceLabelDetection> {
+    await new Promise((resolve) => setTimeout(resolve, 1100));
+    const shuffled = [...CANNED_APPLIANCE_LABELS].sort(() => Math.random() - 0.5);
+    return shuffled[0];
+  }
 }
+
+const CANNED_APPLIANCE_LABELS: ApplianceLabelDetection[] = [
+  { suggestedName: "Samsung Refrigerator", photoEmoji: "🧊", manufacturer: "Samsung", modelNumber: "RF28R7351SG", serialNumber: "0A1B2C3D4E5F", manufactureDate: "2023-04", confidence: 0.91 },
+  { suggestedName: "LG Front-Load Washer", photoEmoji: "🧺", manufacturer: "LG", modelNumber: "WM3400CW", serialNumber: "205KWXY01234", manufactureDate: "2022", confidence: 0.88 },
+  { suggestedName: "Whirlpool Dishwasher", photoEmoji: "🍽️", manufacturer: "Whirlpool", modelNumber: "WDF520PADM", serialNumber: "F41234567", manufactureDate: "", confidence: 0.62 },
+  { suggestedName: "unidentified appliance", photoEmoji: "🔌", manufacturer: "", modelNumber: "", serialNumber: "", manufactureDate: "", confidence: 0.35 },
+];
 
 const CANNED_STATEMENT_TRANSACTIONS: StatementTransactionExtraction[] = [
   { date: "2026-05-14", merchant: "NETFLIX.COM", amount: -15.49 },
@@ -298,6 +332,24 @@ export class HttpVisionProvider implements VisionProvider {
     }
     const { transactions } = (await res.json()) as { transactions: StatementTransactionExtraction[] };
     return transactions;
+  }
+
+  async detectApplianceLabel(photos: string[]): Promise<ApplianceLabelDetection> {
+    let res: Response;
+    try {
+      res = await fetch("/api/v1/vision/detect-appliance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ photos }),
+      });
+    } catch {
+      throw new VisionDetectionError("Couldn't reach the server. Check your connection and try again.", true);
+    }
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new VisionDetectionError(body?.error ?? `Appliance label reading failed (${res.status}).`, body?.retryable ?? true);
+    }
+    return (await res.json()) as ApplianceLabelDetection;
   }
 }
 
