@@ -244,7 +244,15 @@ export function createAskTools(supabase: SupabaseClient, householdId: string) {
             purchases,
             receiptAttached: itemIdsWithReceipt.has(item.id as string),
             warrantyEnd,
-            warrantyStatus: warrantyEnd ? (new Date(warrantyEnd).getTime() >= Date.now() ? "active" : "expired") : "unknown",
+            // warrantyEnd is freeform text (no format enforced at capture)
+            // — an unparsable value must land in "unknown", not silently
+            // collapse into "expired" and state a false fact to the user.
+            warrantyStatus: (() => {
+              if (!warrantyEnd) return "unknown";
+              const endMs = new Date(warrantyEnd).getTime();
+              if (Number.isNaN(endMs)) return "unknown";
+              return endMs >= Date.now() ? "active" : "expired";
+            })(),
           };
         });
 

@@ -33,9 +33,13 @@ const SOURCE_LABEL: Record<ItemPurchase["source"], string> = {
 // Calling Date.now() straight inside a component body is an impure render
 // (react-hooks/purity) — pulled into its own plain helper, same pattern
 // linked-banks-card.tsx's formatLastSynced() already uses for the same
-// reason.
-function isWarrantyActive(warrantyEndIso: string): boolean {
-  return new Date(warrantyEndIso).getTime() >= Date.now();
+// reason. warrantyEnd is freeform text (no format enforced at capture), so
+// an unparsable value returns null ("unknown") rather than silently
+// collapsing into "expired" and stating a false fact to the user.
+function isWarrantyActive(warrantyEndIso: string): boolean | null {
+  const end = new Date(warrantyEndIso).getTime();
+  if (Number.isNaN(end)) return null;
+  return end >= Date.now();
 }
 
 export function ItemPurchaseSection({ itemId }: { itemId: string }) {
@@ -44,7 +48,6 @@ export function ItemPurchaseSection({ itemId }: { itemId: string }) {
   const transactions = useInventoryStore((s) => s.transactions);
   const accounts = useInventoryStore((s) => s.accounts);
   const transactionAttachments = useInventoryStore((s) => s.transactionAttachments);
-  const itemAttachments = useInventoryStore((s) => s.attachments);
   const linkItemPurchase = useInventoryStore((s) => s.linkItemPurchase);
   const unlinkItemPurchase = useInventoryStore((s) => s.unlinkItemPurchase);
 
@@ -103,20 +106,28 @@ export function ItemPurchaseSection({ itemId }: { itemId: string }) {
   const warrantyEnd: string | null = item.extraDetails.warrantyEnd || null;
   const warrantyActive = warrantyEnd ? isWarrantyActive(warrantyEnd) : null;
 
+  // Link/unlink is an edit action, same as Move/Edit/Favorite two sections
+  // below on the item detail page — gated behind item.status === "active"
+  // there, so this section shouldn't stay interactive for an archived or
+  // trashed item when everything else on the page has already locked down.
+  const editable = item.status === "active";
+
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-border bg-white p-4 shadow-sm">
       <div className="flex items-center justify-between">
         <h2 className="text-body font-semibold text-ink">Purchase & Warranty</h2>
-        <button
-          type="button"
-          onClick={() => setLinkOpen(true)}
-          className="flex items-center gap-1 text-caption font-medium text-yellow-text"
-        >
-          <Icon name="plus" size={13} /> Link a purchase
-        </button>
+        {editable && (
+          <button
+            type="button"
+            onClick={() => setLinkOpen(true)}
+            className="flex items-center gap-1 text-caption font-medium text-yellow-text"
+          >
+            <Icon name="plus" size={13} /> Link a purchase
+          </button>
+        )}
       </div>
 
-      {warrantyEnd && (
+      {warrantyEnd && warrantyActive !== null && (
         <div
           className={cn(
             "flex items-center gap-2 rounded-lg px-3 py-2 text-caption font-medium",
@@ -134,31 +145,37 @@ export function ItemPurchaseSection({ itemId }: { itemId: string }) {
         </p>
       ) : (
         <div className="flex flex-col divide-y divide-border">
-          {purchases.map((purchase) => (
-            <PurchaseRow
-              key={purchase.id}
-              purchase={purchase}
-              transaction={transactions.find((t) => t.id === purchase.transactionId)}
-              account={accounts.find((a) => a.id === transactions.find((t) => t.id === purchase.transactionId)?.accountId)}
-              lineItem={purchase.scannedReceiptLineItemId ? lineItemsById[purchase.scannedReceiptLineItemId] : undefined}
-              hasReceipt={
-                itemAttachments.some((a) => a.itemId === itemId && a.kind === "receipt") ||
-                transactionAttachments.some((a) => a.transactionId === purchase.transactionId)
-              }
-              onUnlink={() => handleUnlink(purchase.id)}
-            />
-          ))}
+          {purchases.map((purchase) => {
+            const txn = transactions.find((t) => t.id === purchase.transactionId);
+            return (
+              <PurchaseRow
+                key={purchase.id}
+                purchase={purchase}
+                transaction={txn}
+                account={accounts.find((a) => a.id === txn?.accountId)}
+                lineItem={purchase.scannedReceiptLineItemId ? lineItemsById[purchase.scannedReceiptLineItemId] : undefined}
+                // Scoped to this purchase's own transaction, not the item as
+                // a whole — an item can have more than one linked purchase,
+                // and itemAttachments' item-level "receipt" kind (Workstream
+                // 4) has no way to say which purchase it belongs to.
+                hasReceipt={transactionAttachments.some((a) => a.transactionId === purchase.transactionId)}
+                onUnlink={editable ? () => handleUnlink(purchase.id) : undefined}
+              />
+            );
+          })}
         </div>
       )}
 
-      <LinkPurchaseSheet
-        open={linkOpen}
-        onOpenChange={setLinkOpen}
-        mode="transaction"
-        referenceDate={item.createdAt}
-        excludeIds={linkedTransactionIds}
-        onPick={handlePickTransaction}
-      />
+      {editable && (
+        <LinkPurchaseSheet
+          open={linkOpen}
+          onOpenChange={setLinkOpen}
+          mode="transaction"
+          referenceDate={item.createdAt}
+          excludeIds={linkedTransactionIds}
+          onPick={handlePickTransaction}
+        />
+      )}
     </div>
   );
 }
@@ -176,7 +193,8 @@ function PurchaseRow({
   account: Account | undefined;
   lineItem: ScannedReceiptLineItem | undefined;
   hasReceipt: boolean;
-  onUnlink: () => void;
+  /** Undefined (not just a no-op) for an archived/trashed item — hides the control entirely rather than rendering a button that does nothing. */
+  onUnlink: (() => void) | undefined;
 }) {
   // A line item's own share of a receipt is the more accurate "what did
   // this specific thing cost" figure on a multi-item receipt — the
@@ -204,14 +222,16 @@ function PurchaseRow({
       </div>
       <div className="flex shrink-0 items-center gap-2">
         {priceCents !== null && <span className="text-body font-semibold text-ink">{formatCurrency(priceCents / 100)}</span>}
-        <button
-          type="button"
-          onClick={onUnlink}
-          aria-label="Remove link"
-          className="tap-target flex size-7 items-center justify-center rounded-full text-muted-foreground hover:text-danger"
-        >
-          <Icon name="close" size={13} />
-        </button>
+        {onUnlink && (
+          <button
+            type="button"
+            onClick={onUnlink}
+            aria-label="Remove link"
+            className="tap-target flex size-7 items-center justify-center rounded-full text-muted-foreground hover:text-danger"
+          >
+            <Icon name="close" size={13} />
+          </button>
+        )}
       </div>
     </div>
   );

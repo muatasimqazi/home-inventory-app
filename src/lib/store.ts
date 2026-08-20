@@ -2166,12 +2166,39 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
   permanentlyDeleteTransaction: (transactionId) => {
     const supabase = getSupabaseBrowserClient();
     const t = get().transactions.find((x) => x.id === transactionId);
-    set((s) => ({ transactions: s.transactions.filter((x) => x.id !== transactionId) }));
-    persistOrRevert(
-      supabase.from("transactions").delete().eq("id", transactionId),
-      () => { if (t) set((s) => ({ transactions: [...s.transactions, t] })); },
-      "Couldn't permanently delete transaction"
-    );
+    // item_purchases_has_a_target (0017_household_ledger_core.sql) requires
+    // at least one anchor to survive a write — the FK here is ON DELETE SET
+    // NULL, so a purchase anchored only by this transaction (no
+    // scanned_receipt_line_item_id) would otherwise violate that
+    // constraint and fail the whole delete. Remove those links first, and
+    // await it before the transaction delete fires — both are real
+    // network calls with no ordering guarantee if fired fire-and-forget
+    // alongside each other the way persistOrRevert normally would.
+    const orphaned = get().itemPurchases.filter((p) => p.transactionId === transactionId && !p.scannedReceiptLineItemId);
+    const orphanedIds = orphaned.map((p) => p.id);
+    set((s) => ({
+      transactions: s.transactions.filter((x) => x.id !== transactionId),
+      itemPurchases: s.itemPurchases.filter((p) => !orphanedIds.includes(p.id)),
+    }));
+    const revert = () => {
+      if (t) set((s) => ({ transactions: [...s.transactions, t] }));
+      if (orphaned.length) set((s) => ({ itemPurchases: [...s.itemPurchases, ...orphaned] }));
+    };
+    void (async () => {
+      if (orphanedIds.length > 0) {
+        const { error: unlinkError } = await supabase.from("item_purchases").delete().in("id", orphanedIds);
+        if (unlinkError) {
+          revert();
+          toast.error(`Couldn't permanently delete transaction: ${unlinkError.message}`);
+          return;
+        }
+      }
+      const { error } = await supabase.from("transactions").delete().eq("id", transactionId);
+      if (error) {
+        revert();
+        toast.error(`Couldn't permanently delete transaction: ${error.message}`);
+      }
+    })();
     if (t) get().logActivity({ entityType: "transaction", entityId: t.id, entityName: t.merchant ?? t.description ?? "Transaction", action: "deleted_forever" });
   },
 

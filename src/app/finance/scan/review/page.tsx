@@ -120,7 +120,18 @@ export default function SingleReceiptReviewPage() {
             .update({ transaction_id: data.id })
             .in("scanned_receipt_line_item_id", lineItemIds)
             .is("transaction_id", null);
-          if (backfillError) console.error("Couldn't backfill item_purchases.transaction_id:", backfillError.message);
+          if (backfillError) {
+            // Not atomic with confirm_scanned_transaction_draft() above —
+            // a real gap the reviewer correctly flagged as belonging
+            // inside that RPC instead, deferred rather than folded into
+            // this merge. Until then, at minimum don't let this fail
+            // silently: a link made during review would otherwise stay
+            // permanently anchored only by scanned_receipt_line_item_id
+            // and read as "pending" forever even though the receipt was,
+            // in fact, confirmed.
+            console.error("Couldn't backfill item_purchases.transaction_id:", backfillError.message);
+            toast.error("Confirmed, but couldn't finish linking an item to this receipt — check the item's Purchase & Warranty section.");
+          }
         }
       }
 
