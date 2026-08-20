@@ -190,13 +190,25 @@ function ApplianceCaptureInner() {
       setPhoto(finalPhoto);
       setPreviewUrl(null);
       setMode("analyzing");
-      stopCameraStream();
       await runDetection();
       if (useApplianceCapture.getState().detectError) {
-        setMode("preview");
-        setPreviewUrl(finalPhoto);
+        // Stay on "analyzing" — its own detectError branch is what
+        // actually renders the error card (message + Try again/Retake),
+        // the same landing spot handleRetryDetection's failure path uses
+        // below. Bouncing to "preview" here skipped that card entirely:
+        // the user would land back on the crop screen with no explanation
+        // of why "Use Photo" didn't proceed.
         return;
       }
+      // Only stop the shared stream once we're actually leaving for
+      // /capture/appliance/review, not before knowing detection succeeded
+      // — same reasoning as capture/page.tsx's handleSave: an earlier stop
+      // here meant any detection failure forced a fresh getUserMedia() call
+      // on the next Retake (returnToLive() only reuses the stream if
+      // hasLiveTracks() is still true), which can visibly re-prompt for
+      // camera permission on the very browsers the shared-stream mechanism
+      // exists to protect against.
+      stopCameraStream();
       router.replace("/capture/appliance/review");
     } finally {
       setCropping(false);
@@ -207,10 +219,13 @@ function ApplianceCaptureInner() {
     setMode("analyzing");
     runDetection().then(() => {
       if (!useApplianceCapture.getState().detectError) {
+        stopCameraStream();
         router.replace("/capture/appliance/review");
-      } else {
-        setMode("preview");
       }
+      // else: stay on "analyzing" — its detectError branch re-renders the
+      // error card with the new error. (Previously bounced to "preview"
+      // with no previewUrl set, which rendered nothing but the header —
+      // see the comment on the equivalent branch in handleUsePhoto above.)
     });
   }
 
