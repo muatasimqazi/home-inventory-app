@@ -37,6 +37,39 @@ export interface Invite {
   expiresAt: string;
 }
 
+// Household Ledger — People (supabase/migrations/0017_household_ledger_core.sql,
+// docs/v4 - Enhanced Features §8/§9/§23). A Person is a household member who
+// may or may not have an Account: every authenticated Member also has a
+// Person row (linkedUserId = their user id, created automatically by
+// create_household()/accept_invite()), and a managed profile (a child or
+// anyone else who doesn't sign in themselves) is a Person row with
+// linkedUserId null. Ownership, "who does this belong to", and the People
+// list in Settings all key off Person, not Member, going forward.
+export const PERSON_RELATIONSHIPS = ["partner_spouse", "child", "parent", "family_member", "roommate", "other"] as const;
+export type PersonRelationship = (typeof PERSON_RELATIONSHIPS)[number];
+
+export const PERSON_RELATIONSHIP_LABEL: Record<PersonRelationship, string> = {
+  partner_spouse: "Partner / Spouse",
+  child: "Child",
+  parent: "Parent",
+  family_member: "Family member",
+  roommate: "Roommate",
+  other: "Other",
+};
+
+export interface Person {
+  id: string;
+  householdId: string;
+  displayName: string;
+  relationship: PersonRelationship;
+  /** Path within the public "item-photos" Storage bucket (same convention as Item/Location/Container cover photos) — null falls back to an initial-letter avatar. */
+  avatarPath: string | null;
+  /** Set once this Person is linked to a real Account (every authenticated Member's Person row has this set to their user id). Null = managed profile (PRD §23): no email, phone, password, or account required. */
+  linkedUserId: string | null;
+  createdByUserId: string;
+  createdAt: string;
+}
+
 export type EntityLifecycleStatus = "active" | "trashed";
 
 export interface Location {
@@ -116,7 +149,9 @@ export interface Item {
   tagIds: string[];
   /** Category-scoped extra fields (e.g. { serialNumber: "..." }), keyed by field key from CATEGORY_EXTRA_FIELDS. */
   extraDetails: Record<string, string>;
-  /** Which household member this item personally belongs to. null = shared/household item, not owned by one person. */
+  /** Which Person this item personally belongs to. null = shared/household item, not owned by one person (PRD §9's "Household" default). This is the source of truth going forward — set/read this, not ownerUserId. */
+  ownerPersonId: string | null;
+  /** Compatibility shim (0017_household_ledger_core.sql) — kept in sync with ownerPersonId automatically by a DB trigger regardless of which one a write names. Do not read this for display; it exists so not-yet-migrated call sites (if any remain) keep working. Slated for removal once every call site is confirmed on ownerPersonId. */
   ownerUserId: string | null;
   createdByUserId: string;
   createdAt: string;
@@ -190,6 +225,7 @@ export type ActivityEntityType =
   | "location"
   | "household"
   | "member"
+  | "person"
   | "account"
   | "transaction"
   | "category"

@@ -7,6 +7,7 @@ import { Icon } from "@/components/icon";
 import { BreadcrumbTrail } from "@/components/breadcrumb-trail";
 import { MoveSheet } from "@/components/move-sheet";
 import { PhotoThumb } from "@/components/photo-thumb";
+import { AddPersonSheet } from "@/components/add-person-sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,7 +18,8 @@ import { SORTED_CATEGORIES } from "@/lib/types";
 import { extraFieldsForCategory } from "@/lib/category";
 import { cn } from "@/lib/utils";
 
-const SHARED_OWNER_VALUE = "shared";
+const HOUSEHOLD_OWNER_VALUE = "household";
+const ADD_PERSON_VALUE = "__add_person__";
 
 const CATEGORY_EMOJI: Record<string, string> = {
   Tool: "🛠️",
@@ -46,7 +48,8 @@ function ManualAddItemInner() {
   const searchParams = useSearchParams();
   const locations = useInventoryStore((s) => s.locations);
   const containers = useInventoryStore((s) => s.containers);
-  const members = sortByLabel(useInventoryStore((s) => s.members), (m) => m.displayName);
+  const people = sortByLabel(useInventoryStore((s) => s.people), (p) => p.displayName);
+  const isOwner = useInventoryStore((s) => s.members.find((m) => m.userId === s.currentUserId)?.role === "owner");
   const createItem = useInventoryStore((s) => s.createItem);
   const setItemCoverPhoto = useInventoryStore((s) => s.setItemCoverPhoto);
   const getOrCreateTag = useInventoryStore((s) => s.getOrCreateTag);
@@ -62,7 +65,8 @@ function ManualAddItemInner() {
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [extraDetails, setExtraDetails] = useState<Record<string, string>>({});
-  const [ownerUserId, setOwnerUserId] = useState(SHARED_OWNER_VALUE);
+  const [ownerPersonId, setOwnerPersonId] = useState(HOUSEHOLD_OWNER_VALUE);
+  const [addPersonOpen, setAddPersonOpen] = useState(false);
   const [destination, setDestinationState] = useState<{ locationId: string | null; containerId: string | null }>(() => {
     const locationId = searchParams.get("locationId");
     const containerId = searchParams.get("containerId");
@@ -99,6 +103,7 @@ function ManualAddItemInner() {
       return;
     }
     setSaving(true);
+    const ownerPerson = ownerPersonId === HOUSEHOLD_OWNER_VALUE ? null : (people.find((p) => p.id === ownerPersonId) ?? null);
     const item = createItem({
       name: name.trim(),
       category,
@@ -109,7 +114,13 @@ function ManualAddItemInner() {
       containerId: destination.containerId,
       tagIds: tags.map((t) => getOrCreateTag(t).id),
       extraDetails,
-      ownerUserId: ownerUserId === SHARED_OWNER_VALUE ? null : ownerUserId,
+      ownerPersonId: ownerPerson?.id ?? null,
+      // Kept in lockstep with ownerPersonId here rather than left for the
+      // DB trigger (0018_owner_sync.sql) to derive — a managed profile's
+      // linkedUserId is null, and deriving from a stale ownerUserId would
+      // otherwise trip the trigger's "must refer to the same person" guard
+      // if this item is ever re-saved before a full page reload.
+      ownerUserId: ownerPerson?.linkedUserId ?? null,
     });
     if (photoFile) {
       const result = await setItemCoverPhoto(item.id, photoFile);
@@ -199,17 +210,27 @@ function ManualAddItemInner() {
         </Field>
 
         <Field label="Belongs to">
-          <Select value={ownerUserId} onValueChange={setOwnerUserId}>
+          <Select
+            value={ownerPersonId}
+            onValueChange={(v) => {
+              if (v === ADD_PERSON_VALUE) {
+                setAddPersonOpen(true);
+                return;
+              }
+              setOwnerPersonId(v);
+            }}
+          >
             <SelectTrigger className="h-11 w-full bg-white">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={SHARED_OWNER_VALUE}>Shared</SelectItem>
-              {members.map((m) => (
-                <SelectItem key={m.userId} value={m.userId}>
-                  {m.displayName}
+              <SelectItem value={HOUSEHOLD_OWNER_VALUE}>Household</SelectItem>
+              {people.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.displayName}
                 </SelectItem>
               ))}
+              <SelectItem value={ADD_PERSON_VALUE}>+ Add someone</SelectItem>
             </SelectContent>
           </Select>
         </Field>
@@ -313,6 +334,13 @@ function ManualAddItemInner() {
           setDestinationState(dest);
           if (dest.locationId) setLocationError(null);
         }}
+      />
+
+      <AddPersonSheet
+        open={addPersonOpen}
+        onOpenChange={setAddPersonOpen}
+        onCreated={(person) => setOwnerPersonId(person.id)}
+        canInvite={isOwner}
       />
     </div>
   );

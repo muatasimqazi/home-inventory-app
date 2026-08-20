@@ -6,9 +6,10 @@ import { toast } from "sonner";
 import { Icon } from "@/components/icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { AddPersonSheet, type AddedPerson } from "@/components/add-person-sheet";
+import { AddPersonSheet } from "@/components/add-person-sheet";
 import { useInventoryStore } from "@/lib/store";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import type { Person } from "@/lib/types";
 
 // PRD v4 - Enhanced Features §11-§22: no mandatory household-name, member,
 // or location wizard. A household + home are created invisibly the moment
@@ -59,7 +60,7 @@ function HouseholdSetupInner() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [manualName, setManualName] = useState("");
   const [addPersonOpen, setAddPersonOpen] = useState(false);
-  const [addedPeople, setAddedPeople] = useState<AddedPerson[]>([]);
+  const [addedPeople, setAddedPeople] = useState<Person[]>([]);
   const autoCreateStarted = useRef(false);
 
   const [joinName, setJoinName] = useState("");
@@ -324,9 +325,10 @@ function HouseholdSetupInner() {
 
       <AddPersonSheet
         open={addPersonOpen}
+        onOpenChange={setAddPersonOpen}
         onCreated={(person) => {
           setAddPersonOpen(false);
-          if (person) setAddedPeople((p) => [...p, person]);
+          setAddedPeople((p) => [...p, person]);
         }}
       />
     </div>

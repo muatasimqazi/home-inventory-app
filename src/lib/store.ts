@@ -13,6 +13,8 @@ import {
   rowToMember,
   rowToInvite,
   inviteToInsertRow,
+  rowToPerson,
+  personToInsertRow,
   rowToLocation,
   locationToInsertRow,
   rowToContainer,
@@ -57,6 +59,7 @@ import {
   type HouseholdRow,
   type MemberRow,
   type InviteRow,
+  type PersonRow,
   type LocationRow,
   type ContainerRow,
   type ItemRow,
@@ -102,6 +105,8 @@ import type {
   Location,
   Member,
   NormalizationRule,
+  Person,
+  PersonRelationship,
   PinnedLocation,
   PinnedLocationCategory,
   RecurringBill,
@@ -147,8 +152,17 @@ export interface NewItemInput {
   reviewReason?: string;
   tagIds?: string[];
   extraDetails?: Record<string, string>;
-  /** null/omitted = shared household item, not owned by one person. */
+  /** null/omitted = shared household item, not owned by one person (PRD §9's "Household" default). */
+  ownerPersonId?: string | null;
+  /** Compatibility shim — derived server-side from ownerPersonId if omitted (0018_owner_sync.sql). Callers that already know the owning Person's linkedUserId may pass it explicitly to keep the two columns consistent in the same optimistic write; new call sites should just set ownerPersonId. */
   ownerUserId?: string | null;
+}
+
+export interface NewPersonInput {
+  displayName: string;
+  relationship: PersonRelationship;
+  /** Set only when creating a Person record for an already-authenticated member (e.g. the Phase 0 backfill path) — the normal "+ Add someone" flow (PRD §22) creates a managed profile (linkedUserId null) and links it later, if ever, via a real account-linking flow (not built in Wave 1 — see the Implementation Plan §9 open item). */
+  linkedUserId?: string | null;
 }
 
 const QUANTITY_MIN = 0;
@@ -205,6 +219,8 @@ interface InventoryState {
   currentHouseholdId: string;
   members: Member[];
   invites: Invite[];
+  /** Household Ledger People (PRD §8/§9/§23) — every authenticated Member plus every managed profile. Ownership (Item.ownerPersonId) and the People list in Settings read from here, not `members`. */
+  people: Person[];
   locations: Location[];
   containers: Container[];
   items: Item[];
@@ -414,6 +430,18 @@ interface InventoryState {
   /** Updates the caller's own membership row in the current household (display name, avatar). Real, awaited. */
   updateMyProfile: (patch: { displayName?: string; avatarUrl?: string }) => Promise<{ ok: boolean; error?: string }>;
 
+  // People (PRD §8/§9/§23) — both authenticated members (linkedUserId set,
+  // created automatically by create_household()/accept_invite()) and
+  // managed profiles (linkedUserId null) live here.
+  /** Creates a Person row without an avatar — call setPersonAvatar after, if the caller collected a photo, same two-step shape as createItem + setItemCoverPhoto. */
+  addPerson: (input: NewPersonInput) => Person;
+  updatePerson: (personId: string, patch: Partial<Pick<Person, "displayName" | "relationship">>) => void;
+  /** Removes a Person row. Any item owned by them falls back to unowned/household (items.owner_person_id references people(id) on delete set null) rather than being deleted or reassigned. */
+  deletePerson: (personId: string) => void;
+  /** Uploads `file` to the public "item-photos" bucket and points the Person at it, replacing any existing avatar. Real, awaited: same reasoning as setItemCoverPhoto. */
+  setPersonAvatar: (personId: string, file: File) => Promise<{ ok: boolean; error?: string }>;
+  removePersonAvatar: (personId: string) => void;
+
   // Activity
   logActivity: (entry: {
     entityType: ActivityEntityType;
@@ -444,6 +472,7 @@ function purgeAfter(from: Date): string {
 interface HouseholdBundle {
   members: Member[];
   invites: Invite[];
+  people: Person[];
   locations: Location[];
   containers: Container[];
   items: Item[];
@@ -471,6 +500,7 @@ function snapshotBundle(state: InventoryState): HouseholdBundle {
   return {
     members: state.members,
     invites: state.invites,
+    people: state.people,
     locations: state.locations,
     containers: state.containers,
     items: state.items,
@@ -504,6 +534,7 @@ async function fetchHouseholdBundle(
   const [
     membersRes,
     invitesRes,
+    peopleRes,
     locationsRes,
     containersRes,
     itemsRes,
@@ -526,6 +557,7 @@ async function fetchHouseholdBundle(
   ] = await Promise.all([
     supabase.from("members").select("*").eq("household_id", householdId),
     supabase.from("invites").select("*").eq("household_id", householdId),
+    supabase.from("people").select("*").eq("household_id", householdId),
     supabase.from("locations").select("*").eq("household_id", householdId),
     supabase.from("containers").select("*").eq("household_id", householdId),
     supabase.from("items").select("*, item_tags(tag_id)").eq("household_id", householdId),
@@ -560,7 +592,7 @@ async function fetchHouseholdBundle(
   ]);
 
   const firstError =
-    membersRes.error ?? invitesRes.error ?? locationsRes.error ?? containersRes.error ?? itemsRes.error ?? tagsRes.error ?? favoritesRes.error ?? activityRes.error ??
+    membersRes.error ?? invitesRes.error ?? peopleRes.error ?? locationsRes.error ?? containersRes.error ?? itemsRes.error ?? tagsRes.error ?? favoritesRes.error ?? activityRes.error ??
     attachmentsRes.error ?? pinnedLocationsRes.error ?? labelBatchesRes.error ?? labelBatchEntriesRes.error ?? normalizationRulesRes.error ??
     accountsRes.error ?? financeAccountSharesRes.error ?? transactionsRes.error ?? financeCategoriesRes.error ?? categoryRulesRes.error ?? recurringBillsRes.error ?? financeBillSharesRes.error ??
     transactionAttachmentsRes.error;
@@ -583,6 +615,7 @@ async function fetchHouseholdBundle(
   return {
     members: ((membersRes.data ?? []) as MemberRow[]).map(rowToMember),
     invites: ((invitesRes.data ?? []) as InviteRow[]).map(rowToInvite),
+    people: ((peopleRes.data ?? []) as PersonRow[]).map(rowToPerson),
     locations: ((locationsRes.data ?? []) as LocationRow[]).map(rowToLocation),
     containers: ((containersRes.data ?? []) as ContainerRow[]).map(rowToContainer),
     items: ((itemsRes.data ?? []) as ItemRowWithTags[]).map((row) => rowToItem(row, (row.item_tags ?? []).map((jt) => jt.tag_id))),
@@ -740,6 +773,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
   currentHouseholdId: "",
   members: [],
   invites: [],
+  people: [],
   locations: [],
   containers: [],
   items: [],
@@ -848,7 +882,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       keyOf: (item: TDomain) => string,
       rowKeyOf: (row: Record<string, unknown>) => string,
       stateKey:
-        | "members" | "invites" | "locations" | "containers" | "tags" | "activity" | "attachments" | "pinnedLocations"
+        | "members" | "invites" | "people" | "locations" | "containers" | "tags" | "activity" | "attachments" | "pinnedLocations"
         | "labelBatches" | "labelBatchEntries" | "normalizationRules"
         | "accounts" | "financeAccountShares" | "transactions" | "financeCategories" | "categoryRules"
         | "recurringBills" | "financeBillShares" | "transactionAttachments"
@@ -871,6 +905,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
 
     bind<MemberRow, Member>("members", householdFilter, rowToMember, (m) => m.userId, (r) => r.user_id as string, "members");
     bind<InviteRow, Invite>("invites", householdFilter, rowToInvite, (i) => i.id, (r) => r.id as string, "invites");
+    bind<PersonRow, Person>("people", householdFilter, rowToPerson, (p) => p.id, (r) => r.id as string, "people");
     bind<LocationRow, Location>("locations", householdFilter, rowToLocation, (l) => l.id, (r) => r.id as string, "locations");
     bind<ContainerRow, Container>("containers", householdFilter, rowToContainer, (c) => c.id, (r) => r.id as string, "containers");
     bind<TagRow, Tag>("tags", householdFilter, rowToTag, (t) => t.id, (r) => r.id as string, "tags");
@@ -2754,6 +2789,90 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     return { ok: true };
   },
 
+  addPerson: (input) => {
+    const supabase = getSupabaseBrowserClient();
+    const created: Person = {
+      id: newId(),
+      householdId: get().currentHouseholdId,
+      displayName: input.displayName,
+      relationship: input.relationship,
+      avatarPath: null,
+      linkedUserId: input.linkedUserId ?? null,
+      createdByUserId: get().currentUserId,
+      createdAt: nowIso(),
+    };
+    set((s) => ({ people: [...s.people, created] }));
+    persistOrRevert(
+      supabase.from("people").insert(personToInsertRow(created)),
+      () => set((s) => ({ people: s.people.filter((p) => p.id !== created.id) })),
+      "Couldn't add person"
+    );
+    get().logActivity({ entityType: "person", entityId: created.id, entityName: created.displayName, action: "created" });
+    return created;
+  },
+
+  updatePerson: (personId, patch) => {
+    const supabase = getSupabaseBrowserClient();
+    const previous = get().people.find((p) => p.id === personId);
+    if (!previous) return;
+    const merged: Person = { ...previous, ...patch };
+    set((s) => ({ people: s.people.map((p) => (p.id === personId ? merged : p)) }));
+    persistOrRevert(
+      supabase.from("people").update(personToInsertRow(merged)).eq("id", personId),
+      () => set((s) => ({ people: s.people.map((p) => (p.id === personId ? previous : p)) })),
+      "Couldn't update person"
+    );
+    get().logActivity({ entityType: "person", entityId: merged.id, entityName: merged.displayName, action: "edited" });
+  },
+
+  deletePerson: (personId) => {
+    const supabase = getSupabaseBrowserClient();
+    const previous = get().people.find((p) => p.id === personId);
+    if (!previous) return;
+    set((s) => ({ people: s.people.filter((p) => p.id !== personId) }));
+    persistOrRevert(
+      supabase.from("people").delete().eq("id", personId),
+      () => set((s) => ({ people: [...s.people, previous] })),
+      "Couldn't remove person"
+    );
+    get().logActivity({ entityType: "person", entityId: previous.id, entityName: previous.displayName, action: "removed" });
+  },
+
+  setPersonAvatar: async (personId, file) => {
+    const person = get().people.find((p) => p.id === personId);
+    if (!person) return { ok: false, error: "Person not found." };
+    const previousPath = person.avatarPath;
+
+    const uploaded = await uploadCoverPhotoFile(file, person.householdId);
+    if (!uploaded.ok) return uploaded;
+    const { path } = uploaded;
+
+    const supabase = getSupabaseBrowserClient();
+    set((s) => ({ people: s.people.map((p) => (p.id === personId ? { ...p, avatarPath: path } : p)) }));
+    const { error: updateError } = await supabase.from("people").update({ avatar_path: path }).eq("id", personId);
+    if (updateError) {
+      set((s) => ({ people: s.people.map((p) => (p.id === personId ? { ...p, avatarPath: previousPath } : p)) }));
+      removeCoverPhotoObject(path, "person avatar upload");
+      return { ok: false, error: updateError.message };
+    }
+    if (previousPath) removeCoverPhotoObject(previousPath, "replaced person avatar");
+    return { ok: true };
+  },
+
+  removePersonAvatar: (personId) => {
+    const supabase = getSupabaseBrowserClient();
+    const person = get().people.find((p) => p.id === personId);
+    if (!person || !person.avatarPath) return;
+    const previousPath = person.avatarPath;
+    set((s) => ({ people: s.people.map((p) => (p.id === personId ? { ...p, avatarPath: null } : p)) }));
+    removeCoverPhotoObject(previousPath, "person avatar");
+    persistOrRevert(
+      supabase.from("people").update({ avatar_path: null }).eq("id", personId),
+      () => set((s) => ({ people: s.people.map((p) => (p.id === personId ? { ...p, avatarPath: previousPath } : p)) })),
+      "Couldn't remove avatar"
+    );
+  },
+
   logActivity: (entry) => {
     const supabase = getSupabaseBrowserClient();
     const created: ActivityLogEntry = {
@@ -2900,6 +3019,7 @@ function buildItem(householdId: string, userId: string, input: NewItemInput): It
     reviewReason: input.reviewReason,
     tagIds: input.tagIds ?? [],
     extraDetails: input.extraDetails ?? {},
+    ownerPersonId: input.ownerPersonId ?? null,
     ownerUserId: input.ownerUserId ?? null,
     createdByUserId: userId,
     createdAt: timestamp,
