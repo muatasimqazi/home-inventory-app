@@ -210,3 +210,70 @@ Then do the following:
 8. Stop there. Do not dispatch Wave 2 (plan §5) — report Wave 1 complete
    and wait for explicit go-ahead first.
 ```
+
+---
+
+## 12. Orchestration prompt — Wave 2
+
+Self-contained — paste as the first message in a fresh Claude Code session at this repo:
+
+```
+You are orchestrating Wave 2 of the Household Ledger build. Wave 1 is fully
+merged to develop, plus two post-Wave-1 fixes: the MoveSheet location-
+creation dead end (§9) and its plan-doc writeup. Start by reading
+docs/Household Ledger Implementation Plan.md in full, especially:
+
+- §3 (Wave 1 outcomes — what actually shipped vs. brief, useful context for
+  what Wave 2 is building on top of)
+- §5 (Wave 2 workstreams and their dependencies)
+- §4 (hot-file contention notes — src/app/capture/ and src/app/scan/ are
+  flagged there specifically for Wave 2)
+- §6 (explicit non-scope — enforce this for every agent, verbatim)
+- §8 (ready-to-dispatch briefs for Workstreams 6, 7, 8)
+- §9 (open items — none are Wave 2's job, but be aware of them: the
+  post-scan "+ Add someone" gap and the remaining owner_user_id references
+  are both still open and out of scope here)
+
+Then do the following:
+
+1. Dispatch 2 agents in parallel with the Agent tool — Workstream 6
+   (Finance-triggered capture nudge) and Workstream 7 (Appliance scan +
+   lifecycle). For each: subagent_type "general-purpose", isolation
+   "worktree", run_in_background true, and a prompt built from that
+   workstream's brief in plan §8 plus the non-scope line from §6 verbatim.
+   Tell each agent explicitly to commit to its own branch and NOT merge or
+   push to develop itself.
+
+   Do NOT dispatch Workstream 8 yet — plan §5 states it depends on #7 for
+   the appliance entry point it needs to route around, and both #7 and #8
+   touch camera entry points under src/app/capture/ and src/app/scan/
+   (§4's hot-file note) — running them concurrently risks exactly the kind
+   of collision Wave 1 avoided by sequencing instead of forcing parallelism.
+
+2. Wait for #6 and #7 to complete — don't poll manually.
+
+3. Review each branch's diff before merging (use the /code-review skill).
+
+4. Merge order: Workstream 6 first (no shared surface with #7), then
+   Workstream 7. Run `pnpm exec tsc --noEmit` and lint the changed files
+   after each merge before proceeding.
+
+5. Now dispatch Workstream 8 (Universal Scan narrow launch), same pattern
+   (worktree + background), building against the now-merged Workstream 7.
+
+6. Review, then merge Workstream 8. Run `pnpm exec tsc --noEmit` and lint
+   again.
+
+7. If any agent's output touches files outside its §5/§8 scope, or
+   conflicts with the §6 non-scope list, stop and flag it — don't merge it
+   silently or "fix" it into compliance yourself.
+
+8. Once all 3 are merged, run a full `pnpm exec tsc --noEmit`, update plan
+   §5/§9 to reflect what actually shipped vs. the brief (following the
+   same honest-reporting shape §3 already used for Wave 1 — real gaps
+   flagged, not papered over), and report a summary: what merged, what
+   review found, any deviations.
+
+9. Stop there. This is the last planned wave — don't invent new scope
+   beyond §5 without checking in first.
+```
