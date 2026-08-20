@@ -13,8 +13,11 @@ import {
   Copy,
   CreditCard,
   Download,
+  Droplet,
   File,
   Filter,
+  Flame,
+  Hammer,
   Heart,
   Home,
   ImageOff,
@@ -43,6 +46,7 @@ import {
   Repeat,
   RotateCcw,
   RotateCw,
+  Router,
   ScanLine,
   Search,
   Settings,
@@ -56,7 +60,9 @@ import {
   User,
   Users,
   Wallet,
+  Wind,
   X,
+  Zap,
 } from "lucide-react";
 
 // Single icon registry, per PRD §3: one rounded 24px line-icon family
@@ -121,6 +127,13 @@ const ICONS = {
   repeat: Repeat,
   lock: Lock,
   cash: Banknote,
+  // Home Map (PRD §29) — one icon per pinned_locations category.
+  droplet: Droplet,
+  zap: Zap,
+  flame: Flame,
+  wind: Wind,
+  router: Router,
+  hammer: Hammer,
 } as const;
 
 export type IconName = keyof typeof ICONS;
