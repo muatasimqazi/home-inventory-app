@@ -16,6 +16,7 @@ export default function SettingsPage() {
   const household = useCurrentHousehold();
   const currentUserId = useInventoryStore((s) => s.currentUserId);
   const members = useInventoryStore((s) => s.members);
+  const people = useInventoryStore((s) => s.people);
   const households = useInventoryStore((s) => s.households);
   const tags = useInventoryStore((s) => s.tags);
   const updateMyProfile = useInventoryStore((s) => s.updateMyProfile);
@@ -72,7 +73,7 @@ export default function SettingsPage() {
       <div className="flex flex-col gap-2">
         <SettingsRow icon="home" label="Household" sublabel={household.name} href="/settings/members" />
         <SettingsRow icon="users" label="My Households" sublabel={`${households.length} household${households.length === 1 ? "" : "s"}`} href="/settings/households" />
-        <SettingsRow icon="user" label="Members" sublabel={`${members.length} active`} href="/settings/members" />
+        <SettingsRow icon="user" label="People" sublabel={`${people.length} in household`} href="/settings/members" />
         <SettingsRow icon="printer" label="Label printing" sublabel="Container ID labels" href="/desktop/labels" />
         <SettingsRow icon="upload" label="Import CSV" sublabel="Items or transactions" href="/import" />
         <SettingsRow icon="bell" label="Notifications" sublabel="Bill reminders and more" href="/settings/notifications" />
