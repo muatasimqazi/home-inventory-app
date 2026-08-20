@@ -16,6 +16,7 @@ import { stopCameraStream } from "@/lib/camera-stream";
 import { cropToItem, dataUrlToFile } from "@/lib/crop-image";
 import { buildBreadcrumb } from "@/lib/selectors";
 import { SORTED_CATEGORIES } from "@/lib/types";
+import { formatCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 // A low-confidence AI suggestion (row.needsReview) left completely
@@ -37,14 +38,23 @@ export default function CaptureReviewPage() {
   const updateDetection = useCaptureSession((s) => s.updateDetection);
   const toggleExcludeDetection = useCaptureSession((s) => s.toggleExcludeDetection);
   const setDestination = useCaptureSession((s) => s.setDestination);
+  const linkTransactionId = useCaptureSession((s) => s.linkTransactionId);
 
   const locations = useInventoryStore((s) => s.locations);
   const containers = useInventoryStore((s) => s.containers);
+  const transactions = useInventoryStore((s) => s.transactions);
   const createItem = useInventoryStore((s) => s.createItem);
   const createItemsBatch = useInventoryStore((s) => s.createItemsBatch);
   const setItemCoverPhoto = useInventoryStore((s) => s.setItemCoverPhoto);
   const getOrCreateTag = useInventoryStore((s) => s.getOrCreateTag);
   const saveNormalizationRule = useInventoryStore((s) => s.saveNormalizationRule);
+  const linkItemPurchase = useInventoryStore((s) => s.linkItemPurchase);
+
+  // Household Ledger PRD §26 — the transaction this session arrived
+  // pre-linked to (if any), looked up for display only; the actual link is
+  // written after Save via linkItemPurchase, same call shape as the
+  // manual "Link to item" affordance (Workstream 3).
+  const linkTransaction = linkTransactionId ? transactions.find((t) => t.id === linkTransactionId) ?? null : null;
 
   const [moveOpen, setMoveOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -137,6 +147,10 @@ export default function CaptureReviewPage() {
       const item = createItem(buildInput(included[0]));
       persistNormalizationRules(included);
       if (coverFiles[0]) await setItemCoverPhoto(item.id, coverFiles[0]);
+      if (linkTransaction) {
+        const linkRes = await linkItemPurchase({ itemId: item.id, transactionId: linkTransaction.id, source: "finance_nudge" });
+        if (!linkRes.ok) toast.error(linkRes.error ?? "Saved, but couldn't link the purchase — link it manually from the item page.");
+      }
       toast.success(`Saved ${item.name}`);
       // replace, not push — closes out the whole capture flow's single
       // history slot instead of adding yet another one on top of it, so
@@ -147,6 +161,17 @@ export default function CaptureReviewPage() {
       const created = createItemsBatch(included.map(buildInput));
       persistNormalizationRules(included);
       await Promise.all(created.map((it, i) => (coverFiles[i] ? setItemCoverPhoto(it.id, coverFiles[i]!) : null)));
+      // A capture-nudge is keyed to one transaction, but the user may have
+      // photographed more than one thing from that same purchase (e.g. a
+      // multi-item Home Depot run) — link every item created in this batch
+      // to it rather than only the first, since item_purchases has no
+      // one-item-per-transaction constraint.
+      if (linkTransaction) {
+        const linkResults = await Promise.all(
+          created.map((it) => linkItemPurchase({ itemId: it.id, transactionId: linkTransaction.id, source: "finance_nudge" }))
+        );
+        if (linkResults.some((r) => !r.ok)) toast.error("Saved, but couldn't link one or more items to the purchase — link them manually from the item page.");
+      }
       toast.success(`Saved ${included.length} items`);
       router.replace(destination?.containerId ? `/containers/${destination.containerId}` : "/");
     }
@@ -182,6 +207,16 @@ export default function CaptureReviewPage() {
             {missingDestination ? "Choose" : "Change"}
           </Button>
         </div>
+
+        {linkTransaction && (
+          <div className="flex items-center gap-2 rounded-xl bg-brand-100 px-4 py-3 text-caption text-ink">
+            <Icon name="link" size={14} className="shrink-0" />
+            <span>
+              Will link to your {formatCurrency(Math.abs(linkTransaction.amount))} purchase
+              {linkTransaction.merchant ? ` at ${linkTransaction.merchant}` : ""} — no separate linking step needed.
+            </span>
+          </div>
+        )}
 
         {isBulk ? (
           <div className="flex flex-col gap-2">

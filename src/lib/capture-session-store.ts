@@ -26,8 +26,16 @@ interface CaptureSessionState {
   detecting: boolean;
   /** Set when runDetection() fails (e.g. Gemini overloaded) — null on success or before the first attempt. */
   detectError: DetectError | null;
+  /** Household Ledger PRD §26 (Finance-Triggered Capture) — set when this
+   * capture session was opened from a "log what you bought" push
+   * notification's `Add to Home` CTA (`?linkTransactionId=` on /capture),
+   * so /capture/review can pre-link the resulting item(s) to that
+   * transaction via `item_purchases` without a separate manual linking
+   * step. Null for every ordinary capture entry point. */
+  linkTransactionId: string | null;
 
   setDestination: (dest: { locationId: string | null; containerId: string | null }) => void;
+  setLinkTransactionId: (transactionId: string | null) => void;
   addPhoto: (dataUrl: string) => void;
   removePhoto: (index: number) => void;
   runDetection: () => Promise<void>;
@@ -43,8 +51,10 @@ export const useCaptureSession = create<CaptureSessionState>()((set, get) => ({
   detections: null,
   detecting: false,
   detectError: null,
+  linkTransactionId: null,
 
   setDestination: (dest) => set({ destination: dest }),
+  setLinkTransactionId: (transactionId) => set({ linkTransactionId: transactionId }),
 
   addPhoto: (dataUrl) => set((s) => ({ photos: [...s.photos, dataUrl] })),
 
@@ -106,5 +116,5 @@ export const useCaptureSession = create<CaptureSessionState>()((set, get) => ({
       ],
     })),
 
-  reset: () => set({ photos: [], destination: null, detections: null, detecting: false, detectError: null }),
+  reset: () => set({ photos: [], destination: null, detections: null, detecting: false, detectError: null, linkTransactionId: null }),
 }));
