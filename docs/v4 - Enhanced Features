@@ -1,0 +1,651 @@
+# Product Requirements Document
+## Household Ledger: What You Own, What It Cost, What Protects It
+
+**Status:** Draft (revised)
+**Product:** Existing Home Inventory & Personal Finance Application
+**Feature:** Household Ledger — Onboarding & Core Model
+**Priority:** High
+
+**Revision note:** This is a scope-reduced rewrite of the original "Intelligent Home & Household Onboarding" draft. It keeps the household data model and onboarding shape, cuts kitchen/food, full home schematics, the full home-systems taxonomy, and most document types, and elevates the transaction↔item↔document connection from a buried "long-term" aside to the product's actual thesis. See §6 for what was removed and why.
+
+---
+
+## 1. Overview
+
+The application currently provides two capabilities:
+
+- AI-assisted home inventory management
+- Personal finance and expense tracking
+
+Today they don't know about each other. An inventory system knows:
+
+> Cordless Drill → Garage → Bin 12
+
+A finance system independently knows:
+
+> Home Depot → $149.99
+
+Neither knows that the transaction *bought* the drill, that the drill has an owner, a location, a receipt, and — where it applies — a warranty.
+
+This feature introduces a **Household Ledger**: a structure that connects people, physical spaces, belongings, and the money and paperwork behind them, so those questions can be answered without digging through email, a shoebox of receipts, or memory.
+
+The product model is:
+
+**People + Places + Things + Money + Proof (receipts, warranties, manuals)**
+
+Food, full home systems, and home schematics are explicitly out of this model for now — see §6.
+
+The near-term promise, and the one onboarding should teach in the first two minutes:
+
+> **Never lose track of what you own, what it cost, or whether it's still protected.**
+
+"Ask your home anything" remains the long-term aspiration (§41) but is not a near-term design driver — it only becomes true once the data underneath it is real. Treat it as a north star to grow into, not a justification for building broadly now.
+
+---
+
+## 2. Problem
+
+An inventory record and a finance record describe the same object from two directions and never meet:
+
+- the transaction purchased the item,
+- the item belongs to a household member,
+- it lives in a particular part of the home,
+- its receipt and warranty relate to the same object,
+- future maintenance or replacement cost should trace back to it.
+
+Separately, household members may exist without application accounts — children in particular — and the product needs to represent them without requiring a login.
+
+The product needs a household model that connects these entities, scoped tightly enough that a small team can actually build and maintain it.
+
+---
+
+## 3. Product Vision
+
+Create a persistent record of what a household owns, what it cost, where it is, and what protects it.
+
+**WHO** — who lives in the household and who owns or uses things.
+**WHAT** — what the household owns.
+**WHERE** — where things are physically located.
+**WHEN / HOW MUCH** — when things were purchased and what they cost.
+**PROOF** — receipts, warranties, and manuals for what was purchased.
+**KNOWLEDGE** — search and AI reasoning across all of the above.
+
+The goal is not a home-inventory database and not a personal-finance app bolted to one. It's the connective layer between them — the thing neither one can be on its own.
+
+---
+
+## 4. Goals
+
+### Primary Goals
+
+1. Establish household structure (household, home, spaces) with minimal upfront configuration.
+2. Represent household members independently of application accounts.
+3. Let inventory belong to individuals or the household.
+4. Deliver a working AI-powered first-use experience in under two minutes.
+5. Connect financial transactions to the physical items they purchased.
+6. Avoid overwhelming users with configuration before they've seen value.
+
+### Secondary Goals (progressive, post-onboarding)
+
+- Appliance recognition and warranty lookup
+- Receipts, warranties, and manuals as searchable documents
+- A simple map of critical home locations (shutoffs, panel, router)
+- Household search across people, places, things, and money
+
+---
+
+## 5. Non-Goals
+
+Initial onboarding will **not** require users to:
+
+- catalog their entire home
+- manually enter every possession
+- connect financial accounts
+- configure maintenance schedules
+- upload warranties
+- invite every household member
+- categorize every item manually
+
+These are introduced progressively, after the user has already seen value.
+
+---
+
+## 6. Explicitly Out of Scope
+
+These were in the original draft and are cut, not phased. Re-adding any of them should require a new decision, not a default resumption of the roadmap.
+
+| Cut | Why |
+|---|---|
+| **Kitchen / fridge / pantry scanning, recipe suggestions** | Computer vision can't sustain the cadence food actually needs (occlusion, no visibility into opened packaging, no reliable quantity or expiration-date reading), the inventory goes stale within a day, and recipe-from-ingredients is already commoditized by every recipe app and general chat AI. Wrong food scans are also the fastest way to make users distrust the *rest* of the app. |
+| **Full home schematics / digital twin** (floor plans, room geometry, full electrical/plumbing/HVAC/network as typed infrastructure) | That's a different product, aimed at renovators and professionals (Matterport, iGuide territory), not a consumer photo app. Consumer willingness to do the capture work is low outside an active renovation. |
+| **Home Systems as a rich, typed taxonomy** (separate schemas per electrical/plumbing/HVAC/safety/network category) | Replaced with a much smaller concept: a handful of pinned critical locations (§30). No per-category data model. |
+| **Fridge-diff reconciliation** (comparing old/new fridge photos to infer consumption) | Falls with kitchen scanning above; it's a hard image-alignment problem in service of a feature that isn't shipping. |
+| **Full document taxonomy** (insurance, HOA, inspections, contractor invoices, utility/property records) | Narrowed to receipts, warranties, and manuals (§29) — the three types that directly answer "what did I pay, and is it covered." The rest require much harder parsing for much lower query frequency. |
+| **Universal Scan across all classification types on day one** | Launches with two modes (§32), not seven. Auto-classification expands only as each underlying workflow proves reliable. |
+
+---
+
+## 7. Design Principle
+
+## Setup through action, not configuration
+
+Users should experience value before being asked for extensive information.
+
+Onboarding should reach a real, correct search or answer result **in under two minutes** — realistically closer to 60–90 seconds once household-member collection is removed from the required path (§23).
+
+The primary loop:
+
+**Sign in → Take First Photo → AI Organizes It → Ask For It Back**
+
+Household, home, and default space are created automatically, not configured. Everything else is layered in contextually after the user has already seen the product work once.
+
+---
+
+## 8. Core Data Model
+
+## Account
+
+An authenticated application user (Google, Apple, email/password). An Account is not equivalent to a Person.
+
+## Person
+
+An actual household member — account owner, spouse, child, parent, roommate. A Person may or may not have an Account, which lets a parent create a managed profile for a child without an email or login. A Person may later be linked to an Account, with history preserved (§24).
+
+## Household
+
+The shared organizational boundary. Contains people, a home (or homes), finances, possessions, and documents.
+
+## Home
+
+A physical residence. Multi-home-per-household is schema-supported but not exposed in UI until there's demand for it.
+
+## Space
+
+A physical area within a home (Kitchen, Garage, Primary Bedroom). Spaces may nest. A space's name must never determine ownership of items within it — "Emma's Room" doesn't mean everything in it is Emma's.
+
+## Container
+
+Something that holds items, and may nest: **Garage → Rack A → Shelf 3 → Bin 12 → Extension Cord**.
+
+## Item
+
+A physical possession — laptop, clothing, batteries, tools, toys, household supplies.
+
+## Appliance
+
+A physical object with lifecycle data: model, serial number, purchase info, warranty, manual, related transactions. An appliance can also behave as a Container (a refrigerator holds food) without requiring the Kitchen Inventory feature this document no longer includes — the container relationship is just "what's stored where," not a food-tracking system.
+
+### Implementation note: don't build four rigid parallel tables
+
+Container, Item, Appliance, and "location" all blur in practice — a pantry is a Space in one sentence and a Container in another; a fridge is an Appliance and a Container simultaneously. Model this as **one physical-object entity with capability flags** (`can_contain`, `has_lifecycle_data`, `is_pinned_location`) rather than four separate hierarchies. Four separate tables will fight each other the first time an engineer has to decide which one a smart fridge belongs in.
+
+### Event Log (new)
+
+An append-only record of state changes — item created, moved, ownership changed, linked to a transaction. "History" is one of the product's stated pillars (§3); it needs an event log from day one. Retrofitting it after data has already been mutated in place is far more expensive than including it now.
+
+---
+
+## 9. Ownership Model
+
+Every Item may have an ownership relationship:
+
+- Household (default)
+- Person
+- Multiple People
+- Unassigned
+
+Example:
+
+**MacBook Pro** — Belongs to: John · Located: Office → Desk
+**Television** — Belongs to: Household · Located: Living Room
+**Winter Jacket** — Belongs to: Emma · Located: Emma's Bedroom → Closet
+
+---
+
+## 10. Relationships
+
+The original draft specified five relationship types on every item: Belongs To, Added By, Purchased By, Paid From, Responsible For. Three of those five only become meaningful once transaction-linking (§26) is actually populating data — modeling them before that exists is schema built for a feature that doesn't exist yet.
+
+### MVP relationships
+
+- **Belongs To** — who owns or uses the object (§9).
+- **Located At** — where it physically is.
+
+### Deferred, populated automatically once §26 ships
+
+- **Purchased By / Paid From** — filled in when a transaction is linked to an item, not entered separately by the user.
+- **Responsible For** — introduced only once there's a real workflow (maintenance reminders, §28) that needs it.
+
+### Implicit, not user-facing
+
+- **Added By** — system-tracked in the Event Log (§8), not a configurable field.
+
+---
+
+## 11. Onboarding Flow
+
+## Step 1 — Welcome
+
+**Your home, organized by AI.**
+Know what you own, where it is, what it cost, and whether it's still covered.
+
+Primary CTA: **Get Started** · Secondary: **Sign In**
+
+---
+
+## 12. Account Creation
+
+Continue with Apple / Google / Email. Immediately after authentication, continue straight to the camera (§16) — no household, home, or profile configuration screens first.
+
+---
+
+## 13. Household & Home (auto-created)
+
+A household and a default home are created invisibly at account creation, named from the account ("John's Home"), editable later from settings. No naming screen, no home-type/ownership/address form blocking onboarding. Address, if ever needed, is requested contextually (e.g., when a document requires it), never upfront.
+
+---
+
+## 14. Spaces (lightweight)
+
+No pre-scan space checklist. The first time a user completes a scan, ask once, inline:
+
+**Where was this?**
+
+Freeform, autocomplete text field that creates a Space/Container as a side effect of naming it (typing "Garage" the first time creates the Garage space). Subsequent scans reuse and suggest existing spaces. This replaces the original 14-item space checklist entirely — it produced decision fatigue before any payoff and users rename rooms later anyway.
+
+---
+
+## 15. Product Goals (optional, lightweight)
+
+Shown once, after the first successful scan, not before it — personalizes recommendations, never gates features.
+
+**What would you like help managing?** *(multi-select, skippable)*
+
+- Find & Organize Things
+- Money & Spending
+- Appliances & Warranties
+- Home Maintenance
+- Documents
+- Home Map
+
+*("Food & Meals" removed — see §6.)*
+
+---
+
+## 16. First AI Experience
+
+Immediately after account creation:
+
+**Teach your home its first thing.**
+Just take a photo. We'll figure out the rest.
+
+Primary CTA: **Open Camera**
+
+---
+
+## 17. AI Scene Classification (launch scope: two types)
+
+At launch, the camera supports two explicit modes rather than auto-detecting across everything:
+
+- **Scan Item** — a bin, shelf, drawer, or collection of items
+- **Scan Receipt** — a paper or digital receipt
+
+A third explicit entry point, **Scan Appliance Label**, is available from the appliance flow (§28) but is not auto-classified at launch. Auto-classification across more types (§32) is added only as each underlying workflow proves reliable in production — not modeled speculatively up front.
+
+---
+
+## 18. Inventory Scan
+
+User photographs a storage bin. AI detects: HDMI cable, USB-C charger, extension cord, batteries, power adapter.
+
+**We found 5 items** — users can confirm, rename, remove, add a missing item, or change category.
+
+Then: **Where is this?** (defaults from §14) and **Who does this belong to?** (defaults to Household).
+
+CTA: **Add 5 Items**
+
+---
+
+## 19. AI Trust Requirement
+
+AI-generated inventory must never become silently authoritative. Communicate uncertainty:
+
+✓ USB-C Charger
+? Electronic Adapter
+
+Items below a confidence threshold are visibly flagged, not hidden.
+
+---
+
+## 20. First Success Experience
+
+**Your home just got smarter.** 5 items added.
+
+Then immediately demonstrate retrieval:
+
+> Try asking: **Where are my AA batteries?**
+> **AA Batteries** — Garage → Shelf → Bin 3
+
+This teaches the core loop: **Scan → Understand → Find.** This is the moment onboarding is optimized to reach in under two minutes.
+
+---
+
+## 21. Main Home Dashboard
+
+After first success, the user enters the normal app.
+
+**Ask your home anything** — search/AI field
+Quick actions: Scan · Find · Add
+Summary: Items · Spaces · People
+
+Additional modules appear based on §15 selections, but nothing is gated.
+
+---
+
+## 22. Progressive Onboarding & Contextual Household Members
+
+Household members are **not** collected as a dedicated onboarding step. They're introduced the first time they're actually needed:
+
+The first time a user answers "Who does this belong to?" with anyone other than themselves, offer **+ Add someone** inline. Fields: Name, Relationship (Partner/Spouse, Child, Parent, Family Member, Roommate, Other), optional photo, then:
+
+**Will this person use the app?**
+**Not right now** → managed profile (§24) · **Invite to the app** → sends an invitation
+
+This removes the single biggest abandonment point identified in review — asking a brand-new user to enumerate their family before they've seen any value.
+
+---
+
+## 23. Managed Profiles
+
+No email, phone, password, or authentication account required. A managed profile can still have belongings, expenses, documents, and responsibilities attached to it, and can later be linked to a real Account with all historical relationships intact.
+
+**Open question to resolve before this holds years of data:** when a managed child profile's real person turns 18 and wants their own account, does their history transfer to them, and does the parent lose visibility at that point? This is a consent and identity decision, not an engineering one — resolve it before managed profiles have years of data attached, not after.
+
+---
+
+## 24. Finance Setup
+
+Not mandatory during onboarding.
+
+**Understand where your household money goes**
+Connect your accounts to track spending, bills, and purchases automatically.
+
+CTA: **Connect Account**
+
+---
+
+## 25. Physical Item ↔ Financial Transaction (core capability)
+
+This is the product's actual differentiator, not a "long-term" aside. Once a transaction is linked to an item:
+
+**Dyson Vacuum**
+Purchased: Costco · Price: $679.99 · Paid with: Citi Card · Owner: Household · Location: Hall Closet · Receipt: Attached · Warranty: Active
+
+### Feasibility, stated plainly
+
+Bank transaction data gives merchant, amount, and date — never line items. "Costco $312.47" doesn't say whether that was a vacuum or a grocery run. Real line-item fidelity only comes from a receipt photo captured near the time of purchase, or a parsed retailer email confirmation. The realistic v1 approach is **opportunistic, assisted matching**: AI proposes a candidate link (same amount, nearby date, matching merchant) between a transaction and a receipt/item the user already captured; the user confirms. Full automatic matching is not achievable soon — assisted matching is, and for big-ticket purchases (the ones worth linking), manual confirmation is low-friction because those purchases are rare.
+
+### The three highest-value questions this unlocks
+
+1. **"Is this still under warranty?"** — at the exact moment something breaks, instead of 20 minutes of email archaeology.
+2. **Insurance claim prep** — an itemized, priced, dated, photographed record is exactly what a fire/flood/theft claim needs, and today people reconstruct it from memory under stress.
+3. **"What did this house actually cost us?"** — category-level spend (appliances, electronics, home repairs) that no generic finance app can answer because it doesn't know what a Home Depot charge bought.
+
+---
+
+## 26. Finance-Triggered Capture (the retention loop)
+
+Home inventory has a retention problem on its own: users organize once, then stop opening the app as items drift out of place. The fix is not a better inventory feature — it's using the finance feed, which already updates constantly, as the trigger for inventory capture.
+
+### Mechanism
+
+When a transaction above a configurable threshold (or from a durable-goods merchant category — home improvement, appliance retailers, furniture, electronics) posts:
+
+> **You spent $312.47 at Home Depot on Tuesday.**
+> Want to log what you bought?
+
+CTA **Add to Home** opens the camera pre-linked to that transaction. The resulting item is created with purchase price, merchant, payment account, and date already attached — no separate manual linking step. An optional receipt photo can be attached in the same flow.
+
+This single mechanism does more for inventory retention than any inventory-specific feature: it turns a low-frequency action (photographing your stuff) into something cued by a high-frequency signal (money moving) that's already proven to bring people back to an app. Treat this as a Next-phase priority (§38), not a someday idea.
+
+---
+
+## 27. Appliance Setup & Lifecycle
+
+User photographs an appliance or its model label. AI attempts to identify type, manufacturer, model, serial number, and approximate manufacture date; user confirms. The appliance is associated with a Space.
+
+Appliance data is inert on its own — a spec sheet nobody looks at. It earns its place only combined with §25/§26: an appliance record becomes useful the moment it can answer "is this still under warranty" or "here's the receipt," not before.
+
+---
+
+## 28. Documents (narrowed scope)
+
+Supported document types at launch: **receipts, warranties, manuals** — the three that directly answer purchase and coverage questions.
+
+**Costco Receipt** → Samsung Refrigerator → Purchase → $1,899 → Kitchen
+
+Insurance policies, HOA documents, inspection reports, contractor invoices, and utility/property records are **not planned near-term** (§6) — they're harder to parse reliably (long, inconsistently formatted PDFs) and lower-frequency to matter than the three types above.
+
+---
+
+## 29. Home Map (simple, not a schematic)
+
+Progressively built, never required during onboarding.
+
+**Start mapping your home**
+Save important locations so anyone in your household can find them.
+
+Suggested: main water shutoff, electrical panel, gas shutoff, HVAC, network equipment. User photographs the object/location:
+
+**Electrical Panel** — Location: Garage → East Wall
+
+Each pinned location is a simple record — name, category tag, photo, location — not a typed schema per infrastructure category (§6).
+
+### Renovation wall photos (kept — genuinely differentiated)
+
+The one idea from the original draft worth keeping at full strength: photographing an exposed wall before drywall goes up (studs, wiring, plumbing) and permanently pinning it to a location. Nobody does this well today — the photo exists somewhere in a camera roll and is functionally lost within a year. This is cheap to build (photo + locked location tag + timestamp) and has real word-of-mouth value. It's just another Home Map location type — it does not justify building floor plans or infrastructure modeling around it. AI may annotate what it observes but must not claim certainty about infrastructure that wasn't documented.
+
+---
+
+## 30. Household Member Experience
+
+People are a filtering dimension, not a full feature set. A Person filter (**Everyone ▼**) surfaces belongings, expenses, and documents associated with them — no application account required.
+
+> Where are Emma's winter boots?
+> How much did we spend on Emma's clothes this year?
+
+---
+
+## 31. Child-Specific Future Capabilities (Later)
+
+Managed child profiles enable clothing lifecycle tracking (size, season, status: In Use / Stored / Outgrown / Donate / Sell) and eventual review prompts ("Emma has 17 items marked size 2T — review these?"). Real value for the subset of users with young children; scoped as Later, not MVP.
+
+---
+
+## 32. Universal Scan (launch narrow, expand with evidence)
+
+Long-term, the camera should determine intent without the user picking a mode first. That's a real UX risk before it's a simplifying win: misclassifying a "receipt" as a "document," or a "container" as a "collection of items," and routing to the wrong workflow, is worse than a predictable chooser — especially while the classifier is least mature.
+
+**Launch with two modes** (§17): Scan Item, Scan Receipt, plus AI's best guess shown with one-tap correction rather than silent auto-routing:
+
+> Looks like a storage bin — not right? [Food] [Receipt] [Appliance]
+
+Expand auto-classification to additional types only after each underlying workflow (appliance, home-map location) has independently shipped and proven reliable — not all at once.
+
+---
+
+## 33. Universal Search / AI Assistant (aspirational, data-gated)
+
+The long-term goal is a single AI interface across people, places, things, money, and documents. This cannot ship credibly until location, ownership, and transaction-linking data actually exist and are trustworthy — a wrong answer about a warranty deadline or a shutoff valve costs far more than a wrong answer about the fridge, so this experience should launch only once §25/§26 have real data behind them, not alongside onboarding.
+
+### Realistic, high-frequency questions to design for (not hypothetical showcase queries)
+
+1. Where is [item] — batteries, tape, passport, chargers?
+2. How much did we spend at [merchant] this month?
+3. Is [appliance] still under warranty?
+4. When did we buy [item], and what did it cost?
+5. What's in [bin / closet / storage unit]?
+6. Where is the water shutoff / breaker for [room]?
+7. What recurring charges/subscriptions do we have?
+8. What did we spend on [category] this year?
+9. What's the return/warranty window on [recent purchase]?
+10. What size does [child] currently wear / what's outgrown?
+
+---
+
+## 34. Proposed Information Architecture
+
+```text
+HOUSEHOLD
+│
+├── PEOPLE
+│   ├── Account Members
+│   └── Managed Profiles
+│
+├── HOMES
+│   │
+│   ├── SPACES
+│   │   ├── CONTAINERS
+│   │   │   └── ITEMS
+│   │   └── APPLIANCES
+│   │
+│   └── HOME MAP (pinned locations)
+│
+├── FINANCES
+│   ├── Accounts
+│   ├── Transactions
+│   └── Purchases (linked items/receipts)
+│
+├── DOCUMENTS (receipts · warranties · manuals)
+│
+└── EVENT LOG (history)
+```
+
+*(Kitchen and a typed Home Systems branch removed — see §6.)*
+
+---
+
+## 35. Key Relationship Model
+
+## Refrigerator
+
+```text
+Refrigerator
+│
+├── located_in → Kitchen
+├── owned_by → Household
+├── purchased_from → Costco
+├── purchase_price → $1,899
+├── paid_from → Credit Card       (populated via §25, not entered manually)
+├── receipt → Document
+├── warranty → Document
+├── manual → Document
+└── contains → (a Container, not a food-tracking system)
+```
+
+Features should share entities rather than maintain duplicate domain-specific records.
+
+---
+
+## 36. Privacy & Permissions
+
+- **Household Admin** — full management.
+- **Member** — access per household permissions; **defaults to inventory-visible, finance-invisible**, not an all-or-nothing toggle.
+- **Managed Profile** — no independent access; never exposes other family members' data, even after later linking to a real account.
+
+A household member must not automatically gain financial access merely because they can see shared inventory — enforce this at the data layer before transaction-linking ships, not as a UI setting added later.
+
+**Highest-sensitivity data:** photos of home-systems locations (electrical panel, router, valuables) are the most sensitive category in the product. Prefer on-device classification or explicit, clearly-worded opt-in before syncing these to a cloud vision pipeline by default.
+
+---
+
+## 37. Success Metrics
+
+### Onboarding
+Completion rate · median duration (target: under 2 minutes to first search result) · first scan completion.
+
+### Activation
+Primary: user successfully adds at least one AI-recognized object. Secondary: first successful search, first finance connection, first transaction-item link, first finance-triggered capture accepted, first appliance, first document.
+
+### AI Quality
+Object acceptance rate · correction rate · deletion-after-recognition rate · classification confidence · location correction rate.
+
+### Core Loop Health (new)
+Finance-triggered capture prompt acceptance rate — the clearest signal of whether §26 is actually working as a retention mechanism.
+
+---
+
+## 38. Scope: MVP / Next / Later / Do Not Build
+
+### MVP
+
+- Account, auto-created single household and home
+- Person + managed profiles, introduced contextually (§22)
+- Freeform space/container creation during first scan
+- Camera-first item scan with review and confidence flags
+- Item ownership (household default, assignable)
+- Basic search
+- Existing finance integration, surfaced but not mandatory
+
+### Next
+
+- Finance-triggered capture nudge (§26) — the retention loop
+- Receipt capture linked to a transaction
+- Assisted transaction↔item linking (§25)
+- Appliance label scan tied to warranty lookup
+
+### Later
+
+- Documents: warranties + manuals (§28)
+- Simple Home Map, including renovation wall photos (§29)
+- Household member lifecycle features (outgrown clothing, §31)
+- Maintenance reminders
+
+### Do Not Build (§6)
+
+- Kitchen/fridge scanning and recipes
+- Full home schematics / digital twin
+- Full Home Systems entity taxonomy
+- Universal Scan across all categories at once
+- Fridge-diff reconciliation
+- Insurance / HOA / inspection / utility document parsing
+
+---
+
+## 39. UX Requirements
+
+1. Onboarding should reach a real search result within **2 minutes**, target under 90 seconds.
+2. Users must not need to connect finances to complete onboarding.
+3. Users must be able to add household members without accounts, and never as a mandatory pre-value step.
+4. AI results must be reviewable before becoming authoritative.
+5. Household is the default owner for newly detected shared objects.
+6. Every onboarding step beyond auth and first scan must be skippable.
+7. The camera is the primary capture mechanism, launched narrow (§17, §32) and expanded only with evidence.
+8. Search should work across items, people, and linked purchases as those exist — not promised ahead of the data.
+9. Features share entities; no duplicate domain-specific records.
+
+---
+
+## 40. Product Principles
+
+**One Household, One Ledger.** Inventory, finances, people, and the documents that protect purchases describe the same household — not independent modules.
+
+**AI Should Reduce Data Entry.** Photograph → Detect → Suggest → Confirm, not Create → Select Type → Enter Name → Select Category → Enter Details.
+
+**People Are Not Accounts.** Children and other household members exist independently of authentication.
+
+**Everything Has Context.** An item is more useful once the system knows what it is, where it is, who it belongs to, what it cost, and what protects it.
+
+**Progressive Understanding, Bounded Scope.** The user should never have to document their entire home — and the product should never try to model everything a home could theoretically contain. Every interaction teaches the system something; the product doesn't need to know everything to be worth using.
+
+---
+
+## 41. North-Star Experience (long-term, data-gated)
+
+The long-term product should let a user open the app and ask:
+
+# Ask your home anything.
+
+This is the direction to grow into once §25, §26, and §28 have real, trustworthy data behind them — not a justification for building broadly now. The near-term promise this PRD is actually built to deliver is narrower and achievable today:
+
+> **Never lose track of what you own, what it cost, or whether it's still protected.**
