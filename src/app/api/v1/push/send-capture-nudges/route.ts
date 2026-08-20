@@ -201,13 +201,25 @@ export async function POST(request: Request) {
     }
 
     if (sentToAnyone) {
-      await admin.from("event_notification_log").insert({
+      // Same SELECT-then-INSERT shape as send-due-bills (the UNIQUE
+      // constraint on domain_key/entity_type/entity_id/occurrence_key is
+      // the real duplicate-send guarantee, not the earlier alreadySent
+      // check — a race between overlapping invocations is an accepted,
+      // pre-existing tradeoff of that pattern, not something reworked
+      // here). Unlike send-due-bills, this does check the insert's own
+      // error: a silently-dropped insert failure here wouldn't just risk
+      // a duplicate push next run, it'd mean this run's own notifiedCount
+      // overclaims sends that never actually got logged.
+      const { error: logError } = await admin.from("event_notification_log").insert({
         household_id: txn.household_id,
         domain_key: DOMAIN_KEY,
         entity_type: "transaction",
         entity_id: txn.id,
         occurrence_key: OCCURRENCE_KEY,
       });
+      if (logError) {
+        console.error("push/send-capture-nudges: couldn't log sent notification (possible duplicate risk on next run):", txn.id, logError.message);
+      }
       notifiedCount++;
     }
   }
