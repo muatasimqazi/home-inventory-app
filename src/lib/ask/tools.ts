@@ -143,6 +143,64 @@ export function createAskTools(supabase: SupabaseClient, householdId: string) {
         return { items, count: items.length };
       },
     }),
+
+    // Additive key (Household Ledger Implementation Plan §3/§4, Workstream
+    // 5 — Home Map): a pinned-location lookup alongside the two tools
+    // above, not a refactor of either. `pinned_locations` (PRD §29) is a
+    // handful of simple records — water shutoff, panel, HVAC, network,
+    // renovation wall photos — not a full home-systems catalog, so this
+    // stays a single freeform-search tool rather than one per category.
+    findPinnedLocations: tool({
+      description:
+        "Search the household's Home Map — pinned critical locations like the main water shutoff, electrical " +
+        "panel, gas shutoff, HVAC, network equipment, and renovation wall photos (photographed before drywall " +
+        "went up). Use for questions like 'where's the water shutoff', 'where's our electrical panel', or 'do " +
+        "we have a photo of the wall before it was closed up'. Returns each pin's location note (e.g. 'Garage " +
+        "→ East Wall') and a photo URL when one was saved. This is not a floor plan or a full home-systems " +
+        "catalog — only these deliberately-pinned spots exist.",
+      inputSchema: z.object({
+        query: z.string().optional().describe("Freeform search against the pin's name, e.g. 'water' or 'panel'. Omit to list every pinned location."),
+        category: z
+          .enum(["water_shutoff", "electrical_panel", "gas_shutoff", "hvac", "network", "wall_photo", "other"])
+          .optional()
+          .describe("Restrict results to one category."),
+      }),
+      execute: async ({ query, category }) => {
+        let dbQuery = supabase.from("pinned_locations").select("id, name, category, photo_path, location_note").eq("household_id", householdId);
+        if (category) dbQuery = dbQuery.eq("category", category);
+        if (query) {
+          const escaped = query.replace(/[%,()]/g, "");
+          dbQuery = dbQuery.ilike("name", `%${escaped}%`);
+        }
+        const { data, error } = await dbQuery;
+        if (error) return { error: error.message };
+
+        // photo_path lives in the private "attachments" bucket (not the
+        // public "item-photos" one findInventoryItems reads above — see
+        // PinnedLocation's own doc comment in lib/types.ts for why), so a
+        // usable URL needs a real signed-URL call per pin with a photo,
+        // same as the client's own on-demand fetch (pinned-location-photo.tsx).
+        const pins = await Promise.all(
+          (data ?? []).map(async (pin) => {
+            const photoPath = pin.photo_path as string | null;
+            let photoUrl: string | null = null;
+            if (photoPath) {
+              const { data: signed } = await supabase.storage.from("attachments").createSignedUrl(photoPath, 300);
+              photoUrl = signed?.signedUrl ?? null;
+            }
+            return {
+              id: pin.id as string,
+              name: pin.name as string,
+              category: pin.category as string,
+              locationNote: pin.location_note as string | null,
+              photoUrl,
+            };
+          })
+        );
+
+        return { pinnedLocations: pins, count: pins.length };
+      },
+    }),
   };
 }
 

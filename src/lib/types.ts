@@ -141,6 +141,29 @@ export interface Attachment {
   createdAt: string;
 }
 
+/** Simple Home Map (PRD §29, `pinned_locations` — supabase/migrations/0017_household_ledger_core.sql). One category per infrastructure/safety spot worth remembering (plus `wall_photo` for the renovation-photo case) — deliberately not a typed schema per category, see the migration's own comment. */
+export type PinnedLocationCategory =
+  | "water_shutoff"
+  | "electrical_panel"
+  | "gas_shutoff"
+  | "hvac"
+  | "network"
+  | "wall_photo"
+  | "other";
+
+export interface PinnedLocation {
+  id: string;
+  householdId: string;
+  name: string;
+  category: PinnedLocationCategory;
+  /** Path within the private "attachments" Storage bucket — `${householdId}/pinned-locations/${id}` when set, null when this pin has no photo yet. Private (not "item-photos"): home-systems photos are the most sensitive photo category the product handles (migration 0017's comment). */
+  photoPath: string | null;
+  /** Freeform "where exactly" text, e.g. "Garage → East Wall". */
+  locationNote: string | null;
+  createdByUserId: string;
+  createdAt: string;
+}
+
 export interface Tag {
   id: string;
   householdId: string;

@@ -17,6 +17,8 @@ import type {
   ActivityLogEntry,
   Attachment,
   AttachmentKind,
+  PinnedLocation,
+  PinnedLocationCategory,
   LabelBatch,
   LabelBatchEntry,
   LabelPaperPreset,
@@ -166,6 +168,43 @@ export function locationToInsertRow(loc: Location): LocationRow {
     status: loc.status,
     trashed_at: loc.trashedAt ?? null,
     permanently_delete_after: loc.permanentlyDeleteAfter ?? null,
+  };
+}
+
+export interface PinnedLocationRow {
+  id: string;
+  household_id: string;
+  name: string;
+  category: string;
+  photo_path: string | null;
+  location_note: string | null;
+  created_by_user_id: string;
+  created_at: string;
+}
+
+export function rowToPinnedLocation(row: PinnedLocationRow): PinnedLocation {
+  return {
+    id: row.id,
+    householdId: row.household_id,
+    name: row.name,
+    category: row.category as PinnedLocationCategory,
+    photoPath: row.photo_path,
+    locationNote: row.location_note,
+    createdByUserId: row.created_by_user_id,
+    createdAt: row.created_at,
+  };
+}
+
+export function pinnedLocationToInsertRow(pin: PinnedLocation): PinnedLocationRow {
+  return {
+    id: pin.id,
+    household_id: pin.householdId,
+    name: pin.name,
+    category: pin.category,
+    photo_path: pin.photoPath,
+    location_note: pin.locationNote,
+    created_by_user_id: pin.createdByUserId,
+    created_at: pin.createdAt,
   };
 }
 

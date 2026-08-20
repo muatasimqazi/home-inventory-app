@@ -26,6 +26,8 @@ import {
   activityLogEntryToInsertRow,
   rowToAttachment,
   attachmentToInsertRow,
+  rowToPinnedLocation,
+  pinnedLocationToInsertRow,
   rowToLabelBatch,
   labelBatchToInsertRow,
   rowToLabelBatchEntry,
@@ -62,6 +64,7 @@ import {
   type FavoriteRow,
   type ActivityLogRow,
   type AttachmentRow,
+  type PinnedLocationRow,
   type LabelBatchRow,
   type LabelBatchEntryRow,
   type NormalizationRuleRow,
@@ -99,6 +102,8 @@ import type {
   Location,
   Member,
   NormalizationRule,
+  PinnedLocation,
+  PinnedLocationCategory,
   RecurringBill,
   RecurringBillFrequency,
   Tag,
@@ -208,6 +213,8 @@ interface InventoryState {
   activity: ActivityLogEntry[];
   favorites: Favorite[];
   attachments: Attachment[];
+  /** Simple Home Map (PRD §29) — pinned critical locations (water shutoff, panel, etc.) plus renovation wall photos. Hydrated/Realtime-synced like every other per-household array above. */
+  pinnedLocations: PinnedLocation[];
   labelBatches: LabelBatch[];
   labelBatchEntries: LabelBatchEntry[];
   // Finance domain (supabase/migrations/0010_finance_schema.sql) — RLS
@@ -291,6 +298,24 @@ interface InventoryState {
     file: File;
   }) => Promise<{ ok: boolean; error?: string; attachment?: Attachment }>;
   deleteAttachment: (attachmentId: string) => void;
+
+  // Home Map (pinned locations) — real Supabase Storage (private
+  // "attachments" bucket, same one Attachments uses — see PinnedLocation's
+  // own doc comment for why). Photo upload is optional on every call:
+  // "Simple records only" (PRD §29) — a pin is still a real, useful record
+  // with just a name/category/note and no photo yet.
+  /** Real, awaited: same reasoning as addAttachment — a photo (when provided) has to finish uploading before there's a row worth showing. */
+  createPinnedLocation: (input: {
+    name: string;
+    category: PinnedLocationCategory;
+    locationNote?: string | null;
+    photoFile?: File | null;
+  }) => Promise<{ ok: boolean; error?: string; pinnedLocation?: PinnedLocation }>;
+  updatePinnedLocation: (
+    pinnedLocationId: string,
+    patch: { name?: string; category?: PinnedLocationCategory; locationNote?: string | null; photoFile?: File | null; removePhoto?: boolean }
+  ) => Promise<{ ok: boolean; error?: string }>;
+  deletePinnedLocation: (pinnedLocationId: string) => void;
 
   // Label batches
   createLabelBatch: (input: {
@@ -426,6 +451,7 @@ interface HouseholdBundle {
   favorites: Favorite[];
   activity: ActivityLogEntry[];
   attachments: Attachment[];
+  pinnedLocations: PinnedLocation[];
   labelBatches: LabelBatch[];
   labelBatchEntries: LabelBatchEntry[];
   normalizationRules: NormalizationRule[];
@@ -452,6 +478,7 @@ function snapshotBundle(state: InventoryState): HouseholdBundle {
     favorites: state.favorites,
     activity: state.activity,
     attachments: state.attachments,
+    pinnedLocations: state.pinnedLocations,
     labelBatches: state.labelBatches,
     labelBatchEntries: state.labelBatchEntries,
     normalizationRules: state.normalizationRules,
@@ -484,6 +511,7 @@ async function fetchHouseholdBundle(
     favoritesRes,
     activityRes,
     attachmentsRes,
+    pinnedLocationsRes,
     labelBatchesRes,
     labelBatchEntriesRes,
     normalizationRulesRes,
@@ -505,6 +533,7 @@ async function fetchHouseholdBundle(
     supabase.from("favorites").select("*, items!inner(household_id)").eq("user_id", userId).eq("items.household_id", householdId),
     supabase.from("activity_log").select("*").eq("household_id", householdId).order("created_at", { ascending: false }).limit(500),
     supabase.from("attachments").select("*").eq("household_id", householdId),
+    supabase.from("pinned_locations").select("*").eq("household_id", householdId),
     supabase.from("label_batches").select("*").eq("household_id", householdId).order("created_at", { ascending: false }),
     supabase.from("label_batch_entries").select("*").eq("household_id", householdId),
     supabase.from("normalization_rules").select("*").eq("household_id", householdId),
@@ -532,7 +561,7 @@ async function fetchHouseholdBundle(
 
   const firstError =
     membersRes.error ?? invitesRes.error ?? locationsRes.error ?? containersRes.error ?? itemsRes.error ?? tagsRes.error ?? favoritesRes.error ?? activityRes.error ??
-    attachmentsRes.error ?? labelBatchesRes.error ?? labelBatchEntriesRes.error ?? normalizationRulesRes.error ??
+    attachmentsRes.error ?? pinnedLocationsRes.error ?? labelBatchesRes.error ?? labelBatchEntriesRes.error ?? normalizationRulesRes.error ??
     accountsRes.error ?? financeAccountSharesRes.error ?? transactionsRes.error ?? financeCategoriesRes.error ?? categoryRulesRes.error ?? recurringBillsRes.error ?? financeBillSharesRes.error ??
     transactionAttachmentsRes.error;
   if (firstError) throw new Error(firstError.message);
@@ -561,6 +590,7 @@ async function fetchHouseholdBundle(
     favorites: ((favoritesRes.data ?? []) as FavoriteRow[]).map(rowToFavorite),
     activity: ((activityRes.data ?? []) as ActivityLogRow[]).map(rowToActivityLogEntry),
     attachments: ((attachmentsRes.data ?? []) as AttachmentRow[]).map(rowToAttachment),
+    pinnedLocations: ((pinnedLocationsRes.data ?? []) as PinnedLocationRow[]).map(rowToPinnedLocation),
     labelBatches: ((labelBatchesRes.data ?? []) as LabelBatchRow[]).map(rowToLabelBatch),
     labelBatchEntries: ((labelBatchEntriesRes.data ?? []) as LabelBatchEntryRow[]).map(rowToLabelBatchEntry),
     normalizationRules: ((normalizationRulesRes.data ?? []) as NormalizationRuleRow[]).map(rowToNormalizationRule),
@@ -617,6 +647,41 @@ async function uploadCoverPhotoFile(file: File, householdId: string): Promise<{ 
 function removeCoverPhotoObject(path: string, context: string) {
   getSupabaseBrowserClient()
     .storage.from("item-photos")
+    .remove([path])
+    .then(({ error }) => {
+      if (error) console.error(`Failed to remove ${context} from storage:`, error.message);
+    });
+}
+
+/** Home Map (pinned_locations) photo upload — private "attachments" bucket,
+ * not "item-photos": see PinnedLocation's own doc comment for why. Fixed
+ * path per pin (migration 0017's documented convention), not a fresh id
+ * per upload like uploadCoverPhotoFile — "attachments" grants no UPDATE
+ * storage policy either, so a photo *replacement* removes the old object
+ * at that same path first (see updatePinnedLocation) rather than upserting. */
+async function uploadPinnedLocationPhoto(
+  file: File,
+  householdId: string,
+  pinnedLocationId: string
+): Promise<{ ok: true; path: string } | { ok: false; error: string }> {
+  const contentType = file.type || "application/octet-stream";
+  if (!contentType.startsWith("image/")) {
+    return { ok: false, error: "Only images can be used as a photo." };
+  }
+  if (file.size > ATTACHMENT_MAX_SIZE_BYTES) {
+    return { ok: false, error: `File is too large — max ${ATTACHMENT_MAX_SIZE_LABEL}.` };
+  }
+  const normalized = await normalizeUploadedPhoto(file);
+  const supabase = getSupabaseBrowserClient();
+  const path = `${householdId}/pinned-locations/${pinnedLocationId}`;
+  const { error: uploadError } = await supabase.storage.from("attachments").upload(path, normalized, { contentType: normalized.type });
+  if (uploadError) return { ok: false, error: uploadError.message };
+  return { ok: true, path };
+}
+
+function removePinnedLocationPhotoObject(path: string, context: string) {
+  getSupabaseBrowserClient()
+    .storage.from("attachments")
     .remove([path])
     .then(({ error }) => {
       if (error) console.error(`Failed to remove ${context} from storage:`, error.message);
@@ -683,6 +748,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
   activity: [],
   favorites: [],
   attachments: [],
+  pinnedLocations: [],
   labelBatches: [],
   labelBatchEntries: [],
   accounts: [],
@@ -782,7 +848,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       keyOf: (item: TDomain) => string,
       rowKeyOf: (row: Record<string, unknown>) => string,
       stateKey:
-        | "members" | "invites" | "locations" | "containers" | "tags" | "activity" | "attachments"
+        | "members" | "invites" | "locations" | "containers" | "tags" | "activity" | "attachments" | "pinnedLocations"
         | "labelBatches" | "labelBatchEntries" | "normalizationRules"
         | "accounts" | "financeAccountShares" | "transactions" | "financeCategories" | "categoryRules"
         | "recurringBills" | "financeBillShares" | "transactionAttachments"
@@ -810,6 +876,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     bind<TagRow, Tag>("tags", householdFilter, rowToTag, (t) => t.id, (r) => r.id as string, "tags");
     bind<ActivityLogRow, ActivityLogEntry>("activity_log", householdFilter, rowToActivityLogEntry, (a) => a.id, (r) => r.id as string, "activity");
     bind<AttachmentRow, Attachment>("attachments", householdFilter, rowToAttachment, (a) => a.id, (r) => r.id as string, "attachments");
+    bind<PinnedLocationRow, PinnedLocation>("pinned_locations", householdFilter, rowToPinnedLocation, (p) => p.id, (r) => r.id as string, "pinnedLocations");
     bind<LabelBatchRow, LabelBatch>("label_batches", householdFilter, rowToLabelBatch, (b) => b.id, (r) => r.id as string, "labelBatches");
     bind<LabelBatchEntryRow, LabelBatchEntry>("label_batch_entries", householdFilter, rowToLabelBatchEntry, (e) => e.id, (r) => r.id as string, "labelBatchEntries");
     bind<NormalizationRuleRow, NormalizationRule>("normalization_rules", householdFilter, rowToNormalizationRule, (n) => n.id, (r) => r.id as string, "normalizationRules");
@@ -1658,6 +1725,91 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       supabase.from("attachments").delete().eq("id", attachmentId),
       () => set((s) => ({ attachments: [...s.attachments, previous] })),
       "Couldn't delete attachment"
+    );
+  },
+
+  createPinnedLocation: async (input) => {
+    const supabase = getSupabaseBrowserClient();
+    const householdId = get().currentHouseholdId;
+    const id = newId();
+
+    let photoPath: string | null = null;
+    if (input.photoFile) {
+      const uploaded = await uploadPinnedLocationPhoto(input.photoFile, householdId, id);
+      if (!uploaded.ok) return uploaded;
+      photoPath = uploaded.path;
+    }
+
+    const created: PinnedLocation = {
+      id,
+      householdId,
+      name: input.name,
+      category: input.category,
+      photoPath,
+      locationNote: input.locationNote?.trim() || null,
+      createdByUserId: get().currentUserId,
+      createdAt: nowIso(),
+    };
+
+    const { error: insertError } = await supabase.from("pinned_locations").insert(pinnedLocationToInsertRow(created));
+    if (insertError) {
+      if (photoPath) removePinnedLocationPhotoObject(photoPath, "pinned location create");
+      return { ok: false, error: insertError.message };
+    }
+
+    set((s) => ({ pinnedLocations: [...s.pinnedLocations, created] }));
+    return { ok: true, pinnedLocation: created };
+  },
+
+  updatePinnedLocation: async (pinnedLocationId, patch) => {
+    const previous = get().pinnedLocations.find((p) => p.id === pinnedLocationId);
+    if (!previous) return { ok: false, error: "Pinned location not found." };
+    const supabase = getSupabaseBrowserClient();
+
+    // Photo replace/remove happens before the row write, same ordering as
+    // create — and, for a replacement, before the new upload too: the
+    // bucket grants no UPDATE storage policy, so the old object at this
+    // pin's fixed path has to be gone before a new one can land there.
+    let photoPath = previous.photoPath;
+    if (patch.photoFile) {
+      if (previous.photoPath) {
+        const { error } = await supabase.storage.from("attachments").remove([previous.photoPath]);
+        if (error) return { ok: false, error: error.message };
+      }
+      const uploaded = await uploadPinnedLocationPhoto(patch.photoFile, previous.householdId, pinnedLocationId);
+      if (!uploaded.ok) return uploaded;
+      photoPath = uploaded.path;
+    } else if (patch.removePhoto && previous.photoPath) {
+      const { error } = await supabase.storage.from("attachments").remove([previous.photoPath]);
+      if (error) return { ok: false, error: error.message };
+      photoPath = null;
+    }
+
+    const merged: PinnedLocation = {
+      ...previous,
+      name: patch.name ?? previous.name,
+      category: patch.category ?? previous.category,
+      locationNote: patch.locationNote !== undefined ? (patch.locationNote?.trim() || null) : previous.locationNote,
+      photoPath,
+    };
+
+    const { error: updateError } = await supabase.from("pinned_locations").update(pinnedLocationToInsertRow(merged)).eq("id", pinnedLocationId);
+    if (updateError) return { ok: false, error: updateError.message };
+
+    set((s) => ({ pinnedLocations: s.pinnedLocations.map((p) => (p.id === pinnedLocationId ? merged : p)) }));
+    return { ok: true };
+  },
+
+  deletePinnedLocation: (pinnedLocationId) => {
+    const supabase = getSupabaseBrowserClient();
+    const previous = get().pinnedLocations.find((p) => p.id === pinnedLocationId);
+    set((s) => ({ pinnedLocations: s.pinnedLocations.filter((p) => p.id !== pinnedLocationId) }));
+    if (!previous) return;
+    if (previous.photoPath) removePinnedLocationPhotoObject(previous.photoPath, "pinned location delete");
+    persistOrRevert(
+      supabase.from("pinned_locations").delete().eq("id", pinnedLocationId),
+      () => set((s) => ({ pinnedLocations: [...s.pinnedLocations, previous] })),
+      "Couldn't delete pinned location"
     );
   },
 
