@@ -6,6 +6,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/icon";
 import { LineItemFormSheet } from "@/components/line-item-form-sheet";
+import { LinkPurchaseSheet } from "@/components/link-purchase-sheet";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { rowToScannedReceiptLineItem, type ScannedReceiptLineItemRow } from "@/lib/supabase/mappers";
@@ -48,6 +49,7 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
   const [editingLineItem, setEditingLineItem] = useState<ScannedReceiptLineItem | null>(null);
   const [deleteLineItemConfirm, setDeleteLineItemConfirm] = useState<ScannedReceiptLineItem | null>(null);
   const [addingItem, setAddingItem] = useState(false);
+  const [linkItemOpen, setLinkItemOpen] = useState(false);
 
   // Reaches into the store directly (not threaded down as props from
   // transactions/page.tsx) for the same reason this component already
@@ -57,6 +59,10 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
   // through the one real caller.
   const allTransactions = useInventoryStore((s) => s.transactions);
   const currentHouseholdId = useInventoryStore((s) => s.currentHouseholdId);
+  const items = useInventoryStore((s) => s.items);
+  const itemPurchases = useInventoryStore((s) => s.itemPurchases);
+  const linkItemPurchase = useInventoryStore((s) => s.linkItemPurchase);
+  const unlinkItemPurchase = useInventoryStore((s) => s.unlinkItemPurchase);
 
   // Both fetched on demand, not kept in the global store: a signed URL is
   // deliberately short-lived (private bucket, same pattern
@@ -189,7 +195,28 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
     toast.success("Item added");
   }
 
+  async function handlePickItemToLink(result: { id: string; suggested: boolean }) {
+    if (!transaction) return;
+    const res = await linkItemPurchase({ itemId: result.id, transactionId: transaction.id, source: result.suggested ? "ai_suggested" : "manual" });
+    if (!res.ok) {
+      toast.error(res.error ?? "Couldn't link that item.");
+      return;
+    }
+    toast.success("Item linked");
+  }
+
+  function handleUnlinkItem(purchaseId: string) {
+    unlinkItemPurchase(purchaseId);
+    toast("Link removed");
+  }
+
   if (!transaction) return null;
+
+  // PRD §25's linking is transaction ↔ item, so this drawer only needs
+  // links keyed off transactionId — a link still mid-review (only
+  // scannedReceiptLineItemId set, no transactionId yet) belongs to Receipt
+  // Review's own "Link to item" affordance, not this one.
+  const linkedPurchases = itemPurchases.filter((p) => p.transactionId === transaction.id);
 
   const refundOptions = allTransactions
     .filter((t) => t.type === "refund" && !t.trashedAt && t.accountId === transaction.accountId)
@@ -315,6 +342,44 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
             </div>
           )}
 
+          <div>
+            <div className="mb-1.5 flex items-center justify-between">
+              <p className="text-caption text-muted-foreground">
+                {linkedPurchases.length > 0 ? `Linked items (${linkedPurchases.length})` : "Linked items"}
+              </p>
+              <button type="button" onClick={() => setLinkItemOpen(true)} className="flex items-center gap-1 text-caption font-medium text-yellow-text">
+                <Icon name="link" size={13} /> Link to item
+              </button>
+            </div>
+            {linkedPurchases.length === 0 ? (
+              <p className="rounded-2xl border border-dashed border-border bg-white p-4 text-center text-caption text-muted-foreground">
+                Not linked to anything in your inventory yet.
+              </p>
+            ) : (
+              <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white">
+                {linkedPurchases.map((purchase) => {
+                  const linkedItem = items.find((it) => it.id === purchase.itemId);
+                  return (
+                    <div key={purchase.id} className="flex items-center gap-3 px-3 py-2.5">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-caption font-medium text-ink">{linkedItem?.name ?? "Deleted item"}</p>
+                        {linkedItem && <p className="truncate text-micro text-muted-foreground">{linkedItem.category}</p>}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleUnlinkItem(purchase.id)}
+                        aria-label="Remove link"
+                        className="tap-target flex size-7 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-danger"
+                      >
+                        <Icon name="close" size={13} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
           <div className="flex gap-2">
             <Button variant="outline" className="flex-1" onClick={onEdit}>
               <Icon name="edit" size={16} /> Edit
@@ -326,6 +391,15 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
         </div>
       </SheetContent>
     </Sheet>
+
+    <LinkPurchaseSheet
+      open={linkItemOpen}
+      onOpenChange={setLinkItemOpen}
+      mode="item"
+      referenceDate={transaction.occurredAt}
+      excludeIds={linkedPurchases.map((p) => p.itemId)}
+      onPick={handlePickItemToLink}
+    />
 
     <LineItemFormSheet
       // Same always-mounted-with-open-prop pattern as the transactions list

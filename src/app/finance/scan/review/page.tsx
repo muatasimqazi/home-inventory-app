@@ -7,6 +7,7 @@ import { Icon } from "@/components/icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { LinkPurchaseSheet } from "@/components/link-purchase-sheet";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useInventoryStore } from "@/lib/store";
 import { useReceiptScanSession } from "@/lib/receipt-scan-session-store";
@@ -37,8 +38,18 @@ export default function SingleReceiptReviewPage() {
   const accounts = sortByLabel(useInventoryStore((s) => s.accounts), (a) => a.name);
   const financeCategories = useInventoryStore((s) => s.financeCategories);
   const linkTransactionAttachment = useInventoryStore((s) => s.linkTransactionAttachment);
+  const items = useInventoryStore((s) => s.items);
+  const itemPurchases = useInventoryStore((s) => s.itemPurchases);
+  const linkItemPurchase = useInventoryStore((s) => s.linkItemPurchase);
+  const unlinkItemPurchase = useInventoryStore((s) => s.unlinkItemPurchase);
 
   const [confirming, setConfirming] = useState(false);
+  // Which line item the "Link to item" sheet is open for — PRD §25's
+  // assisted matching applies here too: a receipt can be linked to
+  // inventory items before it's even confirmed into a real transaction
+  // (item_purchases.scanned_receipt_line_item_id), same "user confirms a
+  // candidate" shape as Transaction Detail's own copy of this affordance.
+  const [linkingLineItemId, setLinkingLineItemId] = useState<string | null>(null);
 
   const draft = (drafts ?? []).find((d) => d.status === "pending");
   const activeCategories = sortByLabel(
@@ -94,12 +105,61 @@ export default function SingleReceiptReviewPage() {
         });
       }
 
+      // Any item_purchases link made during review (this page's own "Link
+      // to item" affordance below) only had a scanned_receipt_line_item_id
+      // to point at — the confirmed transaction now exists, so backfill
+      // transactionId onto those links too (item_purchases' own comment:
+      // "or both once a draft resolves into a real transaction"). Realtime
+      // (store.ts's item_purchases subscription) picks up the resulting
+      // row change locally; no need to also patch local state here.
+      if (data) {
+        const lineItemIds = draft.lineItems.map((li) => li.id);
+        if (lineItemIds.length > 0) {
+          const { error: backfillError } = await supabase
+            .from("item_purchases")
+            .update({ transaction_id: data.id })
+            .in("scanned_receipt_line_item_id", lineItemIds)
+            .is("transaction_id", null);
+          if (backfillError) {
+            // Not atomic with confirm_scanned_transaction_draft() above —
+            // a real gap the reviewer correctly flagged as belonging
+            // inside that RPC instead, deferred rather than folded into
+            // this merge. Until then, at minimum don't let this fail
+            // silently: a link made during review would otherwise stay
+            // permanently anchored only by scanned_receipt_line_item_id
+            // and read as "pending" forever even though the receipt was,
+            // in fact, confirmed.
+            console.error("Couldn't backfill item_purchases.transaction_id:", backfillError.message);
+            toast.error("Confirmed, but couldn't finish linking an item to this receipt — check the item's Purchase & Warranty section.");
+          }
+        }
+      }
+
       toast.success(`Confirmed — ${draft.store ?? "receipt"} added to your transactions`);
       reset();
       router.replace(`/finance/transactions`);
     } finally {
       setConfirming(false);
     }
+  }
+
+  async function handlePickItemToLink(result: { id: string; suggested: boolean }) {
+    if (!linkingLineItemId) return;
+    const res = await linkItemPurchase({
+      itemId: result.id,
+      scannedReceiptLineItemId: linkingLineItemId,
+      source: result.suggested ? "ai_suggested" : "manual",
+    });
+    if (!res.ok) {
+      toast.error(res.error ?? "Couldn't link that item.");
+      return;
+    }
+    toast.success("Item linked");
+  }
+
+  function handleUnlinkItem(purchaseId: string) {
+    unlinkItemPurchase(purchaseId);
+    toast("Link removed");
   }
 
   return (
@@ -184,22 +244,53 @@ export default function SingleReceiptReviewPage() {
             Items ({draft.lineItems.length})
           </h2>
           <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white">
-            {draft.lineItems.map((li) => (
-              <div key={li.id} className="flex items-center gap-3 px-4 py-3">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-body font-medium text-ink">{li.standardName || li.rawItem}</p>
-                  <p className="truncate text-caption text-muted-foreground">
-                    {li.rawItem !== li.standardName ? `${li.rawItem} · ` : ""}
-                    Qty {li.quantity}
-                    {li.confidence !== null && li.confidence < 0.75 ? " · low confidence" : ""}
-                  </p>
+            {draft.lineItems.map((li) => {
+              const linkedPurchase = itemPurchases.find((p) => p.scannedReceiptLineItemId === li.id);
+              const linkedItem = linkedPurchase ? items.find((it) => it.id === linkedPurchase.itemId) : undefined;
+              return (
+                <div key={li.id} className="flex flex-col gap-1.5 px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-body font-medium text-ink">{li.standardName || li.rawItem}</p>
+                      <p className="truncate text-caption text-muted-foreground">
+                        {li.rawItem !== li.standardName ? `${li.rawItem} · ` : ""}
+                        Qty {li.quantity}
+                        {li.confidence !== null && li.confidence < 0.75 ? " · low confidence" : ""}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-body font-medium text-ink">{li.lineTotalCents !== null ? formatCurrency(li.lineTotalCents / 100) : "—"}</span>
+                  </div>
+                  {linkedPurchase ? (
+                    <div className="flex items-center gap-1.5 text-micro text-muted-foreground">
+                      <Icon name="link" size={12} />
+                      Linked to {linkedItem?.name ?? "an item"}
+                      <button type="button" onClick={() => handleUnlinkItem(linkedPurchase.id)} className="font-medium text-danger">
+                        Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setLinkingLineItemId(li.id)}
+                      className="flex items-center gap-1 self-start text-micro font-medium text-yellow-text"
+                    >
+                      <Icon name="link" size={12} /> Link to item
+                    </button>
+                  )}
                 </div>
-                <span className="shrink-0 text-body font-medium text-ink">{li.lineTotalCents !== null ? formatCurrency(li.lineTotalCents / 100) : "—"}</span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
+
+      <LinkPurchaseSheet
+        open={!!linkingLineItemId}
+        onOpenChange={(open) => !open && setLinkingLineItemId(null)}
+        mode="item"
+        referenceDate={draft.suggestedDate}
+        onPick={handlePickItemToLink}
+      />
 
       <div className="fixed inset-x-0 bottom-0 border-t border-border bg-white px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <Button size="lg" className="w-full bg-ink text-white hover:bg-ink/90" onClick={handleConfirm} disabled={confirming}>

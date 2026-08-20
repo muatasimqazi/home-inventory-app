@@ -62,7 +62,27 @@ export function unlinkLineItemRefund(current: ScannedReceiptLineItem) {
  * too, same reasoning unlinkLineItemRefund never deletes it.
  */
 export async function deleteScannedReceiptLineItem(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
-  const { error } = await getSupabaseBrowserClient().from("scanned_receipt_line_items").delete().eq("id", id);
+  const supabase = getSupabaseBrowserClient();
+  // item_purchases_has_a_target (0017_household_ledger_core.sql) requires
+  // at least one anchor to survive — the FK here is ON DELETE SET NULL,
+  // so an item_purchases row anchored only by this line item (no
+  // transaction_id) would otherwise violate that constraint and fail
+  // this delete outright. Remove those links first, and await it before
+  // the line-item delete fires so ordering is guaranteed.
+  const { data: orphaned, error: lookupError } = await supabase
+    .from("item_purchases")
+    .select("id")
+    .eq("scanned_receipt_line_item_id", id)
+    .is("transaction_id", null);
+  if (lookupError) return { ok: false, error: lookupError.message };
+  if (orphaned && orphaned.length > 0) {
+    const { error: unlinkError } = await supabase
+      .from("item_purchases")
+      .delete()
+      .in("id", orphaned.map((p) => p.id as string));
+    if (unlinkError) return { ok: false, error: unlinkError.message };
+  }
+  const { error } = await supabase.from("scanned_receipt_line_items").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
   return { ok: true };
 }

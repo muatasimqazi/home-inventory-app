@@ -201,6 +201,122 @@ export function createAskTools(supabase: SupabaseClient, householdId: string) {
         return { pinnedLocations: pins, count: pins.length };
       },
     }),
+
+    // Household Ledger Implementation Plan Workstream 3, PRD (docs/v4 -
+    // Enhanced Features) §25 — the item ↔ transaction link. Additive
+    // addition to this file only: joins item_purchases (0017_household_
+    // ledger_core.sql) to transactions/scanned_receipt_line_items so the
+    // three highest-value questions §25 calls out ("is this still under
+    // warranty," insurance-claim prep, "what did this house actually cost
+    // us") have a real answer instead of two disconnected domains.
+    getItemPurchaseInfo: tool({
+      description:
+        "Look up purchase and warranty details for a physical inventory item by name — merchant, price, purchase " +
+        "date, payment account, receipt availability, and warranty status. Use for 'is X still under warranty', " +
+        "'when did we buy X and what did it cost', 'find the receipt for X', or insurance-claim-prep questions. " +
+        "Returns one entry per matching item; each item's `purchases` list can be empty (nothing linked yet — say " +
+        "so, don't guess) or have more than one entry (bought more than once). `warrantyStatus` is 'unknown' when " +
+        "no warranty end date is tracked for that item, not 'not under warranty' — say it isn't tracked, not that " +
+        "coverage has lapsed.",
+      inputSchema: z.object({
+        itemName: z.string().describe("The item to look up, e.g. 'Dyson vacuum'."),
+        limit: z.number().int().min(1).max(20).optional().describe("Max items to return (default 10)."),
+      }),
+      execute: async ({ itemName, limit }) => {
+        const escaped = itemName.replace(/[%,()]/g, "");
+        const { data: items, error: itemsError } = await supabase
+          .from("items")
+          .select("id, name, category, extra_details")
+          .eq("household_id", householdId)
+          .eq("status", "active")
+          .or(`name.ilike.%${escaped}%,original_detected_name.ilike.%${escaped}%`)
+          .limit(limit ?? 10);
+        if (itemsError) return { error: itemsError.message };
+        if (!items || items.length === 0) return { items: [], count: 0 };
+
+        const itemIds = items.map((i) => i.id as string);
+        // RLS on item_purchases is privacy-aware (0017_household_ledger_
+        // core.sql) — a link into a private account's transaction the
+        // caller can't see is filtered out here automatically, same as
+        // every other finance query in this file.
+        const { data: links, error: linksError } = await supabase
+          .from("item_purchases")
+          .select("id, item_id, transaction_id, scanned_receipt_line_item_id, source")
+          .in("item_id", itemIds);
+        if (linksError) return { error: linksError.message };
+
+        const transactionIds = Array.from(new Set((links ?? []).map((l) => l.transaction_id).filter((id): id is string => !!id)));
+        const lineItemIds = Array.from(new Set((links ?? []).map((l) => l.scanned_receipt_line_item_id).filter((id): id is string => !!id)));
+
+        const [txnsRes, lineItemsRes, receiptAttachmentsRes] = await Promise.all([
+          transactionIds.length > 0
+            ? supabase.from("transactions").select("id, merchant, description, amount, occurred_at, account_id").in("id", transactionIds)
+            : Promise.resolve({ data: [] as Record<string, unknown>[], error: null }),
+          lineItemIds.length > 0
+            ? supabase.from("scanned_receipt_line_items").select("id, standard_name, raw_item, line_total_cents").in("id", lineItemIds)
+            : Promise.resolve({ data: [] as Record<string, unknown>[], error: null }),
+          supabase.from("attachments").select("item_id").eq("household_id", householdId).eq("kind", "receipt").in("item_id", itemIds),
+        ]);
+        if (txnsRes.error) return { error: txnsRes.error.message };
+        if (lineItemsRes.error) return { error: lineItemsRes.error.message };
+        if (receiptAttachmentsRes.error) return { error: receiptAttachmentsRes.error.message };
+
+        const accountIds = Array.from(new Set((txnsRes.data ?? []).map((t) => t.account_id as string)));
+        const accountsRes =
+          accountIds.length > 0 ? await supabase.from("accounts").select("id, name").in("id", accountIds) : { data: [] as Record<string, unknown>[], error: null };
+        if (accountsRes.error) return { error: accountsRes.error.message };
+
+        const txnById = new Map((txnsRes.data ?? []).map((t) => [t.id as string, t]));
+        const lineItemById = new Map((lineItemsRes.data ?? []).map((li) => [li.id as string, li]));
+        const accountNameById = new Map((accountsRes.data ?? []).map((a) => [a.id as string, a.name as string]));
+        const itemIdsWithReceipt = new Set((receiptAttachmentsRes.data ?? []).map((a) => a.item_id as string));
+
+        const result = items.map((item) => {
+          const itemLinks = (links ?? []).filter((l) => l.item_id === item.id);
+          const extraDetails = (item.extra_details ?? {}) as Record<string, string>;
+          const warrantyEnd = extraDetails.warrantyEnd ?? null;
+
+          const purchases = itemLinks.map((link) => {
+            const txn = link.transaction_id ? txnById.get(link.transaction_id as string) : undefined;
+            const lineItem = link.scanned_receipt_line_item_id ? lineItemById.get(link.scanned_receipt_line_item_id as string) : undefined;
+            const priceCents = (lineItem?.line_total_cents as number | null | undefined) ?? (txn ? Math.round(Math.abs(Number(txn.amount)) * 100) : null);
+            return {
+              merchant:
+                (txn?.merchant as string | null | undefined) ??
+                (txn?.description as string | null | undefined) ??
+                (lineItem?.standard_name as string | null | undefined) ??
+                (lineItem?.raw_item as string | null | undefined) ??
+                null,
+              priceDollars: priceCents !== null && priceCents !== undefined ? priceCents / 100 : null,
+              purchaseDate: (txn?.occurred_at as string | null | undefined) ?? null,
+              paidWith: txn ? (accountNameById.get(txn.account_id as string) ?? null) : null,
+              pendingConfirmation: !txn,
+              source: link.source as string,
+            };
+          });
+
+          return {
+            itemId: item.id as string,
+            itemName: item.name as string,
+            category: item.category as string,
+            purchases,
+            receiptAttached: itemIdsWithReceipt.has(item.id as string),
+            warrantyEnd,
+            // warrantyEnd is freeform text (no format enforced at capture)
+            // — an unparsable value must land in "unknown", not silently
+            // collapse into "expired" and state a false fact to the user.
+            warrantyStatus: (() => {
+              if (!warrantyEnd) return "unknown";
+              const endMs = new Date(warrantyEnd).getTime();
+              if (Number.isNaN(endMs)) return "unknown";
+              return endMs >= Date.now() ? "active" : "expired";
+            })(),
+          };
+        });
+
+        return { items: result, count: result.length };
+      },
+    }),
   };
 }
 
