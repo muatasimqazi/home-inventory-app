@@ -34,11 +34,21 @@ export function ContainerCard({ container, itemCount, breadcrumbLabel, status, c
       href={`/containers/${container.id}`}
       className={cn("flex flex-col overflow-hidden rounded-2xl border border-border bg-white shadow-sm transition-shadow hover:shadow-lg", className)}
     >
-      <div className="relative aspect-4/3 w-full shrink-0">
+      <div className="relative aspect-4/3 w-full shrink-0 overflow-hidden">
+        {/* absolute inset-0, not a normal-flow size-full child — a
+            percentage-height image inside a box whose own height is
+            *derived from* aspect-ratio doesn't reliably resolve against
+            it (a real, confirmed-live CSS quirk: the box's rendered
+            height ended up tracking each photo's own intrinsic aspect
+            ratio instead of the intended 4:3, producing visibly
+            different-sized cards depending on what photo a container
+            happened to have). Taking the image out of flow entirely
+            removes it from that sizing negotiation — the wrapper's
+            height is then purely aspect-ratio's, unconditionally. */}
         <PhotoThumb
           emoji={container.coverPhotoEmoji ?? "📦"}
           coverPhotoPath={container.coverPhotoPath}
-          className="size-full rounded-none"
+          className="absolute inset-0 size-full rounded-none"
           emojiClassName="text-8xl"
           fit="cover"
         />

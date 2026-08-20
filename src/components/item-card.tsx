@@ -17,8 +17,22 @@ interface ItemCardProps {
 export function ItemCard({ item, breadcrumbLabel, className, onToggleSelect, selected }: ItemCardProps) {
   const content = (
     <>
-      <div className="relative">
-        <PhotoThumb emoji={item.photoEmoji} coverPhotoPath={item.coverPhotoPath} label={item.category} className="aspect-[145/92] w-full" fit="cover" />
+      {/* aspect-ratio lives on this wrapper, not on PhotoThumb's own root —
+          PhotoThumb is absolutely positioned to fill it (see
+          container-card.tsx's identical fix for why: a normal-flow,
+          percentage-height image inside a box whose height is *derived
+          from* aspect-ratio doesn't reliably resolve against it, so the
+          box's rendered height ends up tracking the photo's own intrinsic
+          ratio instead — confirmed live, this produced visibly different
+          card heights depending on what photo an item happened to have). */}
+      <div className="relative aspect-145/92 w-full overflow-hidden">
+        <PhotoThumb
+          emoji={item.photoEmoji}
+          coverPhotoPath={item.coverPhotoPath}
+          label={item.category}
+          className="absolute inset-0 size-full"
+          fit="cover"
+        />
         {onToggleSelect ? (
           <div
             className={cn(
