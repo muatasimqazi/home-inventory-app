@@ -76,6 +76,7 @@ export function ItemAttachments({ itemId }: { itemId: string }) {
             key={kind}
             kind={kind}
             attachment={attachments.find((a) => a.kind === kind)}
+            uploading={uploadingKind === kind}
             onUpload={() => startUpload(kind)}
             onDelete={(id) => {
               deleteAttachment(id);
@@ -92,11 +93,13 @@ export function ItemAttachments({ itemId }: { itemId: string }) {
 function AttachmentTile({
   kind,
   attachment,
+  uploading,
   onUpload,
   onDelete,
 }: {
   kind: AttachmentKind;
   attachment: Attachment | undefined;
+  uploading: boolean;
   onUpload: () => void;
   onDelete: (id: string) => void;
 }) {
@@ -105,9 +108,11 @@ function AttachmentTile({
       <button
         type="button"
         onClick={onUpload}
-        className="tap-target flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-border text-muted-foreground hover:border-yellow hover:text-yellow"
+        disabled={uploading}
+        aria-busy={uploading}
+        className="tap-target flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-border text-muted-foreground hover:border-yellow hover:text-yellow disabled:opacity-60"
       >
-        <Icon name="plus" size={18} />
+        {uploading ? <Icon name="spinner" size={18} className="animate-spin" /> : <Icon name="plus" size={18} />}
         <span className="text-micro">{KIND_LABELS[kind]}</span>
       </button>
     );
