@@ -18,7 +18,7 @@ export function ItemCard({ item, breadcrumbLabel, className, onToggleSelect, sel
   const content = (
     <>
       <div className="relative">
-        <PhotoThumb emoji={item.photoEmoji} coverPhotoPath={item.coverPhotoPath} label={item.category} className="aspect-[145/92] w-full" />
+        <PhotoThumb emoji={item.photoEmoji} coverPhotoPath={item.coverPhotoPath} label={item.category} className="aspect-[145/92] w-full" fit="cover" />
         {onToggleSelect ? (
           <div
             className={cn(

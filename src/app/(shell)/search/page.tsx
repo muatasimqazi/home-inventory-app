@@ -7,6 +7,9 @@ import { SearchBar } from "@/components/search-bar";
 import { EmptyState } from "@/components/empty-state";
 import { Icon } from "@/components/icon";
 import { IconChip } from "@/components/icon-chip";
+import { Button } from "@/components/ui/button";
+import { AskConversationEntry } from "@/components/ask-conversation-entry";
+import { useAskConversation } from "@/hooks/use-ask-conversation";
 import { categoryAccentClass } from "@/lib/category";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { rowToScannedReceiptLineItem, type ScannedReceiptLineItemRow } from "@/lib/supabase/mappers";
@@ -42,6 +45,13 @@ function SearchPageInner() {
   const transactions = useInventoryStore((s) => s.transactions);
   const accounts = useInventoryStore((s) => s.accounts);
   const financeCategories = useInventoryStore((s) => s.financeCategories);
+  const householdId = useInventoryStore((s) => s.currentHouseholdId);
+  // Same question -> answer -> references flow as the global Ask widget
+  // (hooks/use-ask-conversation.ts) — "we want search to function same as
+  // ask" — rather than Search staying pure keyword-filter-only. Keyword
+  // results (below) stay instant and free; asking is opt-in per query via
+  // the "Ask AI" row so most searches never pay for a model call.
+  const { entries: askEntries, ask } = useAskConversation(householdId);
 
   const [lineItemsByTransaction, setLineItemsByTransaction] = useState<Record<string, ScannedReceiptLineItem[]>>({});
 
@@ -133,11 +143,32 @@ function SearchPageInner() {
         </div>
       )}
 
+      {query.trim() !== "" && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="self-start"
+          onClick={() => ask(query)}
+          disabled={askEntries.some((e) => e.pending)}
+        >
+          <Icon name="ai" size={14} className="text-yellow" />
+          Ask AI: &ldquo;{query.trim()}&rdquo;
+        </Button>
+      )}
+
+      {askEntries.length > 0 && (
+        <div className="flex flex-col gap-3">
+          {askEntries.map((entry) => (
+            <AskConversationEntry key={entry.id} entry={entry} onRetry={ask} />
+          ))}
+        </div>
+      )}
+
       {query.trim() === "" ? (
         <EmptyState
           icon="search"
           title="Search your household"
-          description="Try an item name, a vendor, an account, or a location like “garage.”"
+          description="Try an item name, a vendor, an account, or a location like “garage.” Or ask a question, like “where did I keep my measuring tape?”"
         />
       ) : filteredResults.length === 0 ? (
         <EmptyState
@@ -146,7 +177,7 @@ function SearchPageInner() {
           description={
             hasAnyResults
               ? "Nothing in this domain — try “All” to search everywhere."
-              : "Check the spelling, or try a broader term — searches also match categories, tags, vendors, and accounts."
+              : "Check the spelling, try a broader term, or ask AI above — searches also match categories, tags, vendors, and accounts."
           }
         />
       ) : (

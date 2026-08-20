@@ -80,7 +80,19 @@ export default function CaptureReviewPage() {
       photoEmoji: row.photoEmoji,
       locationId: destination?.locationId ?? null,
       containerId: destination?.containerId ?? null,
-      needsReview: row.needsReview && row.name.trim() === "",
+      // Bug fix: this used to be `row.needsReview && row.name.trim() === ""`
+      // — since needsCorrection() (above) already blocks Save until every
+      // flagged row has a non-empty name, that condition was never true in
+      // practice, so items created here almost never carried needsReview
+      // through to the saved record and the persistent Needs Review queue
+      // silently stayed empty regardless of how many low-confidence
+      // detections actually occurred. The real distinction that matters:
+      // did the user actually correct the name away from the AI's raw
+      // guess (safe to trust, no further review needed) or just accept it
+      // as-is via Confirm/"Confirm all blocked" (still worth a second look
+      // later, even though it wasn't blocking save) — same test
+      // needsCorrection() already uses for the pre-save gate.
+      needsReview: row.needsReview && row.name.trim() === row.suggestedName,
       reviewReason: row.reviewReason,
       tagIds: row.suggestedTags.map((t) => getOrCreateTag(t).id),
     };

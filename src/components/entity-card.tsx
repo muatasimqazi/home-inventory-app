@@ -28,7 +28,7 @@ export function EntityCard({ href, emoji, coverPhotoPath, title, subtitle, badge
       )}
     >
       <div className="relative">
-        <PhotoThumb emoji={emoji} coverPhotoPath={coverPhotoPath} className="aspect-[145/92] w-full" />
+        <PhotoThumb emoji={emoji} coverPhotoPath={coverPhotoPath} className="aspect-[145/92] w-full" fit="cover" />
         {badge && (
           <span
             className={cn(
