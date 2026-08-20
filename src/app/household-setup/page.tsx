@@ -18,7 +18,7 @@ import type { Person } from "@/lib/types";
 // household" path reached deliberately from Settings, since that isn't an
 // onboarding step at all.
 type Mode = "create" | "join";
-type CreatePhase = "loading" | "creating" | "naming" | "ready" | "error";
+type CreatePhase = "loading" | "invited" | "creating" | "naming" | "ready" | "error";
 
 function deriveFirstName(fullName: string, email: string): string {
   const trimmed = fullName.trim();
@@ -54,6 +54,7 @@ function HouseholdSetupInner() {
   const households = useInventoryStore((s) => s.households);
   const createHousehold = useInventoryStore((s) => s.createHousehold);
   const acceptInvite = useInventoryStore((s) => s.acceptInvite);
+  const checkPendingInvite = useInventoryStore((s) => s.checkPendingInvite);
 
   const [phase, setPhase] = useState<CreatePhase>("loading");
   const [readyName, setReadyName] = useState("");
@@ -61,6 +62,7 @@ function HouseholdSetupInner() {
   const [manualName, setManualName] = useState("");
   const [addPersonOpen, setAddPersonOpen] = useState(false);
   const [addedPeople, setAddedPeople] = useState<Person[]>([]);
+  const [pendingInvite, setPendingInvite] = useState<{ householdName: string; invitedByDisplayName: string | null } | null>(null);
   const autoCreateStarted = useRef(false);
 
   const [joinName, setJoinName] = useState("");
@@ -86,11 +88,33 @@ function HouseholdSetupInner() {
     }
   }
 
+  // Before auto-creating, check whether this signed-in email actually has a
+  // pending invite waiting (find_pending_invite_by_email(),
+  // 0019_pending_invite_check.sql). Without this check, a user who signed
+  // up specifically to redeem an invite got a brand-new household
+  // auto-created and owned by them instead — nothing in the app ever
+  // routes here with ?mode=join, so "create" was always this effect's
+  // default and it fired before the user had any chance to say otherwise
+  // (Household Ledger Implementation Plan §9). A real invite still doesn't
+  // add friction to the common case: this is one extra read before the
+  // same invisible auto-create, not a screen anyone sees unless they
+  // actually have something to join.
+  async function checkInviteThenAutoCreate() {
+    const invite = await checkPendingInvite();
+    if (invite) {
+      setPendingInvite(invite);
+      setPhase("invited");
+      return;
+    }
+    await runAutoCreate();
+  }
+
   // Zero-household user (the real onboarding case, §13): auto-create
-  // invisibly, no form. A user who already has a household and explicitly
-  // navigated here (Settings → "Create a new household") gets a minimal
-  // name field instead — that's a deliberate secondary action, not
-  // onboarding, so it's exempt from the "no naming screen" rule.
+  // invisibly, no form (after the pending-invite check above finds
+  // nothing). A user who already has a household and explicitly navigated
+  // here (Settings → "Create a new household") gets a minimal name field
+  // instead — that's a deliberate secondary action, not onboarding, so
+  // it's exempt from the "no naming screen" rule.
   useEffect(() => {
     if (mode !== "create" || !isHydrated) return;
     // Already has a household — the "naming" phase is derived below instead
@@ -99,7 +123,7 @@ function HouseholdSetupInner() {
     if (households.length > 0) return;
     if (autoCreateStarted.current) return;
     autoCreateStarted.current = true;
-    void runAutoCreate();
+    void checkInviteThenAutoCreate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, isHydrated, households.length]);
 
@@ -151,6 +175,16 @@ function HouseholdSetupInner() {
     router.push("/");
   }
 
+  // Pre-fills the email the join form checks against — we already know it
+  // matches (checkPendingInvite only ever returns a hit for the caller's
+  // own authenticated email), so there's no reason to make someone retype
+  // what got them to this screen in the first place.
+  function handleJoinFromInvite() {
+    setJoinEmail(currentUserEmail);
+    setJoinError(null);
+    setMode("join");
+  }
+
   function goBack() {
     if (mode === "join") {
       setMode("create");
@@ -161,7 +195,8 @@ function HouseholdSetupInner() {
   }
 
   const showBack = mode === "join" || displayPhase === "naming";
-  const headerTitle = mode === "join" ? "Join household" : displayPhase === "naming" ? "New household" : "Your home";
+  const headerTitle =
+    mode === "join" ? "Join household" : displayPhase === "naming" ? "New household" : displayPhase === "invited" ? "You're invited" : "Your home";
 
   return (
     <div className="min-h-dvh bg-background">
@@ -252,6 +287,19 @@ function HouseholdSetupInner() {
               {errorMessage && <p className="mt-1 text-caption text-danger">{errorMessage}</p>}
             </Field>
           </>
+        ) : displayPhase === "invited" ? (
+          <div className="flex flex-1 flex-col items-center gap-4 pt-10 text-center">
+            <div className="flex size-14 items-center justify-center rounded-2xl bg-yellow">
+              <Icon name="users" size={26} className="text-white" />
+            </div>
+            <div>
+              <h2 className="text-screen-title font-semibold text-ink">You&apos;re invited</h2>
+              <p className="mt-1 text-body text-muted-foreground">
+                {pendingInvite?.invitedByDisplayName ? `${pendingInvite.invitedByDisplayName} invited you to join ` : "You've been invited to join "}
+                <span className="font-medium text-ink">{pendingInvite?.householdName}</span>.
+              </p>
+            </div>
+          </div>
         ) : (
           <>
             <div className="flex flex-col items-center gap-3 pt-6 text-center">
@@ -304,6 +352,15 @@ function HouseholdSetupInner() {
               </Button>
               <Button size="lg" variant="outline" onClick={() => setMode("join")}>
                 I have an invite code
+              </Button>
+            </>
+          ) : displayPhase === "invited" ? (
+            <>
+              <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={handleJoinFromInvite}>
+                Join {pendingInvite?.householdName}
+              </Button>
+              <Button size="lg" variant="outline" onClick={() => void runAutoCreate()}>
+                No thanks, set up my own
               </Button>
             </>
           ) : displayPhase === "ready" ? (

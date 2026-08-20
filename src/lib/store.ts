@@ -443,6 +443,8 @@ interface InventoryState {
   switchHousehold: (householdId: string) => Promise<void>;
   /** Redeems the caller's own pending invite (matched server-side by their authenticated email, via accept_invite_by_email()) and switches to the joined household. `email` is a client-side confirmation check, not what's sent to the server. */
   acceptInvite: (email: string, displayName: string) => Promise<{ ok: boolean; error?: string; household?: Household }>;
+  /** Read-only counterpart to acceptInvite: checks whether the caller's own authenticated email has a pending, unexpired invite waiting, without accepting it (find_pending_invite_by_email(), 0019_pending_invite_check.sql — the same auth.email()-keyed lookup accept_invite_by_email() uses, but no mutation). Null when there's nothing pending. household-setup/page.tsx calls this before auto-creating a household, so a genuine invitee gets a chance to join instead of an unwanted household getting created out from under them. */
+  checkPendingInvite: () => Promise<{ householdName: string; invitedByDisplayName: string | null } | null>;
   /** Leaves the current household. Blocked if the caller is its Owner (transfer ownership first) or if it's their only household. Real, awaited. */
   leaveHousehold: () => Promise<{ ok: boolean; error?: string }>;
   inviteMember: (email: string) => void;
@@ -1109,6 +1111,18 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     }));
     get().subscribeRealtime(household.id);
     return { ok: true, household };
+  },
+
+  checkPendingInvite: async () => {
+    const supabase = getSupabaseBrowserClient();
+    const { data, error } = await supabase.rpc("find_pending_invite_by_email");
+    // Fails open (null = proceed as if there's no invite) rather than
+    // blocking onboarding on this being unreachable — a household-setup
+    // caller that gets null here just falls through to auto-create, same
+    // as the common case with no invite at all.
+    if (error || !data || data.length === 0) return null;
+    const row = data[0] as { household_name: string; invited_by_display_name: string | null };
+    return { householdName: row.household_name, invitedByDisplayName: row.invited_by_display_name };
   },
 
   leaveHousehold: async () => {
