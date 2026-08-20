@@ -11,6 +11,8 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { MoveSheet } from "@/components/move-sheet";
 import { ActivityRow } from "@/components/activity-row";
 import { ItemAttachments } from "@/components/item-attachments";
+import { ItemOwnershipSection } from "@/components/item-ownership-section";
+import { ItemPurchaseSection } from "@/components/item-purchase-section";
 import { Button } from "@/components/ui/button";
 import { useInventoryStore } from "@/lib/store";
 import { coverPhotoUrl } from "@/lib/cover-photo";
@@ -198,10 +200,7 @@ export default function ItemDetailPage() {
           </dd>
         </div>
         <Field label="Category" value={item.category} />
-        <Field
-          label="Belongs to"
-          value={item.ownerUserId ? (members.find((m) => m.userId === item.ownerUserId)?.displayName ?? "Unknown") : "Shared"}
-        />
+        <ItemOwnershipSection itemId={item.id} />
         {item.tagIds.length > 0 && (
           <div className="col-span-2">
             <dt className="text-caption text-muted-foreground">Tags</dt>
@@ -241,6 +240,8 @@ export default function ItemDetailPage() {
           </dl>
         </div>
       )}
+
+      <ItemPurchaseSection itemId={item.id} />
 
       <ItemAttachments itemId={item.id} />
 
