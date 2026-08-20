@@ -61,7 +61,7 @@ export default function EmailReceiptsSettingsPage() {
         <p className="text-caption text-muted-foreground">
           Forward or CC a purchase confirmation, invoice, or receipt email to this address. It gets read automatically — store, date, total, and
           line items when available — and shows up in{" "}
-          <Link href="/finance/pending-receipts" className="font-medium text-yellow">
+          <Link href="/finance/pending-receipts" className="font-medium text-yellow-text">
             Pending Receipts
           </Link>{" "}
           for you to confirm, same as a photo scan.

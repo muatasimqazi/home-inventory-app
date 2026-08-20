@@ -457,7 +457,7 @@ export default function TransactionsListPage() {
                           <button
                             type="button"
                             onClick={() => setAddingItemForTransactionId(t.id)}
-                            className="flex items-center gap-1.5 py-2 pr-4 text-left text-caption font-medium text-yellow"
+                            className="flex items-center gap-1.5 py-2 pr-4 text-left text-caption font-medium text-yellow-text"
                           >
                             <Icon name="plus" size={13} /> Add Item
                           </button>

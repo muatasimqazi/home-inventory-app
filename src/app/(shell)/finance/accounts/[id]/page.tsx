@@ -100,7 +100,7 @@ export default function AccountDetailPage() {
       <div>
         <div className="mb-2 flex items-center justify-between">
           <h2 className="text-item-title font-semibold text-ink">Transactions</h2>
-          <Link href={`/finance/transactions?open=new&accountId=${account.id}`} className="text-caption font-medium text-yellow">
+          <Link href={`/finance/transactions?open=new&accountId=${account.id}`} className="text-caption font-medium text-yellow-text">
             + Add
           </Link>
         </div>

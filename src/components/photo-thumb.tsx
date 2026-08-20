@@ -8,6 +8,8 @@ interface PhotoThumbProps {
   label?: string;
   className?: string;
   emojiClassName?: string;
+  /** "contain" (default) shows the whole photo, letterboxed if needed — the right choice for most contexts (item photos, form previews). "cover" fills the box edge-to-edge, cropping as needed — v3's full-bleed treatment for storage-container cards specifically, opt-in per caller rather than a global default so existing letterboxed contexts don't silently start cropping. */
+  fit?: "contain" | "cover";
 }
 
 /**
@@ -15,12 +17,12 @@ interface PhotoThumbProps {
  * emoji, so the fallback still reads as designed rather than a flat gray
  * placeholder box.
  */
-export function PhotoThumb({ emoji, coverPhotoPath, label, className, emojiClassName }: PhotoThumbProps) {
+export function PhotoThumb({ emoji, coverPhotoPath, label, className, emojiClassName, fit = "contain" }: PhotoThumbProps) {
   if (coverPhotoPath) {
     return (
       <div className={cn("overflow-hidden rounded-2xl bg-brand-100", className)}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={coverPhotoUrl(coverPhotoPath)} alt="" className="size-full object-contain" />
+        <img src={coverPhotoUrl(coverPhotoPath)} alt="" className={cn("size-full", fit === "cover" ? "object-cover" : "object-contain")} />
       </div>
     );
   }

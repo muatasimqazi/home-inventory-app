@@ -169,7 +169,7 @@ export default function OverviewPage() {
 
       <section aria-label="Home Inventory" className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-section-title font-semibold text-ink">Home Inventory</h2>
+          <h2 className="domain-section-title text-ink">Home Inventory</h2>
           <Link href="/desktop" className="text-caption font-semibold text-ink">
             Open full dashboard
           </Link>
@@ -254,7 +254,7 @@ export default function OverviewPage() {
 
       <section aria-label="Finance" className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-section-title font-semibold text-ink">Finance</h2>
+          <h2 className="domain-section-title text-ink">Finance</h2>
           <Link href="/finance/dashboard" className="text-caption font-semibold text-ink">
             Open full dashboard
           </Link>
@@ -264,7 +264,7 @@ export default function OverviewPage() {
           <div>
             <div className="mb-2 flex items-center justify-between">
               <h3 className="text-item-title font-semibold text-ink">Accounts</h3>
-              <Link href="/finance/accounts" className="text-caption font-medium text-yellow">
+              <Link href="/finance/accounts" className="text-caption font-medium text-yellow-text">
                 View all
               </Link>
             </div>
@@ -302,7 +302,7 @@ export default function OverviewPage() {
           <div>
             <div className="mb-2 flex items-center justify-between">
               <h3 className="text-item-title font-semibold text-ink">Upcoming bills</h3>
-              <Link href="/finance/recurring" className="text-caption font-medium text-yellow">
+              <Link href="/finance/recurring" className="text-caption font-medium text-yellow-text">
                 View all
               </Link>
             </div>
@@ -328,7 +328,7 @@ export default function OverviewPage() {
         <div>
           <div className="mb-2 flex items-center justify-between">
             <h3 className="text-item-title font-semibold text-ink">Recent transactions</h3>
-            <Link href="/finance/transactions" className="text-caption font-medium text-yellow">
+            <Link href="/finance/transactions" className="text-caption font-medium text-yellow-text">
               View all
             </Link>
           </div>

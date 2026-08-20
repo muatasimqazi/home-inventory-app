@@ -5,28 +5,33 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Shohaz design tokens — v2 taupe/neutral system. Variable and utility
- * *names* are kept from v1 (--color-ink, bg-yellow, etc.) so the hundreds of
- * existing call sites repaint automatically; only the hex values below moved
- * to the v2 palette. --color-yellow now holds brand-500 (taupe), not yellow —
- * treat it as "the brand accent" token, not literally yellow.
+ * Shohaz design tokens — v3 sage/neutral system (supersedes v2 taupe,
+ * which itself superseded v1 industrial black/yellow). Variable and
+ * utility *names* are kept from v1 (--color-ink, bg-yellow, etc.) so the
+ * hundreds of existing call sites repaint automatically; only the hex
+ * values below moved to the v3 palette. --color-yellow now holds sage
+ * green, not yellow, not taupe — treat it as "the brand accent" token,
+ * not literally yellow. Settled on live while merging the Home Inventory
+ * + Finance dashboards into one Overview screen — Sage & Clay won out
+ * over Ink & Coral, Plum & Gold, Warm Neutral & Indigo, Stone & Rust, and
+ * an icon-derived Teal & Gold for a calmer, lower-fatigue daily-use fit.
  */
 @theme inline {
-  /* Core palette (v2 neutral/brand) — hex values verified against the Figma
-     "v2 · Current design" page (Dashboard frame 198:19), not eyeballed. */
-  --color-ink: #212121; /* neutral-900 */
-  --color-yellow: #7d5f54; /* brand action color — treat as "the brand accent" token, not literally yellow */
+  /* Core palette (v3 sage/neutral) */
+  --color-ink: #1a1d29; /* heading text — near-black neutral, not warm-toned like v2's #212121 */
+  --color-yellow: #5c7a52; /* brand action color (sage) — fills only (buttons/FAB/active nav-tab); treat as "the brand accent" token, not literally yellow */
+  --color-yellow-text: #3f5a38; /* darker sage for literal text links/CTA text sitting on white — v3's standing link-color rule: fills get --color-yellow, text-on-white gets this darker variant for contrast */
   --color-white: #ffffff; /* neutral-0 */
-  --color-surface-muted: #f1eded; /* neutral-100 */
-  --color-border: #e4ddd8; /* neutral-200 */
-  --color-text-muted: #75625a; /* neutral-500 */
+  --color-surface-muted: #f3f4f6; /* neutral-100 — Tailwind gray-100, kept in the same neutral family as the new text-muted below rather than v2's warm #f1eded */
+  --color-border: #ebf0f4; /* card border — cool neutral, not v2's warm #e4ddd8 */
+  --color-text-muted: #6b7280; /* secondary/label text — neutral gray, explicitly not sage-tinted (an earlier #8d9683 sage-gray read as "muddy" and was rejected) */
   --color-danger: #a31b1b;
   --color-danger-foreground: #ffffff;
 
-  /* Brand scale, for spots that need the fuller ramp than --color-yellow alone */
-  --color-brand-100: #f2edea;
-  --color-brand-200: #d0c2ba;
-  --color-brand-700: #715c52;
+  /* Brand scale, for spots that need the fuller ramp than --color-yellow alone — sage ramp, not v2's taupe */
+  --color-brand-100: #e8ede5;
+  --color-brand-200: #b7c7ae;
+  --color-brand-700: #3f5a38; /* same value as --color-yellow-text — the dark end of the ramp and the link-text color are the same color by design */
 
   /* Category accent trio — muted data accents only (dots/rails/chips), never chrome/actions or large fills */
   --color-accent-yellow: #c9974b;
@@ -60,7 +65,7 @@
   --color-money-negative-text: #9c4221;
 
   /* shadcn semantic slots, mapped onto the Shohaz palette */
-  --color-background: #faf8f6; /* neutral-50 */
+  --color-background: #ffffff; /* pure white in v3 — v2 used a tinted #faf8f6 so cards would read as elevated; v3's card border+shadow recipe (below) carries that elevation instead */
   --color-foreground: var(--color-ink);
   --color-card: var(--color-white);
   --color-card-foreground: var(--color-ink);
@@ -79,23 +84,39 @@
   --color-input: var(--color-border);
   --color-ring: var(--color-ink);
 
+  /* v3 explicit system-sans list (was a bare -apple-system/system-ui
+     stack in v2) — quoted with single quotes throughout since this whole
+     declaration already lives inside a double-quoted-attribute-free CSS
+     custom property; the nesting bug that drops font-family entirely only
+     bites when this same list gets inlined into an HTML style="" string
+     elsewhere (didn't happen here, but worth remembering if it ever does). */
   --font-sans:
-    -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
-    system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    "Helvetica Neue", Helvetica, "Nimbus Sans", system-ui, -apple-system,
+    BlinkMacSystemFont, Arial, "Segoe UI", Roboto, Oxygen, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
 
-  /* Radius scale — PRD §3 */
+  /* Radius scale — PRD §3, with one v3 override below */
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
   --radius-xl: 24px;
-  --radius-2xl: 24px;
+  /* v3 card radius is 12px, down from v2's 24px — overridden here rather
+     than at each of the ~130 `rounded-2xl` card call sites across the
+     app, since every card already reads this one token. Yes, --radius-2xl
+     is now numerically smaller than --radius-xl; that's a known naming
+     quirk from reusing the existing utility rather than a rename sweep,
+     not a mistake. */
+  --radius-2xl: 12px;
   --radius-full: 999px;
 
-  /* Shadows — matched to Figma's card/nav elevation (soft, two-layer) */
-  --shadow-sm: 0px 1px 2px rgba(0, 0, 0, 0.05), 0px 10px 11px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0px 1px 4px rgba(0, 0, 0, 0.05), 0px 10px 22px rgba(0, 0, 0, 0.1);
-  --shadow-sheet: 0 -8px 24px -6px rgba(0, 0, 0, 0.12);
+  /* Shadows — v3 card recipe (rgba base 8,19,30 — a near-ink tint instead
+     of v2's pure black rgba(0,0,0,...)) replaces --shadow-sm, the token
+     every card's `shadow-sm` utility reads. --shadow-lg keeps v2's
+     offset/blur/opacity progression, recolored to the same base tint for
+     consistency; v3 didn't specify an elevated-state value explicitly. */
+  --shadow-sm: 0px 0px 2px 0px rgba(8, 19, 30, 0.04), 0px 2px 8px 0px rgba(8, 19, 30, 0.02);
+  --shadow-lg: 0px 1px 4px rgba(8, 19, 30, 0.05), 0px 10px 22px rgba(8, 19, 30, 0.1);
+  --shadow-sheet: 0 -8px 24px -6px rgba(8, 19, 30, 0.12);
 
   /* Typography scale — PRD §3, Display through Micro */
   --text-display: 30px;
@@ -149,5 +170,23 @@
   }
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
+  }
+
+  /* v3 domain-section-title — the "Home Inventory" / "Finance" headers on
+     the merged Overview screen (src/app/(shell)/page.tsx). Distinct from
+     --text-section-title (17/23, used broadly for card/section headers
+     elsewhere): this is specifically the top-level domain-header
+     treatment introduced with the Overview merge, so it gets its own
+     class rather than changing the shared token's value for every other
+     caller. */
+  .domain-section-title {
+    font-size: 20px;
+    line-height: 28px;
+    font-weight: 600;
+    letter-spacing: 0;
+    font-feature-settings:
+      "clig" 0,
+      "liga" 0;
+    transition: color 200ms ease-in-out;
   }
 }

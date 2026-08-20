@@ -279,7 +279,7 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
             <div>
               <div className="mb-1.5 flex items-center justify-between">
                 <p className="text-caption text-muted-foreground">{lineItems.length > 0 ? `Items (${lineItems.length})` : "Items"}</p>
-                <button type="button" onClick={() => setAddingItem(true)} className="flex items-center gap-1 text-caption font-medium text-yellow">
+                <button type="button" onClick={() => setAddingItem(true)} className="flex items-center gap-1 text-caption font-medium text-yellow-text">
                   <Icon name="plus" size={13} /> Add Item
                 </button>
               </div>

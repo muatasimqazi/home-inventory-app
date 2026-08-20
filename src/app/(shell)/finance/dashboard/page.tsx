@@ -138,7 +138,7 @@ export default function FinanceDashboardPage() {
       <div>
         <div className="mb-2 flex items-center justify-between">
           <h2 className="text-item-title font-semibold text-ink">Accounts</h2>
-          <Link href="/finance/accounts" className="text-caption font-medium text-yellow">
+          <Link href="/finance/accounts" className="text-caption font-medium text-yellow-text">
             View all
           </Link>
         </div>
@@ -178,7 +178,7 @@ export default function FinanceDashboardPage() {
       <div>
         <div className="mb-2 flex items-center justify-between">
           <h2 className="text-item-title font-semibold text-ink">Recent transactions</h2>
-          <Link href="/finance/transactions" className="text-caption font-medium text-yellow">
+          <Link href="/finance/transactions" className="text-caption font-medium text-yellow-text">
             View all
           </Link>
         </div>
@@ -204,7 +204,7 @@ export default function FinanceDashboardPage() {
       <div>
         <div className="mb-2 flex items-center justify-between">
           <h2 className="text-item-title font-semibold text-ink">Upcoming bills</h2>
-          <Link href="/finance/recurring" className="text-caption font-medium text-yellow">
+          <Link href="/finance/recurring" className="text-caption font-medium text-yellow-text">
             View all
           </Link>
         </div>
