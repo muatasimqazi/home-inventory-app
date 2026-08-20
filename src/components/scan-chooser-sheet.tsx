@@ -26,11 +26,32 @@ function ChooserRow({ icon, label, description, onClick }: { icon: IconName; lab
   );
 }
 
+// Household Ledger PRD §27's appliance-label capture lives at a dedicated
+// route (src/app/capture/appliance/), not a mode flag on general item
+// capture — see that page's own header comment. It accepts the same
+// ?locationId=&containerId= context as /capture and /add. itemScanHref is
+// already that context baked into a /capture URL (contextualCaptureHref in
+// src/lib/selectors.ts), so the appliance row just swaps the path prefix
+// and carries the same query string through, keeping all three rows
+// consistently contextual without a second prop.
+function applianceScanHref(itemHref: string): string {
+  const queryIndex = itemHref.indexOf("?");
+  return queryIndex === -1 ? "/capture/appliance" : `/capture/appliance${itemHref.slice(queryIndex)}`;
+}
+
 /**
  * The bottom-nav camera FAB used to link straight to inventory capture —
  * with Finance now a real second domain, "scan" is ambiguous (an item for
  * inventory, or a receipt for Finance), so tapping it opens this chooser
  * instead of guessing which one the user meant.
+ *
+ * Three explicit, user-picked modes (Household Ledger PRD §17/§32): Scan
+ * Item, Scan Receipt, and Scan Appliance. This is deliberately a chooser,
+ * not a classifier — the user always taps a mode before the camera opens,
+ * and each destination shows the AI's best guess with one-tap correction
+ * before anything saves (src/app/capture/review/page.tsx's needsReview
+ * gate; src/app/finance/scan/review/page.tsx's editable draft + explicit
+ * Confirm). No mode here is auto-detected from the photo.
  */
 export function ScanChooserSheet({ open, onOpenChange, itemScanHref }: ScanChooserSheetProps) {
   const router = useRouter();
@@ -49,6 +70,7 @@ export function ScanChooserSheet({ open, onOpenChange, itemScanHref }: ScanChoos
         <div className="flex flex-col gap-2 px-4 pb-6">
           <ChooserRow icon="camera" label="Scan Item" description="Add something to your inventory" onClick={() => go(itemScanHref)} />
           <ChooserRow icon="receipt" label="Scan Receipt" description="Auto-fill a Finance transaction" onClick={() => go("/finance/scan")} />
+          <ChooserRow icon="zap" label="Scan Appliance" description="Read a model/serial label" onClick={() => go(applianceScanHref(itemScanHref))} />
         </div>
       </SheetContent>
     </Sheet>
