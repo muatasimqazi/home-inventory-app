@@ -94,7 +94,7 @@ export default function LocationDetailPage() {
       </div>
 
       <div className="relative">
-        <PhotoThumb emoji={location.coverPhotoEmoji ?? "📦"} coverPhotoPath={location.coverPhotoPath} className="h-48 w-full" emojiClassName="text-8xl" />
+        <PhotoThumb emoji={location.coverPhotoEmoji ?? "📦"} coverPhotoPath={location.coverPhotoPath} className="h-48 w-full" emojiClassName="text-8xl" fit="cover" />
         <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChosen} />
         <div className="absolute bottom-2 right-2 flex gap-2">
           {location.coverPhotoPath && (
