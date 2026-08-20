@@ -13,8 +13,10 @@ import type { MetadataRoute } from "next";
 // wholesale, though — it was exported for a generically-named "Home
 // Inventory" placeholder (different name/description, teal
 // background_color/theme_color) rather than this app's actual identity, so
-// name/description/colors below stay Shohaz's own (cream/ink) rather than
-// switching the whole app's theme to match the icon art.
+// name/description/colors below stay Shohaz's own (white/near-black,
+// updated to the v3 sage/neutral palette — see the design-language
+// reference) rather than switching the whole app's theme to match the
+// icon art.
 //
 // This manifest alone is enough for Android/desktop install prompts. iOS
 // Safari's "Add to Home Screen" historically ignores manifest icons and
@@ -28,8 +30,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Catalog, search, and locate everything in your home.",
     start_url: "/",
     display: "standalone",
-    background_color: "#faf8f6",
-    theme_color: "#212121",
+    background_color: "#ffffff",
+    theme_color: "#1a1d29",
     icons: [
       { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
       { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },

@@ -52,6 +52,8 @@ import type {
   CsvImportBatchStatus,
   PlaidItem,
   PlaidItemStatus,
+  PushDeviceSubscription,
+  NotificationPreference,
 } from "../types";
 
 export interface HouseholdRow {
@@ -1194,5 +1196,59 @@ export function csvImportBatchToInsertRow(b: CsvImportBatch): CsvImportBatchRow 
     status: b.status,
     created_by_user_id: b.createdByUserId,
     created_at: b.createdAt,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Push notifications (supabase/migrations/0016_push_notifications.sql)
+// ---------------------------------------------------------------------------
+
+export interface PushSubscriptionRow {
+  id: string;
+  household_id: string;
+  user_id: string;
+  endpoint: string;
+  p256dh_key: string;
+  auth_key: string;
+  device_label: string | null;
+  created_at: string;
+  last_seen_at: string;
+}
+
+export function rowToPushDeviceSubscription(row: PushSubscriptionRow): PushDeviceSubscription {
+  return {
+    id: row.id,
+    householdId: row.household_id,
+    userId: row.user_id,
+    endpoint: row.endpoint,
+    p256dhKey: row.p256dh_key,
+    authKey: row.auth_key,
+    deviceLabel: row.device_label,
+    createdAt: row.created_at,
+    lastSeenAt: row.last_seen_at,
+  };
+}
+
+export interface NotificationPreferenceRow {
+  id: string;
+  household_id: string;
+  user_id: string;
+  domain_key: string;
+  event_type: string;
+  channel: string;
+  enabled: boolean;
+  updated_at: string;
+}
+
+export function rowToNotificationPreference(row: NotificationPreferenceRow): NotificationPreference {
+  return {
+    id: row.id,
+    householdId: row.household_id,
+    userId: row.user_id,
+    domainKey: row.domain_key,
+    eventType: row.event_type,
+    channel: row.channel as NotificationPreference["channel"],
+    enabled: row.enabled,
+    updatedAt: row.updated_at,
   };
 }

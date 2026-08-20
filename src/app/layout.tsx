@@ -26,7 +26,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#212121",
+  themeColor: "#1a1d29", // v3 palette — near-black ink, was v2's warm-toned #212121
   // Helps Chromium (Android) reposition fixed UI above the keyboard, but
   // Safari/iOS has never implemented interactive-widget, so this alone does
   // nothing there — the real cross-browser fix is useKeyboardInset (see

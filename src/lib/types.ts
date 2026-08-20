@@ -518,3 +518,36 @@ export interface TransactionAttachment {
   createdByUserId: string;
   createdAt: string;
 }
+
+// ---------------------------------------------------------------------------
+// Push notifications (docs/Household Hub Addendum.md §5, generalized per
+// docs/Platform Foundation Addendum.md §2) — real Web Push infrastructure,
+// built against the domain-agnostic shape those addenda specced so any
+// future domain (household_tasks, home automation, ...) plugs in without
+// re-deriving its own notification pipeline.
+// ---------------------------------------------------------------------------
+
+/** A registered browser/device — named PushDeviceSubscription, not PushSubscription, to avoid colliding with the browser's own native PushSubscription type. */
+export interface PushDeviceSubscription {
+  id: string;
+  householdId: string;
+  userId: string;
+  endpoint: string;
+  p256dhKey: string;
+  authKey: string;
+  deviceLabel: string | null;
+  createdAt: string;
+  lastSeenAt: string;
+}
+
+/** One row per (user, domain, event type) — e.g. muting 'finance'/'bill.due' without muting every other notification. Defaults to enabled; a household member has to actually turn one off, never opt in blind. */
+export interface NotificationPreference {
+  id: string;
+  householdId: string;
+  userId: string;
+  domainKey: string;
+  eventType: string;
+  channel: "push" | "in_app_only";
+  enabled: boolean;
+  updatedAt: string;
+}

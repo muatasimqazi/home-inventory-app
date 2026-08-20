@@ -8,13 +8,14 @@ import { NextResponse, type NextRequest } from "next/server";
 // routes authenticate the request themselves via a cryptographic
 // signature check (Svix/webhookSecret), not a Supabase session, so they'd
 // otherwise get redirected to /sign-in before ever reaching route code.
-// /api/v1/plaid/sync-all is the same shape for the same reason: Vercel's
-// cron scheduler calls it with a `CRON_SECRET` bearer token, not a
-// browser session — confirmed live in production that omitting it here
-// meant the nightly sync silently 307'd to /sign-in before the route's
-// own CRON_SECRET check ever ran, i.e. the cron fallback never actually
-// fired.
-const PUBLIC_PATHS = ["/sign-in", "/auth/callback", "/api/v1/webhooks", "/api/v1/plaid/sync-all"];
+// /api/v1/plaid/sync-all and /api/v1/push/send-due-bills are the same
+// shape for the same reason: Vercel's cron scheduler calls them with a
+// `CRON_SECRET` bearer token, not a browser session — confirmed live in
+// production (for the Plaid case) that omitting this meant the nightly
+// job silently 307'd to /sign-in before the route's own CRON_SECRET check
+// ever ran, i.e. the cron fallback never actually fired. Applying that
+// lesson to the push job's route up front rather than rediscovering it.
+const PUBLIC_PATHS = ["/sign-in", "/auth/callback", "/api/v1/webhooks", "/api/v1/plaid/sync-all", "/api/v1/push/send-due-bills"];
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -73,6 +74,12 @@ export const config = {
   // is installable *before* there's necessarily an authenticated session,
   // so gating it here would silently make the app un-installable while
   // signed out (confirmed live: an unauthed request came back a 307 to
-  // /sign-in instead of the manifest JSON).
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  // /sign-in instead of the manifest JSON). sw.js needs the same
+  // exclusion for the same reason — service worker registration is a
+  // plain same-origin fetch, and while a signed-in user's browser sends
+  // its session cookie along fine, the script itself has no reason to be
+  // gated behind auth at all (it's a static asset, not user data), so it
+  // shouldn't depend on that timing working out. Caught this one before
+  // it shipped broken, unlike the manifest case above.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw\\.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
 };

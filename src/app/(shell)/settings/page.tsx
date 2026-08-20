@@ -75,6 +75,7 @@ export default function SettingsPage() {
         <SettingsRow icon="user" label="Members" sublabel={`${members.length} active`} href="/settings/members" />
         <SettingsRow icon="printer" label="Label printing" sublabel="Container ID labels" href="/desktop/labels" />
         <SettingsRow icon="upload" label="Import CSV" sublabel="Items or transactions" href="/import" />
+        <SettingsRow icon="bell" label="Notifications" sublabel="Bill reminders and more" href="/settings/notifications" />
         <SettingsRow icon="attachment" label="Email Receipts" sublabel="Forward purchases with no physical receipt" href="/settings/email-receipts" />
         <SettingsRow icon="download" label="Data & Export" sublabel="CSV, PDF, JSON" href="/settings/export" />
         <SettingsRow icon="tag" label="Tags" sublabel={`${tags.length} tags`} href="/tags" />
