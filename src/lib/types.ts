@@ -122,6 +122,14 @@ export const CATEGORIES = [
   "Decor",
   "Hardware",
   "Outdoor",
+  // Appliance (Household Ledger PRD §27): major/durable-goods appliances
+  // (refrigerator, washer, dryer, dishwasher, water heater, HVAC unit) —
+  // distinct from "Electronics" and "Kitchen" because it carries its own
+  // lifecycle-scoped extra fields (manufacturer, model/serial, warranty —
+  // see CATEGORY_EXTRA_FIELDS in lib/category.ts), not because it needs a
+  // separate table (it doesn't — same `items` row, same `extra_details`
+  // jsonb everything else already uses).
+  "Appliance",
   "Miscellaneous",
 ] as const;
 
