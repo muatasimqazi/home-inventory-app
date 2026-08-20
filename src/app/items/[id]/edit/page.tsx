@@ -4,22 +4,25 @@ import { notFound, useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
+import { AddPersonSheet } from "@/components/add-person-sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useInventoryStore } from "@/lib/store";
 import { sortByLabel } from "@/lib/selectors";
-import { SORTED_CATEGORIES } from "@/lib/types";
+import { SORTED_CATEGORIES, type Person } from "@/lib/types";
 import { extraFieldsForCategory } from "@/lib/category";
 
-const SHARED_OWNER_VALUE = "shared";
+const HOUSEHOLD_OWNER_VALUE = "household";
+const ADD_PERSON_VALUE = "__add_person__";
 
 export default function EditItemPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const items = useInventoryStore((s) => s.items);
-  const members = sortByLabel(useInventoryStore((s) => s.members), (m) => m.displayName);
+  const people = sortByLabel(useInventoryStore((s) => s.people), (p) => p.displayName);
+  const isOwner = useInventoryStore((s) => s.members.find((m) => m.userId === s.currentUserId)?.role === "owner");
   const updateItem = useInventoryStore((s) => s.updateItem);
 
   const item = items.find((it) => it.id === params.id);
@@ -30,7 +33,8 @@ export default function EditItemPage() {
       key={item.id}
       itemId={item.id}
       initial={item}
-      members={members}
+      people={people}
+      canInvite={isOwner}
       onSave={updateItem}
       onDone={() => router.push(`/items/${item.id}`)}
     />
@@ -40,16 +44,18 @@ export default function EditItemPage() {
 function EditItemForm({
   itemId,
   initial,
-  members,
+  people,
+  canInvite,
   onSave,
   onDone,
 }: {
   itemId: string;
-  initial: { name: string; category: string; quantity: number; notes: string; extraDetails: Record<string, string>; ownerUserId: string | null };
-  members: { userId: string; displayName: string }[];
+  initial: { name: string; category: string; quantity: number; notes: string; extraDetails: Record<string, string>; ownerPersonId: string | null };
+  people: Person[];
+  canInvite: boolean;
   onSave: (
     id: string,
-    patch: Partial<{ name: string; category: string; quantity: number; notes: string; extraDetails: Record<string, string>; ownerUserId: string | null }>
+    patch: Partial<{ name: string; category: string; quantity: number; notes: string; extraDetails: Record<string, string>; ownerPersonId: string | null; ownerUserId: string | null }>
   ) => void;
   onDone: () => void;
 }) {
@@ -59,7 +65,8 @@ function EditItemForm({
   const [quantity, setQuantity] = useState(String(initial.quantity));
   const [notes, setNotes] = useState(initial.notes);
   const [extraDetails, setExtraDetails] = useState<Record<string, string>>(initial.extraDetails);
-  const [ownerUserId, setOwnerUserId] = useState(initial.ownerUserId ?? SHARED_OWNER_VALUE);
+  const [ownerPersonId, setOwnerPersonId] = useState(initial.ownerPersonId ?? HOUSEHOLD_OWNER_VALUE);
+  const [addPersonOpen, setAddPersonOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function handleSave() {
@@ -67,13 +74,17 @@ function EditItemForm({
       setError("Give this item a name.");
       return;
     }
+    const ownerPerson = ownerPersonId === HOUSEHOLD_OWNER_VALUE ? null : (people.find((p) => p.id === ownerPersonId) ?? null);
     onSave(itemId, {
       name: name.trim(),
       category,
       quantity: Math.max(0, Math.min(9999, Number(quantity) || 0)),
       notes: notes.trim(),
       extraDetails,
-      ownerUserId: ownerUserId === SHARED_OWNER_VALUE ? null : ownerUserId,
+      ownerPersonId: ownerPerson?.id ?? null,
+      // See add/page.tsx's identical comment — kept in lockstep here
+      // rather than left for the DB trigger to derive.
+      ownerUserId: ownerPerson?.linkedUserId ?? null,
     });
     toast.success("Item updated");
     onDone();
@@ -137,17 +148,27 @@ function EditItemForm({
         </Field>
 
         <Field label="Belongs to">
-          <Select value={ownerUserId} onValueChange={setOwnerUserId}>
+          <Select
+            value={ownerPersonId}
+            onValueChange={(v) => {
+              if (v === ADD_PERSON_VALUE) {
+                setAddPersonOpen(true);
+                return;
+              }
+              setOwnerPersonId(v);
+            }}
+          >
             <SelectTrigger className="h-11 w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={SHARED_OWNER_VALUE}>Shared</SelectItem>
-              {members.map((m) => (
-                <SelectItem key={m.userId} value={m.userId}>
-                  {m.displayName}
+              <SelectItem value={HOUSEHOLD_OWNER_VALUE}>Household</SelectItem>
+              {people.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.displayName}
                 </SelectItem>
               ))}
+              <SelectItem value={ADD_PERSON_VALUE}>+ Add someone</SelectItem>
             </SelectContent>
           </Select>
         </Field>
@@ -183,6 +204,13 @@ function EditItemForm({
           </Button>
         </div>
       </div>
+
+      <AddPersonSheet
+        open={addPersonOpen}
+        onOpenChange={setAddPersonOpen}
+        onCreated={(person) => setOwnerPersonId(person.id)}
+        canInvite={canInvite}
+      />
     </div>
   );
 }

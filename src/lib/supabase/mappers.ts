@@ -9,6 +9,8 @@ import type {
   Household,
   Member,
   Invite,
+  Person,
+  PersonRelationship,
   Location,
   Container,
   Item,
@@ -120,6 +122,43 @@ export function inviteToInsertRow(invite: Invite): InviteRow {
     status: invite.status,
     created_at: invite.createdAt,
     expires_at: invite.expiresAt,
+  };
+}
+
+export interface PersonRow {
+  id: string;
+  household_id: string;
+  display_name: string;
+  relationship: string;
+  avatar_path: string | null;
+  linked_user_id: string | null;
+  created_by_user_id: string;
+  created_at: string;
+}
+
+export function rowToPerson(row: PersonRow): Person {
+  return {
+    id: row.id,
+    householdId: row.household_id,
+    displayName: row.display_name,
+    relationship: row.relationship as PersonRelationship,
+    avatarPath: row.avatar_path,
+    linkedUserId: row.linked_user_id,
+    createdByUserId: row.created_by_user_id,
+    createdAt: row.created_at,
+  };
+}
+
+export function personToInsertRow(p: Person): PersonRow {
+  return {
+    id: p.id,
+    household_id: p.householdId,
+    display_name: p.displayName,
+    relationship: p.relationship,
+    avatar_path: p.avatarPath,
+    linked_user_id: p.linkedUserId,
+    created_by_user_id: p.createdByUserId,
+    created_at: p.createdAt,
   };
 }
 
@@ -246,6 +285,7 @@ export interface ItemRow {
   needs_review: boolean;
   review_reason: string | null;
   extra_details: Record<string, string>;
+  owner_person_id: string | null;
   owner_user_id: string | null;
   created_by_user_id: string;
   created_at: string;
@@ -273,6 +313,7 @@ export function rowToItem(row: ItemRow, tagIds: string[]): Item {
     reviewReason: row.review_reason ?? undefined,
     tagIds,
     extraDetails: row.extra_details,
+    ownerPersonId: row.owner_person_id,
     ownerUserId: row.owner_user_id,
     createdByUserId: row.created_by_user_id,
     createdAt: row.created_at,
@@ -299,6 +340,7 @@ export function itemToInsertRow(it: Item): ItemRow {
     needs_review: it.needsReview,
     review_reason: it.reviewReason ?? null,
     extra_details: it.extraDetails,
+    owner_person_id: it.ownerPersonId,
     owner_user_id: it.ownerUserId,
     created_by_user_id: it.createdByUserId,
     created_at: it.createdAt,

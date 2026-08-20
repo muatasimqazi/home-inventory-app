@@ -4,25 +4,23 @@ import { useInventoryStore } from "@/lib/store";
 
 /**
  * "Belongs to" cell inside the item-detail `<dl>` grid (Household Ledger
- * Implementation Plan §2 — Phase 0 componentization). Extracted with zero
- * behavior change from the inline version it replaces, so Workstream 2
- * (People & ownership UI) has an isolated file to swap to a real picker
- * against `people`/`owner_person_id` without touching the parent page.
+ * Implementation Plan §2 — Phase 0 componentization). Reads `people` /
+ * `owner_person_id` (PRD §8/§9) — Workstream 2's migration off the legacy
+ * `ownerUserId`/`members` shape this file originally shipped with.
  *
- * Still reads the legacy `ownerUserId`/`members` shape on purpose —
- * migrating the read side to `people`/`owner_person_id` is Workstream 2's
- * job, not Phase 0's (see the migration's note on why `owner_user_id`
- * stays as a compatibility shim for now).
+ * "Household" (not "Shared") for a null owner, matching PRD §9's example
+ * ("Television — Belongs to: Household") — kept consistent with the same
+ * wording in the add/edit item ownership pickers.
  */
 export function ItemOwnershipSection({ itemId }: { itemId: string }) {
   const items = useInventoryStore((s) => s.items);
-  const members = useInventoryStore((s) => s.members);
+  const people = useInventoryStore((s) => s.people);
   const item = items.find((it) => it.id === itemId);
   if (!item) return null;
 
-  const value = item.ownerUserId
-    ? (members.find((m) => m.userId === item.ownerUserId)?.displayName ?? "Unknown")
-    : "Shared";
+  const value = item.ownerPersonId
+    ? (people.find((p) => p.id === item.ownerPersonId)?.displayName ?? "Unknown")
+    : "Household";
 
   return (
     <div>
