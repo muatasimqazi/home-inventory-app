@@ -10,9 +10,15 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { rowToNotificationPreference } from "@/lib/supabase/mappers";
 import type { NotificationPreferenceRow } from "@/lib/supabase/mappers";
 
-/** The one real event type wired to the send job so far (Household Hub Addendum §5's push infrastructure, first triggered off Finance's recurring bills since household_tasks doesn't exist in code yet) — more rows get added here as future domains plug into the same pipeline. */
+/** Event types wired to a real send job (Household Hub Addendum §5's generalized push infrastructure) — bill.due (Finance's recurring bills) and capture.nudge (Household Ledger PRD §26 — the finance-triggered inventory capture nudge, src/app/api/v1/push/send-capture-nudges/). More rows get added here as future domains plug into the same pipeline. */
 const EVENT_TYPES: { domainKey: string; eventType: string; label: string; description: string }[] = [
   { domainKey: "finance", eventType: "bill.due", label: "Bill reminders", description: "A recurring bill is due within a few days" },
+  {
+    domainKey: "inventory",
+    eventType: "capture.nudge",
+    label: "Capture reminders",
+    description: "A big purchase posts and we don't have a photo of it yet",
+  },
 ];
 
 export default function NotificationSettingsPage() {

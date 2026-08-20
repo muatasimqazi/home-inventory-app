@@ -58,6 +58,7 @@ function CameraCaptureInner() {
   const addPhoto = useCaptureSession((s) => s.addPhoto);
   const removePhoto = useCaptureSession((s) => s.removePhoto);
   const setDestination = useCaptureSession((s) => s.setDestination);
+  const setLinkTransactionId = useCaptureSession((s) => s.setLinkTransactionId);
   const runDetection = useCaptureSession((s) => s.runDetection);
   const detectError = useCaptureSession((s) => s.detectError);
   const reset = useCaptureSession((s) => s.reset);
@@ -80,6 +81,13 @@ function CameraCaptureInner() {
         ? { locationId, containerId: containerId ?? null }
         : lastUsedDestination ?? { locationId: null, containerId: null }
     );
+    // Household Ledger PRD §26 — the "Add to Home" CTA on a finance
+    // capture-nudge push notification opens the camera at
+    // /capture?linkTransactionId=<id>. Carried through the session (not
+    // re-read on every mount) so it survives the /capture <-> /capture/review
+    // round trip and "Add another photo," same as destination above.
+    const linkTransactionId = searchParams.get("linkTransactionId");
+    if (linkTransactionId) setLinkTransactionId(linkTransactionId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
