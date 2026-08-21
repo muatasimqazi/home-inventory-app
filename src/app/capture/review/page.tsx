@@ -93,6 +93,35 @@ export default function CaptureReviewPage() {
     );
   }
 
+  // A successful vision call that genuinely found nothing (not a
+  // detectError — that's handled back on /capture, before this page is
+  // ever reached) used to crash here: `isBulk` only checks `> 1`, so a
+  // `length === 0` array still rendered SingleReviewForm with
+  // `row={detections[0]}` — undefined, `row.rowId` throws. A real, empty
+  // photo (accidental capture, or subject too unclear to recognize
+  // anything) should show an empty state and a way forward, not crash.
+  if (detections.length === 0) {
+    return (
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-white px-8 text-center">
+        <div className="flex size-14 items-center justify-center rounded-full bg-surface-muted">
+          <Icon name="camera" size={26} className="text-muted-foreground" />
+        </div>
+        <div>
+          <p className="text-item-title font-semibold text-ink">We didn&apos;t spot anything</p>
+          <p className="mt-1 text-body text-muted-foreground">Try a clearer or closer photo, or add this item manually instead.</p>
+        </div>
+        <div className="flex w-full max-w-xs flex-col gap-2">
+          <Button size="lg" onClick={() => router.replace("/capture")}>
+            Try again
+          </Button>
+          <Button size="lg" variant="outline" onClick={() => router.replace("/add")}>
+            Add manually
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   const breadcrumb = buildBreadcrumb(destination?.locationId ?? null, destination?.containerId ?? null, locations, containers);
   const included = detections.filter((d) => !d.excluded);
   const isBulk = detections.length > 1;
