@@ -4,6 +4,21 @@ import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
+ * Strips characters that would otherwise change what a raw user string
+ * means once it's spliced into an ilike pattern or a PostgREST `.or()`
+ * filter string — `%`/`_` are ILIKE wildcards (a literal "_" in a search
+ * term like "water_shutoff" would otherwise match "waterXshutoff" too,
+ * one character too loose to be a real bug worth leaving in five separate
+ * copies of this same regex), `,`/`(`/`)` are PostgREST's own filter-string
+ * separators. One shared helper instead of five independently-maintained
+ * copies of the same regex, so the next new character that needs handling
+ * here only needs adding once.
+ */
+function escapeSearchInput(raw: string): string {
+  return raw.replace(/[%_,()]/g, "");
+}
+
+/**
  * The real data-access tools behind the Ask widget (docs note: "how much
  * did I spend at Costco last month?", "when did I last buy milk?", "where
  * did I keep my measuring tape?"). Real SQL, not the model eyeballing a
@@ -45,7 +60,7 @@ export function createAskTools(supabase: SupabaseClient, householdId: string) {
         const matchedItemNameByTxn: Record<string, string> = {};
 
         if (itemName) {
-          const escaped = itemName.replace(/[%,()]/g, "");
+          const escaped = escapeSearchInput(itemName);
           const { data: items, error: itemsError } = await supabase
             .from("scanned_receipt_line_items")
             .select("transaction_id, raw_item, standard_name")
@@ -73,7 +88,7 @@ export function createAskTools(supabase: SupabaseClient, householdId: string) {
           .is("trashed_at", null);
 
         if (merchant) {
-          const escaped = merchant.replace(/[%,()]/g, "");
+          const escaped = escapeSearchInput(merchant);
           query = query.or(`merchant.ilike.%${escaped}%,description.ilike.%${escaped}%`);
         }
         if (itemMatchTransactionIds) query = query.in("id", itemMatchTransactionIds);
@@ -115,7 +130,7 @@ export function createAskTools(supabase: SupabaseClient, householdId: string) {
         limit: z.number().int().min(1).max(20).optional().describe("Max items to return (default 10)."),
       }),
       execute: async ({ itemName, limit }) => {
-        const escaped = itemName.replace(/[%,()]/g, "");
+        const escaped = escapeSearchInput(itemName);
         const { data, error } = await supabase
           .from("items")
           .select("id, name, category, notes, container_id, location_id, cover_photo_path")
@@ -169,7 +184,7 @@ export function createAskTools(supabase: SupabaseClient, householdId: string) {
         let dbQuery = supabase.from("pinned_locations").select("id, name, category, photo_path, location_note").eq("household_id", householdId);
         if (category) dbQuery = dbQuery.eq("category", category);
         if (query) {
-          const escaped = query.replace(/[%,()]/g, "");
+          const escaped = escapeSearchInput(query);
           dbQuery = dbQuery.ilike("name", `%${escaped}%`);
         }
         const { data, error } = await dbQuery;
@@ -223,7 +238,7 @@ export function createAskTools(supabase: SupabaseClient, householdId: string) {
         limit: z.number().int().min(1).max(20).optional().describe("Max items to return (default 10)."),
       }),
       execute: async ({ itemName, limit }) => {
-        const escaped = itemName.replace(/[%,()]/g, "");
+        const escaped = escapeSearchInput(itemName);
         const { data: items, error: itemsError } = await supabase
           .from("items")
           .select("id, name, category, extra_details")
