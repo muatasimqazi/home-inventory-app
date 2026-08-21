@@ -169,7 +169,7 @@ Condensed prompts — paste into the `Agent` tool's `prompt` field, adjust the w
 
 ## 10. Remote deployment
 
-**Status: done.** `0017_household_ledger_core.sql` and `0018_owner_sync.sql` were both verified locally first (§2, §9), then pushed to the linked production project via `supabase db push --linked` (dry-run confirmed before each push — exactly one pending migration each time, nothing unexpected). `supabase migration list` shows local and remote both at `0018`. Wave 1 agents can build against real production schema now.
+**Status: done.** `0017_household_ledger_core.sql`, `0018_owner_sync.sql`, and `0019_pending_invite_check.sql` were all verified locally first, then pushed to the linked production project via `supabase db push --linked` (dry-run confirmed before each push — exactly one pending migration each time, nothing unexpected). `supabase migration list` shows local and remote both at `0019`.
 
 ---
 
