@@ -159,8 +159,6 @@ export interface NewItemInput {
   extraDetails?: Record<string, string>;
   /** null/omitted = shared household item, not owned by one person (PRD §9's "Household" default). */
   ownerPersonId?: string | null;
-  /** Compatibility shim — derived server-side from ownerPersonId if omitted (0018_owner_sync.sql). Callers that already know the owning Person's linkedUserId may pass it explicitly to keep the two columns consistent in the same optimistic write; new call sites should just set ownerPersonId. */
-  ownerUserId?: string | null;
 }
 
 export interface NewPersonInput {
@@ -3182,7 +3180,6 @@ function buildItem(householdId: string, userId: string, input: NewItemInput): It
     tagIds: input.tagIds ?? [],
     extraDetails: input.extraDetails ?? {},
     ownerPersonId: input.ownerPersonId ?? null,
-    ownerUserId: input.ownerUserId ?? null,
     createdByUserId: userId,
     createdAt: timestamp,
     updatedAt: timestamp,

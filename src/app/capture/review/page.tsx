@@ -138,12 +138,6 @@ export default function CaptureReviewPage() {
       locationId: destination?.locationId ?? null,
       containerId: destination?.containerId ?? null,
       ownerPersonId: ownerPerson?.id ?? null,
-      // Kept in lockstep here rather than left for the DB trigger
-      // (0018_owner_sync.sql) to derive — same reasoning as add/page.tsx's
-      // identical comment: a managed profile's linkedUserId is null, and a
-      // stale derived value could otherwise trip the trigger's consistency
-      // guard if this item is ever re-saved before a full page reload.
-      ownerUserId: ownerPerson?.linkedUserId ?? null,
       // Bug fix: this used to be `row.needsReview && row.name.trim() === ""`
       // — since needsCorrection() (above) already blocks Save until every
       // flagged row has a non-empty name, that condition was never true in

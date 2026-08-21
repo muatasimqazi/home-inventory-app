@@ -55,7 +55,7 @@ function EditItemForm({
   canInvite: boolean;
   onSave: (
     id: string,
-    patch: Partial<{ name: string; category: string; quantity: number; notes: string; extraDetails: Record<string, string>; ownerPersonId: string | null; ownerUserId: string | null }>
+    patch: Partial<{ name: string; category: string; quantity: number; notes: string; extraDetails: Record<string, string>; ownerPersonId: string | null }>
   ) => void;
   onDone: () => void;
 }) {
@@ -82,9 +82,6 @@ function EditItemForm({
       notes: notes.trim(),
       extraDetails,
       ownerPersonId: ownerPerson?.id ?? null,
-      // See add/page.tsx's identical comment — kept in lockstep here
-      // rather than left for the DB trigger to derive.
-      ownerUserId: ownerPerson?.linkedUserId ?? null,
     });
     toast.success("Item updated");
     onDone();

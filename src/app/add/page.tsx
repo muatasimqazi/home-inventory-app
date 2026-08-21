@@ -116,12 +116,6 @@ function ManualAddItemInner() {
       tagIds: tags.map((t) => getOrCreateTag(t).id),
       extraDetails,
       ownerPersonId: ownerPerson?.id ?? null,
-      // Kept in lockstep with ownerPersonId here rather than left for the
-      // DB trigger (0018_owner_sync.sql) to derive — a managed profile's
-      // linkedUserId is null, and deriving from a stale ownerUserId would
-      // otherwise trip the trigger's "must refer to the same person" guard
-      // if this item is ever re-saved before a full page reload.
-      ownerUserId: ownerPerson?.linkedUserId ?? null,
     });
     if (photoFile) {
       const result = await setItemCoverPhoto(item.id, photoFile);

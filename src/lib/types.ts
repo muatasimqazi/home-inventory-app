@@ -157,10 +157,8 @@ export interface Item {
   tagIds: string[];
   /** Category-scoped extra fields (e.g. { serialNumber: "..." }), keyed by field key from CATEGORY_EXTRA_FIELDS. */
   extraDetails: Record<string, string>;
-  /** Which Person this item personally belongs to. null = shared/household item, not owned by one person (PRD §9's "Household" default). This is the source of truth going forward — set/read this, not ownerUserId. */
+  /** Which Person this item personally belongs to. null = shared/household item, not owned by one person (PRD §9's "Household" default). */
   ownerPersonId: string | null;
-  /** Compatibility shim (0017_household_ledger_core.sql) — kept in sync with ownerPersonId automatically by a DB trigger regardless of which one a write names. Do not read this for display; it exists so not-yet-migrated call sites (if any remain) keep working. Slated for removal once every call site is confirmed on ownerPersonId. */
-  ownerUserId: string | null;
   createdByUserId: string;
   createdAt: string;
   updatedAt: string;
