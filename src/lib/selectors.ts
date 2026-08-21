@@ -5,6 +5,25 @@ export function sortByLabel<T>(items: T[], getLabel: (item: T) => string): T[] {
   return [...items].sort((a, b) => getLabel(a).localeCompare(getLabel(b), undefined, { sensitivity: "base" }));
 }
 
+export type WarrantyStatus = "active" | "expired" | "unknown";
+
+/**
+ * One shared classification for an item's `extraDetails.warrantyEnd`
+ * (freeform text, no format enforced at capture) — used by both
+ * item-purchase-section.tsx's UI badge and the Ask assistant's
+ * getItemPurchaseInfo tool, previously two separate copies of the same
+ * date-parse-and-compare logic (Household Ledger Implementation Plan §9).
+ * "unknown" for a missing or unparsable date, never "expired" — an
+ * unparsable value stating a false fact ("coverage has lapsed") is worse
+ * than admitting the date isn't tracked/understood.
+ */
+export function warrantyStatus(warrantyEndIso: string | null | undefined): WarrantyStatus {
+  if (!warrantyEndIso) return "unknown";
+  const end = new Date(warrantyEndIso).getTime();
+  if (Number.isNaN(end)) return "unknown";
+  return end >= Date.now() ? "active" : "expired";
+}
+
 export interface BreadcrumbSegment {
   id: string;
   name: string;

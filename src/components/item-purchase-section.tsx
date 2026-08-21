@@ -8,6 +8,7 @@ import { useInventoryStore } from "@/lib/store";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { rowToScannedReceiptLineItem, type ScannedReceiptLineItemRow } from "@/lib/supabase/mappers";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { warrantyStatus } from "@/lib/selectors";
 import { cn } from "@/lib/utils";
 import type { Account, ItemPurchase, ScannedReceiptLineItem, Transaction } from "@/lib/types";
 
@@ -29,18 +30,6 @@ const SOURCE_LABEL: Record<ItemPurchase["source"], string> = {
   ai_suggested: "Suggested match",
   finance_nudge: "From nudge",
 };
-
-// Calling Date.now() straight inside a component body is an impure render
-// (react-hooks/purity) — pulled into its own plain helper, same pattern
-// linked-banks-card.tsx's formatLastSynced() already uses for the same
-// reason. warrantyEnd is freeform text (no format enforced at capture), so
-// an unparsable value returns null ("unknown") rather than silently
-// collapsing into "expired" and stating a false fact to the user.
-function isWarrantyActive(warrantyEndIso: string): boolean | null {
-  const end = new Date(warrantyEndIso).getTime();
-  if (Number.isNaN(end)) return null;
-  return end >= Date.now();
-}
 
 export function ItemPurchaseSection({ itemId }: { itemId: string }) {
   const items = useInventoryStore((s) => s.items);
@@ -104,7 +93,7 @@ export function ItemPurchaseSection({ itemId }: { itemId: string }) {
   }
 
   const warrantyEnd: string | null = item.extraDetails.warrantyEnd || null;
-  const warrantyActive = warrantyEnd ? isWarrantyActive(warrantyEnd) : null;
+  const status = warrantyStatus(warrantyEnd);
 
   // Link/unlink is an edit action, same as Move/Edit/Favorite two sections
   // below on the item detail page — gated behind item.status === "active"
@@ -127,15 +116,15 @@ export function ItemPurchaseSection({ itemId }: { itemId: string }) {
         )}
       </div>
 
-      {warrantyEnd && warrantyActive !== null && (
+      {warrantyEnd && status !== "unknown" && (
         <div
           className={cn(
             "flex items-center gap-2 rounded-lg px-3 py-2 text-caption font-medium",
-            warrantyActive ? "bg-badge-green-bg text-badge-green-text" : "bg-surface-muted text-muted-foreground"
+            status === "active" ? "bg-badge-green-bg text-badge-green-text" : "bg-surface-muted text-muted-foreground"
           )}
         >
           <Icon name="shieldCheck" size={15} />
-          {warrantyActive ? `Warranty active until ${formatDate(warrantyEnd)}` : `Warranty expired ${formatDate(warrantyEnd)}`}
+          {status === "active" ? `Warranty active until ${formatDate(warrantyEnd)}` : `Warranty expired ${formatDate(warrantyEnd)}`}
         </div>
       )}
 

@@ -2,6 +2,7 @@ import "server-only";
 import { tool } from "ai";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { warrantyStatus } from "@/lib/selectors";
 
 /**
  * Strips characters that would otherwise change what a raw user string
@@ -317,15 +318,7 @@ export function createAskTools(supabase: SupabaseClient, householdId: string) {
             purchases,
             receiptAttached: itemIdsWithReceipt.has(item.id as string),
             warrantyEnd,
-            // warrantyEnd is freeform text (no format enforced at capture)
-            // — an unparsable value must land in "unknown", not silently
-            // collapse into "expired" and state a false fact to the user.
-            warrantyStatus: (() => {
-              if (!warrantyEnd) return "unknown";
-              const endMs = new Date(warrantyEnd).getTime();
-              if (Number.isNaN(endMs)) return "unknown";
-              return endMs >= Date.now() ? "active" : "expired";
-            })(),
+            warrantyStatus: warrantyStatus(warrantyEnd),
           };
         });
 
