@@ -1,5 +1,6 @@
 import { Icon, type IconName } from "@/components/icon";
 import { relativeTime } from "@/lib/format";
+import { ACTION_LABEL } from "@/lib/activity-copy";
 import type { ActivityLogAppend } from "@/lib/store";
 import type { Member } from "@/lib/types";
 
@@ -14,21 +15,8 @@ const ACTION_ICON: Record<string, IconName> = {
   invited: "user",
   joined: "user",
   removed: "user",
+  left: "user",
   ownership_transferred: "key",
-};
-
-const ACTION_LABEL: Record<string, string> = {
-  created: "added",
-  edited: "edited",
-  moved: "moved",
-  archived: "archived",
-  trashed: "trashed",
-  restored: "restored",
-  deleted_forever: "permanently deleted",
-  invited: "invited",
-  joined: "joined the household",
-  removed: "was removed",
-  ownership_transferred: "became the Owner",
 };
 
 export function ActivityRow({ entry, members }: { entry: ActivityLogAppend; members: Member[] }) {
