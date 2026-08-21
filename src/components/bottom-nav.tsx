@@ -9,19 +9,32 @@ import { useInventoryStore } from "@/lib/store";
 import { contextualCaptureHref } from "@/lib/selectors";
 import { cn } from "@/lib/utils";
 
-// Household Hub Addendum §6's originally-decided shape (Home, Search,
-// [Scan FAB], More), landed on for real 2026-08-18 after a first attempt
-// (the 2026-08-18 nav cutover) kept Locations as its own persistent tab to
-// avoid disrupting existing muscle memory — which turned out to just be a
-// different kind of confusing: Locations got one-tap access its own
-// domain's other screens don't have, while Finance's equivalent (Accounts)
-// sits two taps deep in More, an inconsistency raised directly and fixed
-// here. Home's own dashboard already links to Locations ("Storage
-// containers → View all"), and More also lists it explicitly now — so
-// nothing becomes harder to reach, it just no longer gets a uniquely
-// privileged slot relative to Finance.
+// Reversed back to a persistent Locations tab (2026-08-21) after the
+// 2026-08-18 cutover below demoted it to More — reported directly against
+// the real app: a home-inventory app burying "browse what I own" two taps
+// deep is a real regression, not a nitpick, even though it reintroduces
+// the exact asymmetry the 2026-08-18 change was fixing (Finance's
+// equivalent, Accounts, still sits in More). That trade-off is deliberate
+// this time, not an oversight: Locations/inventory is this app's primary,
+// first-run domain (the name, the onboarding, the marketing copy are all
+// inventory-first); Finance is real but secondary. Consistency between the
+// two domains' nav treatment isn't worth the cost of making the core loop
+// harder to reach. Kept in both places rather than removed from More —
+// More's own list still makes sense as "everything in this domain,"
+// Locations included, same as Favorites/Home Map/Manage sitting alongside
+// their own hub pages elsewhere.
+//
+// Original 2026-08-18 reasoning, still true for *why the symmetric version
+// existed* even though it's no longer the answer: a first attempt at this
+// cutover kept Locations as its own persistent tab specifically to avoid
+// disrupting existing muscle memory — which turned out to be a different
+// kind of confusing, since Locations got one-tap access its own domain's
+// other screens (Favorites, Home Map, Manage) don't have, while Finance's
+// equivalent (Accounts) sat two taps deep in More. Home's own dashboard
+// still also links to Locations ("Storage containers → View all").
 const LEFT_TABS: { href: string; icon: IconName; label: string }[] = [
   { href: "/", icon: "home", label: "Home" },
+  { href: "/locations", icon: "box", label: "Locations" },
   { href: "/search", icon: "search", label: "Search" },
 ];
 
