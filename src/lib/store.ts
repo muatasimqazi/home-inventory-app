@@ -735,7 +735,20 @@ async function uploadPinnedLocationPhoto(
   }
   const normalized = await normalizeUploadedPhoto(file);
   const supabase = getSupabaseBrowserClient();
-  const path = `${householdId}/pinned-locations/${pinnedLocationId}`;
+  // A fresh path per upload (matching uploadCoverPhotoFile's own scheme),
+  // not the fixed `${householdId}/pinned-locations/${pinnedLocationId}` this
+  // used to be — that fixed path meant a *replacement* upload had to delete
+  // the old object first (no update/upsert policy on this bucket, insert-
+  // only), which made updatePinnedLocation's old-photo-delete happen before
+  // the new photo_path was durably written. A DB update failure after that
+  // point left the row (and reverted client state) pointing at an object
+  // that no longer existed — a permanent 404 until someone manually
+  // re-uploaded (Household Ledger Implementation Plan §9). A unique path
+  // per upload lets updatePinnedLocation follow the same safe order
+  // setLocationCoverPhoto already uses: upload new, write the DB row, only
+  // *then* delete the old object — so a failure after the upload never
+  // destroys the only copy still referenced by (reverted) state.
+  const path = `${householdId}/pinned-locations/${pinnedLocationId}/${newId()}`;
   const { error: uploadError } = await supabase.storage.from("attachments").upload(path, normalized, { contentType: normalized.type });
   if (uploadError) return { ok: false, error: uploadError.message };
   return { ok: true, path };
@@ -1848,22 +1861,20 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     if (!previous) return { ok: false, error: "Pinned location not found." };
     const supabase = getSupabaseBrowserClient();
 
-    // Photo replace/remove happens before the row write, same ordering as
-    // create — and, for a replacement, before the new upload too: the
-    // bucket grants no UPDATE storage policy, so the old object at this
-    // pin's fixed path has to be gone before a new one can land there.
+    // A replacement upload now lands at its own fresh path (uploadPinnedLocationPhoto),
+    // so — same safe order as setLocationCoverPhoto — the new photo goes up
+    // and the DB row is written *before* the old object is ever deleted. A
+    // failure at any point up through the DB write leaves the old photo
+    // (and the row that still points at it) fully intact; only a *pure*
+    // removal (no replacement upload) deletes the existing object, and even
+    // then only after the row itself has already been updated to stop
+    // referencing it.
     let photoPath = previous.photoPath;
     if (patch.photoFile) {
-      if (previous.photoPath) {
-        const { error } = await supabase.storage.from("attachments").remove([previous.photoPath]);
-        if (error) return { ok: false, error: error.message };
-      }
       const uploaded = await uploadPinnedLocationPhoto(patch.photoFile, previous.householdId, pinnedLocationId);
       if (!uploaded.ok) return uploaded;
       photoPath = uploaded.path;
-    } else if (patch.removePhoto && previous.photoPath) {
-      const { error } = await supabase.storage.from("attachments").remove([previous.photoPath]);
-      if (error) return { ok: false, error: error.message };
+    } else if (patch.removePhoto) {
       photoPath = null;
     }
 
@@ -1876,9 +1887,22 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     };
 
     const { error: updateError } = await supabase.from("pinned_locations").update(pinnedLocationToInsertRow(merged)).eq("id", pinnedLocationId);
-    if (updateError) return { ok: false, error: updateError.message };
+    if (updateError) {
+      // The row write is what failed, not the upload — clean up the new
+      // orphaned photo (if any) rather than leaving it dangling forever,
+      // same as setLocationCoverPhoto's own failure branch.
+      if (patch.photoFile && photoPath) removePinnedLocationPhotoObject(photoPath, "pinned location photo upload");
+      return { ok: false, error: updateError.message };
+    }
 
     set((s) => ({ pinnedLocations: s.pinnedLocations.map((p) => (p.id === pinnedLocationId ? merged : p)) }));
+    // Only now, with the row durably pointing at the new state, is it safe
+    // to delete whatever the *old* photo was (a replacement's previous
+    // object, or a removed one) — the same object that reverting on
+    // failure above would otherwise have needed to still be intact.
+    if (previous.photoPath && previous.photoPath !== photoPath) {
+      removePinnedLocationPhotoObject(previous.photoPath, "replaced or removed pinned location photo");
+    }
     return { ok: true };
   },
 
@@ -2847,6 +2871,25 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       "Couldn't remove member"
     );
     if (m) get().logActivity({ entityType: "member", entityId: userId, entityName: m.displayName, action: "removed" });
+
+    // Converts their Person row to a managed profile rather than leaving
+    // linkedUserId stale — nothing else clears it (it only nulls out via
+    // an auth.users row deletion, not a household-membership removal), so
+    // without this the People page's role lookup — which cross-references
+    // the *current* members list, not linkedUserId's nullness — silently
+    // mislabels a removed member as "Managed" while their Person row still
+    // points at an account no longer in this household (Household Ledger
+    // Implementation Plan §9).
+    const person = get().people.find((p) => p.householdId === householdId && p.linkedUserId === userId);
+    if (person) {
+      const previousPerson = person;
+      set((s) => ({ people: s.people.map((p) => (p.id === person.id ? { ...p, linkedUserId: null } : p)) }));
+      persistOrRevert(
+        supabase.from("people").update({ linked_user_id: null }).eq("id", person.id),
+        () => set((s) => ({ people: s.people.map((p) => (p.id === person.id ? previousPerson : p)) })),
+        "Removed the member, but couldn't update their profile"
+      );
+    }
   },
 
   transferOwnership: (toUserId) => {
