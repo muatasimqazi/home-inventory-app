@@ -22,14 +22,14 @@ import { useInventoryStore } from "@/lib/store";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { displayCodeBadgeClasses } from "@/lib/badge-color";
-import type { Account, FinanceCategory, ScannedReceiptLineItem, Transaction, TransactionAttachment } from "@/lib/types";
+import { categoriesForTransaction } from "@/lib/selectors";
+import type { Account, ScannedReceiptLineItem, Transaction, TransactionAttachment } from "@/lib/types";
 
 interface TransactionDetailSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   transaction: Transaction | null;
   account: Account | undefined;
-  category: FinanceCategory | undefined;
   /** Present when this transaction has a permanently-retained receipt image (Receipt Scanning Addendum §6). */
   attachment: TransactionAttachment | undefined;
   onEdit: () => void;
@@ -44,7 +44,7 @@ const SOURCE_LABEL: Record<Transaction["source"], string> = {
 };
 
 /** Right-side drawer, not a route — docs/Personal Finance PRD.md §35: "Transactions list (+ add/edit form) ... list; detail opens as a drawer, not a route." */
-export function TransactionDetailSheet({ open, onOpenChange, transaction, account, category, attachment, onEdit, onTrash }: TransactionDetailSheetProps) {
+export function TransactionDetailSheet({ open, onOpenChange, transaction, account, attachment, onEdit, onTrash }: TransactionDetailSheetProps) {
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
   const [lineItems, setLineItems] = useState<ScannedReceiptLineItem[]>([]);
   const [editingLineItem, setEditingLineItem] = useState<ScannedReceiptLineItem | null>(null);
@@ -65,9 +65,11 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
   const linkItemPurchase = useInventoryStore((s) => s.linkItemPurchase);
   const unlinkItemPurchase = useInventoryStore((s) => s.unlinkItemPurchase);
   // Tag-style multi-category links (Categories Foundation workstream) —
-  // the full set attached to this transaction, not just the single
-  // primary `category` prop below (which stays around for the "as of"
-  // legacy shape every other single-category call site still reads).
+  // combined with financeCategories below via the shared
+  // categoriesForTransaction() selector to get this transaction's full
+  // display set (falls back to its single legacy categoryId internally,
+  // so this component no longer needs a separate `category` prop from
+  // its caller for that).
   const transactionCategoryLinks = useInventoryStore((s) => s.transactionCategories);
   const financeCategories = useInventoryStore((s) => s.financeCategories);
 
@@ -225,16 +227,14 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
   // Review's own "Link to item" affordance, not this one.
   const linkedPurchases = itemPurchases.filter((p) => p.transactionId === transaction.id);
 
-  // Full tag-style category set for this transaction. Falls back to the
-  // single `category` prop when no transaction_categories rows exist for
-  // it yet (shouldn't normally happen post-backfill, but keeps this
-  // resilient rather than showing "Uncategorized" for an old row that
-  // predates the junction table for some reason).
-  const taggedCategories = transactionCategoryLinks
-    .filter((tc) => tc.transactionId === transaction.id)
-    .map((tc) => financeCategories.find((c) => c.id === tc.categoryId))
-    .filter((c): c is FinanceCategory => !!c);
-  const displayedCategories = taggedCategories.length > 0 ? taggedCategories : category ? [category] : [];
+  // Full tag-style category set for this transaction — shared with the
+  // transactions list and the edit form (lib/selectors.ts) so all three
+  // can't drift on what "this transaction's categories" means.
+  const displayedCategories = categoriesForTransaction(
+    transaction,
+    transactionCategoryLinks.filter((tc) => tc.transactionId === transaction.id).map((tc) => tc.categoryId),
+    financeCategories
+  );
 
   const refundOptions = allTransactions
     .filter((t) => t.type === "refund" && !t.trashedAt && t.accountId === transaction.accountId)

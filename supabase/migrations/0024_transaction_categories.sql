@@ -79,6 +79,35 @@ from transactions
 where category_id is not null
 on conflict (transaction_id, category_id) do nothing;
 
+-- prevent_trash_referenced_category() (0010_finance_schema.sql) only ever
+-- checked transactions.category_id — the single legacy column. Now that a
+-- category can also be referenced purely as a secondary tag (via
+-- transaction_categories, with no transaction's own category_id pointing
+-- at it), the original check alone would let that category be trashed
+-- while still actively tagging a transaction, silently violating PRD
+-- §32.6's "cannot trash a still-referenced category" invariant. Extended,
+-- not replaced, so every part of the original guard still applies.
+create or replace function prevent_trash_referenced_category()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.trashed_at is not null and old.trashed_at is null then
+    if exists (select 1 from transactions where category_id = new.id and trashed_at is null) then
+      raise exception 'Cannot trash a category still referenced by transactions. Reassign or archive instead.';
+    end if;
+    if exists (
+      select 1 from transaction_categories tc
+      join transactions t on t.id = tc.transaction_id
+      where tc.category_id = new.id and t.trashed_at is null
+    ) then
+      raise exception 'Cannot trash a category still referenced by transactions. Reassign or archive instead.';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
 -- ---------------------------------------------------------------------------
 -- Row Level Security
 -- ---------------------------------------------------------------------------

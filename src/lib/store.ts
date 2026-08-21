@@ -2322,7 +2322,15 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     // transaction_categories row FK's to transactions(id), so firing both
     // inserts concurrently (persistOrRevert's usual fire-and-forget shape)
     // would race the tag insert against the transaction insert.
-    const categoryTagRows: TransactionCategory[] = Array.from(new Set(input.categoryIds ?? [])).map((categoryId) => ({
+    //
+    // Falls back to [categoryId] when categoryIds isn't passed at all —
+    // not just when it's an empty array — so every creation path that
+    // predates this workstream (CSV import, receipt-scan confirm, refund
+    // creation) and only ever sets categoryId still gets a matching
+    // transaction_categories row automatically, instead of silently
+    // having a categoryId with no tag behind it forever.
+    const resolvedCategoryIds = input.categoryIds ?? (input.categoryId ? [input.categoryId] : []);
+    const categoryTagRows: TransactionCategory[] = Array.from(new Set(resolvedCategoryIds)).map((categoryId) => ({
       id: newId(),
       householdId: created.householdId,
       transactionId: created.id,
@@ -2420,24 +2428,34 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     const touchesProtectedField = ["categoryId", "merchant", "description", "notes"].some((k) => k in transactionPatch);
     const merged: Transaction = { ...previous, ...transactionPatch, userEdited: touchesProtectedField ? true : previous.userEdited, updatedAt: nowIso() };
     set((s) => ({ transactions: s.transactions.map((t) => (t.id === transactionId ? merged : t)) }));
-    persistOrRevert(
-      supabase.from("transactions").update(transactionToInsertRow(merged)).eq("id", transactionId),
-      () => set((s) => ({ transactions: s.transactions.map((t) => (t.id === transactionId ? previous : t)) })),
-      "Couldn't update transaction"
-    );
-    get().logActivity({ entityType: "transaction", entityId: merged.id, entityName: merged.merchant ?? merged.description ?? "Transaction", action: "edited" });
+    // Not persistOrRevert here (unlike almost every other edit action in
+    // this file): the categoryIds diff below has to run only once the
+    // transaction row's own update has actually landed, not unconditionally
+    // right after firing it — persistOrRevert's fire-and-forget shape gives
+    // no way to sequence "then do this other thing on success," so this is
+    // a directly-awaited async block instead, same idiom
+    // permanentlyDeleteTransaction already uses for its own ordering need.
+    void (async () => {
+      const { error } = await supabase.from("transactions").update(transactionToInsertRow(merged)).eq("id", transactionId);
+      if (error) {
+        set((s) => ({ transactions: s.transactions.map((t) => (t.id === transactionId ? previous : t)) }));
+        toast.error(`Couldn't update transaction: ${error.message}`);
+        return;
+      }
+      get().logActivity({ entityType: "transaction", entityId: merged.id, entityName: merged.merchant ?? merged.description ?? "Transaction", action: "edited" });
 
-    if (categoryIds) {
-      const desired = new Set(categoryIds);
-      const existing = get().transactionCategories.filter((tc) => tc.transactionId === transactionId);
-      const existingIds = new Set(existing.map((tc) => tc.categoryId));
-      for (const categoryId of desired) {
-        if (!existingIds.has(categoryId)) get().addTransactionCategory(transactionId, categoryId);
+      if (categoryIds) {
+        const desired = new Set(categoryIds);
+        const existing = get().transactionCategories.filter((tc) => tc.transactionId === transactionId);
+        const existingIds = new Set(existing.map((tc) => tc.categoryId));
+        for (const categoryId of desired) {
+          if (!existingIds.has(categoryId)) get().addTransactionCategory(transactionId, categoryId);
+        }
+        for (const tc of existing) {
+          if (!desired.has(tc.categoryId)) get().removeTransactionCategory(transactionId, tc.categoryId);
+        }
       }
-      for (const tc of existing) {
-        if (!desired.has(tc.categoryId)) get().removeTransactionCategory(transactionId, tc.categoryId);
-      }
-    }
+    })();
   },
 
   trashTransaction: (transactionId) => {
@@ -2547,6 +2565,18 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       () => set((s) => ({ transactionCategories: s.transactionCategories.filter((tc) => tc.id !== created.id) })),
       "Couldn't tag category"
     );
+    // Keep transactions.categoryId in sync — the documented "primary
+    // category" invariant every legacy single-category call site
+    // (dashboards, budget math, category_rules, the Ask tool) relies on.
+    // Only backfills a missing primary; never overrides one that's
+    // already set, so adding a second/third tag never bumps an existing
+    // primary choice. Routed through updateTransaction (not a raw column
+    // write) so this gets the same revert-on-failure and activity-log
+    // behavior every other categoryId change already gets.
+    const txn = get().transactions.find((t) => t.id === transactionId);
+    if (txn && !txn.categoryId) {
+      get().updateTransaction(transactionId, { categoryId });
+    }
   },
 
   removeTransactionCategory: (transactionId, categoryId) => {
@@ -2559,6 +2589,16 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       () => set((s) => ({ transactionCategories: [...s.transactionCategories, previous] })),
       "Couldn't remove category tag"
     );
+    // If the removed tag was the primary category, promote another
+    // remaining tag to primary (or clear to null if none remain) — same
+    // sync invariant as addTransactionCategory above. get() here already
+    // reflects the set() above (Zustand updates are synchronous), so this
+    // reads the post-removal tag list correctly.
+    const txn = get().transactions.find((t) => t.id === transactionId);
+    if (txn && txn.categoryId === categoryId) {
+      const remaining = get().transactionCategories.filter((tc) => tc.transactionId === transactionId);
+      get().updateTransaction(transactionId, { categoryId: remaining[0]?.categoryId ?? null });
+    }
   },
 
   // ---------------------------------------------------------------------

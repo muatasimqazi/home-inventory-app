@@ -121,6 +121,24 @@ export function TransactionFormSheet({
   });
   const [newCategoryDialogOpen, setNewCategoryDialogOpen] = useState(false);
   const [newCategoryDialogKey, bumpNewCategoryDialogKey] = useRemountKey();
+  // Self-healing pruning, adjusted during render rather than in a
+  // useEffect (React's documented "adjust state when a prop changes"
+  // pattern — same prevOpen-comparison technique add-person-sheet.tsx
+  // already uses — since a useEffect+setState here would cost an extra
+  // cascading render this codebase's lint config flags): createFinanceCategory()
+  // (called from the inline "+ Add new category" dialog below) is
+  // optimistic and gives this component no success/failure signal — it
+  // just reverts the store's own category list if the insert fails
+  // server-side. This prunes any selected id no longer present in
+  // `categories` the moment the prop changes — catches that failure case
+  // and any other way a selected category could vanish out from under
+  // this form (e.g. another member trashing it concurrently via Realtime).
+  const [prevCategories, setPrevCategories] = useState(categories);
+  if (categories !== prevCategories) {
+    setPrevCategories(categories);
+    const stillValid = categoryIds.filter((id) => categories.some((c) => c.id === id));
+    if (stillValid.length !== categoryIds.length) setCategoryIds(stillValid);
+  }
   const [merchant, setMerchant] = useState(initial?.merchant ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [notes, setNotes] = useState(initial?.notes ?? "");

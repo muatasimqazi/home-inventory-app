@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useSearchParams } from "next/navigation";
@@ -26,6 +26,7 @@ import { createAndLinkRefundTransaction } from "@/lib/receipt-refunds";
 import { decideCategoryRuleLearnAction } from "@/lib/receipt-resolution";
 import { useInventoryStore } from "@/lib/store";
 import { displayCodeBadgeClasses } from "@/lib/badge-color";
+import { categoriesForTransaction } from "@/lib/selectors";
 import { formatCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useRemountKey } from "@/hooks/use-remount-key";
@@ -102,6 +103,17 @@ export default function TransactionsListPage() {
   const [detailId, setDetailId] = useState<string | null>(() => searchParams.get("transactionId"));
   const [trashConfirmId, setTrashConfirmId] = useState<string | null>(null);
   const [lineItemsByTransaction, setLineItemsByTransaction] = useState<Record<string, ScannedReceiptLineItem[]>>({});
+  // Grouped once per transactionCategoryLinks change, not re-filtered per
+  // row on every render — same reasoning as lineItemsByTransaction above,
+  // just synchronous (transaction_categories is already in the store's
+  // hydrated bundle, no separate fetch needed the way line items require).
+  const categoryIdsByTransaction = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    for (const tc of transactionCategoryLinks) {
+      (map[tc.transactionId] ??= []).push(tc.categoryId);
+    }
+    return map;
+  }, [transactionCategoryLinks]);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [editingLineItem, setEditingLineItem] = useState<ScannedReceiptLineItem | null>(null);
   const [deleteLineItemConfirm, setDeleteLineItemConfirm] = useState<ScannedReceiptLineItem | null>(null);
@@ -297,7 +309,6 @@ export default function TransactionsListPage() {
   const groups = groupByDay(sorted);
   const detailTxn = transactions.find((t) => t.id === detailId) ?? null;
   const detailAccount = accounts.find((a) => a.id === detailTxn?.accountId);
-  const detailCategory = financeCategories.find((c) => c.id === detailTxn?.categoryId);
   const detailAttachment = transactionAttachments.find((a) => a.transactionId === detailTxn?.id);
 
   const editingLineItemTxn = editingLineItem ? transactions.find((t) => t.id === editingLineItem.transactionId) : undefined;
@@ -376,20 +387,7 @@ export default function TransactionsListPage() {
               <p className="mb-1.5 text-caption font-medium tracking-wide text-muted-foreground uppercase">{day}</p>
               <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
                 {entries.map((t) => {
-                  // Full tag-style set (falls back to the single legacy
-                  // categoryId if — unexpectedly — no transaction_categories
-                  // rows exist yet for this transaction).
-                  const taggedCategories = transactionCategoryLinks
-                    .filter((tc) => tc.transactionId === t.id)
-                    .map((tc) => financeCategories.find((c) => c.id === tc.categoryId))
-                    .filter((c): c is NonNullable<typeof c> => !!c);
-                  const displayedCategories =
-                    taggedCategories.length > 0
-                      ? taggedCategories
-                      : (() => {
-                          const primary = financeCategories.find((c) => c.id === t.categoryId);
-                          return primary ? [primary] : [];
-                        })();
+                  const displayedCategories = categoriesForTransaction(t, categoryIdsByTransaction[t.id] ?? [], financeCategories);
                   const items = lineItemsByTransaction[t.id] ?? [];
                   // Every receipt-scan transaction can expand — not just
                   // ones that already have items. A real Costco receipt
@@ -540,7 +538,6 @@ export default function TransactionsListPage() {
         onOpenChange={(open) => !open && setDetailId(null)}
         transaction={detailTxn}
         account={detailAccount}
-        category={detailCategory}
         attachment={detailAttachment}
         onEdit={() => setEditOpen(true)}
         onTrash={() => setTrashConfirmId(detailId)}
