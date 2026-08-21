@@ -7,6 +7,7 @@ import { Icon } from "@/components/icon";
 import { PhotoThumb } from "@/components/photo-thumb";
 import { BreadcrumbTrail } from "@/components/breadcrumb-trail";
 import { MoveSheet } from "@/components/move-sheet";
+import { AddPersonSheet } from "@/components/add-person-sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -14,10 +15,13 @@ import { useCaptureSession, type DetectionRow } from "@/lib/capture-session-stor
 import { useInventoryStore, type NewItemInput } from "@/lib/store";
 import { stopCameraStream } from "@/lib/camera-stream";
 import { cropToItem, dataUrlToFile } from "@/lib/crop-image";
-import { buildBreadcrumb } from "@/lib/selectors";
+import { buildBreadcrumb, sortByLabel } from "@/lib/selectors";
 import { SORTED_CATEGORIES } from "@/lib/types";
 import { formatCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
+
+const HOUSEHOLD_OWNER_VALUE = "household";
+const ADD_PERSON_VALUE = "__add_person__";
 
 // A low-confidence AI suggestion (row.needsReview) left completely
 // untouched shouldn't be savable as-is — that's how items end up
@@ -43,6 +47,8 @@ export default function CaptureReviewPage() {
   const locations = useInventoryStore((s) => s.locations);
   const containers = useInventoryStore((s) => s.containers);
   const transactions = useInventoryStore((s) => s.transactions);
+  const people = sortByLabel(useInventoryStore((s) => s.people), (p) => p.displayName);
+  const isOwner = useInventoryStore((s) => s.members.find((m) => m.userId === s.currentUserId)?.role === "owner");
   const createItem = useInventoryStore((s) => s.createItem);
   const createItemsBatch = useInventoryStore((s) => s.createItemsBatch);
   const setItemCoverPhoto = useInventoryStore((s) => s.setItemCoverPhoto);
@@ -59,6 +65,17 @@ export default function CaptureReviewPage() {
   const [moveOpen, setMoveOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [rememberFlags, setRememberFlags] = useState<Record<string, boolean>>({});
+  // One shared "Belongs to" for the whole session, same design as
+  // `destination` above — a scan can produce several items at once (a
+  // whole bin), and per-item ownership would be more configuration than
+  // the "setup through action, not configuration" onboarding this page is
+  // part of calls for (PRD `v4 - Enhanced Features` §14/§22). Mirrors
+  // add/page.tsx's own "Belongs to" field exactly, including the inline
+  // "+ Add someone" entry — this page previously had no ownership picker
+  // at all, the last piece of the onboarding "who does this belong to"
+  // moment that wasn't wired up (Household Ledger Implementation Plan §9).
+  const [ownerPersonId, setOwnerPersonId] = useState(HOUSEHOLD_OWNER_VALUE);
+  const [addPersonOpen, setAddPersonOpen] = useState(false);
 
   useEffect(() => {
     if (!detecting && detections === null && photos.length === 0) {
@@ -82,6 +99,7 @@ export default function CaptureReviewPage() {
   const blockedCount = included.filter(needsCorrection).length;
 
   function buildInput(row: DetectionRow): NewItemInput {
+    const ownerPerson = ownerPersonId === HOUSEHOLD_OWNER_VALUE ? null : (people.find((p) => p.id === ownerPersonId) ?? null);
     return {
       name: row.name.trim(),
       originalDetectedName: row.suggestedName || null,
@@ -90,6 +108,13 @@ export default function CaptureReviewPage() {
       photoEmoji: row.photoEmoji,
       locationId: destination?.locationId ?? null,
       containerId: destination?.containerId ?? null,
+      ownerPersonId: ownerPerson?.id ?? null,
+      // Kept in lockstep here rather than left for the DB trigger
+      // (0018_owner_sync.sql) to derive — same reasoning as add/page.tsx's
+      // identical comment: a managed profile's linkedUserId is null, and a
+      // stale derived value could otherwise trip the trigger's consistency
+      // guard if this item is ever re-saved before a full page reload.
+      ownerUserId: ownerPerson?.linkedUserId ?? null,
       // Bug fix: this used to be `row.needsReview && row.name.trim() === ""`
       // — since needsCorrection() (above) already blocks Save until every
       // flagged row has a non-empty name, that condition was never true in
@@ -208,6 +233,33 @@ export default function CaptureReviewPage() {
           </Button>
         </div>
 
+        <div className="rounded-xl bg-white px-4 py-3 shadow-sm">
+          <p className="mb-1.5 text-caption text-muted-foreground">Belongs to</p>
+          <Select
+            value={ownerPersonId}
+            onValueChange={(v) => {
+              if (v === ADD_PERSON_VALUE) {
+                setAddPersonOpen(true);
+                return;
+              }
+              setOwnerPersonId(v);
+            }}
+          >
+            <SelectTrigger className="h-10 w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={HOUSEHOLD_OWNER_VALUE}>Household</SelectItem>
+              {people.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.displayName}
+                </SelectItem>
+              ))}
+              <SelectItem value={ADD_PERSON_VALUE}>+ Add someone</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
         {linkTransaction && (
           <div className="flex items-center gap-2 rounded-xl bg-brand-100 px-4 py-3 text-caption text-ink">
             <Icon name="link" size={14} className="shrink-0" />
@@ -276,6 +328,13 @@ export default function CaptureReviewPage() {
         currentLocationId={destination?.locationId ?? null}
         currentContainerId={destination?.containerId ?? null}
         onMove={setDestination}
+      />
+
+      <AddPersonSheet
+        open={addPersonOpen}
+        onOpenChange={setAddPersonOpen}
+        onCreated={(person) => setOwnerPersonId(person.id)}
+        canInvite={isOwner}
       />
     </div>
   );
