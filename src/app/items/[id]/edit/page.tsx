@@ -178,7 +178,7 @@ function EditItemForm({
                   key={field.key}
                   value={extraDetails[field.key] ?? ""}
                   onChange={(e) => setExtraDetails((d) => ({ ...d, [field.key]: e.target.value }))}
-                  placeholder={field.label}
+                  placeholder={field.placeholder ? `${field.label} (${field.placeholder})` : field.label}
                   className="h-11"
                 />
               ))}
