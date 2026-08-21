@@ -114,10 +114,16 @@ export function AddPersonSheet({ open, onOpenChange, onCreated, canInvite = true
 
   async function handleManagedProfile() {
     setSaving(true);
-    const person = addPerson({ displayName: displayName.trim(), relationship });
+    const result = await addPerson({ displayName: displayName.trim(), relationship });
+    if (!result.ok || !result.person) {
+      setSaving(false);
+      toast.error(result.error ?? "Couldn't add that person.");
+      return;
+    }
+    const person = result.person;
     if (photoFile) {
-      const result = await setPersonAvatar(person.id, photoFile);
-      if (!result.ok) toast.error(result.error ?? "Added, but the photo couldn't be uploaded.");
+      const avatarResult = await setPersonAvatar(person.id, photoFile);
+      if (!avatarResult.ok) toast.error(avatarResult.error ?? "Added, but the photo couldn't be uploaded.");
     }
     toast.success(`Added ${person.displayName}`);
     setSaving(false);

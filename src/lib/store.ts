@@ -457,8 +457,17 @@ interface InventoryState {
   // People (PRD §8/§9/§23) — both authenticated members (linkedUserId set,
   // created automatically by create_household()/accept_invite()) and
   // managed profiles (linkedUserId null) live here.
-  /** Creates a Person row without an avatar — call setPersonAvatar after, if the caller collected a photo, same two-step shape as createItem + setItemCoverPhoto. */
-  addPerson: (input: NewPersonInput) => Person;
+  /**
+   * Creates a Person row without an avatar — call setPersonAvatar after, if
+   * the caller collected a photo, same two-step shape as createItem +
+   * setItemCoverPhoto. Real, awaited (not the optimistic-then-revert shape
+   * most create* actions use): a caller like AddPersonSheet immediately
+   * treats the returned id as a real, selectable person — e.g. selecting
+   * them in an ownership picker — and an optimistic id that later reverted
+   * out from under that selection would leave the picker silently pointing
+   * at a person that no longer exists.
+   */
+  addPerson: (input: NewPersonInput) => Promise<{ ok: boolean; error?: string; person?: Person }>;
   updatePerson: (personId: string, patch: Partial<Pick<Person, "displayName" | "relationship">>) => void;
   /** Removes a Person row. Any item owned by them falls back to unowned/household (items.owner_person_id references people(id) on delete set null) rather than being deleted or reassigned. */
   deletePerson: (personId: string) => void;
@@ -2942,7 +2951,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     return { ok: true };
   },
 
-  addPerson: (input) => {
+  addPerson: async (input) => {
     const supabase = getSupabaseBrowserClient();
     const created: Person = {
       id: newId(),
@@ -2954,14 +2963,14 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       createdByUserId: get().currentUserId,
       createdAt: nowIso(),
     };
+    // Insert first, add to local state only once it's actually real — see
+    // the interface comment above for why this one isn't the usual
+    // optimistic-then-revert shape.
+    const { error } = await supabase.from("people").insert(personToInsertRow(created));
+    if (error) return { ok: false, error: error.message };
     set((s) => ({ people: [...s.people, created] }));
-    persistOrRevert(
-      supabase.from("people").insert(personToInsertRow(created)),
-      () => set((s) => ({ people: s.people.filter((p) => p.id !== created.id) })),
-      "Couldn't add person"
-    );
     get().logActivity({ entityType: "person", entityId: created.id, entityName: created.displayName, action: "created" });
-    return created;
+    return { ok: true, person: created };
   },
 
   updatePerson: (personId, patch) => {
