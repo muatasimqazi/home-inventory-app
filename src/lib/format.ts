@@ -12,8 +12,37 @@ export function relativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
+// Every formatDate()/formatShortDate() caller means "this calendar day" —
+// a transaction's occurred_at, a warranty end date, a bill's next due date
+// — never a precise instant that should shift with the viewer's timezone.
+// Almost all of them are backed by a Postgres `date` column or a bare
+// "YYYY-MM-DD" string (occurred_at in 0010_finance_schema.sql chief among
+// them), and `new Date("2030-01-01")` parses that as *UTC* midnight per
+// spec — then .toLocaleDateString() renders it in the *local* timezone,
+// silently showing the previous day for anyone west of UTC (Household
+// Ledger Implementation Plan §9a: a warranty end entered as 2030-01-01
+// displayed as "Dec 31, 2029"). A `new Date(x).toISOString()` round-trip
+// (net-worth/page.tsx's trend chart) hits the same bug via a full
+// "T00:00:00.000Z" string instead of a bare date, so a regex for the bare
+// form alone wouldn't have caught it — reading the leading Y-M-D digits
+// directly, regardless of what follows them, does.
+//
+// The one caller that's a genuine instant, not a calendar date
+// (desktop/labels/page.tsx's batch.createdAt, a real `timestamptz`), loses
+// timezone-sensitive rendering as a result — accepted deliberately: that's
+// a "which day was this label batch created" glance, not a moment anyone
+// needs precise to the hour, and it's a small, edge-case-only trade-off
+// against a bug that was previously wrong by a day for every finance date
+// in the app, every time, for roughly half the world's timezones.
+function parseCalendarDate(iso: string): Date {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (!match) return new Date(iso);
+  const [, y, m, d] = match;
+  return new Date(Number(y), Number(m) - 1, Number(d));
+}
+
 export function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  return parseCalendarDate(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
 export function formatBytes(bytes: number): string {
@@ -31,7 +60,7 @@ export function formatCurrency(amount: number, options?: { showPositiveSign?: bo
   return formatted;
 }
 
-/** "Aug 17" — Finance's transaction/bill date grain (dates, not full timestamps). Distinct from formatDate() above, which includes a year for inventory's longer-lived records. */
+/** "Aug 17" — Finance's transaction/bill date grain (dates, not full timestamps). Distinct from formatDate() above, which includes a year for inventory's longer-lived records. Same calendar-date parsing as formatDate() — see parseCalendarDate()'s comment. */
 export function formatShortDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return parseCalendarDate(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
