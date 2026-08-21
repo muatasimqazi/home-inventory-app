@@ -11,7 +11,7 @@ import { EntityFormSheet } from "@/components/entity-form-sheet";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useInventoryStore } from "@/lib/store";
-import { activeLocations, directChildContainers, itemsIn } from "@/lib/selectors";
+import { activeLocations, directChildContainers } from "@/lib/selectors";
 import { cn } from "@/lib/utils";
 import { useRemountKey } from "@/hooks/use-remount-key";
 import type { Container } from "@/lib/types";
@@ -41,7 +41,24 @@ export default function DesktopManagementPage() {
 
   const locationId = selectedNode?.type === "location" ? selectedNode.id : containers.find((c) => c.id === selectedNode?.id)?.locationId ?? null;
   const containerId = selectedNode?.type === "container" ? selectedNode.id : null;
-  const rows = locationId ? itemsIn(items, containerId ? null : locationId, containerId) : [];
+  // Not itemsIn() here on purpose: itemsIn(items, locationId, containerId)
+  // means "directly in this exact location+container pair" (correctly used
+  // that way elsewhere, e.g. locations/[id]/page.tsx's "loose items"
+  // section) — this view wants "everything under the selected node"
+  // instead. A container node narrows to items in that exact container; a
+  // location node shows every item at that location regardless of which
+  // container (or none) holds it, same aggregate semantics
+  // activeItemCountForLocation already uses for the tree's own count
+  // badges. Filtering only by containerId when a container is selected
+  // was also silently broken the same way: items always carry a non-null
+  // locationId even inside a container (the location/container sync
+  // trigger), so itemsIn's implicit "locationId === null" requirement in
+  // that branch could never match a real item either.
+  const rows = containerId
+    ? items.filter((it) => it.status === "active" && it.containerId === containerId)
+    : locationId
+      ? items.filter((it) => it.status === "active" && it.locationId === locationId)
+      : [];
 
   function openAddLocation() {
     bumpAddLocationKey();
