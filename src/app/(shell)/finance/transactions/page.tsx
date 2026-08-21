@@ -57,6 +57,11 @@ export default function TransactionsListPage() {
   const accounts = useInventoryStore((s) => s.accounts);
   const transactions = useInventoryStore((s) => s.transactions);
   const financeCategories = useInventoryStore((s) => s.financeCategories);
+  // Tag-style multi-category links (Categories Foundation workstream) —
+  // display only here (the row-list badges below); create/edit wiring
+  // lives entirely in TransactionFormSheet, which reads/writes this same
+  // store state itself.
+  const transactionCategoryLinks = useInventoryStore((s) => s.transactionCategories);
   const categoryRules = useInventoryStore((s) => s.categoryRules);
   const transactionAttachments = useInventoryStore((s) => s.transactionAttachments);
   const createTransaction = useInventoryStore((s) => s.createTransaction);
@@ -371,7 +376,20 @@ export default function TransactionsListPage() {
               <p className="mb-1.5 text-caption font-medium tracking-wide text-muted-foreground uppercase">{day}</p>
               <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
                 {entries.map((t) => {
-                  const category = financeCategories.find((c) => c.id === t.categoryId);
+                  // Full tag-style set (falls back to the single legacy
+                  // categoryId if — unexpectedly — no transaction_categories
+                  // rows exist yet for this transaction).
+                  const taggedCategories = transactionCategoryLinks
+                    .filter((tc) => tc.transactionId === t.id)
+                    .map((tc) => financeCategories.find((c) => c.id === tc.categoryId))
+                    .filter((c): c is NonNullable<typeof c> => !!c);
+                  const displayedCategories =
+                    taggedCategories.length > 0
+                      ? taggedCategories
+                      : (() => {
+                          const primary = financeCategories.find((c) => c.id === t.categoryId);
+                          return primary ? [primary] : [];
+                        })();
                   const items = lineItemsByTransaction[t.id] ?? [];
                   // Every receipt-scan transaction can expand — not just
                   // ones that already have items. A real Costco receipt
@@ -386,11 +404,13 @@ export default function TransactionsListPage() {
                         <button type="button" onClick={() => setDetailId(t.id)} className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left">
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-body font-medium text-ink">{t.merchant ?? t.description ?? "Transaction"}</p>
-                            <div className="mt-0.5 flex items-center gap-1.5">
-                              {category ? (
-                                <span className={cn("rounded-full border px-1.5 py-0.5 text-micro font-medium", displayCodeBadgeClasses(category.id))}>
-                                  {category.name}
-                                </span>
+                            <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                              {displayedCategories.length > 0 ? (
+                                displayedCategories.map((c) => (
+                                  <span key={c.id} className={cn("rounded-full border px-1.5 py-0.5 text-micro font-medium", displayCodeBadgeClasses(c.id))}>
+                                    {c.name}
+                                  </span>
+                                ))
                               ) : (
                                 <span className="text-caption text-muted-foreground">Uncategorized</span>
                               )}

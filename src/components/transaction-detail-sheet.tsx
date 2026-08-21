@@ -21,6 +21,7 @@ import { createAndLinkRefundTransaction } from "@/lib/receipt-refunds";
 import { useInventoryStore } from "@/lib/store";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { displayCodeBadgeClasses } from "@/lib/badge-color";
 import type { Account, FinanceCategory, ScannedReceiptLineItem, Transaction, TransactionAttachment } from "@/lib/types";
 
 interface TransactionDetailSheetProps {
@@ -63,6 +64,12 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
   const itemPurchases = useInventoryStore((s) => s.itemPurchases);
   const linkItemPurchase = useInventoryStore((s) => s.linkItemPurchase);
   const unlinkItemPurchase = useInventoryStore((s) => s.unlinkItemPurchase);
+  // Tag-style multi-category links (Categories Foundation workstream) —
+  // the full set attached to this transaction, not just the single
+  // primary `category` prop below (which stays around for the "as of"
+  // legacy shape every other single-category call site still reads).
+  const transactionCategoryLinks = useInventoryStore((s) => s.transactionCategories);
+  const financeCategories = useInventoryStore((s) => s.financeCategories);
 
   // Both fetched on demand, not kept in the global store: a signed URL is
   // deliberately short-lived (private bucket, same pattern
@@ -218,6 +225,17 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
   // Review's own "Link to item" affordance, not this one.
   const linkedPurchases = itemPurchases.filter((p) => p.transactionId === transaction.id);
 
+  // Full tag-style category set for this transaction. Falls back to the
+  // single `category` prop when no transaction_categories rows exist for
+  // it yet (shouldn't normally happen post-backfill, but keeps this
+  // resilient rather than showing "Uncategorized" for an old row that
+  // predates the junction table for some reason).
+  const taggedCategories = transactionCategoryLinks
+    .filter((tc) => tc.transactionId === transaction.id)
+    .map((tc) => financeCategories.find((c) => c.id === tc.categoryId))
+    .filter((c): c is FinanceCategory => !!c);
+  const displayedCategories = taggedCategories.length > 0 ? taggedCategories : category ? [category] : [];
+
   const refundOptions = allTransactions
     .filter((t) => t.type === "refund" && !t.trashedAt && t.accountId === transaction.accountId)
     .sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
@@ -260,8 +278,18 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
               <p className="text-body font-medium text-ink">{account?.name ?? "—"}</p>
             </div>
             <div>
-              <p className="text-caption text-muted-foreground">Category</p>
-              <p className="text-body font-medium text-ink">{category?.name ?? "Uncategorized"}</p>
+              <p className="text-caption text-muted-foreground">{displayedCategories.length > 1 ? "Categories" : "Category"}</p>
+              {displayedCategories.length === 0 ? (
+                <p className="text-body font-medium text-ink">Uncategorized</p>
+              ) : (
+                <div className="mt-0.5 flex flex-wrap gap-1">
+                  {displayedCategories.map((c) => (
+                    <span key={c.id} className={cn("rounded-full border px-1.5 py-0.5 text-micro font-medium", displayCodeBadgeClasses(c.id))}>
+                      {c.name}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
             <div>
               <p className="text-caption text-muted-foreground">Source</p>

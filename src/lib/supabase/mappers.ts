@@ -52,6 +52,7 @@ import type {
   BoundingBoxLike,
   ScannedReceiptLineItem,
   TransactionAttachment,
+  TransactionCategory,
   ItemPurchase,
   ItemPurchaseSource,
   CsvImportBatch,
@@ -1233,6 +1234,34 @@ export function transactionAttachmentToInsertRow(a: TransactionAttachment): Tran
     source_draft_id: a.sourceDraftId,
     created_by_user_id: a.createdByUserId,
     created_at: a.createdAt,
+  };
+}
+
+export interface TransactionCategoryRow {
+  id: string;
+  household_id: string;
+  transaction_id: string;
+  category_id: string;
+  created_at: string;
+}
+
+export function rowToTransactionCategory(row: TransactionCategoryRow): TransactionCategory {
+  return {
+    id: row.id,
+    householdId: row.household_id,
+    transactionId: row.transaction_id,
+    categoryId: row.category_id,
+    createdAt: row.created_at,
+  };
+}
+
+export function transactionCategoryToInsertRow(tc: TransactionCategory): TransactionCategoryRow {
+  return {
+    id: tc.id,
+    household_id: tc.householdId,
+    transaction_id: tc.transactionId,
+    category_id: tc.categoryId,
+    created_at: tc.createdAt,
   };
 }
 
