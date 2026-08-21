@@ -445,7 +445,8 @@ interface InventoryState {
   checkPendingInvite: () => Promise<{ householdName: string; invitedByDisplayName: string | null } | null>;
   /** Leaves the current household. Blocked if the caller is its Owner (transfer ownership first) or if it's their only household. Real, awaited. */
   leaveHousehold: () => Promise<{ ok: boolean; error?: string }>;
-  inviteMember: (email: string) => void;
+  /** `personId` scopes this invite to convert one existing managed profile (PRD §23) — omit for an ordinary invite, which creates a fresh Person row on acceptance instead (0022_invite_target_person.sql). */
+  inviteMember: (email: string, personId?: string | null) => void;
   cancelInvite: (inviteId: string) => void;
   removeMember: (userId: string) => void;
   transferOwnership: (toUserId: string) => void;
@@ -2836,7 +2837,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     return get().favorites.some((f) => f.itemId === itemId && f.userId === userId);
   },
 
-  inviteMember: (email) => {
+  inviteMember: (email, personId) => {
     const supabase = getSupabaseBrowserClient();
     const created: Invite = {
       id: newId(),
@@ -2846,6 +2847,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       status: "pending",
       createdAt: nowIso(),
       expiresAt: purgeAfter(new Date()),
+      targetPersonId: personId ?? null,
     };
     set((s) => ({ invites: [...s.invites, created] }));
     persistOrRevert(

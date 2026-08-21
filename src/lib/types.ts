@@ -35,6 +35,8 @@ export interface Invite {
   status: InviteStatus;
   createdAt: string;
   expiresAt: string;
+  /** Set when this invite is meant to convert an existing managed profile to a real account (PRD §23's "Invite to the app" from an existing Person, not the generic "Add someone" flow) — null for an ordinary invite, which creates a fresh Person row on acceptance instead. */
+  targetPersonId: string | null;
 }
 
 // Household Ledger — People (supabase/migrations/0017_household_ledger_core.sql,

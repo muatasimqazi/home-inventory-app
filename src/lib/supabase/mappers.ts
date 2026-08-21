@@ -103,6 +103,7 @@ export interface InviteRow {
   status: string;
   created_at: string;
   expires_at: string;
+  target_person_id: string | null;
 }
 
 export function rowToInvite(row: InviteRow): Invite {
@@ -114,6 +115,7 @@ export function rowToInvite(row: InviteRow): Invite {
     status: row.status as Invite["status"],
     createdAt: row.created_at,
     expiresAt: row.expires_at,
+    targetPersonId: row.target_person_id,
   };
 }
 
@@ -126,6 +128,7 @@ export function inviteToInsertRow(invite: Invite): InviteRow {
     status: invite.status,
     created_at: invite.createdAt,
     expires_at: invite.expiresAt,
+    target_person_id: invite.targetPersonId,
   };
 }
 

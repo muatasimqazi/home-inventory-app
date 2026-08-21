@@ -47,6 +47,7 @@ export default function PeoplePage() {
   const transferOwnership = useInventoryStore((s) => s.transferOwnership);
   const leaveHousehold = useInventoryStore((s) => s.leaveHousehold);
   const deletePerson = useInventoryStore((s) => s.deletePerson);
+  const inviteMember = useInventoryStore((s) => s.inviteMember);
 
   const me = members.find((m) => m.userId === currentUserId);
   const isOwner = me?.role === "owner";
@@ -57,6 +58,12 @@ export default function PeoplePage() {
   const [removePersonTarget, setRemovePersonTarget] = useState<Person | null>(null);
   const [transferTarget, setTransferTarget] = useState<Member | null>(null);
   const [leaveOpen, setLeaveOpen] = useState(false);
+  // Converting an *existing* managed profile to a real account (PRD §23) —
+  // distinct from AddPersonSheet's own "Invite to the app" step, which is
+  // for someone who doesn't have a Person row yet. This one targets a
+  // specific already-existing profile so acceptance can convert it in
+  // place (0022_invite_target_person.sql) instead of creating a duplicate.
+  const [invitePersonTarget, setInvitePersonTarget] = useState<Person | null>(null);
 
   return (
     <div className="flex flex-col gap-4">
@@ -109,9 +116,14 @@ export default function PeoplePage() {
                     </>
                   )
                 ) : (
-                  <Button variant="ghost" size="icon-sm" aria-label={`Remove ${p.displayName}`} onClick={() => setRemovePersonTarget(p)}>
-                    <Icon name="close" size={14} className="text-danger" />
-                  </Button>
+                  <>
+                    <Button variant="ghost" size="icon-sm" aria-label={`Invite ${p.displayName} to the app`} onClick={() => setInvitePersonTarget(p)}>
+                      <Icon name="mail" size={14} />
+                    </Button>
+                    <Button variant="ghost" size="icon-sm" aria-label={`Remove ${p.displayName}`} onClick={() => setRemovePersonTarget(p)}>
+                      <Icon name="close" size={14} className="text-danger" />
+                    </Button>
+                  </>
                 )}
               </div>
             </div>
@@ -161,6 +173,18 @@ export default function PeoplePage() {
         allowRename={!editTarget?.linkedUserId}
         open={!!editTarget}
         onOpenChange={(open) => !open && setEditTarget(null)}
+      />
+
+      <InvitePersonSheet
+        person={invitePersonTarget}
+        open={!!invitePersonTarget}
+        onOpenChange={(open) => !open && setInvitePersonTarget(null)}
+        onSend={(email) => {
+          if (!invitePersonTarget) return;
+          inviteMember(email, invitePersonTarget.id);
+          toast.success(`Invite sent to ${email}`);
+          setInvitePersonTarget(null);
+        }}
       />
 
       <ConfirmDialog
@@ -356,6 +380,64 @@ function EditPersonSheet({
             </Button>
           </div>
         )}
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+/**
+ * Converts an *existing* managed profile to a real account (PRD §23) —
+ * the invite carries `target_person_id` (0022_invite_target_person.sql)
+ * so acceptance updates this exact Person row instead of creating a new
+ * one, keeping every item and activity entry they've already accumulated
+ * attached. Distinct from AddPersonSheet's own "Invite to the app" step,
+ * which is for someone who doesn't have a Person row at all yet.
+ */
+function InvitePersonSheet({
+  person,
+  open,
+  onOpenChange,
+  onSend,
+}: {
+  person: Person | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSend: (email: string) => void;
+}) {
+  const [email, setEmail] = useState("");
+
+  const [prevPersonId, setPrevPersonId] = useState<string | null>(person?.id ?? null);
+  if (person && person.id !== prevPersonId) {
+    setPrevPersonId(person.id);
+    setEmail("");
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="bottom" className="rounded-t-3xl">
+        <SheetHeader>
+          <SheetTitle className="text-section-title font-medium text-ink">Invite {person?.displayName ?? "them"} to the app</SheetTitle>
+        </SheetHeader>
+        <div className="flex flex-col gap-3 px-4 pb-6">
+          <p className="text-caption text-muted-foreground">
+            {person?.displayName ?? "They"} keeps everything already tracked under their profile — this just adds a real sign-in for them.
+          </p>
+          <div>
+            <label className="mb-1 block text-caption text-muted-foreground">Email address</label>
+            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@example.com" className="h-11" autoFocus />
+          </div>
+          <Button
+            size="lg"
+            className="bg-ink text-white hover:bg-ink/90"
+            disabled={!email.trim()}
+            onClick={() => {
+              onSend(email.trim());
+              setEmail("");
+            }}
+          >
+            Send invite
+          </Button>
+        </div>
       </SheetContent>
     </Sheet>
   );
