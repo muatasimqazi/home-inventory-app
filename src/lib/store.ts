@@ -54,10 +54,13 @@ import {
   accountBalanceSnapshotToInsertRow,
   rowToTransactionAttachment,
   transactionAttachmentToInsertRow,
+  rowToTransactionCategory,
+  transactionCategoryToInsertRow,
   rowToItemPurchase,
   itemPurchaseToInsertRow,
   csvImportBatchToInsertRow,
   type TransactionAttachmentRow,
+  type TransactionCategoryRow,
   type ItemPurchaseRow,
   type HouseholdRow,
   type MemberRow,
@@ -117,6 +120,7 @@ import type {
   Tag,
   Transaction,
   TransactionAttachment,
+  TransactionCategory,
   TransactionType,
   CsvImportBatch,
   ItemPurchase,
@@ -195,6 +199,8 @@ export interface NewTransactionInput {
   amount: number;
   type: TransactionType;
   categoryId?: string | null;
+  /** Full tag-style set of categories to attach via transaction_categories (Categories Foundation workstream) — categoryId above should be this list's first/primary entry (or null when empty), kept in sync by the caller (transaction-form-sheet.tsx) for backward compat with every call site that only reads categoryId. Omit entirely for a caller that hasn't been updated to the multi-category picker yet — createTransaction only touches transaction_categories when this is provided. */
+  categoryIds?: string[];
   merchant?: string | null;
   description?: string | null;
   notes?: string;
@@ -252,6 +258,8 @@ interface InventoryState {
   accountBalanceSnapshots: AccountBalanceSnapshot[];
   /** Permanently-retained receipt images (docs/Receipt Scanning Addendum.md §6) — unlike receipt_scan_batches/scanned_transaction_drafts/scanned_receipt_line_items (review-stage only, fetched on-demand by receipt-scan-session-store.ts, not part of this bundle), attachments are real permanent records shown on Transaction Detail, so they hydrate here like everything else. */
   transactionAttachments: TransactionAttachment[];
+  /** Tag-style multi-category links (Categories Foundation workstream, supabase/migrations/0024_transaction_categories.sql) — a transaction can carry several of these, each still representing its full amount (not split-transaction accounting). transactions.categoryId is kept in sync alongside this table (whichever category is selected first/primary), so every existing single-category call site (dashboards, budget math, category_rules, the Ask tool) keeps working unchanged. RLS is privacy-aware like transactions' own policy, so — like itemPurchases — this array is already the complete set the caller should see. */
+  transactionCategories: TransactionCategory[];
   /** Item ↔ transaction links (0017_household_ledger_core.sql, PRD §25 "Physical Item ↔ Financial Transaction"). RLS is privacy-aware (a link into a private account's transaction is only visible to those who can see that account), so — like `accounts` — this array is already the complete set the caller should see, no client-side filtering needed. */
   itemPurchases: ItemPurchase[];
   currentUserId: string;
@@ -382,10 +390,22 @@ interface InventoryState {
     merchant?: string | null;
     description?: string | null;
   }) => { fromTxn: Transaction; toTxn: Transaction };
-  updateTransaction: (transactionId: string, patch: Partial<Transaction>) => void;
+  /** `categoryIds`, when provided, replaces this transaction's full tag-style category set (transaction_categories) — diffed against current state, not append-only. Plain `Partial<Transaction>` fields (including categoryId) are applied as before regardless of whether categoryIds is present. */
+  updateTransaction: (transactionId: string, patch: Partial<Transaction> & { categoryIds?: string[] }) => void;
   trashTransaction: (transactionId: string) => void;
   restoreTransaction: (transactionId: string) => void;
   permanentlyDeleteTransaction: (transactionId: string) => void;
+
+  // Finance — Tag-style multi-category links (transaction_categories,
+  // Categories Foundation workstream). createTransaction/updateTransaction
+  // above already accept an optional categoryIds list and call these
+  // internally to stay in sync — most callers won't need these directly,
+  // but they're exposed for a caller (e.g. a future bulk-categorize
+  // workstream) that wants to add/remove one tag at a time without
+  // resubmitting the whole transaction form.
+  /** No-ops (doesn't insert a duplicate) if this transaction is already tagged with `categoryId` — the DB's own unique(transaction_id, category_id) constraint would reject it anyway, this just avoids the round trip. */
+  addTransactionCategory: (transactionId: string, categoryId: string) => void;
+  removeTransactionCategory: (transactionId: string, categoryId: string) => void;
 
   // Finance — Categories & rules (household-wide, no privacy layer)
   createFinanceCategory: (input: { name: string; parentCategoryId?: string | null }) => FinanceCategory;
@@ -525,6 +545,7 @@ interface HouseholdBundle {
   financeBillShares: FinanceBillShare[];
   accountBalanceSnapshots: AccountBalanceSnapshot[];
   transactionAttachments: TransactionAttachment[];
+  transactionCategories: TransactionCategory[];
   itemPurchases: ItemPurchase[];
   lastUsedDestination: { locationId: string | null; containerId: string | null } | null;
 }
@@ -554,6 +575,7 @@ function snapshotBundle(state: InventoryState): HouseholdBundle {
     financeBillShares: state.financeBillShares,
     accountBalanceSnapshots: state.accountBalanceSnapshots,
     transactionAttachments: state.transactionAttachments,
+    transactionCategories: state.transactionCategories,
     itemPurchases: state.itemPurchases,
     lastUsedDestination: state.lastUsedDestination,
   };
@@ -588,6 +610,7 @@ async function fetchHouseholdBundle(
     recurringBillsRes,
     financeBillSharesRes,
     transactionAttachmentsRes,
+    transactionCategoriesRes,
     itemPurchasesRes,
   ] = await Promise.all([
     supabase.from("members").select("*").eq("household_id", householdId),
@@ -624,6 +647,7 @@ async function fetchHouseholdBundle(
     supabase.from("recurring_bills").select("*").eq("household_id", householdId),
     supabase.from("finance_bill_shares").select("*").eq("household_id", householdId),
     supabase.from("transaction_attachments").select("*").eq("household_id", householdId),
+    supabase.from("transaction_categories").select("*").eq("household_id", householdId),
     supabase.from("item_purchases").select("*").eq("household_id", householdId),
   ]);
 
@@ -631,7 +655,7 @@ async function fetchHouseholdBundle(
     membersRes.error ?? invitesRes.error ?? peopleRes.error ?? locationsRes.error ?? containersRes.error ?? itemsRes.error ?? tagsRes.error ?? favoritesRes.error ?? activityRes.error ??
     attachmentsRes.error ?? pinnedLocationsRes.error ?? labelBatchesRes.error ?? labelBatchEntriesRes.error ?? normalizationRulesRes.error ??
     accountsRes.error ?? financeAccountSharesRes.error ?? transactionsRes.error ?? financeCategoriesRes.error ?? categoryRulesRes.error ?? recurringBillsRes.error ?? financeBillSharesRes.error ??
-    transactionAttachmentsRes.error ?? itemPurchasesRes.error;
+    transactionAttachmentsRes.error ?? transactionCategoriesRes.error ?? itemPurchasesRes.error;
   if (firstError) throw new Error(firstError.message);
 
   // account_balance_snapshots has no household_id column of its own
@@ -672,6 +696,7 @@ async function fetchHouseholdBundle(
     financeBillShares: ((financeBillSharesRes.data ?? []) as FinanceBillShareRow[]).map(rowToFinanceBillShare),
     accountBalanceSnapshots: ((snapshotsRes.data ?? []) as AccountBalanceSnapshotRow[]).map(rowToAccountBalanceSnapshot),
     transactionAttachments: ((transactionAttachmentsRes.data ?? []) as TransactionAttachmentRow[]).map(rowToTransactionAttachment),
+    transactionCategories: ((transactionCategoriesRes.data ?? []) as TransactionCategoryRow[]).map(rowToTransactionCategory),
     itemPurchases: ((itemPurchasesRes.data ?? []) as ItemPurchaseRow[]).map(rowToItemPurchase),
     lastUsedDestination: null,
   };
@@ -844,6 +869,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
   financeBillShares: [],
   accountBalanceSnapshots: [],
   transactionAttachments: [],
+  transactionCategories: [],
   itemPurchases: [],
   currentUserId: "",
   currentUserEmail: "",
@@ -936,7 +962,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
         | "members" | "invites" | "people" | "locations" | "containers" | "tags" | "activity" | "attachments" | "pinnedLocations"
         | "labelBatches" | "labelBatchEntries" | "normalizationRules"
         | "accounts" | "financeAccountShares" | "transactions" | "financeCategories" | "categoryRules"
-        | "recurringBills" | "financeBillShares" | "transactionAttachments" | "itemPurchases"
+        | "recurringBills" | "financeBillShares" | "transactionAttachments" | "transactionCategories" | "itemPurchases"
     ) {
       const handler = arrayMergeHandler<TRow, TDomain>(mapper, keyOf, rowKeyOf, (updater) =>
         set((s) => ({ [stateKey]: updater(s[stateKey] as unknown as TDomain[]) }) as Partial<InventoryState>)
@@ -988,6 +1014,11 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     // other table this store subscribes to.
     bind<FinanceCategoryRow, FinanceCategory>("categories", householdFilter, rowToFinanceCategory, (c) => c.id, (r) => r.id as string, "financeCategories");
     bind<TransactionAttachmentRow, TransactionAttachment>("transaction_attachments", householdFilter, rowToTransactionAttachment, (a) => a.id, (r) => r.id as string, "transactionAttachments");
+    // transaction_categories (Categories Foundation workstream,
+    // 0024_transaction_categories.sql) — same privacy-aware RLS as its own
+    // initial fetch above; a tag on a private account's transaction only
+    // reaches subscribers who can see that account.
+    bind<TransactionCategoryRow, TransactionCategory>("transaction_categories", householdFilter, rowToTransactionCategory, (c) => c.id, (r) => r.id as string, "transactionCategories");
     // item_purchases (0017_household_ledger_core.sql, PRD §25) — same
     // privacy-aware RLS as its own initial fetch above; a link into a
     // private account's transaction only reaches subscribers who can see
@@ -2285,12 +2316,49 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       plaidTransactionId: null,
       userEdited: false,
     };
-    set((s) => ({ transactions: [created, ...s.transactions] }));
-    persistOrRevert(
-      supabase.from("transactions").insert(transactionToInsertRow(created)),
-      () => set((s) => ({ transactions: s.transactions.filter((t) => t.id !== created.id) })),
-      "Couldn't save transaction"
-    );
+    // Tag-style multi-category set (Categories Foundation workstream) —
+    // deduped, and only actually written once the transaction row itself
+    // has landed server-side (see the sequential await below): a
+    // transaction_categories row FK's to transactions(id), so firing both
+    // inserts concurrently (persistOrRevert's usual fire-and-forget shape)
+    // would race the tag insert against the transaction insert.
+    //
+    // Falls back to [categoryId] when categoryIds isn't passed at all —
+    // not just when it's an empty array — so every creation path that
+    // predates this workstream (CSV import, receipt-scan confirm, refund
+    // creation) and only ever sets categoryId still gets a matching
+    // transaction_categories row automatically, instead of silently
+    // having a categoryId with no tag behind it forever.
+    const resolvedCategoryIds = input.categoryIds ?? (input.categoryId ? [input.categoryId] : []);
+    const categoryTagRows: TransactionCategory[] = Array.from(new Set(resolvedCategoryIds)).map((categoryId) => ({
+      id: newId(),
+      householdId: created.householdId,
+      transactionId: created.id,
+      categoryId,
+      createdAt: timestamp,
+    }));
+    set((s) => ({
+      transactions: [created, ...s.transactions],
+      transactionCategories: [...s.transactionCategories, ...categoryTagRows],
+    }));
+    void (async () => {
+      const { error } = await supabase.from("transactions").insert(transactionToInsertRow(created));
+      if (error) {
+        set((s) => ({
+          transactions: s.transactions.filter((t) => t.id !== created.id),
+          transactionCategories: s.transactionCategories.filter((tc) => tc.transactionId !== created.id),
+        }));
+        toast.error(`Couldn't save transaction: ${error.message}`);
+        return;
+      }
+      if (categoryTagRows.length > 0) {
+        const { error: tagError } = await supabase.from("transaction_categories").insert(categoryTagRows.map(transactionCategoryToInsertRow));
+        if (tagError) {
+          set((s) => ({ transactionCategories: s.transactionCategories.filter((tc) => tc.transactionId !== created.id) }));
+          toast.error(`Transaction saved, but couldn't save its categories: ${tagError.message}`);
+        }
+      }
+    })();
     get().logActivity({ entityType: "transaction", entityId: created.id, entityName: created.merchant ?? created.description ?? "Transaction", action: "created" });
     return created;
   },
@@ -2343,6 +2411,11 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
   },
 
   updateTransaction: (transactionId, patch) => {
+    // categoryIds isn't a Transaction column — pulled out of the patch
+    // before it touches anything Transaction-typed, and applied afterward
+    // as a diff against transaction_categories (add what's newly selected,
+    // remove what's no longer selected) rather than a blind replace.
+    const { categoryIds, ...transactionPatch } = patch;
     const supabase = getSupabaseBrowserClient();
     const previous = get().transactions.find((t) => t.id === transactionId);
     if (!previous) return;
@@ -2352,15 +2425,37 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     // requiring every call site to remember it — a plain field-level
     // patch, not a dedicated action, is exactly how every other edit path
     // (transaction form, detail sheet inline edits) already calls this.
-    const touchesProtectedField = ["categoryId", "merchant", "description", "notes"].some((k) => k in patch);
-    const merged: Transaction = { ...previous, ...patch, userEdited: touchesProtectedField ? true : previous.userEdited, updatedAt: nowIso() };
+    const touchesProtectedField = ["categoryId", "merchant", "description", "notes"].some((k) => k in transactionPatch);
+    const merged: Transaction = { ...previous, ...transactionPatch, userEdited: touchesProtectedField ? true : previous.userEdited, updatedAt: nowIso() };
     set((s) => ({ transactions: s.transactions.map((t) => (t.id === transactionId ? merged : t)) }));
-    persistOrRevert(
-      supabase.from("transactions").update(transactionToInsertRow(merged)).eq("id", transactionId),
-      () => set((s) => ({ transactions: s.transactions.map((t) => (t.id === transactionId ? previous : t)) })),
-      "Couldn't update transaction"
-    );
-    get().logActivity({ entityType: "transaction", entityId: merged.id, entityName: merged.merchant ?? merged.description ?? "Transaction", action: "edited" });
+    // Not persistOrRevert here (unlike almost every other edit action in
+    // this file): the categoryIds diff below has to run only once the
+    // transaction row's own update has actually landed, not unconditionally
+    // right after firing it — persistOrRevert's fire-and-forget shape gives
+    // no way to sequence "then do this other thing on success," so this is
+    // a directly-awaited async block instead, same idiom
+    // permanentlyDeleteTransaction already uses for its own ordering need.
+    void (async () => {
+      const { error } = await supabase.from("transactions").update(transactionToInsertRow(merged)).eq("id", transactionId);
+      if (error) {
+        set((s) => ({ transactions: s.transactions.map((t) => (t.id === transactionId ? previous : t)) }));
+        toast.error(`Couldn't update transaction: ${error.message}`);
+        return;
+      }
+      get().logActivity({ entityType: "transaction", entityId: merged.id, entityName: merged.merchant ?? merged.description ?? "Transaction", action: "edited" });
+
+      if (categoryIds) {
+        const desired = new Set(categoryIds);
+        const existing = get().transactionCategories.filter((tc) => tc.transactionId === transactionId);
+        const existingIds = new Set(existing.map((tc) => tc.categoryId));
+        for (const categoryId of desired) {
+          if (!existingIds.has(categoryId)) get().addTransactionCategory(transactionId, categoryId);
+        }
+        for (const tc of existing) {
+          if (!desired.has(tc.categoryId)) get().removeTransactionCategory(transactionId, tc.categoryId);
+        }
+      }
+    })();
   },
 
   trashTransaction: (transactionId) => {
@@ -2409,13 +2504,21 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     // alongside each other the way persistOrRevert normally would.
     const orphaned = get().itemPurchases.filter((p) => p.transactionId === transactionId && !p.scannedReceiptLineItemId);
     const orphanedIds = orphaned.map((p) => p.id);
+    // transaction_categories has its own ON DELETE CASCADE (unlike
+    // item_purchases' SET NULL above), so no separate unlink step is
+    // needed server-side — this just keeps local state in sync with what
+    // the cascade is about to do, rather than waiting on a Realtime DELETE
+    // event per tag to catch up.
+    const orphanedCategoryTags = get().transactionCategories.filter((tc) => tc.transactionId === transactionId);
     set((s) => ({
       transactions: s.transactions.filter((x) => x.id !== transactionId),
       itemPurchases: s.itemPurchases.filter((p) => !orphanedIds.includes(p.id)),
+      transactionCategories: s.transactionCategories.filter((tc) => tc.transactionId !== transactionId),
     }));
     const revert = () => {
       if (t) set((s) => ({ transactions: [...s.transactions, t] }));
       if (orphaned.length) set((s) => ({ itemPurchases: [...s.itemPurchases, ...orphaned] }));
+      if (orphanedCategoryTags.length) set((s) => ({ transactionCategories: [...s.transactionCategories, ...orphanedCategoryTags] }));
     };
     void (async () => {
       if (orphanedIds.length > 0) {
@@ -2433,6 +2536,69 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       }
     })();
     if (t) get().logActivity({ entityType: "transaction", entityId: t.id, entityName: t.merchant ?? t.description ?? "Transaction", action: "deleted_forever" });
+  },
+
+  // ---------------------------------------------------------------------
+  // Finance — Tag-style multi-category links (transaction_categories,
+  // Categories Foundation workstream, 0024_transaction_categories.sql).
+  // createTransaction/updateTransaction above call these (or the
+  // equivalent inline logic) to stay in sync with their optional
+  // categoryIds input — most callers won't reach for these two directly.
+  // ---------------------------------------------------------------------
+
+  addTransactionCategory: (transactionId, categoryId) => {
+    const supabase = getSupabaseBrowserClient();
+    // The DB's unique(transaction_id, category_id) constraint would reject
+    // a duplicate anyway — checked here first just to skip the round trip.
+    const already = get().transactionCategories.some((tc) => tc.transactionId === transactionId && tc.categoryId === categoryId);
+    if (already) return;
+    const created: TransactionCategory = {
+      id: newId(),
+      householdId: get().currentHouseholdId,
+      transactionId,
+      categoryId,
+      createdAt: nowIso(),
+    };
+    set((s) => ({ transactionCategories: [...s.transactionCategories, created] }));
+    persistOrRevert(
+      supabase.from("transaction_categories").insert(transactionCategoryToInsertRow(created)),
+      () => set((s) => ({ transactionCategories: s.transactionCategories.filter((tc) => tc.id !== created.id) })),
+      "Couldn't tag category"
+    );
+    // Keep transactions.categoryId in sync — the documented "primary
+    // category" invariant every legacy single-category call site
+    // (dashboards, budget math, category_rules, the Ask tool) relies on.
+    // Only backfills a missing primary; never overrides one that's
+    // already set, so adding a second/third tag never bumps an existing
+    // primary choice. Routed through updateTransaction (not a raw column
+    // write) so this gets the same revert-on-failure and activity-log
+    // behavior every other categoryId change already gets.
+    const txn = get().transactions.find((t) => t.id === transactionId);
+    if (txn && !txn.categoryId) {
+      get().updateTransaction(transactionId, { categoryId });
+    }
+  },
+
+  removeTransactionCategory: (transactionId, categoryId) => {
+    const supabase = getSupabaseBrowserClient();
+    const previous = get().transactionCategories.find((tc) => tc.transactionId === transactionId && tc.categoryId === categoryId);
+    if (!previous) return;
+    set((s) => ({ transactionCategories: s.transactionCategories.filter((tc) => tc.id !== previous.id) }));
+    persistOrRevert(
+      supabase.from("transaction_categories").delete().eq("id", previous.id),
+      () => set((s) => ({ transactionCategories: [...s.transactionCategories, previous] })),
+      "Couldn't remove category tag"
+    );
+    // If the removed tag was the primary category, promote another
+    // remaining tag to primary (or clear to null if none remain) — same
+    // sync invariant as addTransactionCategory above. get() here already
+    // reflects the set() above (Zustand updates are synchronous), so this
+    // reads the post-removal tag list correctly.
+    const txn = get().transactions.find((t) => t.id === transactionId);
+    if (txn && txn.categoryId === categoryId) {
+      const remaining = get().transactionCategories.filter((tc) => tc.transactionId === transactionId);
+      get().updateTransaction(transactionId, { categoryId: remaining[0]?.categoryId ?? null });
+    }
   },
 
   // ---------------------------------------------------------------------

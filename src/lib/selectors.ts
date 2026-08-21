@@ -1,5 +1,34 @@
 import type { Account, AccountType, Container, FinanceCategory, Item, Location, RecurringBill, Tag, Transaction } from "./types";
 
+/**
+ * The full tag-style category set for one transaction (Categories
+ * Foundation workstream) — `taggedCategoryIds` should already be just
+ * this transaction's own transaction_categories rows, not the whole
+ * household's. A caller rendering many transactions at once should group
+ * transaction_categories into a `Record<transactionId, categoryId[]>`
+ * once (e.g. via useMemo) and look up each row's slice from that, the
+ * same way the transactions list page already groups scanned receipt
+ * line items — not filter the full array again per row.
+ *
+ * Falls back to the transaction's single legacy `categoryId` only when no
+ * tag rows exist for it yet (predates the junction table, or a creation
+ * path that only ever set categoryId) — never shows both, never shows
+ * empty when a real primary category is set. Previously three near-
+ * identical copies of this same fallback logic (the transactions list,
+ * the detail sheet, and the edit form) — one shared function now, so
+ * "what categories does this transaction show" can't drift between them.
+ */
+export function categoriesForTransaction(
+  transaction: Pick<Transaction, "categoryId">,
+  taggedCategoryIds: string[],
+  financeCategories: FinanceCategory[]
+): FinanceCategory[] {
+  const tagged = taggedCategoryIds.map((id) => financeCategories.find((c) => c.id === id)).filter((c): c is FinanceCategory => !!c);
+  if (tagged.length > 0) return tagged;
+  const primary = transaction.categoryId ? financeCategories.find((c) => c.id === transaction.categoryId) : undefined;
+  return primary ? [primary] : [];
+}
+
 /** Case-insensitive alphabetical sort by whatever label a caller extracts — the shared ordering every dropdown of accounts/categories/members/etc. should use instead of rendering the raw store/DB order (usually creation order, not remotely alphabetical, and different again after every edit). Copies rather than sorting in place — callers almost always feed this a store array directly. */
 export function sortByLabel<T>(items: T[], getLabel: (item: T) => string): T[] {
   return [...items].sort((a, b) => getLabel(a).localeCompare(getLabel(b), undefined, { sensitivity: "base" }));

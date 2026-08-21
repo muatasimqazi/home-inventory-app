@@ -21,14 +21,15 @@ import { createAndLinkRefundTransaction } from "@/lib/receipt-refunds";
 import { useInventoryStore } from "@/lib/store";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { Account, FinanceCategory, ScannedReceiptLineItem, Transaction, TransactionAttachment } from "@/lib/types";
+import { displayCodeBadgeClasses } from "@/lib/badge-color";
+import { categoriesForTransaction } from "@/lib/selectors";
+import type { Account, ScannedReceiptLineItem, Transaction, TransactionAttachment } from "@/lib/types";
 
 interface TransactionDetailSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   transaction: Transaction | null;
   account: Account | undefined;
-  category: FinanceCategory | undefined;
   /** Present when this transaction has a permanently-retained receipt image (Receipt Scanning Addendum §6). */
   attachment: TransactionAttachment | undefined;
   onEdit: () => void;
@@ -43,7 +44,7 @@ const SOURCE_LABEL: Record<Transaction["source"], string> = {
 };
 
 /** Right-side drawer, not a route — docs/Personal Finance PRD.md §35: "Transactions list (+ add/edit form) ... list; detail opens as a drawer, not a route." */
-export function TransactionDetailSheet({ open, onOpenChange, transaction, account, category, attachment, onEdit, onTrash }: TransactionDetailSheetProps) {
+export function TransactionDetailSheet({ open, onOpenChange, transaction, account, attachment, onEdit, onTrash }: TransactionDetailSheetProps) {
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
   const [lineItems, setLineItems] = useState<ScannedReceiptLineItem[]>([]);
   const [editingLineItem, setEditingLineItem] = useState<ScannedReceiptLineItem | null>(null);
@@ -63,6 +64,14 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
   const itemPurchases = useInventoryStore((s) => s.itemPurchases);
   const linkItemPurchase = useInventoryStore((s) => s.linkItemPurchase);
   const unlinkItemPurchase = useInventoryStore((s) => s.unlinkItemPurchase);
+  // Tag-style multi-category links (Categories Foundation workstream) —
+  // combined with financeCategories below via the shared
+  // categoriesForTransaction() selector to get this transaction's full
+  // display set (falls back to its single legacy categoryId internally,
+  // so this component no longer needs a separate `category` prop from
+  // its caller for that).
+  const transactionCategoryLinks = useInventoryStore((s) => s.transactionCategories);
+  const financeCategories = useInventoryStore((s) => s.financeCategories);
 
   // Both fetched on demand, not kept in the global store: a signed URL is
   // deliberately short-lived (private bucket, same pattern
@@ -218,6 +227,15 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
   // Review's own "Link to item" affordance, not this one.
   const linkedPurchases = itemPurchases.filter((p) => p.transactionId === transaction.id);
 
+  // Full tag-style category set for this transaction — shared with the
+  // transactions list and the edit form (lib/selectors.ts) so all three
+  // can't drift on what "this transaction's categories" means.
+  const displayedCategories = categoriesForTransaction(
+    transaction,
+    transactionCategoryLinks.filter((tc) => tc.transactionId === transaction.id).map((tc) => tc.categoryId),
+    financeCategories
+  );
+
   const refundOptions = allTransactions
     .filter((t) => t.type === "refund" && !t.trashedAt && t.accountId === transaction.accountId)
     .sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
@@ -260,8 +278,18 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
               <p className="text-body font-medium text-ink">{account?.name ?? "—"}</p>
             </div>
             <div>
-              <p className="text-caption text-muted-foreground">Category</p>
-              <p className="text-body font-medium text-ink">{category?.name ?? "Uncategorized"}</p>
+              <p className="text-caption text-muted-foreground">{displayedCategories.length > 1 ? "Categories" : "Category"}</p>
+              {displayedCategories.length === 0 ? (
+                <p className="text-body font-medium text-ink">Uncategorized</p>
+              ) : (
+                <div className="mt-0.5 flex flex-wrap gap-1">
+                  {displayedCategories.map((c) => (
+                    <span key={c.id} className={cn("rounded-full border px-1.5 py-0.5 text-micro font-medium", displayCodeBadgeClasses(c.id))}>
+                      {c.name}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
             <div>
               <p className="text-caption text-muted-foreground">Source</p>

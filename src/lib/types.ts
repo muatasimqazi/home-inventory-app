@@ -429,6 +429,25 @@ export interface Transaction {
   userEdited: boolean;
 }
 
+/**
+ * Tag-style multi-category link (supabase/migrations/0024_transaction_categories.sql,
+ * Categories Foundation workstream). A transaction can carry several of
+ * these — each one still represents the transaction's *full* amount, not
+ * a fraction of it (this is explicitly not split-transaction accounting).
+ * `transactions.categoryId` is kept populated alongside this table with
+ * whichever category was selected first/primary, so every existing
+ * single-category call site (dashboards, budget math, category_rules, the
+ * Ask tool) keeps reading something sensible without needing to know this
+ * table exists.
+ */
+export interface TransactionCategory {
+  id: string;
+  householdId: string;
+  transactionId: string;
+  categoryId: string;
+  createdAt: string;
+}
+
 export type RecurringBillFrequency = "weekly" | "biweekly" | "monthly" | "quarterly" | "yearly";
 
 export interface RecurringBill {
