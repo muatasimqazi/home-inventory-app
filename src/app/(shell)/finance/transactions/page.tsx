@@ -14,6 +14,7 @@ import { TransactionDetailSheet } from "@/components/transaction-detail-sheet";
 import { LineItemFormSheet } from "@/components/line-item-form-sheet";
 import { BulkCategorizeBar } from "@/components/bulk-categorize-bar";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { CategorizeSuggestionsSheet, type CategorizeSuggestionRow } from "@/components/categorize-suggestions-sheet";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { rowToScannedReceiptLineItem, type ScannedReceiptLineItemRow } from "@/lib/supabase/mappers";
 import {
@@ -31,7 +32,18 @@ import { categoriesForTransaction } from "@/lib/selectors";
 import { formatCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useRemountKey } from "@/hooks/use-remount-key";
+import { categorizationProvider, REVIEW_THRESHOLD, VisionDetectionError, type CategorySuggestion } from "@/lib/ai";
 import type { ScannedReceiptLineItem, Transaction } from "@/lib/types";
+
+// AI category suggestion (Household Ledger Implementation Plan, Workstream
+// 3 batch) — an on-demand batch pass over currently-uncategorized
+// transactions, not a database-triggered background job (see the "Suggest
+// categories" banner and its handler below for why that's the deliberate,
+// simpler interpretation here). Cap keeps one batch call fast — stricter
+// than (not "matching," they're two independent constants) the API
+// route's own MAX_TRANSACTIONS guard (60, src/app/api/v1/finance/
+// categorize/route.ts), so this cap is what actually binds today.
+const MAX_AI_CATEGORIZE_BATCH = 30;
 
 type DateScope = "all" | "month" | "custom";
 
@@ -74,6 +86,7 @@ export default function TransactionsListPage() {
   const deleteCategoryRule = useInventoryStore((s) => s.deleteCategoryRule);
   // Bulk categorize workstream — the only store write this feature needs;
   // additive tag-style add, same as the single-transaction category picker.
+  // Also reused by AI categorize's accept/apply actions below.
   const addTransactionCategory = useInventoryStore((s) => s.addTransactionCategory);
 
   const searchParams = useSearchParams();
@@ -127,6 +140,23 @@ export default function TransactionsListPage() {
   const [editingLineItem, setEditingLineItem] = useState<ScannedReceiptLineItem | null>(null);
   const [deleteLineItemConfirm, setDeleteLineItemConfirm] = useState<ScannedReceiptLineItem | null>(null);
   const [addingItemForTransactionId, setAddingItemForTransactionId] = useState<string | null>(null);
+
+  // AI category suggestions (Household Ledger Implementation Plan,
+  // Workstream 3 batch) — client-side only, never persisted: a "Suggest
+  // categories" pass fills this map, each row shows an inline "AI: <name>"
+  // badge with a one-tap Accept (which just calls addTransactionCategory,
+  // same as any manual pick), and "Review & apply" opens the fuller sheet
+  // to adjust/skip before a batch apply. Nothing in either path calls
+  // addTransactionCategory without this explicit per-suggestion or
+  // per-batch confirmation step.
+  const [suggestions, setSuggestions] = useState<Record<string, CategorySuggestion>>({});
+  const [suggesting, setSuggesting] = useState(false);
+  const [reviewSuggestionsOpen, setReviewSuggestionsOpen] = useState(false);
+  // Forces CategorizeSuggestionsSheet to remount (and reseed its per-row
+  // choices from the latest suggestions) each time it's freshly opened —
+  // same always-mounted-with-`open`-as-a-prop situation useRemountKey's own
+  // doc comment describes, bumped in the same click handler that opens it.
+  const [reviewSuggestionsKey, bumpReviewSuggestionsKey] = useRemountKey();
 
   // Line items nested right in the list (not only behind the detail
   // drawer) — one bulk fetch scoped to every receipt-sourced transaction
@@ -364,6 +394,134 @@ export default function TransactionsListPage() {
     toast.success(`Future "${merchant}" transactions will be categorized automatically`, { duration: 3000 });
   }
 
+  // AI category suggestion — batch pass over currently-uncategorized
+  // transactions. See MAX_AI_CATEGORIZE_BATCH's comment for why this is an
+  // on-demand pass rather than a background job. Most-recent-first so a
+  // household with more uncategorized transactions than the cap gets
+  // suggestions for the ones they're most likely reviewing right now.
+  //
+  // Scoped to `filtered` (the page's own date/search/uncategorized-only
+  // filters), not the full household `transactions` list — the banner's
+  // own count ("Suggest categories for N uncategorized transactions") sits
+  // right above the filtered list, so a batch that silently reached beyond
+  // what's on screen would mismatch what the user is looking at (e.g. "This
+  // month" + a search narrowing to 2 visible uncategorized rows, but the
+  // batch/count still covering up to 30 uncategorized rows household-wide).
+  function uncategorizedForSuggestion(): Transaction[] {
+    // categoriesForTransaction, not a bare !t.categoryId check — a
+    // transaction can have real tag-style categories with no primary
+    // categoryId set (e.g. created via a caller that only passed
+    // categoryIds), and !t.categoryId alone would wrongly pull it into
+    // the AI batch. Worse: since addTransactionCategory backfills a
+    // missing primary categoryId, accepting that AI guess would silently
+    // become this transaction's *primary* category even though it
+    // already had real ones — exactly the "never automatic" guarantee
+    // this feature is supposed to keep.
+    // `filtered` already excludes trashed transactions (derived from
+    // `active`), so no separate !t.trashedAt check is needed here.
+    return filtered
+      .filter(
+        (t) =>
+          (t.type === "expense" || t.type === "income" || t.type === "refund") &&
+          categoriesForTransaction(t, categoryIdsByTransaction[t.id] ?? [], financeCategories).length === 0
+      )
+      .sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime())
+      .slice(0, MAX_AI_CATEGORIZE_BATCH);
+  }
+
+  async function handleSuggestCategories() {
+    const targets = uncategorizedForSuggestion();
+    if (targets.length === 0) {
+      toast("No uncategorized transactions to suggest categories for.");
+      return;
+    }
+    const activeCategories = financeCategories.filter((c) => c.status === "active");
+    if (activeCategories.length === 0) {
+      toast.error("Add a category first — there's nothing for AI to suggest from yet.");
+      return;
+    }
+
+    setSuggesting(true);
+    try {
+      const results = await categorizationProvider.suggestCategories(
+        targets.map((t) => ({ id: t.id, merchant: t.merchant, description: t.description, amount: t.amount })),
+        activeCategories.map((c) => ({ id: c.id, name: c.name }))
+      );
+      const confident = results.filter((r) => r.categoryId !== null);
+      if (confident.length === 0) {
+        toast("AI couldn't confidently match a category for any of these.");
+        return;
+      }
+      setSuggestions((prev) => {
+        const next = { ...prev };
+        for (const r of confident) next[r.transactionId] = r;
+        return next;
+      });
+      toast.success(`${confident.length} category suggestion${confident.length === 1 ? "" : "s"} ready to review`);
+    } catch (error) {
+      const message = error instanceof VisionDetectionError ? error.message : "Couldn't suggest categories. Please try again.";
+      toast.error(message);
+    } finally {
+      setSuggesting(false);
+    }
+  }
+
+  function dismissSuggestion(transactionId: string) {
+    setSuggestions((prev) => {
+      const next = { ...prev };
+      delete next[transactionId];
+      return next;
+    });
+  }
+
+  /** One-tap accept straight from the row badge — same write as picking a category by hand in TransactionFormSheet, just via the suggested categoryId. Defensively re-checks the category is still active (the row's own suggestedCategory lookup already does this for the UI, but a suggestion could in principle be accepted via another path later) and below-threshold suggestions never reach here since the accept button itself is hidden for them. */
+  function acceptSuggestion(transactionId: string) {
+    const suggestion = suggestions[transactionId];
+    if (!suggestion?.categoryId) return;
+    const category = financeCategories.find((c) => c.id === suggestion.categoryId);
+    if (!category || category.status !== "active") {
+      dismissSuggestion(transactionId);
+      toast.error("That category is no longer available — dismissed the suggestion.");
+      return;
+    }
+    addTransactionCategory(transactionId, suggestion.categoryId);
+    dismissSuggestion(transactionId);
+    toast.success("Category applied");
+  }
+
+  function handleApplySuggestions(accepted: { transactionId: string; categoryId: string }[]) {
+    // The sheet seeds its per-row category picker from the suggestion at
+    // the moment it opened and doesn't re-check status on Apply — this is
+    // the one place both the sheet and the inline accept path converge,
+    // so the active-category guard lives here rather than duplicated in
+    // the sheet component too. A category archived/trashed between
+    // suggestion and Apply is silently dropped instead of tagged.
+    const valid = accepted.filter((a) => financeCategories.some((c) => c.id === a.categoryId && c.status === "active"));
+    for (const a of valid) addTransactionCategory(a.transactionId, a.categoryId);
+    setSuggestions((prev) => {
+      const next = { ...prev };
+      for (const a of accepted) delete next[a.transactionId];
+      return next;
+    });
+    if (valid.length > 0) toast.success(`Applied ${valid.length} categor${valid.length === 1 ? "y" : "ies"}`);
+    if (valid.length < accepted.length) toast.error(`${accepted.length - valid.length} category no longer available — skipped.`);
+  }
+
+  const suggestionCount = Object.keys(suggestions).length;
+  const uncategorizedCount = uncategorizedForSuggestion().length;
+  // Same stale-suggestion guard the inline row badge already applies
+  // (displayedCategories.length === 0 above) — without it, a transaction
+  // the user manually recategorized after its suggestion was generated
+  // (but before opening this sheet) would still show up pre-checked here,
+  // and Apply would additively stack the AI's now-outdated guess
+  // alongside the category the user actually picked.
+  const suggestionRows: CategorizeSuggestionRow[] = Object.values(suggestions)
+    .map((s) => ({ transaction: transactions.find((t) => t.id === s.transactionId), suggestedCategoryId: s.categoryId, confidence: s.confidence }))
+    .filter(
+      (row): row is CategorizeSuggestionRow =>
+        !!row.transaction && categoriesForTransaction(row.transaction, categoryIdsByTransaction[row.transaction.id] ?? [], financeCategories).length === 0
+    );
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-start justify-between">
@@ -441,6 +599,49 @@ export default function TransactionsListPage() {
         </div>
       )}
 
+      {/* AI category suggestion — a distinct banner, deliberately kept out of
+          the filter-chip row and out of the transaction list's own
+          row-selection affordances (a parallel workstream owns bulk-select
+          on this page) so the two don't visually collide. */}
+      {accounts.length > 0 &&
+        (suggestionCount > 0 ? (
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-yellow/10 px-4 py-3">
+            <p className="flex items-center gap-1.5 text-caption font-medium text-ink">
+              <Icon name="ai" size={14} className="shrink-0 text-yellow" />
+              {suggestionCount} AI suggestion{suggestionCount === 1 ? "" : "s"} ready to review
+            </p>
+            <div className="flex shrink-0 items-center gap-3">
+              <button type="button" onClick={() => setSuggestions({})} className="tap-target text-caption text-muted-foreground">
+                Dismiss
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  bumpReviewSuggestionsKey();
+                  setReviewSuggestionsOpen(true);
+                }}
+                className="tap-target text-caption font-semibold text-yellow-text"
+              >
+                Review &amp; apply
+              </button>
+            </div>
+          </div>
+        ) : (
+          uncategorizedCount > 0 && (
+            <button
+              type="button"
+              onClick={handleSuggestCategories}
+              disabled={suggesting}
+              className="flex items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-white px-4 py-3 text-caption font-medium text-ink disabled:opacity-60"
+            >
+              <Icon name="ai" size={15} className="text-yellow" />
+              {suggesting
+                ? "Suggesting categories…"
+                : `Suggest categories for ${uncategorizedCount} uncategorized transaction${uncategorizedCount === 1 ? "" : "s"}`}
+            </button>
+          )
+        ))}
+
       {accounts.length === 0 ? (
         <EmptyState icon="receipt" title="Add an account first" description="Transactions belong to an account — add one from the Accounts tab to get started." />
       ) : sorted.length === 0 ? (
@@ -457,6 +658,24 @@ export default function TransactionsListPage() {
               <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
                 {entries.map((t) => {
                   const displayedCategories = categoriesForTransaction(t, categoryIdsByTransaction[t.id] ?? [], financeCategories);
+                  const suggestion = displayedCategories.length === 0 ? suggestions[t.id] : undefined;
+                  // Re-validated at display/accept time, not just when the
+                  // suggestion was first generated: a category can be
+                  // archived/trashed while a suggestion still sits unapplied
+                  // in state, and no manual category picker in this app
+                  // allows picking a non-active category.
+                  const suggestedCategory =
+                    suggestion?.categoryId ? financeCategories.find((c) => c.id === suggestion.categoryId && c.status === "active") : undefined;
+                  // Every other AI-suggestion surface in this app (capture/
+                  // review's needsReview gate, appliance capture's
+                  // lowConfidence gate) keeps a below-threshold guess from
+                  // being one-tap-applicable — this inline accept button was
+                  // the one path that didn't. Below threshold, the badge
+                  // still shows the guess (useful information) but the
+                  // accept checkmark is hidden; "Review & apply" (the sheet)
+                  // is where a low-confidence suggestion can actually be
+                  // applied, since it already labels rows below threshold.
+                  const suggestionNeedsReview = suggestion ? suggestion.confidence < REVIEW_THRESHOLD : false;
                   const items = lineItemsByTransaction[t.id] ?? [];
                   // Every receipt-scan transaction can expand — not just
                   // ones that already have items. A real Costco receipt
@@ -515,6 +734,10 @@ export default function TransactionsListPage() {
                                     {c.name}
                                   </span>
                                 ))
+                              ) : suggestedCategory ? (
+                                <span className="flex items-center gap-1 rounded-full bg-yellow/20 px-1.5 py-0.5 text-micro font-medium text-ink">
+                                  <Icon name="ai" size={10} /> {suggestedCategory.name}
+                                </span>
                               ) : (
                                 <span className="text-caption text-muted-foreground">Uncategorized</span>
                               )}
@@ -529,6 +752,19 @@ export default function TransactionsListPage() {
                             {formatCurrency(t.amount, { showPositiveSign: true })}
                           </span>
                         </button>
+                        {/* Hidden while selecting, same as the expand chevron below —
+                            bulk select is about picking rows, and the row tap already
+                            toggles selection instead of doing anything else. */}
+                        {suggestedCategory && !suggestionNeedsReview && !selectMode && (
+                          <button
+                            type="button"
+                            onClick={() => acceptSuggestion(t.id)}
+                            aria-label={`Accept AI suggestion: ${suggestedCategory.name}`}
+                            className="tap-target flex size-8 shrink-0 items-center justify-center rounded-full text-yellow-text"
+                          >
+                            <Icon name="check" size={17} />
+                          </button>
+                        )}
                         {isScanSourced && !selectMode && (
                           <button
                             type="button"
@@ -702,6 +938,15 @@ export default function TransactionsListPage() {
         tone="danger"
         icon="trash"
         onConfirm={handleDeleteLineItem}
+      />
+
+      <CategorizeSuggestionsSheet
+        key={reviewSuggestionsKey}
+        open={reviewSuggestionsOpen}
+        onOpenChange={setReviewSuggestionsOpen}
+        rows={suggestionRows}
+        categories={financeCategories}
+        onApply={handleApplySuggestions}
       />
     </div>
   );
