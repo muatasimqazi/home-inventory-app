@@ -7,6 +7,7 @@ import { SearchBar } from "@/components/search-bar";
 import { ContainerCarousel } from "@/components/container-carousel";
 import { Icon } from "@/components/icon";
 import { IconChip } from "@/components/icon-chip";
+import { PhotoThumb } from "@/components/photo-thumb";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/empty-state";
 import { useInventoryStore, useCurrentHousehold } from "@/lib/store";
@@ -195,6 +196,42 @@ export default function OverviewPage() {
             <ActionChip label="Loose" count={loose} tone="orange" href="/unassigned" />
           </div>
         </div>
+
+        {locations.length > 0 && (
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-item-title font-semibold text-ink">Storage locations</h3>
+              <Link href="/locations" className="text-caption font-semibold text-ink">
+                View all
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {locations.map((loc) => {
+                const count = summary.itemCountByLocation[loc.id] ?? 0;
+                return (
+                  <Link
+                    key={loc.id}
+                    href={`/locations/${loc.id}`}
+                    className="tap-target flex items-center gap-2.5 rounded-2xl border border-border bg-white p-3 shadow-sm"
+                  >
+                    <PhotoThumb
+                      emoji={loc.coverPhotoEmoji ?? "📍"}
+                      coverPhotoPath={loc.coverPhotoPath}
+                      className="size-9 shrink-0 rounded-sm"
+                      emojiClassName="text-base"
+                    />
+                    <span className="min-w-0 flex-1 truncate text-caption font-medium text-ink">{loc.name}</span>
+                    {count > 0 && (
+                      <span className="shrink-0 rounded-full bg-badge-green-bg px-2 py-0.5 text-micro font-semibold text-badge-green-text">
+                        {count}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
