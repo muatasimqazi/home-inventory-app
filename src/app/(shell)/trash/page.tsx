@@ -7,8 +7,10 @@ import { Icon, type IconName } from "@/components/icon";
 import { EmptyState } from "@/components/empty-state";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { SearchBar } from "@/components/search-bar";
+import { LoadMoreButton } from "@/components/load-more-button";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { usePaginated } from "@/hooks/use-paginated";
 import { useInventoryStore } from "@/lib/store";
 import { daysUntil } from "@/lib/selectors";
 import { formatCurrency } from "@/lib/format";
@@ -116,8 +118,17 @@ function InventoryTrashPanel() {
     ? typeFilteredRows.filter((r) => r.name.toLowerCase().includes(query.trim().toLowerCase()))
     : typeFilteredRows;
 
+  // Bulk-action handlers below act on every individually selected row
+  // regardless of how many "pages" have been revealed — selectedRows stays
+  // derived from the full filteredRows, not the paginated window, so
+  // Restore/Delete Forever never silently drops a selection made before
+  // "Load more" was tapped again.
   const selectedRows = filteredRows.filter((r) => selected.has(inventoryRowKey(r)));
-  const allVisibleSelected = filteredRows.length > 0 && selectedRows.length === filteredRows.length;
+  const { visible: paginatedRows, hasMore, remaining, pageSize, loadMore } = usePaginated(filteredRows, `${filter}:${query}`);
+  // "Select all" only ever means "everything currently on screen" though —
+  // scoped to paginatedRows, not the full filtered set, same reasoning as
+  // Transactions' own bulk-select.
+  const allVisibleSelected = paginatedRows.length > 0 && paginatedRows.every((r) => selected.has(inventoryRowKey(r)));
 
   function restore(row: InventoryTrashRow) {
     if (row.type === "item") restoreItem(row.id);
@@ -146,10 +157,10 @@ function InventoryTrashPanel() {
     setSelected((s) => {
       if (allVisibleSelected) {
         const next = new Set(s);
-        for (const r of filteredRows) next.delete(inventoryRowKey(r));
+        for (const r of paginatedRows) next.delete(inventoryRowKey(r));
         return next;
       }
-      return new Set([...s, ...filteredRows.map(inventoryRowKey)]);
+      return new Set([...s, ...paginatedRows.map(inventoryRowKey)]);
     });
   }
 
@@ -212,7 +223,7 @@ function InventoryTrashPanel() {
         <EmptyState icon="trash" title="Trash is empty" description="Trashed items, containers, and locations show up here for 30 days before they're automatically deleted." />
       ) : (
         <div className="flex flex-col gap-2">
-          {filteredRows.map((row) => {
+          {paginatedRows.map((row) => {
             const key = inventoryRowKey(row);
             const isSelected = selected.has(key);
             return (
@@ -262,6 +273,7 @@ function InventoryTrashPanel() {
               </div>
             );
           })}
+          {hasMore && <LoadMoreButton remaining={remaining} pageSize={pageSize} onClick={loadMore} />}
         </div>
       )}
 
@@ -361,6 +373,7 @@ function FinanceTrashPanel() {
   ].sort((a, b) => b.trashedAt.localeCompare(a.trashedAt));
 
   const filteredRows = filter === "all" ? rows : rows.filter((r) => r.type === filter);
+  const { visible: paginatedRows, hasMore, remaining, pageSize, loadMore } = usePaginated(filteredRows, filter);
 
   function restore(row: FinanceTrashRow) {
     if (row.type === "account") restoreAccount(row.id);
@@ -401,7 +414,7 @@ function FinanceTrashPanel() {
         <EmptyState icon="trash" title="Trash is empty" description="Trashed accounts, transactions, categories, and bills show up here for 30 days." />
       ) : (
         <div className="flex flex-col gap-2">
-          {filteredRows.map((row) => {
+          {paginatedRows.map((row) => {
             const key = financeRowKey(row);
             return (
               <div key={key} className="flex items-center gap-3 rounded-2xl border border-border bg-white p-3 shadow-sm">
@@ -433,6 +446,7 @@ function FinanceTrashPanel() {
               </div>
             );
           })}
+          {hasMore && <LoadMoreButton remaining={remaining} pageSize={pageSize} onClick={loadMore} />}
         </div>
       )}
 

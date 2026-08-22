@@ -9,7 +9,9 @@ import { Icon } from "@/components/icon";
 import { IconChip } from "@/components/icon-chip";
 import { Button } from "@/components/ui/button";
 import { AskConversationEntry } from "@/components/ask-conversation-entry";
+import { LoadMoreButton } from "@/components/load-more-button";
 import { useAskConversation } from "@/hooks/use-ask-conversation";
+import { usePaginated } from "@/hooks/use-paginated";
 import { categoryAccentClass } from "@/lib/category";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { rowToScannedReceiptLineItem, type ScannedReceiptLineItemRow } from "@/lib/supabase/mappers";
@@ -118,6 +120,7 @@ function SearchPageInner() {
     categoryFilter && domain !== "finance" ? combined.filter((r) => r.kind === "item" && r.item.category === categoryFilter) : combined;
 
   const hasAnyResults = inventoryResults.length > 0 || financeResults.length > 0;
+  const { visible: paginatedResults, hasMore, remaining, pageSize, loadMore } = usePaginated(filteredResults, `${domain}:${categoryFilter}:${query}`);
 
   return (
     <div className="flex flex-col gap-4">
@@ -186,10 +189,11 @@ function SearchPageInner() {
             {filteredResults.length} result{filteredResults.length === 1 ? "" : "s"}
           </p>
           <div className="flex flex-col gap-2">
-            {filteredResults.map((r) => (
+            {paginatedResults.map((r) => (
               <SearchResultRow key={`${r.kind}-${r.kind === "item" ? r.item.id : r.kind === "transaction" ? r.transaction.id : r.account.id}`} result={r} />
             ))}
           </div>
+          {hasMore && <LoadMoreButton remaining={remaining} pageSize={pageSize} onClick={loadMore} />}
         </>
       )}
     </div>

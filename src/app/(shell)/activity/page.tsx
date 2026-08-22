@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ActivityRow } from "@/components/activity-row";
 import { EmptyState } from "@/components/empty-state";
+import { LoadMoreButton } from "@/components/load-more-button";
+import { usePaginated } from "@/hooks/use-paginated";
 import { useInventoryStore } from "@/lib/store";
 import type { ActivityEntityType } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -58,7 +60,13 @@ export default function ActivityFeedPage() {
         ? activity.filter((a) => FINANCE_ENTITY_TYPES.includes(a.entityType))
         : activity.filter((a) => !FINANCE_ENTITY_TYPES.includes(a.entityType));
 
-  const groups = groupByDay(filtered);
+  // Sorted here (not left to groupByDay's own internal sort) so pagination
+  // windows the same chronological order the feed actually renders in,
+  // rather than an arbitrary pre-sort slice of `filtered`. Reset key is
+  // the domain filter — the only thing that changes what's in `filtered`.
+  const sortedActivity = [...filtered].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const { visible: paginatedActivity, hasMore, remaining, pageSize, loadMore } = usePaginated(sortedActivity, filter);
+  const groups = groupByDay(paginatedActivity);
 
   return (
     <div className="flex flex-col gap-4">
@@ -94,6 +102,7 @@ export default function ActivityFeedPage() {
               </div>
             </div>
           ))}
+          {hasMore && <LoadMoreButton remaining={remaining} pageSize={pageSize} onClick={loadMore} />}
         </div>
       )}
     </div>

@@ -32,6 +32,8 @@ import { categoriesForTransaction } from "@/lib/selectors";
 import { formatCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useRemountKey } from "@/hooks/use-remount-key";
+import { usePaginated } from "@/hooks/use-paginated";
+import { LoadMoreButton } from "@/components/load-more-button";
 import { categorizationProvider, REVIEW_THRESHOLD, VisionDetectionError, type CategorySuggestion } from "@/lib/ai";
 import type { ScannedReceiptLineItem, Transaction } from "@/lib/types";
 
@@ -371,7 +373,17 @@ export default function TransactionsListPage() {
   });
 
   const sorted = [...filtered].sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
-  const groups = groupByDay(sorted);
+  // "Load more" over the fully-loaded, already-filtered+sorted list — the
+  // reset key covers every filter dimension above (date scope/custom
+  // range/search/uncategorized-only) so changing any of them jumps back to
+  // the first page, but stays stable across a Realtime-driven update to
+  // `transactions` itself, so a scrolled-down user's progress survives a
+  // live edit elsewhere.
+  const { visible: paginatedTransactions, hasMore, remaining, pageSize, loadMore } = usePaginated(
+    sorted,
+    `${dateScope}:${customFrom}:${customTo}:${trimmedQuery}:${uncategorizedOnly}`
+  );
+  const groups = groupByDay(paginatedTransactions);
   const detailTxn = transactions.find((t) => t.id === detailId) ?? null;
   const detailAccount = accounts.find((a) => a.id === detailTxn?.accountId);
   const detailAttachment = transactionAttachments.find((a) => a.transactionId === detailTxn?.id);
@@ -564,12 +576,16 @@ export default function TransactionsListPage() {
             scoped to categorizable transactions only — transfers/payments
             never take a category (see the row-render comment below), so
             they're excluded here the same way their checkbox is. */}
-        {selectMode && sorted.some((t) => t.type !== "transfer" && t.type !== "payment") && (
+        {/* Scoped to paginatedTransactions (what's actually rendered right
+            now), not the full filtered set — selecting rows a "Load more"
+            tap hasn't revealed yet would silently check items with no
+            checkbox on screen to show for it. */}
+        {selectMode && paginatedTransactions.some((t) => t.type !== "transfer" && t.type !== "payment") && (
           <button
             type="button"
             onClick={() =>
               setSelectedIds((prev) => {
-                const selectable = sorted.filter((t) => t.type !== "transfer" && t.type !== "payment");
+                const selectable = paginatedTransactions.filter((t) => t.type !== "transfer" && t.type !== "payment");
                 const allVisibleSelected = selectable.every((t) => prev.has(t.id));
                 if (allVisibleSelected) {
                   const next = new Set(prev);
@@ -581,7 +597,7 @@ export default function TransactionsListPage() {
             }
             className="shrink-0 text-caption font-medium text-ink underline underline-offset-2"
           >
-            {sorted.filter((t) => t.type !== "transfer" && t.type !== "payment").every((t) => selectedIds.has(t.id)) ? "Deselect all" : "Select all"}
+            {paginatedTransactions.filter((t) => t.type !== "transfer" && t.type !== "payment").every((t) => selectedIds.has(t.id)) ? "Deselect all" : "Select all"}
           </button>
         )}
       </div>
@@ -829,6 +845,7 @@ export default function TransactionsListPage() {
               </div>
             </div>
           ))}
+          {hasMore && <LoadMoreButton remaining={remaining} pageSize={pageSize} onClick={loadMore} />}
         </div>
       )}
 

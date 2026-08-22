@@ -15,7 +15,9 @@ import { EmptyState } from "@/components/empty-state";
 import { EntityFormSheet } from "@/components/entity-form-sheet";
 import { MoveSheet } from "@/components/move-sheet";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { LoadMoreButton } from "@/components/load-more-button";
 import { Button } from "@/components/ui/button";
+import { usePaginated } from "@/hooks/use-paginated";
 import { useInventoryStore } from "@/lib/store";
 import { coverPhotoUrl } from "@/lib/cover-photo";
 import { rotateStoredPhoto } from "@/lib/crop-image";
@@ -55,10 +57,19 @@ export default function LocationDetailPage() {
   const [bulkTrashOpen, setBulkTrashOpen] = useState(false);
 
   const location = locations.find((l) => l.id === params.id);
+  // Computed from params.id (not location.id) and the pagination hook
+  // called here, both ahead of the `if (!location)` early return below —
+  // hooks can't come after a conditional return, and params.id is already
+  // available regardless of whether the lookup above found a real
+  // location. itemsIn() naturally returns [] for an id with no match, so
+  // this is harmless on the not-found path (which throws via notFound()
+  // a few lines down anyway).
+  const directItems = itemsIn(items, params.id, null);
+  const { visible: paginatedDirectItems, hasMore, remaining, pageSize, loadMore } = usePaginated(directItems, params.id);
+
   if (!location) return notFound();
 
   const childContainers = directChildContainers(containers, null, location.id);
-  const directItems = itemsIn(items, location.id, null);
 
   function toggleItemSelected(itemId: string) {
     setSelectedItemIds((s) => {
@@ -248,7 +259,7 @@ export default function LocationDetailPage() {
           </div>
           {view === "grid" ? (
             <div className="grid grid-cols-2 gap-3">
-              {directItems.map((item) => (
+              {paginatedDirectItems.map((item) => (
                 <ItemCard
                   key={item.id}
                   item={item}
@@ -260,7 +271,7 @@ export default function LocationDetailPage() {
             </div>
           ) : (
             <div className="flex flex-col gap-2">
-              {directItems.map((item) => (
+              {paginatedDirectItems.map((item) => (
                 <ItemRow
                   key={item.id}
                   item={item}
@@ -271,6 +282,7 @@ export default function LocationDetailPage() {
               ))}
             </div>
           )}
+          {hasMore && <LoadMoreButton remaining={remaining} pageSize={pageSize} onClick={loadMore} />}
         </section>
       )}
 

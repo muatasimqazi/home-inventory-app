@@ -8,8 +8,10 @@ import { MoveSheet } from "@/components/move-sheet";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { EntityFormSheet } from "@/components/entity-form-sheet";
+import { LoadMoreButton } from "@/components/load-more-button";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { usePaginated } from "@/hooks/use-paginated";
 import { useInventoryStore } from "@/lib/store";
 import { activeLocations, directChildContainers } from "@/lib/selectors";
 import { cn } from "@/lib/utils";
@@ -59,6 +61,7 @@ export default function DesktopManagementPage() {
     : locationId
       ? items.filter((it) => it.status === "active" && it.locationId === locationId)
       : [];
+  const { visible: paginatedRows, hasMore, remaining, pageSize, loadMore } = usePaginated(rows, `${locationId}:${containerId}`);
 
   function openAddLocation() {
     bumpAddLocationKey();
@@ -161,7 +164,7 @@ export default function DesktopManagementPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.map((item) => (
+                  {paginatedRows.map((item) => (
                     <TableRow key={item.id}>
                       <TableCell>
                         <input type="checkbox" checked={selectedItems.has(item.id)} onChange={() => toggleItem(item.id)} className="size-4" />
@@ -184,6 +187,7 @@ export default function DesktopManagementPage() {
                   ))}
                 </TableBody>
               </Table>
+              {hasMore && <LoadMoreButton remaining={remaining} pageSize={pageSize} onClick={loadMore} />}
             </>
           )}
         </div>

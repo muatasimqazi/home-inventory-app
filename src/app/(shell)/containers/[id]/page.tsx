@@ -17,21 +17,16 @@ import { EntityFormSheet } from "@/components/entity-form-sheet";
 import { MoveSheet } from "@/components/move-sheet";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { DisplayCodeSheet } from "@/components/display-code-sheet";
+import { LoadMoreButton } from "@/components/load-more-button";
 import { Button } from "@/components/ui/button";
 import { useRemountKey } from "@/hooks/use-remount-key";
+import { usePaginated } from "@/hooks/use-paginated";
 import { useInventoryStore } from "@/lib/store";
 import { coverPhotoUrl } from "@/lib/cover-photo";
 import { rotateStoredPhoto } from "@/lib/crop-image";
 import { displayCodeBadgeClasses } from "@/lib/badge-color";
 import { cn } from "@/lib/utils";
-import {
-  activeItemCountForContainer,
-  buildBreadcrumb,
-  breadcrumbLabel,
-  collectDescendantIds,
-  directChildContainers,
-  itemsIn,
-} from "@/lib/selectors";
+import { activeItemCountForContainer, buildBreadcrumb, breadcrumbLabel, collectDescendantIds, directChildContainers } from "@/lib/selectors";
 
 export default function ContainerDetailPage() {
   const params = useParams<{ id: string }>();
@@ -66,11 +61,20 @@ export default function ContainerDetailPage() {
   const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
 
   const container = containers.find((c) => c.id === params.id);
+  // Filtered by containerId alone (equivalent to itemsIn(items,
+  // container.locationId, container.id) — every item's locationId is kept
+  // in sync with its container's location, so containerId alone already
+  // narrows correctly) so this can run, and the pagination hook below can
+  // be called, ahead of the `if (!container)` early return — hooks can't
+  // come after a conditional return, and container.locationId isn't
+  // available yet at this point if the lookup above found nothing.
+  const directItems = items.filter((it) => it.status === "active" && it.containerId === params.id);
+  const { visible: paginatedDirectItems, hasMore, remaining, pageSize, loadMore } = usePaginated(directItems, params.id);
+
   if (!container) return notFound();
 
   const breadcrumb = buildBreadcrumb(container.locationId, container.id, locations, containers);
   const subContainers = directChildContainers(containers, container.id, container.locationId);
-  const directItems = itemsIn(items, container.locationId, container.id);
   const isEmpty = subContainers.length === 0 && directItems.length === 0;
 
   async function handlePhotoChosen(e: React.ChangeEvent<HTMLInputElement>) {
@@ -293,7 +297,7 @@ export default function ContainerDetailPage() {
               </div>
               {view === "grid" ? (
                 <div className="grid grid-cols-2 gap-3">
-                  {directItems.map((item) => (
+                  {paginatedDirectItems.map((item) => (
                     <ItemCard
                       key={item.id}
                       item={item}
@@ -305,7 +309,7 @@ export default function ContainerDetailPage() {
                 </div>
               ) : (
                 <div className="flex flex-col gap-2">
-                  {directItems.map((item) => (
+                  {paginatedDirectItems.map((item) => (
                     <ItemRow
                       key={item.id}
                       item={item}
@@ -316,6 +320,7 @@ export default function ContainerDetailPage() {
                   ))}
                 </div>
               )}
+              {hasMore && <LoadMoreButton remaining={remaining} pageSize={pageSize} onClick={loadMore} />}
             </section>
           )}
         </>
