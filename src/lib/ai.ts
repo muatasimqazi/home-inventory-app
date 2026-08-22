@@ -358,3 +358,104 @@ export class HttpVisionProvider implements VisionProvider {
 // VisionProvider interface, so this was the only line that needed to change
 // when the underlying implementation moved off a direct Google API key.
 export const visionProvider: VisionProvider = new HttpVisionProvider();
+
+// ---------------------------------------------------------------------------
+// AI category suggestion for transactions (Household Ledger Implementation
+// Plan, Workstream 3 batch) — a sibling to VisionProvider, not an extension
+// of it: this is a pure text classification task (merchant/description/
+// amount in, a categoryId out), no photo ever involved, so it gets its own
+// small provider interface instead of a fourth VisionProvider method.
+//
+// Same assisted-not-automatic posture as link-purchase-sheet.tsx's item<->
+// transaction matching (PRD §25 "assisted, opportunistic matching, not
+// automatic"): a suggestion is always shown for the user to accept/adjust,
+// never applied on its own. See the transactions list page for the two
+// surfaces built on this — a "Suggest categories" batch pass and a review
+// sheet, plus a one-tap-accept badge per suggested row.
+// ---------------------------------------------------------------------------
+
+export interface CategorySuggestionTransaction {
+  id: string;
+  merchant: string | null;
+  description: string | null;
+  /** Signed, same convention as Transaction.amount. */
+  amount: number;
+}
+
+export interface CategorySuggestionCategory {
+  id: string;
+  name: string;
+}
+
+export interface CategorySuggestion {
+  transactionId: string;
+  /** One of the ids passed in via `categories`, or null if nothing reasonably fits — never a made-up category. */
+  categoryId: string | null;
+  confidence: number; // 0-1
+}
+
+export interface CategorizationProvider {
+  /** Suggests a best-fit category (from `categories` — the household's real, active list) for each transaction, one suggestion per input transaction, same order. */
+  suggestCategories(transactions: CategorySuggestionTransaction[], categories: CategorySuggestionCategory[]): Promise<CategorySuggestion[]>;
+}
+
+/** A little variety so mock mode exercises both a confident-badge path and a below-threshold one, same texture as CANNED_POOL's confidence spread above. */
+function mockConfidenceFor(index: number, matched: boolean): number {
+  if (matched) return 0.92;
+  return [0.82, 0.68, 0.55, 0.9][index % 4];
+}
+
+export class MockCategorizationProvider implements CategorizationProvider {
+  async suggestCategories(transactions: CategorySuggestionTransaction[], categories: CategorySuggestionCategory[]): Promise<CategorySuggestion[]> {
+    await new Promise((resolve) => setTimeout(resolve, 900));
+    if (categories.length === 0) {
+      return transactions.map((t) => ({ transactionId: t.id, categoryId: null, confidence: 0 }));
+    }
+    return transactions.map((t, i) => {
+      // Light keyword pass so mock mode still feels sensible in a demo (a
+      // "Whole Foods" transaction lands on a category actually named
+      // something grocery-like when one exists) — real matching happens
+      // server-side in lib/finance/categorize.ts via a real model call.
+      const text = `${t.merchant ?? ""} ${t.description ?? ""}`.toLowerCase().trim();
+      const keywordMatch = text ? categories.find((c) => text.includes(c.name.toLowerCase()) || c.name.toLowerCase().includes(text)) : undefined;
+      const picked = keywordMatch ?? categories[(i + text.length) % categories.length];
+      return { transactionId: t.id, categoryId: picked.id, confidence: mockConfidenceFor(i, !!keywordMatch) };
+    });
+  }
+}
+
+/**
+ * Real, active provider — calls /api/v1/finance/categorize over fetch,
+ * never touches a model provider directly (that lives server-side in
+ * lib/finance/categorize.ts, routed through Vercel AI Gateway same as
+ * lib/vision/detect.ts). Reuses VisionDetectionError for its error type —
+ * every other HTTP*Provider in this file already does the same despite the
+ * name (see appliance-capture-store.ts, receipt-scan-session-store.ts,
+ * recurring/import/page.tsx), so this stays consistent rather than adding a
+ * near-identical error class just for this one provider.
+ */
+export class HttpCategorizationProvider implements CategorizationProvider {
+  async suggestCategories(transactions: CategorySuggestionTransaction[], categories: CategorySuggestionCategory[]): Promise<CategorySuggestion[]> {
+    let res: Response;
+    try {
+      res = await fetch("/api/v1/finance/categorize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transactions, categories }),
+      });
+    } catch {
+      throw new VisionDetectionError("Couldn't reach the server. Check your connection and try again.", true);
+    }
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new VisionDetectionError(body?.error ?? `Category suggestion failed (${res.status}).`, body?.retryable ?? true);
+    }
+    const { suggestions } = (await res.json()) as { suggestions: CategorySuggestion[] };
+    return suggestions;
+  }
+}
+
+// Real suggestion is live, routed through Vercel AI Gateway (see
+// lib/finance/categorize.ts). Every call site depends only on the
+// CategorizationProvider interface.
+export const categorizationProvider: CategorizationProvider = new HttpCategorizationProvider();

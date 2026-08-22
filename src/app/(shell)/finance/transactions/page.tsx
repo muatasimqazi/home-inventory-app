@@ -13,6 +13,7 @@ import { TransactionFormSheet } from "@/components/transaction-form-sheet";
 import { TransactionDetailSheet } from "@/components/transaction-detail-sheet";
 import { LineItemFormSheet } from "@/components/line-item-form-sheet";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { CategorizeSuggestionsSheet, type CategorizeSuggestionRow } from "@/components/categorize-suggestions-sheet";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { rowToScannedReceiptLineItem, type ScannedReceiptLineItemRow } from "@/lib/supabase/mappers";
 import {
@@ -30,7 +31,16 @@ import { categoriesForTransaction } from "@/lib/selectors";
 import { formatCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useRemountKey } from "@/hooks/use-remount-key";
+import { categorizationProvider, VisionDetectionError, type CategorySuggestion } from "@/lib/ai";
 import type { ScannedReceiptLineItem, Transaction } from "@/lib/types";
+
+// AI category suggestion (Household Ledger Implementation Plan, Workstream
+// 3 batch) — an on-demand batch pass over currently-uncategorized
+// transactions, not a database-triggered background job (see the "Suggest
+// categories" banner and its handler below for why that's the deliberate,
+// simpler interpretation here). Cap keeps one batch call fast and matches
+// the API route's own MAX_TRANSACTIONS guard.
+const MAX_AI_CATEGORIZE_BATCH = 30;
 
 type DateScope = "all" | "month" | "custom";
 
@@ -71,6 +81,7 @@ export default function TransactionsListPage() {
   const trashTransaction = useInventoryStore((s) => s.trashTransaction);
   const createCategoryRule = useInventoryStore((s) => s.createCategoryRule);
   const deleteCategoryRule = useInventoryStore((s) => s.deleteCategoryRule);
+  const addTransactionCategory = useInventoryStore((s) => s.addTransactionCategory);
 
   const searchParams = useSearchParams();
   const defaultAccountId = searchParams.get("accountId") ?? undefined;
@@ -118,6 +129,23 @@ export default function TransactionsListPage() {
   const [editingLineItem, setEditingLineItem] = useState<ScannedReceiptLineItem | null>(null);
   const [deleteLineItemConfirm, setDeleteLineItemConfirm] = useState<ScannedReceiptLineItem | null>(null);
   const [addingItemForTransactionId, setAddingItemForTransactionId] = useState<string | null>(null);
+
+  // AI category suggestions (Household Ledger Implementation Plan,
+  // Workstream 3 batch) — client-side only, never persisted: a "Suggest
+  // categories" pass fills this map, each row shows an inline "AI: <name>"
+  // badge with a one-tap Accept (which just calls addTransactionCategory,
+  // same as any manual pick), and "Review & apply" opens the fuller sheet
+  // to adjust/skip before a batch apply. Nothing in either path calls
+  // addTransactionCategory without this explicit per-suggestion or
+  // per-batch confirmation step.
+  const [suggestions, setSuggestions] = useState<Record<string, CategorySuggestion>>({});
+  const [suggesting, setSuggesting] = useState(false);
+  const [reviewSuggestionsOpen, setReviewSuggestionsOpen] = useState(false);
+  // Forces CategorizeSuggestionsSheet to remount (and reseed its per-row
+  // choices from the latest suggestions) each time it's freshly opened —
+  // same always-mounted-with-`open`-as-a-prop situation useRemountKey's own
+  // doc comment describes, bumped in the same click handler that opens it.
+  const [reviewSuggestionsKey, bumpReviewSuggestionsKey] = useRemountKey();
 
   // Line items nested right in the list (not only behind the detail
   // drawer) — one bulk fetch scoped to every receipt-sourced transaction
@@ -329,6 +357,89 @@ export default function TransactionsListPage() {
     toast.success(`Future "${merchant}" transactions will be categorized automatically`, { duration: 3000 });
   }
 
+  // AI category suggestion — batch pass over currently-uncategorized
+  // transactions. See MAX_AI_CATEGORIZE_BATCH's comment for why this is an
+  // on-demand pass rather than a background job. Most-recent-first so a
+  // household with more uncategorized transactions than the cap gets
+  // suggestions for the ones they're most likely reviewing right now.
+  function uncategorizedForSuggestion(): Transaction[] {
+    return transactions
+      .filter((t) => !t.trashedAt && !t.categoryId && (t.type === "expense" || t.type === "income" || t.type === "refund"))
+      .sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime())
+      .slice(0, MAX_AI_CATEGORIZE_BATCH);
+  }
+
+  async function handleSuggestCategories() {
+    const targets = uncategorizedForSuggestion();
+    if (targets.length === 0) {
+      toast("No uncategorized transactions to suggest categories for.");
+      return;
+    }
+    const activeCategories = financeCategories.filter((c) => c.status === "active");
+    if (activeCategories.length === 0) {
+      toast.error("Add a category first — there's nothing for AI to suggest from yet.");
+      return;
+    }
+
+    setSuggesting(true);
+    try {
+      const results = await categorizationProvider.suggestCategories(
+        targets.map((t) => ({ id: t.id, merchant: t.merchant, description: t.description, amount: t.amount })),
+        activeCategories.map((c) => ({ id: c.id, name: c.name }))
+      );
+      const confident = results.filter((r) => r.categoryId !== null);
+      if (confident.length === 0) {
+        toast("AI couldn't confidently match a category for any of these.");
+        return;
+      }
+      setSuggestions((prev) => {
+        const next = { ...prev };
+        for (const r of confident) next[r.transactionId] = r;
+        return next;
+      });
+      toast.success(`${confident.length} category suggestion${confident.length === 1 ? "" : "s"} ready to review`);
+    } catch (error) {
+      const message = error instanceof VisionDetectionError ? error.message : "Couldn't suggest categories. Please try again.";
+      toast.error(message);
+    } finally {
+      setSuggesting(false);
+    }
+  }
+
+  function dismissSuggestion(transactionId: string) {
+    setSuggestions((prev) => {
+      const next = { ...prev };
+      delete next[transactionId];
+      return next;
+    });
+  }
+
+  /** One-tap accept straight from the row badge — same write as picking a category by hand in TransactionFormSheet, just via the suggested categoryId. */
+  function acceptSuggestion(transactionId: string) {
+    const suggestion = suggestions[transactionId];
+    if (!suggestion?.categoryId) return;
+    addTransactionCategory(transactionId, suggestion.categoryId);
+    dismissSuggestion(transactionId);
+    toast.success("Category applied");
+  }
+
+  function handleApplySuggestions(accepted: { transactionId: string; categoryId: string }[]) {
+    for (const a of accepted) addTransactionCategory(a.transactionId, a.categoryId);
+    setSuggestions((prev) => {
+      const next = { ...prev };
+      for (const a of accepted) delete next[a.transactionId];
+      return next;
+    });
+    if (accepted.length > 0) toast.success(`Applied ${accepted.length} categor${accepted.length === 1 ? "y" : "ies"}`);
+  }
+
+  const suggestionCount = Object.keys(suggestions).length;
+  const uncategorizedCount = uncategorizedForSuggestion().length;
+  const suggestionRows: CategorizeSuggestionRow[] = Object.values(suggestions).map((s) => {
+    const transaction = transactions.find((t) => t.id === s.transactionId);
+    return { transaction: transaction as Transaction, suggestedCategoryId: s.categoryId, confidence: s.confidence };
+  }).filter((row) => !!row.transaction);
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-start justify-between">
@@ -372,6 +483,49 @@ export default function TransactionsListPage() {
         </div>
       )}
 
+      {/* AI category suggestion — a distinct banner, deliberately kept out of
+          the filter-chip row and out of the transaction list's own
+          row-selection affordances (a parallel workstream owns bulk-select
+          on this page) so the two don't visually collide. */}
+      {accounts.length > 0 &&
+        (suggestionCount > 0 ? (
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-yellow/10 px-4 py-3">
+            <p className="flex items-center gap-1.5 text-caption font-medium text-ink">
+              <Icon name="ai" size={14} className="shrink-0 text-yellow" />
+              {suggestionCount} AI suggestion{suggestionCount === 1 ? "" : "s"} ready to review
+            </p>
+            <div className="flex shrink-0 items-center gap-3">
+              <button type="button" onClick={() => setSuggestions({})} className="tap-target text-caption text-muted-foreground">
+                Dismiss
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  bumpReviewSuggestionsKey();
+                  setReviewSuggestionsOpen(true);
+                }}
+                className="tap-target text-caption font-semibold text-yellow-text"
+              >
+                Review &amp; apply
+              </button>
+            </div>
+          </div>
+        ) : (
+          uncategorizedCount > 0 && (
+            <button
+              type="button"
+              onClick={handleSuggestCategories}
+              disabled={suggesting}
+              className="flex items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-white px-4 py-3 text-caption font-medium text-ink disabled:opacity-60"
+            >
+              <Icon name="ai" size={15} className="text-yellow" />
+              {suggesting
+                ? "Suggesting categories…"
+                : `Suggest categories for ${uncategorizedCount} uncategorized transaction${uncategorizedCount === 1 ? "" : "s"}`}
+            </button>
+          )
+        ))}
+
       {accounts.length === 0 ? (
         <EmptyState icon="receipt" title="Add an account first" description="Transactions belong to an account — add one from the Accounts tab to get started." />
       ) : sorted.length === 0 ? (
@@ -388,6 +542,8 @@ export default function TransactionsListPage() {
               <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
                 {entries.map((t) => {
                   const displayedCategories = categoriesForTransaction(t, categoryIdsByTransaction[t.id] ?? [], financeCategories);
+                  const suggestion = displayedCategories.length === 0 ? suggestions[t.id] : undefined;
+                  const suggestedCategory = suggestion?.categoryId ? financeCategories.find((c) => c.id === suggestion.categoryId) : undefined;
                   const items = lineItemsByTransaction[t.id] ?? [];
                   // Every receipt-scan transaction can expand — not just
                   // ones that already have items. A real Costco receipt
@@ -409,6 +565,10 @@ export default function TransactionsListPage() {
                                     {c.name}
                                   </span>
                                 ))
+                              ) : suggestedCategory ? (
+                                <span className="flex items-center gap-1 rounded-full bg-yellow/20 px-1.5 py-0.5 text-micro font-medium text-ink">
+                                  <Icon name="ai" size={10} /> {suggestedCategory.name}
+                                </span>
                               ) : (
                                 <span className="text-caption text-muted-foreground">Uncategorized</span>
                               )}
@@ -423,6 +583,16 @@ export default function TransactionsListPage() {
                             {formatCurrency(t.amount, { showPositiveSign: true })}
                           </span>
                         </button>
+                        {suggestedCategory && (
+                          <button
+                            type="button"
+                            onClick={() => acceptSuggestion(t.id)}
+                            aria-label={`Accept AI suggestion: ${suggestedCategory.name}`}
+                            className="tap-target flex size-8 shrink-0 items-center justify-center rounded-full text-yellow-text"
+                          >
+                            <Icon name="check" size={17} />
+                          </button>
+                        )}
                         {isScanSourced && (
                           <button
                             type="button"
@@ -592,6 +762,15 @@ export default function TransactionsListPage() {
         tone="danger"
         icon="trash"
         onConfirm={handleDeleteLineItem}
+      />
+
+      <CategorizeSuggestionsSheet
+        key={reviewSuggestionsKey}
+        open={reviewSuggestionsOpen}
+        onOpenChange={setReviewSuggestionsOpen}
+        rows={suggestionRows}
+        categories={financeCategories}
+        onApply={handleApplySuggestions}
       />
     </div>
   );
