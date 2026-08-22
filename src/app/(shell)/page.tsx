@@ -9,6 +9,7 @@ import { Icon } from "@/components/icon";
 import { IconChip } from "@/components/icon-chip";
 import { PhotoThumb } from "@/components/photo-thumb";
 import { Badge } from "@/components/ui/badge";
+import { ReviewBadge } from "@/components/review-badge";
 import { EmptyState } from "@/components/empty-state";
 import { useInventoryStore, useCurrentHousehold } from "@/lib/store";
 import {
@@ -26,6 +27,7 @@ import {
   looseItemCount,
   netWorth,
   recentTransactions,
+  unreadActivityCount,
   upcomingRecurringBills,
 } from "@/lib/selectors";
 import { formatCurrency, formatShortDate } from "@/lib/format";
@@ -33,6 +35,12 @@ import { cn } from "@/lib/utils";
 
 const ONBOARDING_THRESHOLD = 5;
 const BILLS_DUE_SOON_DAYS = 7;
+// Same "at a glance, not the whole list" cap every other Overview preview
+// (e.g. recentContainers below) already applies — nothing currently
+// deletes a tag (getOrCreateTag only adds), so an unbounded list here
+// would only grow and eventually push the rest of the page below the
+// fold. "View all" (next to the heading) is the actual full list.
+const TAGS_PREVIEW_LIMIT = 8;
 
 /**
  * The former Home page was an inventory-only dashboard living at "/" —
@@ -56,6 +64,8 @@ export default function OverviewPage() {
   const accounts = useInventoryStore((s) => s.accounts);
   const transactions = useInventoryStore((s) => s.transactions);
   const recurringBills = useInventoryStore((s) => s.recurringBills);
+  const tags = useInventoryStore((s) => s.tags);
+  const currentUserId = useInventoryStore((s) => s.currentUserId);
 
   const [view, setView] = useState<"mine" | "household">("mine");
 
@@ -67,6 +77,9 @@ export default function OverviewPage() {
   const genericPhotos = genericPhotoItemCount(items);
   const latestActivity = activity[0];
   const actor = latestActivity ? members.find((m) => m.userId === latestActivity.actorUserId) : null;
+  const me = members.find((m) => m.userId === currentUserId);
+  const unreadCount = unreadActivityCount(activity, currentUserId, me?.lastActivityViewedAt ?? null);
+  const sortedTags = [...tags].sort((a, b) => a.name.localeCompare(b.name));
 
   // Same My Dashboard/Household split as the Finance Dashboard itself
   // (Personal Finance Addendum, "Privacy model") — Household never
@@ -98,6 +111,7 @@ export default function OverviewPage() {
           </Link>
           <Link href="/activity" aria-label="Activity" className="tap-target relative flex size-11 items-center justify-center rounded-md border border-border bg-white">
             <Icon name="bell" size={20} className="text-ink" />
+            <ReviewBadge count={unreadCount} className="absolute -right-1 -top-1 bg-danger" />
           </Link>
         </div>
       </div>
@@ -275,6 +289,29 @@ export default function OverviewPage() {
             />
           )}
         </div>
+
+        {sortedTags.length > 0 && (
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-item-title font-semibold text-ink">Tags</h3>
+              <Link href="/tags" className="text-caption font-semibold text-ink">
+                View all
+              </Link>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {sortedTags.slice(0, TAGS_PREVIEW_LIMIT).map((tag) => (
+                <Link
+                  key={tag.id}
+                  href={`/tags/${tag.id}`}
+                  className="tap-target flex items-center gap-1.5 rounded-full bg-surface-muted px-3 py-1.5 text-caption font-medium text-ink"
+                >
+                  <Icon name="tag" size={14} className="text-yellow" />
+                  {tag.name}
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
 
         {activeItems.length >= ONBOARDING_THRESHOLD && latestActivity ? (
           <Link

@@ -82,6 +82,7 @@ export interface MemberRow {
   display_name: string;
   email: string;
   avatar_url: string | null;
+  last_activity_viewed_at: string | null;
 }
 
 export function rowToMember(row: MemberRow): Member {
@@ -93,6 +94,7 @@ export function rowToMember(row: MemberRow): Member {
     displayName: row.display_name,
     email: row.email,
     avatarUrl: row.avatar_url ?? undefined,
+    lastActivityViewedAt: row.last_activity_viewed_at,
   };
 }
 
