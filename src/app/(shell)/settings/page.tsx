@@ -100,6 +100,13 @@ export default function SettingsPage() {
         <Icon name="logOut" size={16} /> Sign out
       </button>
 
+      <Link
+        href="/settings/delete-account"
+        className="tap-target flex items-center justify-center gap-2 py-1 text-caption font-medium text-muted-foreground"
+      >
+        <Icon name="danger" size={14} /> Delete account
+      </Link>
+
       <Sheet open={editOpen} onOpenChange={setEditOpen}>
         <SheetContent side="bottom" className="rounded-t-3xl">
           <SheetHeader>
