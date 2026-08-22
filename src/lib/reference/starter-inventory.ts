@@ -53,24 +53,46 @@ export async function loadReferenceItems(): Promise<ReferenceInventoryItem[]> {
 }
 
 /**
+ * Case-insensitive exact match first, then substring containment either
+ * direction — the one matching policy this module (and the Ask tool's own
+ * household-location matcher, which needs the same policy against
+ * different data) builds every "best-effort name match" on, so a future
+ * change to the policy itself (punctuation normalization, word-boundary
+ * matching, whatever) only needs to land here once. Returns every item
+ * satisfying the best tier that matched at all (every exact match, or if
+ * none, every containment match) — never a mix of tiers. Callers decide
+ * how to handle more than one: REFERENCE_LOCATIONS' fixed 22 names don't
+ * collide this way in practice, so matchReferenceLocation below just takes
+ * the first; a caller matching against arbitrary user-named data (real
+ * household Locations) should treat more than one candidate as genuinely
+ * ambiguous rather than silently picking one.
+ */
+export function matchByName<T>(items: readonly T[], getName: (item: T) => string, query: string): T[] {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return [];
+  const exact = items.filter((it) => getName(it).toLowerCase() === needle);
+  if (exact.length > 0) return exact;
+  return items.filter((it) => {
+    const name = getName(it).toLowerCase();
+    return needle.includes(name) || name.includes(needle);
+  });
+}
+
+/**
  * Best-effort match from a household's own (free-text, user-chosen)
  * Location name to one of REFERENCE_LOCATIONS, so item-name suggestions
  * can be scoped to "what's typically in a Garage" for a household location
- * actually named "Garage" — exact case-insensitive match first, then
- * substring containment either direction (so "Kids Room" matches
- * "Children" only if a caller phrases the reference name to contain it;
- * today's list doesn't overlap that way, so this mostly resolves to the
- * exact-match case, with substring as a harmless, conservative fallback
- * for near-misses like "The Garage" or "Main Garage"). Returns null
- * (no suggestions, not a wrong guess) when nothing reasonably matches.
+ * actually named "Garage" (so "Kids Room" matches "Children" only if a
+ * caller phrases the reference name to contain it; today's list doesn't
+ * overlap that way, so this mostly resolves to the exact-match case, with
+ * substring as a harmless, conservative fallback for near-misses like "The
+ * Garage" or "Main Garage"). Returns null (no suggestions, not a wrong
+ * guess) when nothing reasonably matches. The 22-entry reference list
+ * doesn't produce real multi-match ambiguity in practice, so this takes
+ * the first match rather than surfacing the list matchByName returns.
  */
 export function matchReferenceLocation(householdLocationName: string): string | null {
-  const needle = householdLocationName.trim().toLowerCase();
-  if (!needle) return null;
-  const exact = REFERENCE_LOCATIONS.find((loc) => loc.toLowerCase() === needle);
-  if (exact) return exact;
-  const contains = REFERENCE_LOCATIONS.find((loc) => needle.includes(loc.toLowerCase()) || loc.toLowerCase().includes(needle));
-  return contains ?? null;
+  return matchByName(REFERENCE_LOCATIONS, (loc) => loc, householdLocationName)[0] ?? null;
 }
 
 /** Shared by both suggest* functions below: case-insensitive substring match on name, shortest-name-first so closer matches (e.g. "Oven" before "Oven and Range" for query "oven") lead the list. Under 2 characters is treated as "no query yet" (matches the Add Item typeahead's own threshold — a 1-character query against a 2,662-row catalog is mostly noise). */

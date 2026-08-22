@@ -3,6 +3,7 @@ import { tool } from "ai";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { warrantyStatus } from "@/lib/selectors";
+import { loadReferenceItems, matchByName, matchReferenceLocation } from "@/lib/reference/starter-inventory";
 
 /**
  * Strips characters that would otherwise change what a raw user string
@@ -325,7 +326,140 @@ export function createAskTools(supabase: SupabaseClient, householdId: string) {
         return { items: result, count: result.length };
       },
     }),
+
+    // Docs/v4 "Enhanced Features" — "what am I missing from my kitchen"
+    // style questions. Reuses the onboarding/typeahead reference catalog
+    // (lib/reference/starter-inventory.ts) that already backs the
+    // add-item suggestion typeahead, rather than inventing a second
+    // "commonly kept items" dataset — this is the same 22-bucket, ~2,662-
+    // item catalog, just read from the other direction (what's missing,
+    // not what to suggest while typing). A suggestion feature, not a
+    // precision-critical one (unlike the finance tools above): the
+    // "already have" check is deliberately a loose substring-containment
+    // match, same conservative spirit as escapeSearchInput/matchReference
+    // Location elsewhere in this codebase, not a rewrite of matching
+    // philosophy.
+    findMissingCommonItems: tool({
+      description:
+        "For 'what am I missing from my X' or 'what should I have in my X' questions — compares a real " +
+        "household Location's actual inventory against a generic reference catalog of commonly-kept items for " +
+        "that kind of space (e.g. kitchen, garage, bathroom) and reports what's commonly kept there that this " +
+        "household doesn't seem to have yet. `locationName` can be whatever the user said (e.g. 'kitchen', 'the " +
+        "garage') — it's matched against the household's real Locations here, no need to canonicalize it " +
+        "yourself. If the result has `locationNotFound` or `noReferenceData` set, say so plainly rather than " +
+        "guessing. If it has `locationAmbiguous` set, more than one of the household's own Locations could match " +
+        "what was said — list the candidate names from `candidates` and ask which one was meant, rather than " +
+        "picking one yourself. This is a suggestion feature, not an inventory audit — an imperfect 'already " +
+        "have' match is expected, so phrase the answer as a rough suggestion (e.g. 'you have about N of the M " +
+        "common items'), not a precise count; if `missingItemsTruncated` is true, say the list below is a " +
+        "partial sample (e.g. 'including') rather than implying it's everything.",
+      inputSchema: z.object({
+        locationName: z.string().describe("The location as the user described it, e.g. 'kitchen' or 'garage'. Freeform — not required to be an exact Location name."),
+      }),
+      execute: async ({ locationName }) => {
+        // Started immediately, not after the locations query/matching below
+        // — it has no data dependency on either, so it can load/parse
+        // concurrently with that DB round trip instead of serialized
+        // behind it.
+        const referenceItemsPromise = loadReferenceItems();
+
+        // .order("name") makes the (rare) exact-name-tie case — two real
+        // Locations literally sharing a name, which locations.name has no
+        // uniqueness constraint against — at least deterministic across
+        // calls, even though it's still an arbitrary pick between two
+        // otherwise-indistinguishable Locations either way.
+        const { data: locations, error: locationsError } = await supabase
+          .from("locations")
+          .select("id, name")
+          .eq("household_id", householdId)
+          .eq("status", "active")
+          .order("name");
+        if (locationsError) return { error: locationsError.message };
+
+        const locationMatch = matchHouseholdLocation(locations ?? [], locationName);
+        if (locationMatch.kind === "none") {
+          return {
+            locationNotFound: true,
+            message: `No location named "${locationName}" found in this household.`,
+          };
+        }
+        if (locationMatch.kind === "ambiguous") {
+          return {
+            locationAmbiguous: true,
+            candidates: locationMatch.candidates.map((l) => l.name),
+            message: `More than one location could match "${locationName}" — ask which one was meant.`,
+          };
+        }
+        const matchedLocation = locationMatch.location;
+
+        const referenceLocation = matchReferenceLocation(matchedLocation.name);
+        if (!referenceLocation) {
+          return {
+            noReferenceData: true,
+            locationName: matchedLocation.name,
+            message: `No reference data available for a location like "${matchedLocation.name}".`,
+          };
+        }
+
+        const [allReferenceItems, { data: realItems, error: itemsError }] = await Promise.all([
+          referenceItemsPromise,
+          supabase.from("items").select("name").eq("household_id", householdId).eq("location_id", matchedLocation.id).eq("status", "active"),
+        ]);
+        if (itemsError) return { error: itemsError.message };
+
+        const referenceItemsHere = allReferenceItems.filter((it) => it.location === referenceLocation);
+        const realItemNames = (realItems ?? []).map((i) => (i.name as string).toLowerCase());
+
+        const missing = referenceItemsHere.filter((refItem) => {
+          const refName = refItem.name.toLowerCase();
+          return !realItemNames.some((realName) => {
+            if (realName === refName) return true;
+            // Containment only counts once both sides are long enough to
+            // be a meaningful phrase match — a short, generic real item
+            // name like "Bag" or "Box" would otherwise satisfy containment
+            // against many unrelated reference items ("Trash Bags",
+            // "Freezer Bags", ...) purely by being a short substring of a
+            // longer phrase, inflating haveCount for a location that's
+            // actually still mostly empty.
+            if (Math.min(realName.length, refName.length) < 5) return false;
+            return realName.includes(refName) || refName.includes(realName);
+          });
+        });
+
+        const MISSING_ITEMS_LIMIT = 20;
+        return {
+          locationName: matchedLocation.name,
+          totalCommonItems: referenceItemsHere.length,
+          haveCount: referenceItemsHere.length - missing.length,
+          missingCount: missing.length,
+          missingItems: missing.slice(0, MISSING_ITEMS_LIMIT).map((it) => it.name),
+          missingItemsTruncated: missing.length > MISSING_ITEMS_LIMIT,
+        };
+      },
+    }),
   };
+}
+
+type HouseholdLocationMatch<T> = { kind: "none" } | { kind: "ambiguous"; candidates: T[] } | { kind: "found"; location: T };
+
+/**
+ * Matches a freeform question phrase (e.g. "kitchen", "the garage") to one
+ * of the household's real Locations, via the same matchByName policy
+ * lib/reference/starter-inventory.ts's matchReferenceLocation is built on
+ * (case-insensitive exact match first, then substring containment either
+ * direction) — but unlike that function's fixed, non-colliding 22-name
+ * list, a household's own Locations are arbitrary and user-named, so more
+ * than one can genuinely match the same freeform phrase (e.g. "Garage" and
+ * "Garage Loft" both matching "garage"). Silently picking the first one in
+ * that case would let the tool confidently answer about the wrong
+ * Location, so this returns an explicit "ambiguous" result instead — never
+ * a guess.
+ */
+function matchHouseholdLocation<T extends { name: string }>(locations: T[], query: string): HouseholdLocationMatch<T> {
+  const matches = matchByName(locations, (l) => l.name, query);
+  if (matches.length === 0) return { kind: "none" };
+  if (matches.length === 1) return { kind: "found", location: matches[0] };
+  return { kind: "ambiguous", candidates: matches };
 }
 
 /** Walks a container's parent_container_id chain up to its root, then resolves that root's location — mirrors buildBreadcrumb() in lib/selectors.ts, server-side, for the one tool that needs it. */
