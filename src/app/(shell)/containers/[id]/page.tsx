@@ -61,14 +61,19 @@ export default function ContainerDetailPage() {
   const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
 
   const container = containers.find((c) => c.id === params.id);
-  // Filtered by containerId alone (equivalent to itemsIn(items,
-  // container.locationId, container.id) — every item's locationId is kept
-  // in sync with its container's location, so containerId alone already
-  // narrows correctly) so this can run, and the pagination hook below can
-  // be called, ahead of the `if (!container)` early return — hooks can't
-  // come after a conditional return, and container.locationId isn't
-  // available yet at this point if the lookup above found nothing.
-  const directItems = items.filter((it) => it.status === "active" && it.containerId === params.id);
+  // Same double check itemsIn() itself enforces (containerId AND
+  // locationId, not containerId alone) — computed inline here rather than
+  // via that selector so it can run, and the pagination hook below can be
+  // called, ahead of the `if (!container)` early return (hooks can't come
+  // after a conditional return). `container` is already looked up above,
+  // so this costs nothing extra; when it's undefined (not-found path),
+  // `container?.locationId` is undefined and no item ever matches it,
+  // same harmless empty result as before. Keeping both fields matters as
+  // real defense-in-depth, not redundancy: every item's locationId is
+  // *supposed* to stay in sync with its container's location, but this
+  // page shouldn't silently trust that invariant any less than itemsIn()
+  // itself does for the exact same query shape elsewhere in the app.
+  const directItems = items.filter((it) => it.status === "active" && it.containerId === params.id && it.locationId === container?.locationId);
   const { visible: paginatedDirectItems, hasMore, remaining, pageSize, loadMore } = usePaginated(directItems, params.id);
 
   if (!container) return notFound();
