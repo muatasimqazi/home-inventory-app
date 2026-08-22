@@ -17,10 +17,16 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { rowToScannedReceiptLineItem, type ScannedReceiptLineItemRow } from "@/lib/supabase/mappers";
 import { useInventoryStore } from "@/lib/store";
 import { searchInventory, searchFinance, type SearchResult } from "@/lib/search";
-import { accountTypeIcon } from "@/lib/selectors";
+import { accountTypeIcon, activeLocations } from "@/lib/selectors";
 import { formatCurrency, formatShortDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { ScannedReceiptLineItem } from "@/lib/types";
+import {
+  loadReferenceItems,
+  matchReferenceLocation,
+  suggestReferenceItemsAcrossCatalog,
+  type ReferenceInventoryItem,
+} from "@/lib/reference/starter-inventory";
 
 type Domain = "all" | "inventory" | "finance";
 
@@ -101,6 +107,27 @@ function SearchPageInner() {
     return () => cancelAnimationFrame(raf);
   }, []);
 
+  // Reference-catalog ("Common items") lazy load. Unlike the Add Item
+  // form's typeahead — which defers loadReferenceItems() to first focus on
+  // its Name field, since most visits to that form never touch typeahead —
+  // this route's entire purpose is "the user is about to type a query," so
+  // loading the ~220KB catalog once on mount avoids "Common items" popping
+  // in a beat after the real results on someone's very first search here.
+  // Still a dynamic import behind loadReferenceItems's own module-scope
+  // cache, so the ~220KB item list stays its own chunk rather than bloating
+  // this route's eagerly-loaded bundle (see starter-inventory.ts's header
+  // comment).
+  const [referenceItems, setReferenceItems] = useState<ReferenceInventoryItem[] | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void loadReferenceItems().then((items) => {
+      if (!cancelled) setReferenceItems(items);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const inventoryResults = useMemo(() => searchInventory(query, items, containers, locations, tags), [query, items, containers, locations, tags]);
   const financeResults = useMemo(
     () => searchFinance(query, transactions, accounts, financeCategories, lineItemsByTransaction),
@@ -121,6 +148,49 @@ function SearchPageInner() {
 
   const hasAnyResults = inventoryResults.length > 0 || financeResults.length > 0;
   const { visible: paginatedResults, hasMore, remaining, pageSize, loadMore } = usePaginated(filteredResults, `${domain}:${categoryFilter}:${query}`);
+
+  // Names the household already has, active items only — exact
+  // case-insensitive match, deliberately not the same loose bidirectional
+  // substring containment matchReferenceLocation() uses for locations: a
+  // household item genuinely named "Bag" would otherwise suppress every
+  // reference item whose name merely contains "bag" ("Trash Bags",
+  // "Freezer Bags", ...). Exact-name dedup is conservative — it can still
+  // miss a real duplicate phrased slightly differently — but it can't
+  // wrongly hide a suggestion the household doesn't actually have, which
+  // matters more given the section's own "not yet in your inventory" label.
+  const ownedItemNames = useMemo(() => new Set(items.filter((it) => it.status === "active").map((it) => it.name.trim().toLowerCase())), [items]);
+
+  // "Common items" — reference-catalog matches, inventory-domain only (the
+  // catalog has no finance concept) so hidden under the Finance filter same
+  // as the category chips above. Deliberately NOT filtered by the category
+  // chip (categoryFilter): that chip's option list is derived from the
+  // household's real inventoryResults, and a reference item's mapped
+  // category may not even appear in it — applying it here would silently
+  // hide otherwise-relevant suggestions rather than narrow them.
+  const referenceResults = useMemo(() => {
+    if (domain === "finance" || !referenceItems) return [];
+    return suggestReferenceItemsAcrossCatalog(referenceItems, query, 24).filter((r) => !ownedItemNames.has(r.name.trim().toLowerCase()));
+  }, [domain, referenceItems, query, ownedItemNames]);
+
+  // Reverse of matchReferenceLocation: for each reference location name
+  // that some real household Location resolves to (via the same
+  // conservative exact/substring heuristic used everywhere else this
+  // catalog is location-matched), remember that Location's id so a
+  // suggestion's "Add" link can prefill it. First household Location to
+  // match a given reference name wins on the rare case of more than one
+  // matching (e.g. two locations both loosely matching "Closet").
+  // activeLocations() — not the raw store slice — since a trashed
+  // Location's id has no business being handed to /add as a destination;
+  // every other placement-facing use of `locations` in this app already
+  // filters this way (locations/page.tsx, move-sheet.tsx, ...).
+  const referenceLocationToHouseholdId = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const loc of activeLocations(locations)) {
+      const matched = matchReferenceLocation(loc.name);
+      if (matched && !(matched in map)) map[matched] = loc.id;
+    }
+    return map;
+  }, [locations]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -196,7 +266,52 @@ function SearchPageInner() {
           {hasMore && <LoadMoreButton remaining={remaining} pageSize={pageSize} onClick={loadMore} />}
         </>
       )}
+
+      {referenceResults.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <p className="text-caption text-muted-foreground">
+            Common items — not yet in your inventory, tap one to add it
+          </p>
+          <div className="flex flex-col gap-2">
+            {referenceResults.map((r) => (
+              <ReferenceResultRow
+                key={`${r.location}:${r.name}`}
+                refItem={r}
+                locationId={referenceLocationToHouseholdId[r.location] ?? null}
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+/**
+ * A reference-catalog suggestion, not a real household result — same card
+ * shape as SearchResultRow's item row (rounded-2xl/border/shadow) so it
+ * reads as part of the same list idiom, but an IconChip "plus" instead of
+ * the item row's box glyph signals "add this," not "open this," and there's
+ * no category accent bar: category is shown, but only as secondary text
+ * next to the reference location, per the brief's "subtly, not primary."
+ * Links straight into the manual Add Item form, prefilled via the same
+ * ?name=/?category=/?locationId= params that form already reads (added
+ * alongside this feature) — locationId is included only when this
+ * reference item's location resolved to a real household Location.
+ */
+function ReferenceResultRow({ refItem, locationId }: { refItem: ReferenceInventoryItem; locationId: string | null }) {
+  const params = new URLSearchParams({ name: refItem.name, category: refItem.category });
+  if (locationId) params.set("locationId", locationId);
+  return (
+    <Link href={`/add?${params.toString()}`} className="flex items-center gap-3 rounded-2xl border border-border bg-white p-3 shadow-sm">
+      <IconChip icon="plus" tone="muted" />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-item-title font-medium text-ink">{refItem.name}</p>
+        <p className="truncate text-caption text-muted-foreground">
+          {refItem.location} · {refItem.category}
+        </p>
+      </div>
+    </Link>
   );
 }
 

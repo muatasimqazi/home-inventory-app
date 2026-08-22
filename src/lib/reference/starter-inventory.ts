@@ -73,12 +73,26 @@ export function matchReferenceLocation(householdLocationName: string): string | 
   return contains ?? null;
 }
 
-/** Up to `limit` items in `referenceLocation` whose name contains `query` (case-insensitive), shortest-name-first so closer matches (e.g. "Oven" before "Oven and Range" for query "oven") lead the list. */
-export function suggestReferenceItems(items: ReferenceInventoryItem[], referenceLocation: string, query: string, limit = 6): ReferenceInventoryItem[] {
+/** Shared by both suggest* functions below: case-insensitive substring match on name, shortest-name-first so closer matches (e.g. "Oven" before "Oven and Range" for query "oven") lead the list. Under 2 characters is treated as "no query yet" (matches the Add Item typeahead's own threshold — a 1-character query against a 2,662-row catalog is mostly noise). */
+function rankByName(items: ReferenceInventoryItem[], query: string, limit: number): ReferenceInventoryItem[] {
   const needle = query.trim().toLowerCase();
   if (needle.length < 2) return [];
   return items
-    .filter((it) => it.location === referenceLocation && it.name.toLowerCase().includes(needle))
+    .filter((it) => it.name.toLowerCase().includes(needle))
     .sort((a, b) => a.name.length - b.name.length)
     .slice(0, limit);
+}
+
+/** Up to `limit` items in `referenceLocation` whose name contains `query` (case-insensitive). Used by the Add Item form's location-scoped name typeahead. */
+export function suggestReferenceItems(items: ReferenceInventoryItem[], referenceLocation: string, query: string, limit = 6): ReferenceInventoryItem[] {
+  return rankByName(
+    items.filter((it) => it.location === referenceLocation),
+    query,
+    limit
+  );
+}
+
+/** Same matching/ranking as suggestReferenceItems, but across the whole catalog rather than one location — Search's "Common items" results aren't scoped to a single household location the way the Add Item form's typeahead is. */
+export function suggestReferenceItemsAcrossCatalog(items: ReferenceInventoryItem[], query: string, limit = 24): ReferenceInventoryItem[] {
+  return rankByName(items, query, limit);
 }
