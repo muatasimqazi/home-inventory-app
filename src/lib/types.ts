@@ -478,6 +478,26 @@ export interface FinanceBillShare {
   createdAt: string;
 }
 
+/**
+ * AI recurring-bill detection (Workstream 4, supabase/migrations/0025_
+ * recurring_candidate_dismissals.sql) — a household member dismissing a
+ * detected candidate ("not actually recurring") on
+ * /finance/recurring/detected. `candidateKey` matches
+ * TransactionRecurringCandidate.id (lib/recurring-transaction-
+ * detection.ts): `${accountId}:${normalizedMerchantKey}`, recomputed
+ * fresh each detection run, not tied to specific transaction ids — so a
+ * dismissal keeps suppressing the same merchant+account pattern across
+ * runs without needing to track which transactions were involved.
+ */
+export interface RecurringCandidateDismissal {
+  id: string;
+  householdId: string;
+  accountId: string;
+  candidateKey: string;
+  dismissedByUserId: string;
+  dismissedAt: string;
+}
+
 export type CsvImportBatchStatus = "pending" | "imported" | "failed";
 
 export interface CsvImportBatch {

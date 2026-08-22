@@ -60,9 +60,16 @@ export default function RecurringBillsPage() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-screen-title font-semibold text-ink">Recurring Bills</h1>
-          <p className="mt-0.5 text-caption text-muted-foreground">Add manually, or detect subscriptions from a statement.</p>
+          <p className="mt-0.5 text-caption text-muted-foreground">Add manually, or detect subscriptions from your history or a statement.</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <Link
+            href="/finance/recurring/detected"
+            aria-label="Detect from transaction history"
+            className="tap-target flex size-11 items-center justify-center rounded-md border border-border bg-white text-ink"
+          >
+            <Icon name="ai" size={18} />
+          </Link>
           <Link
             href="/finance/recurring/import"
             aria-label="Import from statement"

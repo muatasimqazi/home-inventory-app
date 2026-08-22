@@ -44,6 +44,7 @@ import type {
   RecurringBill,
   RecurringBillFrequency,
   FinanceBillShare,
+  RecurringCandidateDismissal,
   ReceiptScanBatch,
   ReceiptScanBatchStatus,
   ScannedTransactionDraft,
@@ -990,6 +991,37 @@ export function financeBillShareToInsertRow(s: FinanceBillShare): FinanceBillSha
     shared_with_user_id: s.sharedWithUserId,
     shared_by_user_id: s.sharedByUserId,
     created_at: s.createdAt,
+  };
+}
+
+export interface RecurringCandidateDismissalRow {
+  id: string;
+  household_id: string;
+  account_id: string;
+  candidate_key: string;
+  dismissed_by_user_id: string;
+  dismissed_at: string;
+}
+
+export function rowToRecurringCandidateDismissal(row: RecurringCandidateDismissalRow): RecurringCandidateDismissal {
+  return {
+    id: row.id,
+    householdId: row.household_id,
+    accountId: row.account_id,
+    candidateKey: row.candidate_key,
+    dismissedByUserId: row.dismissed_by_user_id,
+    dismissedAt: row.dismissed_at,
+  };
+}
+
+export function recurringCandidateDismissalToInsertRow(d: RecurringCandidateDismissal): RecurringCandidateDismissalRow {
+  return {
+    id: d.id,
+    household_id: d.householdId,
+    account_id: d.accountId,
+    candidate_key: d.candidateKey,
+    dismissed_by_user_id: d.dismissedByUserId,
+    dismissed_at: d.dismissedAt,
   };
 }
 

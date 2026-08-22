@@ -50,6 +50,8 @@ import {
   recurringBillToInsertRow,
   rowToFinanceBillShare,
   financeBillShareToInsertRow,
+  rowToRecurringCandidateDismissal,
+  recurringCandidateDismissalToInsertRow,
   rowToAccountBalanceSnapshot,
   accountBalanceSnapshotToInsertRow,
   rowToTransactionAttachment,
@@ -85,6 +87,7 @@ import {
   type RecurringBillRow,
   type FinanceBillShareRow,
   type AccountBalanceSnapshotRow,
+  type RecurringCandidateDismissalRow,
 } from "./supabase/mappers";
 import type {
   Account,
@@ -117,6 +120,7 @@ import type {
   PinnedLocationCategory,
   RecurringBill,
   RecurringBillFrequency,
+  RecurringCandidateDismissal,
   Tag,
   Transaction,
   TransactionAttachment,
@@ -254,6 +258,8 @@ interface InventoryState {
   categoryRules: CategoryRule[];
   recurringBills: RecurringBill[];
   financeBillShares: FinanceBillShare[];
+  /** AI recurring-bill detection dismissals (Workstream 4, supabase/migrations/0026_recurring_candidate_dismissals.sql) — which detected-but-not-yet-tracked merchant+account patterns a household member has already said "not recurring" to, so /finance/recurring/detected doesn't keep re-surfacing them every run. Privacy-scoped like transactions (RLS via the account's own can_view_account()). */
+  recurringCandidateDismissals: RecurringCandidateDismissal[];
   /** No Realtime subscription (rarely changes, not needed for live sync) — fetched once at hydration like everything else. */
   accountBalanceSnapshots: AccountBalanceSnapshot[];
   /** Permanently-retained receipt images (docs/Receipt Scanning Addendum.md §6) — unlike receipt_scan_batches/scanned_transaction_drafts/scanned_receipt_line_items (review-stage only, fetched on-demand by receipt-scan-session-store.ts, not part of this bundle), attachments are real permanent records shown on Transaction Detail, so they hydrate here like everything else. */
@@ -424,6 +430,10 @@ interface InventoryState {
   permanentlyDeleteRecurringBill: (billId: string) => void;
   shareRecurringBill: (billId: string, withUserId: string) => void;
   unshareRecurringBill: (billId: string, withUserId: string) => void;
+  /** Marks a detected-but-not-yet-tracked recurring pattern (TransactionRecurringCandidate.id, `${accountId}:${normalizedMerchantKey}`) as "not recurring" so /finance/recurring/detected stops surfacing it. No-op if already dismissed (the DB's own unique(account_id, candidate_key) would reject a duplicate anyway). */
+  dismissRecurringCandidate: (accountId: string, candidateKey: string) => void;
+  /** Undoes a dismissal — lets the candidate reappear on the next detection run. */
+  undismissRecurringCandidate: (accountId: string, candidateKey: string) => void;
   /** Manually records today's balance for every active account as one AccountBalanceSnapshot batch (source: 'manual') — real usable history without waiting on the nightly scheduled job (PRD §30) this pass doesn't set up. */
   recordNetWorthSnapshot: () => void;
   /** Uploads a receipt image to the shared "attachments" Storage bucket and links it to a transaction. Real, awaited: same reasoning as addAttachment — a file has to actually finish uploading before there's anything to show. `sourceDraftId` is set when this comes from confirming a scanned receipt, omitted for a manually-attached one. */
@@ -545,6 +555,7 @@ interface HouseholdBundle {
   categoryRules: CategoryRule[];
   recurringBills: RecurringBill[];
   financeBillShares: FinanceBillShare[];
+  recurringCandidateDismissals: RecurringCandidateDismissal[];
   accountBalanceSnapshots: AccountBalanceSnapshot[];
   transactionAttachments: TransactionAttachment[];
   transactionCategories: TransactionCategory[];
@@ -575,6 +586,7 @@ function snapshotBundle(state: InventoryState): HouseholdBundle {
     categoryRules: state.categoryRules,
     recurringBills: state.recurringBills,
     financeBillShares: state.financeBillShares,
+    recurringCandidateDismissals: state.recurringCandidateDismissals,
     accountBalanceSnapshots: state.accountBalanceSnapshots,
     transactionAttachments: state.transactionAttachments,
     transactionCategories: state.transactionCategories,
@@ -611,6 +623,7 @@ async function fetchHouseholdBundle(
     categoryRulesRes,
     recurringBillsRes,
     financeBillSharesRes,
+    recurringCandidateDismissalsRes,
     transactionAttachmentsRes,
     transactionCategoriesRes,
     itemPurchasesRes,
@@ -648,6 +661,7 @@ async function fetchHouseholdBundle(
     supabase.from("category_rules").select("*").eq("household_id", householdId),
     supabase.from("recurring_bills").select("*").eq("household_id", householdId),
     supabase.from("finance_bill_shares").select("*").eq("household_id", householdId),
+    supabase.from("recurring_candidate_dismissals").select("*").eq("household_id", householdId),
     supabase.from("transaction_attachments").select("*").eq("household_id", householdId),
     supabase.from("transaction_categories").select("*").eq("household_id", householdId),
     supabase.from("item_purchases").select("*").eq("household_id", householdId),
@@ -657,6 +671,7 @@ async function fetchHouseholdBundle(
     membersRes.error ?? invitesRes.error ?? peopleRes.error ?? locationsRes.error ?? containersRes.error ?? itemsRes.error ?? tagsRes.error ?? favoritesRes.error ?? activityRes.error ??
     attachmentsRes.error ?? pinnedLocationsRes.error ?? labelBatchesRes.error ?? labelBatchEntriesRes.error ?? normalizationRulesRes.error ??
     accountsRes.error ?? financeAccountSharesRes.error ?? transactionsRes.error ?? financeCategoriesRes.error ?? categoryRulesRes.error ?? recurringBillsRes.error ?? financeBillSharesRes.error ??
+    recurringCandidateDismissalsRes.error ??
     transactionAttachmentsRes.error ?? transactionCategoriesRes.error ?? itemPurchasesRes.error;
   if (firstError) throw new Error(firstError.message);
 
@@ -696,6 +711,7 @@ async function fetchHouseholdBundle(
     categoryRules: ((categoryRulesRes.data ?? []) as CategoryRuleRow[]).map(rowToCategoryRule),
     recurringBills: ((recurringBillsRes.data ?? []) as RecurringBillRow[]).map(rowToRecurringBill),
     financeBillShares: ((financeBillSharesRes.data ?? []) as FinanceBillShareRow[]).map(rowToFinanceBillShare),
+    recurringCandidateDismissals: ((recurringCandidateDismissalsRes.data ?? []) as RecurringCandidateDismissalRow[]).map(rowToRecurringCandidateDismissal),
     accountBalanceSnapshots: ((snapshotsRes.data ?? []) as AccountBalanceSnapshotRow[]).map(rowToAccountBalanceSnapshot),
     transactionAttachments: ((transactionAttachmentsRes.data ?? []) as TransactionAttachmentRow[]).map(rowToTransactionAttachment),
     transactionCategories: ((transactionCategoriesRes.data ?? []) as TransactionCategoryRow[]).map(rowToTransactionCategory),
@@ -869,6 +885,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
   categoryRules: [],
   recurringBills: [],
   financeBillShares: [],
+  recurringCandidateDismissals: [],
   accountBalanceSnapshots: [],
   transactionAttachments: [],
   transactionCategories: [],
@@ -964,7 +981,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
         | "members" | "invites" | "people" | "locations" | "containers" | "tags" | "activity" | "attachments" | "pinnedLocations"
         | "labelBatches" | "labelBatchEntries" | "normalizationRules"
         | "accounts" | "financeAccountShares" | "transactions" | "financeCategories" | "categoryRules"
-        | "recurringBills" | "financeBillShares" | "transactionAttachments" | "transactionCategories" | "itemPurchases"
+        | "recurringBills" | "financeBillShares" | "recurringCandidateDismissals" | "transactionAttachments" | "transactionCategories" | "itemPurchases"
     ) {
       const handler = arrayMergeHandler<TRow, TDomain>(mapper, keyOf, rowKeyOf, (updater) =>
         set((s) => ({ [stateKey]: updater(s[stateKey] as unknown as TDomain[]) }) as Partial<InventoryState>)
@@ -1007,6 +1024,14 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     bind<CategoryRuleRow, CategoryRule>("category_rules", householdFilter, rowToCategoryRule, (r) => r.id, (r) => r.id as string, "categoryRules");
     bind<RecurringBillRow, RecurringBill>("recurring_bills", householdFilter, rowToRecurringBill, (b) => b.id, (r) => r.id as string, "recurringBills");
     bind<FinanceBillShareRow, FinanceBillShare>("finance_bill_shares", householdFilter, rowToFinanceBillShare, (s) => s.id, (r) => r.id as string, "financeBillShares");
+    bind<RecurringCandidateDismissalRow, RecurringCandidateDismissal>(
+      "recurring_candidate_dismissals",
+      householdFilter,
+      rowToRecurringCandidateDismissal,
+      (d) => d.id,
+      (r) => r.id as string,
+      "recurringCandidateDismissals"
+    );
     // categories: filtered by household_id like everything else above,
     // which means it only catches this household's own custom categories
     // — a system default (household_id null) changing live wouldn't reach
@@ -2819,6 +2844,36 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       supabase.from("finance_bill_shares").delete().eq("bill_id", billId).eq("shared_with_user_id", withUserId),
       () => set({ financeBillShares: previous }),
       "Couldn't revoke sharing"
+    );
+  },
+
+  dismissRecurringCandidate: (accountId, candidateKey) => {
+    if (get().recurringCandidateDismissals.some((d) => d.accountId === accountId && d.candidateKey === candidateKey)) return;
+    const supabase = getSupabaseBrowserClient();
+    const created: RecurringCandidateDismissal = {
+      id: newId(),
+      householdId: get().currentHouseholdId,
+      accountId,
+      candidateKey,
+      dismissedByUserId: get().currentUserId,
+      dismissedAt: nowIso(),
+    };
+    set((s) => ({ recurringCandidateDismissals: [...s.recurringCandidateDismissals, created] }));
+    persistOrRevert(
+      supabase.from("recurring_candidate_dismissals").insert(recurringCandidateDismissalToInsertRow(created)),
+      () => set((s) => ({ recurringCandidateDismissals: s.recurringCandidateDismissals.filter((d) => d.id !== created.id) })),
+      "Couldn't dismiss suggestion"
+    );
+  },
+
+  undismissRecurringCandidate: (accountId, candidateKey) => {
+    const supabase = getSupabaseBrowserClient();
+    const previous = get().recurringCandidateDismissals;
+    set((s) => ({ recurringCandidateDismissals: s.recurringCandidateDismissals.filter((d) => !(d.accountId === accountId && d.candidateKey === candidateKey)) }));
+    persistOrRevert(
+      supabase.from("recurring_candidate_dismissals").delete().eq("account_id", accountId).eq("candidate_key", candidateKey),
+      () => set({ recurringCandidateDismissals: previous }),
+      "Couldn't undo dismissal"
     );
   },
 
