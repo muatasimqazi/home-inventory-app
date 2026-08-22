@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Icon, type IconName } from "@/components/icon";
 import { ReviewBadge } from "@/components/review-badge";
 import { ScanChooserSheet } from "@/components/scan-chooser-sheet";
@@ -10,6 +10,8 @@ import { useInventoryStore, useCurrentHousehold } from "@/lib/store";
 import { computeHouseholdSummary, contextualCaptureHref } from "@/lib/selectors";
 import { INVENTORY_LINKS, FINANCE_LINKS, SHARED_LINKS } from "@/lib/nav-links";
 import { cn } from "@/lib/utils";
+
+const COLLAPSED_STORAGE_KEY = "shohaz:sidebar-collapsed";
 
 export function DesktopSidebar() {
   const pathname = usePathname();
@@ -20,16 +22,66 @@ export function DesktopSidebar() {
   const summary = computeHouseholdSummary(items, locations);
   const scanHref = contextualCaptureHref(pathname, containers);
   const [chooserOpen, setChooserOpen] = useState(false);
+  // Defaults to expanded on both server and first client render (no
+  // access to localStorage during SSR/initial hydration — reading it
+  // synchronously here would mismatch and trip a hydration warning), then
+  // reconciled from the persisted preference right after mount. Returning
+  // users with a collapsed sidebar see one initial frame expanded before
+  // this runs, same tradeoff every localStorage-backed UI preference in a
+  // server-rendered app makes.
+  const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    // Deferred a tick (react-hooks/set-state-in-effect) — same pattern as
+    // every other "reconcile from an external source on mount" effect in
+    // this app (e.g. finance/recurring/detected/page.tsx's load()): the
+    // read-and-possibly-setCollapsed shouldn't run synchronously inside
+    // the effect body itself, only as a reaction once it's scheduled.
+    queueMicrotask(() => {
+      const stored = window.localStorage.getItem(COLLAPSED_STORAGE_KEY);
+      if (stored !== null) setCollapsed(stored === "true");
+    });
+  }, []);
+
+  function toggleCollapsed() {
+    setCollapsed((current) => {
+      const next = !current;
+      try {
+        window.localStorage.setItem(COLLAPSED_STORAGE_KEY, String(next));
+      } catch {
+        // Private-browsing/storage-disabled contexts can throw on write —
+        // the toggle still works for this session, it just won't persist.
+      }
+      return next;
+    });
+  }
 
   return (
-    <aside className="hidden md:flex md:w-64 md:shrink-0 md:flex-col md:gap-6 md:border-r md:border-border md:bg-white md:px-4 md:py-6">
-      <div className="flex items-center gap-3 px-2">
+    <aside
+      className={cn(
+        "hidden md:flex md:shrink-0 md:flex-col md:gap-6 md:border-r md:border-border md:bg-white md:py-6 md:transition-[width] md:duration-200",
+        collapsed ? "md:w-16 md:px-2" : "md:w-64 md:px-4"
+      )}
+    >
+      <div className={cn("flex items-center gap-3", collapsed ? "flex-col px-0" : "px-2")}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/icon.svg" alt="" width={36} height={36} className="size-9 shrink-0 rounded-[10px]" />
-        <div className="min-w-0">
-          <p className="text-body font-semibold text-ink">Shohaz</p>
-          <p className="truncate text-caption text-muted-foreground">{household.name}</p>
-        </div>
+        {!collapsed && (
+          <div className="min-w-0 flex-1">
+            <p className="text-body font-semibold text-ink">Shohaz</p>
+            <p className="truncate text-caption text-muted-foreground">{household.name}</p>
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          aria-pressed={collapsed}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          className="tap-target flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-surface-muted hover:text-ink"
+        >
+          <Icon name={collapsed ? "panelLeftOpen" : "panelLeftClose"} size={18} />
+        </button>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto">
@@ -37,30 +89,38 @@ export function DesktopSidebar() {
             own top-level section, same reasoning as Settings living below
             the divider: it isn't part of either domain, it sits above both. */}
         <div>
-          <p className="px-3 pb-1 text-micro font-semibold tracking-wide text-muted-foreground uppercase">Overview</p>
+          {!collapsed && <p className="px-3 pb-1 text-micro font-semibold tracking-wide text-muted-foreground uppercase">Overview</p>}
           <nav className="flex flex-col gap-1" aria-label="Overview">
-            <SidebarLink href="/" icon="home" label="Overview" pathname={pathname} exact />
+            <SidebarLink href="/" icon="home" label="Overview" pathname={pathname} exact collapsed={collapsed} />
           </nav>
         </div>
 
         <div>
-          <p className="px-3 pb-1 text-micro font-semibold tracking-wide text-muted-foreground uppercase">Home inventory</p>
+          {!collapsed && <p className="px-3 pb-1 text-micro font-semibold tracking-wide text-muted-foreground uppercase">Home inventory</p>}
           <nav className="flex flex-col gap-1" aria-label="Home inventory">
-            <SidebarLink href="/locations" icon="box" label="Locations" pathname={pathname} />
+            <SidebarLink href="/locations" icon="box" label="Locations" pathname={pathname} collapsed={collapsed} />
             <Link
               href="/review"
+              title={collapsed ? "Needs Review" : undefined}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-body",
+                "relative flex items-center gap-3 rounded-lg py-2 text-body",
+                collapsed ? "justify-center px-0" : "px-3",
                 pathname.startsWith("/review") ? "bg-surface-muted text-ink" : "text-ink hover:bg-surface-muted"
               )}
             >
               <Icon name="needsReview" size={18} />
-              <span className="flex-1">Needs Review</span>
-              <ReviewBadge count={summary.needsReviewCount} />
+              {collapsed ? (
+                <ReviewBadge count={summary.needsReviewCount} className="absolute right-1 top-1 h-3.5 min-w-3.5 px-0.5 text-[9px]" />
+              ) : (
+                <>
+                  <span className="flex-1">Needs Review</span>
+                  <ReviewBadge count={summary.needsReviewCount} />
+                </>
+              )}
             </Link>
-            <SidebarLink href="/tags" icon="tag" label="Tags" pathname={pathname} />
+            <SidebarLink href="/tags" icon="tag" label="Tags" pathname={pathname} collapsed={collapsed} />
             {INVENTORY_LINKS.map((link) => (
-              <SidebarLink key={link.href} {...link} pathname={pathname} />
+              <SidebarLink key={link.href} {...link} pathname={pathname} collapsed={collapsed} />
             ))}
           </nav>
         </div>
@@ -69,10 +129,10 @@ export function DesktopSidebar() {
             Platform Foundation Addendum's "desktop shows every domain as a
             sidebar section, not a mobile-style switcher" recommendation). */}
         <div>
-          <p className="px-3 pb-1 text-micro font-semibold tracking-wide text-muted-foreground uppercase">Finance</p>
+          {!collapsed && <p className="px-3 pb-1 text-micro font-semibold tracking-wide text-muted-foreground uppercase">Finance</p>}
           <nav className="flex flex-col gap-1" aria-label="Finance">
             {FINANCE_LINKS.map((link) => (
-              <SidebarLink key={link.href} {...link} pathname={pathname} />
+              <SidebarLink key={link.href} {...link} pathname={pathname} collapsed={collapsed} />
             ))}
           </nav>
         </div>
@@ -82,18 +142,22 @@ export function DesktopSidebar() {
             separate "Scan"/"Scan Receipt" buttons) plus the already-merged
             Activity/Trash/Import CSV pages. */}
         <div>
-          <p className="px-3 pb-1 text-micro font-semibold tracking-wide text-muted-foreground uppercase">Shared</p>
+          {!collapsed && <p className="px-3 pb-1 text-micro font-semibold tracking-wide text-muted-foreground uppercase">Shared</p>}
           <nav className="flex flex-col gap-1" aria-label="Shared">
             {SHARED_LINKS.map((link) => (
-              <SidebarLink key={link.href} {...link} pathname={pathname} />
+              <SidebarLink key={link.href} {...link} pathname={pathname} collapsed={collapsed} />
             ))}
             <button
               type="button"
               onClick={() => setChooserOpen(true)}
-              className="tap-target mt-1 flex items-center justify-center gap-2 rounded-md bg-yellow px-4 py-2.5 text-caption font-medium text-white"
+              title={collapsed ? "Scan" : undefined}
+              className={cn(
+                "tap-target mt-1 flex items-center justify-center gap-2 rounded-md bg-yellow text-caption font-medium text-white",
+                collapsed ? "size-8 self-center px-0 py-0" : "px-4 py-2.5"
+              )}
             >
               <Icon name="camera" size={16} />
-              Scan
+              {!collapsed && "Scan"}
             </button>
           </nav>
         </div>
@@ -104,7 +168,7 @@ export function DesktopSidebar() {
           Shared section above (a settings surface, not a shared action/
           view), so it keeps its own standalone slot below a divider. */}
       <div className="border-t border-border pt-4">
-        <SidebarLink href="/settings" icon="settings" label="Settings" pathname={pathname} />
+        <SidebarLink href="/settings" icon="settings" label="Settings" pathname={pathname} collapsed={collapsed} />
       </div>
 
       <ScanChooserSheet open={chooserOpen} onOpenChange={setChooserOpen} itemScanHref={scanHref} />
@@ -118,24 +182,28 @@ function SidebarLink({
   label,
   pathname,
   exact,
+  collapsed,
 }: {
   href: string;
   icon: IconName;
   label: string;
   pathname: string;
   exact?: boolean;
+  collapsed?: boolean;
 }) {
   const active = exact ? pathname === href : pathname.startsWith(href);
   return (
     <Link
       href={href}
+      title={collapsed ? label : undefined}
       className={cn(
-        "flex items-center gap-3 rounded-lg px-3 py-2 text-body",
+        "flex items-center gap-3 rounded-lg py-2 text-body",
+        collapsed ? "justify-center px-0" : "px-3",
         active ? "bg-surface-muted text-ink" : "text-ink hover:bg-surface-muted"
       )}
     >
       <Icon name={icon} size={18} />
-      {label}
+      {!collapsed && label}
     </Link>
   );
 }
