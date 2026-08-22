@@ -60,8 +60,18 @@ function ManualAddItemInner() {
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
-  const [name, setName] = useState("");
-  const [category, setCategory] = useState<string>(SORTED_CATEGORIES[0]);
+  // Optional prefill from a reference-catalog pick (Search's "Common
+  // items" results, and the reference catalog browse page) — same
+  // lazy-initializer, read-only-on-mount convention as ?locationId=/
+  // ?containerId= below, not live two-way sync with the URL. `category` is
+  // validated against the real enum rather than trusted as-is: a stale or
+  // hand-edited URL param naming a category that no longer exists would
+  // otherwise silently set the Select to an unrenderable value.
+  const [name, setName] = useState(() => searchParams.get("name") ?? "");
+  const [category, setCategory] = useState<string>(() => {
+    const param = searchParams.get("category");
+    return param && (SORTED_CATEGORIES as readonly string[]).includes(param) ? param : SORTED_CATEGORIES[0];
+  });
   const [quantity, setQuantity] = useState("1");
   const [notes, setNotes] = useState("");
   const [tagInput, setTagInput] = useState("");
