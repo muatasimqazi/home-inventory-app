@@ -39,14 +39,24 @@ function applianceScanHref(itemHref: string): string {
   return queryIndex === -1 ? "/capture/appliance" : `/capture/appliance${itemHref.slice(queryIndex)}`;
 }
 
+// Barcode-scan capture (src/app/capture/barcode/) accepts the same
+// ?locationId=&containerId= context as the other three rows — same
+// path-prefix swap as applianceScanHref above, added when that flow's own
+// workstream (independent of the Categories Foundation cluster) wired up
+// its route.
+function barcodeScanHref(itemHref: string): string {
+  const queryIndex = itemHref.indexOf("?");
+  return queryIndex === -1 ? "/capture/barcode" : `/capture/barcode${itemHref.slice(queryIndex)}`;
+}
+
 /**
  * The bottom-nav camera FAB used to link straight to inventory capture —
  * with Finance now a real second domain, "scan" is ambiguous (an item for
  * inventory, or a receipt for Finance), so tapping it opens this chooser
  * instead of guessing which one the user meant.
  *
- * Three explicit, user-picked modes (Household Ledger PRD §17/§32): Scan
- * Item, Scan Receipt, and Scan Appliance. This is deliberately a chooser,
+ * Four explicit, user-picked modes (Household Ledger PRD §17/§32): Scan
+ * Item, Scan Receipt, Scan Appliance, and Scan Barcode. This is deliberately a chooser,
  * not a classifier — the user always taps a mode before the camera opens,
  * and each destination shows the AI's best guess with one-tap correction
  * before anything saves (src/app/capture/review/page.tsx's needsReview
@@ -71,6 +81,7 @@ export function ScanChooserSheet({ open, onOpenChange, itemScanHref }: ScanChoos
           <ChooserRow icon="camera" label="Scan Item" description="Add something to your inventory" onClick={() => go(itemScanHref)} />
           <ChooserRow icon="receipt" label="Scan Receipt" description="Auto-fill a Finance transaction" onClick={() => go("/finance/scan")} />
           <ChooserRow icon="zap" label="Scan Appliance" description="Read a model/serial label" onClick={() => go(applianceScanHref(itemScanHref))} />
+          <ChooserRow icon="scanBarcode" label="Scan Barcode" description="Look up a product by UPC/EAN" onClick={() => go(barcodeScanHref(itemScanHref))} />
         </div>
       </SheetContent>
     </Sheet>
