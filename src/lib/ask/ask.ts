@@ -41,6 +41,10 @@ function systemPrompt(): string {
     "For 'where is my X' questions, use findInventoryItems and always state the actual container and location by " +
     "name (e.g. 'in the Leather Tools bin, in the Office') — never just 'it's in your inventory.' If nothing " +
     "matches, say so plainly and suggest a different search term rather than guessing. " +
+    "For 'what am I missing from my X' or 'what should I have in my X' questions, use findMissingCommonItems. " +
+    "This compares against a generic reference catalog, not a precise inventory audit — phrase the answer as a " +
+    "rough suggestion, and say so plainly (never guess a location or an item list yourself) if it reports no " +
+    "matching location or no reference data. " +
     "Transaction amounts are signed: negative means money spent, positive means money received (income or " +
     "a refund) — describe spending as a positive dollar figure in your answer, don't say 'spent -$40'. " +
     "When summarizing total spend, use searchTransactions' own totalAmount/count fields, which reflect every " +

@@ -3,6 +3,7 @@ import { tool } from "ai";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { warrantyStatus } from "@/lib/selectors";
+import { loadReferenceItems, matchReferenceLocation } from "@/lib/reference/starter-inventory";
 
 /**
  * Strips characters that would otherwise change what a raw user string
@@ -325,7 +326,102 @@ export function createAskTools(supabase: SupabaseClient, householdId: string) {
         return { items: result, count: result.length };
       },
     }),
+
+    // Docs/v4 "Enhanced Features" — "what am I missing from my kitchen"
+    // style questions. Reuses the onboarding/typeahead reference catalog
+    // (lib/reference/starter-inventory.ts) that already backs the
+    // add-item suggestion typeahead, rather than inventing a second
+    // "commonly kept items" dataset — this is the same 22-bucket, ~2,662-
+    // item catalog, just read from the other direction (what's missing,
+    // not what to suggest while typing). A suggestion feature, not a
+    // precision-critical one (unlike the finance tools above): the
+    // "already have" check is deliberately a loose substring-containment
+    // match, same conservative spirit as escapeSearchInput/matchReference
+    // Location elsewhere in this codebase, not a rewrite of matching
+    // philosophy.
+    findMissingCommonItems: tool({
+      description:
+        "For 'what am I missing from my X' or 'what should I have in my X' questions — compares a real " +
+        "household Location's actual inventory against a generic reference catalog of commonly-kept items for " +
+        "that kind of space (e.g. kitchen, garage, bathroom) and reports what's commonly kept there that this " +
+        "household doesn't seem to have yet. `locationName` can be whatever the user said (e.g. 'kitchen', 'the " +
+        "garage') — it's matched against the household's real Locations here, no need to canonicalize it " +
+        "yourself. If the result has `locationNotFound` or `noReferenceData` set, say so plainly rather than " +
+        "guessing — never invent a location or a list of commonly-kept items yourself. This is a suggestion " +
+        "feature, not an inventory audit — an imperfect 'already have' match is expected, so phrase the answer " +
+        "as a rough suggestion (e.g. 'you have about N of the M common items'), not a precise count.",
+      inputSchema: z.object({
+        locationName: z.string().describe("The location as the user described it, e.g. 'kitchen' or 'garage'. Freeform — not required to be an exact Location name."),
+      }),
+      execute: async ({ locationName }) => {
+        const { data: locations, error: locationsError } = await supabase
+          .from("locations")
+          .select("id, name")
+          .eq("household_id", householdId)
+          .eq("status", "active");
+        if (locationsError) return { error: locationsError.message };
+
+        const matchedLocation = matchHouseholdLocation(locations ?? [], locationName);
+        if (!matchedLocation) {
+          return {
+            locationNotFound: true,
+            message: `No location named "${locationName}" found in this household.`,
+          };
+        }
+
+        const referenceLocation = matchReferenceLocation(matchedLocation.name);
+        if (!referenceLocation) {
+          return {
+            noReferenceData: true,
+            locationName: matchedLocation.name,
+            message: `No reference data available for a location like "${matchedLocation.name}".`,
+          };
+        }
+
+        const [allReferenceItems, { data: realItems, error: itemsError }] = await Promise.all([
+          loadReferenceItems(),
+          supabase.from("items").select("name").eq("household_id", householdId).eq("location_id", matchedLocation.id).eq("status", "active"),
+        ]);
+        if (itemsError) return { error: itemsError.message };
+
+        const referenceItemsHere = allReferenceItems.filter((it) => it.location === referenceLocation);
+        const realItemNames = (realItems ?? []).map((i) => (i.name as string).toLowerCase());
+
+        const missing = referenceItemsHere.filter((refItem) => {
+          const refName = refItem.name.toLowerCase();
+          return !realItemNames.some((realName) => realName.includes(refName) || refName.includes(realName));
+        });
+
+        return {
+          locationName: matchedLocation.name,
+          totalCommonItems: referenceItemsHere.length,
+          haveCount: referenceItemsHere.length - missing.length,
+          missingCount: missing.length,
+          missingItems: missing.slice(0, 20).map((it) => it.name),
+        };
+      },
+    }),
   };
+}
+
+/**
+ * Matches a freeform question phrase (e.g. "kitchen", "the garage") to one
+ * of the household's real Locations. Same conservative case-insensitive-
+ * exact-then-substring-containment approach as matchReferenceLocation in
+ * lib/reference/starter-inventory.ts, but the other direction: that
+ * function matches a real Location's name to one of the 22 fixed
+ * reference-catalog buckets, this matches free text to one of the
+ * household's own (arbitrary, user-named) real Locations, so it needs its
+ * own small variant rather than reusing that function's signature. Returns
+ * null (no match, not a guess) when nothing reasonably matches.
+ */
+function matchHouseholdLocation<T extends { name: string }>(locations: T[], query: string): T | null {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return null;
+  const exact = locations.find((l) => l.name.toLowerCase() === needle);
+  if (exact) return exact;
+  const contains = locations.find((l) => needle.includes(l.name.toLowerCase()) || l.name.toLowerCase().includes(needle));
+  return contains ?? null;
 }
 
 /** Walks a container's parent_container_id chain up to its root, then resolves that root's location — mirrors buildBreadcrumb() in lib/selectors.ts, server-side, for the one tool that needs it. */
