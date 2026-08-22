@@ -17,6 +17,7 @@ import { buildBreadcrumb, sortByLabel } from "@/lib/selectors";
 import { SORTED_CATEGORIES } from "@/lib/types";
 import { extraFieldsForCategory } from "@/lib/category";
 import { cn } from "@/lib/utils";
+import { loadReferenceItems, matchReferenceLocation, suggestReferenceItems, type ReferenceInventoryItem } from "@/lib/reference/up-home-inventory";
 
 const HOUSEHOLD_OWNER_VALUE = "household";
 const ADD_PERSON_VALUE = "__add_person__";
@@ -77,8 +78,19 @@ function ManualAddItemInner() {
   const [error, setError] = useState<string | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // United Policyholders reference item-name typeahead (Household Ledger
+  // Implementation Plan's deferred spreadsheet-import workstream). The full
+  // ~2,662-row list is loaded lazily (loadReferenceItems caches it in
+  // module scope after the first call) rather than up front, so opening
+  // this form doesn't pay for it until the Name field is actually used.
+  const [referenceItems, setReferenceItems] = useState<ReferenceInventoryItem[] | null>(null);
+  const [nameSuggestionsOpen, setNameSuggestionsOpen] = useState(false);
 
   const breadcrumb = buildBreadcrumb(destination.locationId, destination.containerId, locations, containers);
+  const currentLocationName = locations.find((l) => l.id === destination.locationId)?.name ?? null;
+  const matchedReferenceLocation = currentLocationName ? matchReferenceLocation(currentLocationName) : null;
+  const nameSuggestions =
+    referenceItems && matchedReferenceLocation ? suggestReferenceItems(referenceItems, matchedReferenceLocation, name) : [];
 
   function addTag() {
     const value = tagInput.trim();
@@ -176,16 +188,52 @@ function ManualAddItemInner() {
         </Field>
 
         <Field label="Name" required>
-          <Input
-            value={name}
-            onChange={(e) => {
-              setName(e.target.value);
-              if (error) setError(null);
-            }}
-            placeholder="e.g. Cordless Drill"
-            className="h-11 bg-white"
-            autoFocus
-          />
+          <div className="relative">
+            <Input
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                if (error) setError(null);
+                setNameSuggestionsOpen(true);
+              }}
+              onFocus={() => {
+                setNameSuggestionsOpen(true);
+                // Lazy-load once, on first real interaction with this
+                // field — not on page mount, and not re-fetched on every
+                // focus once cached (loadReferenceItems's own module-scope
+                // cache handles that).
+                if (!referenceItems) void loadReferenceItems().then(setReferenceItems);
+              }}
+              onBlur={() => {
+                // Deferred so a suggestion button's own onClick still
+                // fires first — a plain synchronous close-on-blur would
+                // unmount the list before the click below it registers.
+                setTimeout(() => setNameSuggestionsOpen(false), 150);
+              }}
+              placeholder="e.g. Cordless Drill"
+              className="h-11 bg-white"
+              autoFocus
+            />
+            {nameSuggestionsOpen && nameSuggestions.length > 0 && (
+              <div className="absolute z-10 mt-1 w-full overflow-hidden rounded-lg border border-border bg-white shadow-lg">
+                {nameSuggestions.map((s) => (
+                  <button
+                    key={`${s.location}:${s.name}`}
+                    type="button"
+                    onClick={() => {
+                      setName(s.name);
+                      setCategory(s.category);
+                      setNameSuggestionsOpen(false);
+                    }}
+                    className="flex w-full items-center justify-between px-3 py-2 text-left text-body text-ink hover:bg-surface-muted"
+                  >
+                    <span>{s.name}</span>
+                    <span className="text-caption text-muted-foreground">{s.category}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           {error && <p className="mt-1 text-caption text-danger">{error}</p>}
         </Field>
 

@@ -13,6 +13,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useInventoryStore } from "@/lib/store";
 import { activeItemCountForLocation, activeLocations } from "@/lib/selectors";
 import { useRemountKey } from "@/hooks/use-remount-key";
+import { REFERENCE_LOCATIONS } from "@/lib/reference/up-home-inventory";
 
 export default function LocationsListPage() {
   const locations = activeLocations(useInventoryStore((s) => s.locations));
@@ -29,6 +30,13 @@ export default function LocationsListPage() {
     bumpCreateKey();
     setCreateOpen(true);
   }
+
+  // United Policyholders reference list (docs/Household Ledger
+  // Implementation Plan's deferred spreadsheet-import workstream), minus
+  // whatever this household already has (case-insensitive) — no point
+  // suggesting "Kitchen" again once they've already added one.
+  const existingLocationNames = new Set(locations.map((l) => l.name.trim().toLowerCase()));
+  const locationSuggestions = REFERENCE_LOCATIONS.filter((name) => !existingLocationNames.has(name.toLowerCase()));
 
   function toggleContainer(id: string) {
     setOpenContainerIds((s) => {
@@ -123,6 +131,7 @@ export default function LocationsListPage() {
         onOpenChange={setCreateOpen}
         title="Add Location"
         namePlaceholder="e.g. Garage"
+        nameSuggestions={locationSuggestions}
         onSubmit={async ({ name, description, photoFile }) => {
           const loc = createLocation({ name, description });
           if (photoFile) {

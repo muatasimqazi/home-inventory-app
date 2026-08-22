@@ -19,6 +19,8 @@ interface EntityFormSheetProps {
   initialCoverPhotoEmoji?: string;
   /** Omit to hide the photo picker entirely (not every caller wants one). When present, a chosen file is handed back on submit for the caller to upload once the entity itself exists. */
   onSubmit: (values: { name: string; description: string; photoFile?: File | null }) => void;
+  /** Optional tap-to-fill name suggestions (e.g. Location's UP reference list) shown as pill chips under the Name field. Omit to show none — Container creation and every "edit" use of this sheet don't pass it. */
+  nameSuggestions?: string[];
 }
 
 /** Shared Create/Edit sheet for Location and Container — name + optional description + optional cover photo. */
@@ -32,6 +34,7 @@ export function EntityFormSheet({
   initialCoverPhotoPath = null,
   initialCoverPhotoEmoji = "📦",
   onSubmit,
+  nameSuggestions,
 }: EntityFormSheetProps) {
   // Lazy-seeded from initial* props, not reseeded via an effect — this only
   // stays correct because every caller mounts this component behind a
@@ -112,6 +115,23 @@ export function EntityFormSheet({
               autoFocus
             />
             {error && <p className="mt-1 text-caption text-danger">{error}</p>}
+            {nameSuggestions && nameSuggestions.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {nameSuggestions.map((suggestion) => (
+                  <button
+                    key={suggestion}
+                    type="button"
+                    onClick={() => {
+                      setName(suggestion);
+                      if (error) setError(null);
+                    }}
+                    className="rounded-full bg-surface-muted px-3 py-1 text-caption font-medium text-ink transition-colors hover:bg-yellow hover:text-white"
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <div>
             <label className="mb-1 block text-caption text-muted-foreground">Description (optional)</label>
