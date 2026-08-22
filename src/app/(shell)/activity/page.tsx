@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ActivityRow } from "@/components/activity-row";
 import { EmptyState } from "@/components/empty-state";
@@ -34,7 +34,16 @@ const FILTERS: { value: DomainFilter; label: string }[] = [
 export default function ActivityFeedPage() {
   const activity = useInventoryStore((s) => s.activity);
   const members = useInventoryStore((s) => s.members);
+  const markActivityViewed = useInventoryStore((s) => s.markActivityViewed);
   const searchParams = useSearchParams();
+
+  // Bell badge (Overview page) reads each member's last-viewed watermark —
+  // stamp it the moment this feed is opened, not on scroll/dismiss, so
+  // simply visiting clears the count the same way opening an inbox does.
+  useEffect(() => {
+    markActivityViewed();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // Deep-linkable (?domain=inventory|finance) so each domain's own
   // "Activity" link lands pre-filtered, same reasoning as Trash's ?tab=.
   const [filter, setFilter] = useState<DomainFilter>(() => {

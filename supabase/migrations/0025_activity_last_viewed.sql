@@ -1,0 +1,12 @@
+-- Overview page's notification-bell unread badge needs a per-member
+-- read/unread watermark — nothing in the schema tracked this before.
+-- Nullable: null means "never visited /activity", which the app treats
+-- as "everything is unread" rather than defaulting to now() at row
+-- creation (a brand-new member who hasn't opened Activity yet should see
+-- the household's existing history as unread, not miss it because their
+-- watermark silently started at their join time).
+--
+-- No RLS change needed: "member updates own row" (0007) already permits
+-- a caller to update any column on their own members row, so it covers
+-- this new one automatically.
+alter table members add column last_activity_viewed_at timestamptz;

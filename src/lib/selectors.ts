@@ -1,4 +1,4 @@
-import type { Account, AccountType, Container, FinanceCategory, Item, Location, RecurringBill, Tag, Transaction } from "./types";
+import type { Account, AccountType, ActivityLogEntry, Container, FinanceCategory, Item, Location, RecurringBill, Tag, Transaction } from "./types";
 
 /**
  * The full tag-style category set for one transaction (Categories
@@ -190,6 +190,19 @@ export function tagItemCounts(items: Item[], tags: Tag[]): TagWithCount[] {
 
 export function itemsForTag(items: Item[], tagId: string): Item[] {
   return items.filter((it) => it.status === "active" && it.tagIds.includes(tagId));
+}
+
+/**
+ * Overview page's notification-bell badge (`members.last_activity_viewed_at`,
+ * 0025_activity_last_viewed.sql). `null` lastViewedAt means the current
+ * member has never opened /activity — every row counts as unread rather
+ * than none, since defaulting to "caught up" would silently hide a
+ * brand-new member's entire backlog. The caller's own actions are
+ * excluded: you already know what you just did, so it never counts
+ * against your own badge.
+ */
+export function unreadActivityCount(activity: ActivityLogEntry[], currentUserId: string, lastViewedAt: string | null): number {
+  return activity.filter((a) => a.actorUserId !== currentUserId && (lastViewedAt === null || a.createdAt > lastViewedAt)).length;
 }
 
 /**

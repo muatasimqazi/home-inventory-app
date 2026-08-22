@@ -502,6 +502,8 @@ interface InventoryState {
     action: ActivityAction;
     detail?: string;
   }) => void;
+  /** Stamps the caller's own membership row with now() as their last-viewed watermark (0025_activity_last_viewed.sql) — call on visiting /activity so the Overview page's bell badge stops counting today's rows as unread. Optimistic, fire-and-forget like logActivity: losing this update to a transient network error just means the badge undercounts slightly next time, not worth blocking or rolling back the visit over. */
+  markActivityViewed: () => void;
 
   /** Hides items/containers/locations whose permanentlyDeleteAfter has passed from local state. The real purge_expired_trash() + pg_cron job (see the migration) does the actual server-side deletion; this just keeps the UI in sync between reloads without re-fetching. */
   purgeExpiredTrash: () => void;
@@ -3218,6 +3220,23 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       .insert(activityLogEntryToInsertRow(created))
       .then(({ error }) => {
         if (error) console.error("Failed to persist activity log entry:", error.message);
+      });
+  },
+
+  markActivityViewed: () => {
+    const supabase = getSupabaseBrowserClient();
+    const state = get();
+    const viewedAt = nowIso();
+    set((s) => ({
+      members: s.members.map((m) => (m.userId === state.currentUserId ? { ...m, lastActivityViewedAt: viewedAt } : m)),
+    }));
+    supabase
+      .from("members")
+      .update({ last_activity_viewed_at: viewedAt })
+      .eq("household_id", state.currentHouseholdId)
+      .eq("user_id", state.currentUserId)
+      .then(({ error }) => {
+        if (error) console.error("Failed to persist activity-viewed watermark:", error.message);
       });
   },
 
