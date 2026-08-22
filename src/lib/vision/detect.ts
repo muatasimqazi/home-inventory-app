@@ -2,6 +2,17 @@ import "server-only";
 import { generateText, Output, type LanguageModel, type ModelMessage } from "ai";
 import { z } from "zod";
 import { CATEGORIES } from "@/lib/types";
+import { matchReferenceLocation, type ReferenceInventoryItem } from "@/lib/reference/starter-inventory";
+// Direct (static, top-level) JSON import rather than starter-inventory.ts's
+// own loadReferenceItems() dynamic import — that dynamic import exists
+// specifically to keep the ~220KB item list out of a *client* bundle that
+// hasn't asked for it yet (see that file's header comment). This module is
+// "server-only" already, so there's no bundle to protect: a plain static
+// import is simpler, has no first-call latency/await, and Next.js still
+// tree-shakes/bundles it once at build time same as any other server module.
+import referenceItemsJson from "@/lib/reference/starter-inventory-items.json";
+
+const referenceItems = referenceItemsJson as ReferenceInventoryItem[];
 
 // Server-only vision item detection from photos. The `server-only` import
 // makes an accidental client-component import of this module a build error
@@ -72,39 +83,99 @@ const detectionSchema = z.object({
 
 export type VisionDetectedItem = z.infer<typeof detectionSchema>["items"][number];
 
+// Reference-catalog prompt steer (see this file's header-level comment
+// block below runDetection for the full design writeup). Capped at 100
+// items: Kitchen, the largest of the 22 reference locations, has 380 —
+// sending all of them on every single capture call would add real tokens
+// and real latency to a flow that already spends its CALL_TIMEOUT_MS budget
+// carefully (see that constant's comment below), for a "soft steer" whose
+// job is done just as well by a representative sample as by the full list.
+// 100 sits in the middle of this workstream's recommended 80-120 range.
+const REFERENCE_HINT_ITEM_CAP = 100;
+
+/**
+ * Deterministically samples `count` items evenly spread across `items`
+ * (assumed alphabetically ordered per-location, matching the source data's
+ * own layout — see starter-inventory.ts's header comment) rather than just
+ * truncating to the first `count`. A straight truncation of an alphabetical
+ * list would only ever surface names starting with the first few letters
+ * (e.g. "Acetate", "Adhesive", ...) — an evenly-strided sample instead
+ * covers the location's full range, which matters more for a steer meant to
+ * catch whatever the household actually points a camera at.
+ */
+function sampleEvenly<T>(items: T[], count: number): T[] {
+  if (items.length <= count) return items;
+  const step = items.length / count;
+  const picked: T[] = [];
+  for (let i = 0; i < count; i++) {
+    picked.push(items[Math.floor(i * step)]);
+  }
+  return picked;
+}
+
+/**
+ * Builds the optional reference-catalog prompt addition for a given
+ * household Location name, or null when there's nothing useful to add —
+ * no name given, no reasonable match among the 22 bundled reference
+ * locations (matchReferenceLocation), or (belt-and-suspenders) that
+ * location somehow has zero reference items. Every one of those is a
+ * silent no-op, never an error: this is a soft steer, and its total absence
+ * must reproduce exactly today's prompt/behavior.
+ */
+function buildReferenceHint(locationName: string | null | undefined): string | null {
+  if (!locationName) return null;
+  try {
+    const matched = matchReferenceLocation(locationName);
+    if (!matched) return null;
+    const itemsForLocation = referenceItems.filter((it) => it.location === matched);
+    if (itemsForLocation.length === 0) return null;
+    const sampled = sampleEvenly(itemsForLocation, REFERENCE_HINT_ITEM_CAP);
+    const list = sampled.map((it) => `${it.name} (${it.category})`).join(", ");
+    return (
+      `Here are common item names typically found in a ${matched}: ${list}. If what you see closely ` +
+      "and confidently matches one of these, use that exact name (and its category, provided " +
+      "alongside) — otherwise use your own best judgment as usual, exactly like today."
+    );
+  } catch (error) {
+    // Never let a reference-catalog problem take down detection itself —
+    // fall back to no hint, exactly as if locationName had been omitted.
+    console.error("Failed to build reference-catalog hint, continuing without it:", error);
+    return null;
+  }
+}
+
 // Each photo gets an explicit "Photo N:" label immediately before its file
 // part — relying on the model to infer index purely from part order was
 // unreliable enough not to trust for something the crop step depends on
 // (photoIndex needs to be right, or an item's cover comes from the wrong
 // photo entirely).
-function buildMessages(photos: string[]): ModelMessage[] {
+function buildMessages(photos: string[], referenceHint: string | null): ModelMessage[] {
   const labeledPhotos = photos.flatMap((photo, i) => [
     { type: "text" as const, text: `Photo ${i}:` },
     { type: "file" as const, mediaType: "image" as const, data: photo },
   ]);
 
+  const baseText =
+    "You are cataloging items for a home inventory app. Identify every distinct KIND of " +
+    "physical item visible across these labeled photos — when you see multiple identical (or " +
+    "near-identical, e.g. same product) copies of the same item, that's ONE entry with an " +
+    "accurate quantity, not one entry per copy. Someone's drawer of 5 identical pens is a " +
+    "single 'Pen' entry with quantity 5, not 5 separate 'Pen' entries. For each entry, pick " +
+    "the category from the allowed list that fits best, suggest a couple of short lowercase " +
+    "tags if relevant, and give an honest confidence score — use a lower score for anything " +
+    "ambiguous, partially obscured, or generic-looking rather than guessing.\n\n" +
+    "Also report, per entry, which labeled photo it's in (photoIndex) and a bounding box " +
+    "around it within that photo — one photo can contain several different items (e.g. a " +
+    "shelf holding a hammer, a drill, and a box of screws), and each needs its own box so its " +
+    "cover photo can be cropped to just it instead of the whole shot. See the quantity and " +
+    "boundingBox field descriptions for exactly how to handle multiples of the same item, and " +
+    "when to leave boundingBox null instead of guessing.";
+
   return [
     {
       role: "user",
       content: [
-        {
-          type: "text",
-          text:
-            "You are cataloging items for a home inventory app. Identify every distinct KIND of " +
-            "physical item visible across these labeled photos — when you see multiple identical (or " +
-            "near-identical, e.g. same product) copies of the same item, that's ONE entry with an " +
-            "accurate quantity, not one entry per copy. Someone's drawer of 5 identical pens is a " +
-            "single 'Pen' entry with quantity 5, not 5 separate 'Pen' entries. For each entry, pick " +
-            "the category from the allowed list that fits best, suggest a couple of short lowercase " +
-            "tags if relevant, and give an honest confidence score — use a lower score for anything " +
-            "ambiguous, partially obscured, or generic-looking rather than guessing.\n\n" +
-            "Also report, per entry, which labeled photo it's in (photoIndex) and a bounding box " +
-            "around it within that photo — one photo can contain several different items (e.g. a " +
-            "shelf holding a hammer, a drill, and a box of screws), and each needs its own box so its " +
-            "cover photo can be cropped to just it instead of the whole shot. See the quantity and " +
-            "boundingBox field descriptions for exactly how to handle multiples of the same item, and " +
-            "when to leave boundingBox null instead of guessing.",
-        },
+        { type: "text", text: referenceHint ? `${baseText}\n\n${referenceHint}` : baseText },
         ...labeledPhotos,
       ],
     },
@@ -152,11 +223,11 @@ const CALL_MAX_RETRIES = 0;
 // trading away accuracy on the one thing this app depends on for a
 // speedup that isn't even real once graded against actual label text.
 // Left unset — the model's own default — for both models.
-async function runDetection(model: LanguageModel, photos: string[]): Promise<VisionDetectedItem[]> {
+async function runDetection(model: LanguageModel, photos: string[], referenceHint: string | null): Promise<VisionDetectedItem[]> {
   const { output } = await generateText({
     model,
     output: Output.object({ schema: detectionSchema }),
-    messages: buildMessages(photos),
+    messages: buildMessages(photos, referenceHint),
     timeout: CALL_TIMEOUT_MS,
     maxRetries: CALL_MAX_RETRIES,
   });
@@ -168,6 +239,17 @@ async function runDetection(model: LanguageModel, photos: string[]): Promise<Vis
  * URLs (e.g. from a camera capture), passed inline — no persistent file
  * upload needed for this one-shot use case.
  *
+ * `locationName` is an optional hint — the household's own name for the
+ * capture's current destination Location — used to softly steer the model
+ * toward matching names/categories already in the bundled reference catalog
+ * (lib/reference/starter-inventory.ts) for that location, per "The data is
+ * the source of truth for the home... AI should use this if possible before
+ * suggesting new ones of its own." This is prompt-level guidance only, not
+ * a post-hoc override: the schema, the model's own judgment, and every
+ * existing field stay exactly as before. Omitted, unmatched, or otherwise
+ * unusable (see buildReferenceHint) all degrade silently to the unscoped
+ * prompt — no locationName reproduces prior behavior exactly.
+ *
  * The primary model is tried first; if it fails for any reason, this falls
  * back to a cheap OpenAI model once before giving up, so a provider-wide
  * outage on one side doesn't block detection entirely. Bounding-box
@@ -176,13 +258,14 @@ async function runDetection(model: LanguageModel, photos: string[]): Promise<Vis
  * full photo downstream (see cropToItem in lib/crop-image.ts), never a hard
  * error.
  */
-export async function detectItems(photos: string[]): Promise<VisionDetectedItem[]> {
+export async function detectItems(photos: string[], locationName?: string | null): Promise<VisionDetectedItem[]> {
+  const referenceHint = buildReferenceHint(locationName);
   try {
-    return await runDetection(PRIMARY_MODEL, photos);
+    return await runDetection(PRIMARY_MODEL, photos, referenceHint);
   } catch (primaryError) {
     console.error("Primary vision model failed, falling back to", FALLBACK_MODEL, primaryError);
     try {
-      return await runDetection(FALLBACK_MODEL, photos);
+      return await runDetection(FALLBACK_MODEL, photos, referenceHint);
     } catch (fallbackError) {
       console.error(`Fallback model ${FALLBACK_MODEL} also failed:`, fallbackError);
       // Surface the fallback's error — it's the one that actually ended the

@@ -25,8 +25,9 @@ export const runtime = "nodejs";
 // guard server-side here anymore — just the Gateway's own credentials.
 export async function POST(request: Request) {
   let photos: unknown;
+  let locationName: unknown;
   try {
-    ({ photos } = await request.json());
+    ({ photos, locationName } = await request.json());
   } catch {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
@@ -34,9 +35,14 @@ export async function POST(request: Request) {
   if (!Array.isArray(photos) || photos.length === 0 || !photos.every((p) => typeof p === "string")) {
     return NextResponse.json({ error: "`photos` must be a non-empty array of data URL strings." }, { status: 400 });
   }
+  // Optional hint — the household's own Location name for the capture's
+  // current destination. Anything other than a non-empty string (missing,
+  // null, wrong type) is treated as "no hint" rather than a 400: this field
+  // is purely a soft steer, never required.
+  const locationNameHint = typeof locationName === "string" && locationName.trim() ? locationName : null;
 
   try {
-    const detected = await detectItems(photos);
+    const detected = await detectItems(photos, locationNameHint);
     const items: DetectedItem[] = detected.map(withReview);
     return NextResponse.json({ items });
   } catch (error) {

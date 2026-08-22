@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import { visionProvider, VisionDetectionError, type DetectedItem } from "./ai";
 import { id } from "./id";
+import { useInventoryStore } from "./store";
 
 export interface DetectionRow extends DetectedItem {
   rowId: string;
@@ -63,7 +64,18 @@ export const useCaptureSession = create<CaptureSessionState>()((set, get) => ({
   runDetection: async () => {
     set({ detecting: true, detectError: null });
     try {
-      const detected = await visionProvider.detectItems(get().photos);
+      // Cross-store read (established pattern — see receipt-refunds.ts and
+      // store.ts's own use of useInventoryStore.getState()): resolve the
+      // capture's current destination location, if any, to its real name so
+      // detection can steer toward this household's own reference catalog
+      // for that location. Soft-fails to undefined (not an error) when
+      // there's no destination yet, or its locationId doesn't resolve —
+      // detectItems treats a missing name exactly like today's behavior.
+      const destinationLocationId = get().destination?.locationId ?? null;
+      const locationName = destinationLocationId
+        ? (useInventoryStore.getState().locations.find((l) => l.id === destinationLocationId)?.name ?? null)
+        : null;
+      const detected = await visionProvider.detectItems(get().photos, locationName);
       const rows: DetectionRow[] = detected.map((d) => ({
         ...d,
         rowId: id("det"),
