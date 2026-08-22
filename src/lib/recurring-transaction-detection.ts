@@ -67,7 +67,18 @@ export function detectRecurringFromTransactions(
   existingBills: RecurringBill[],
   dismissedCandidateKeys: ReadonlySet<string>
 ): TransactionRecurringCandidate[] {
-  const existingNames = new Set(existingBills.filter((b) => b.trashedAt === null).map((b) => normalizeMerchant(b.name)));
+  // Scoped per account, matching this module's own per-account+merchant
+  // grouping below — a same-named bill tracked on a different account is
+  // NOT "already tracked" for this one (the module's own doc comment:
+  // "the same merchant charged to two different cards as two genuinely
+  // separate bills"). A bill with no accountId of its own (not tied to a
+  // specific payment account) is treated as covering any account it might
+  // show up on, so it still suppresses a real match there.
+  const existingActiveBills = existingBills.filter((b) => b.trashedAt === null);
+  const existingByAccount = new Set(
+    existingActiveBills.filter((b) => b.accountId !== null).map((b) => `${b.accountId}:${normalizeMerchant(b.name)}`)
+  );
+  const existingAnyAccount = new Set(existingActiveBills.filter((b) => b.accountId === null).map((b) => normalizeMerchant(b.name)));
 
   const groups = new Map<string, { accountId: string; candidateKey: string; displayName: string; entries: Transaction[] }>();
   for (const t of transactions) {
@@ -111,7 +122,7 @@ export function detectRecurringFromTransactions(
       nextDueDate,
       occurrenceCount: sorted.length,
       lastOccurrence: mostRecent.occurredAt,
-      alreadyTracked: existingNames.has(normalizeMerchant(displayName)),
+      alreadyTracked: existingByAccount.has(`${accountId}:${normalizeMerchant(displayName)}`) || existingAnyAccount.has(normalizeMerchant(displayName)),
       matchingTransactions: [...sorted].reverse().map((t) => ({ id: t.id, occurredAt: t.occurredAt, amount: t.amount, merchant: t.merchant, description: t.description })),
     });
   }

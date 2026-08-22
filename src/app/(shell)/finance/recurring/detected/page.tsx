@@ -238,8 +238,15 @@ export default function DetectedRecurringPage() {
                   <Button variant="outline" className="flex-1" disabled={busy} onClick={() => handleDismiss(row)}>
                     Not recurring
                   </Button>
-                  <Button className="flex-1" disabled={busy} onClick={() => handleCreate(row)}>
-                    Create recurring bill
+                  {/* Same dedupe intent as the statement-import review
+                      screen's `include: !c.alreadyTracked` default
+                      (finance/recurring/import/page.tsx) — the badge above
+                      already tells the user a matching bill exists;
+                      disabling Create here (not just labeling it) is what
+                      actually stops a second, duplicate RecurringBill row
+                      for the same merchant/account from being created. */}
+                  <Button className="flex-1" disabled={busy || c.alreadyTracked} onClick={() => handleCreate(row)}>
+                    {c.alreadyTracked ? "Already tracked" : "Create recurring bill"}
                   </Button>
                 </div>
               </div>
