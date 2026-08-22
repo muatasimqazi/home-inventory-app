@@ -140,11 +140,22 @@ export async function POST(request: Request) {
     });
   }
 
+  // Bounded the same way fetchPhotoDataUrl already is below — this is the
+  // hot path every single scan blocks on, and a hanging/slow upstream
+  // response would otherwise tie up the request indefinitely with the
+  // client's "Looking up this barcode…" spinner stuck with no way out.
   let upstream: Response;
   try {
-    upstream = await fetch(`${UPCITEMDB_TRIAL_URL}?upc=${encodeURIComponent(code)}`, {
-      headers: { Accept: "application/json" },
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    try {
+      upstream = await fetch(`${UPCITEMDB_TRIAL_URL}?upc=${encodeURIComponent(code)}`, {
+        headers: { Accept: "application/json" },
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
   } catch {
     return NextResponse.json(
       { error: "Couldn't reach the barcode lookup service. Check your connection and try again.", retryable: true },

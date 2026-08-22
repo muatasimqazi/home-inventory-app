@@ -92,8 +92,16 @@ export default function BarcodeReviewPage() {
       photoEmoji,
       locationId: destination?.locationId ?? null,
       containerId: destination?.containerId ?? null,
-      needsReview: result.found && fields.name.trim() === result.suggestedName,
-      reviewReason: result.found ? "Matched from a barcode lookup — confirm this is the right item." : undefined,
+      // The only way to reach here with an unedited, found match is via
+      // explicit Confirm (the `blocked` gate above requires it) — so a
+      // found match is always either edited or user-verified by the time
+      // Save runs, unlike the appliance flow's lowConfidence-gated
+      // version of this same field (there is no confidence score from a
+      // barcode lookup, just found/not-found). The real uncertainty here
+      // is the opposite case: no match at all, meaning every field was
+      // typed blind with nothing external to verify it against.
+      needsReview: !result.found,
+      reviewReason: result.found ? undefined : "No barcode match found — details entered manually, worth a second look.",
       extraDetails,
     });
 
