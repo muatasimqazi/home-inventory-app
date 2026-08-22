@@ -28,10 +28,18 @@ async function classifyMemberships(supabase: SupabaseClient, userId: string) {
 
   const households: HouseholdRow[] = [];
   for (const m of myMemberships ?? []) {
-    const [{ data: household }, { count }] = await Promise.all([
+    const [{ data: household }, { count, error: countError }] = await Promise.all([
       supabase.from("households").select("name").eq("id", m.household_id).single(),
       supabase.from("members").select("user_id", { count: "exact", head: true }).eq("household_id", m.household_id),
     ]);
+    // A failed count query must not silently read as "1" — for a
+    // household where the caller is actually Owner with other members,
+    // that would misclassify it as soleOwner instead of blocked, showing
+    // "safe to delete" in the preview when it isn't. The authoritative
+    // SQL RPC would still correctly reject the deletion itself, but this
+    // preview exists specifically so the user never reaches that
+    // rejection having been told it was safe.
+    if (countError) throw countError;
     households.push({
       household_id: m.household_id,
       role: m.role,

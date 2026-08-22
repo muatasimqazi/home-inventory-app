@@ -170,6 +170,30 @@ begin
       delete from people where id = target_person_id;
     end if;
 
+    -- Re-check the case-2 invariant immediately before this delete, not
+    -- just once at the top of the function: the initial check and this
+    -- loop are separate statements under READ COMMITTED (each sees the
+    -- latest committed data as of its own start), so a concurrent
+    -- membership change to this exact household between them — someone
+    -- else accepting a pending invite, turning a sole-member household
+    -- into a shared one after the top-level check already passed it —
+    -- could otherwise let this statement remove the household's only
+    -- owner. Raising here aborts and rolls back the whole transaction
+    -- (this function's existing all-or-nothing contract), converting a
+    -- silent invariant violation into a safe, retryable failure.
+    if exists (
+      select 1 from members m
+      where m.household_id = shared_membership.household_id
+        and m.user_id = p_user_id
+        and m.role = 'owner'
+        and exists (
+          select 1 from members m2
+          where m2.household_id = shared_membership.household_id and m2.user_id <> p_user_id
+        )
+    ) then
+      raise exception 'OWNER_OF_SHARED_HOUSEHOLD: A household membership changed during deletion — please try again.';
+    end if;
+
     delete from members where household_id = shared_membership.household_id and user_id = p_user_id;
   end loop;
 
