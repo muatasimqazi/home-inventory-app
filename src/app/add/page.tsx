@@ -17,7 +17,7 @@ import { buildBreadcrumb, sortByLabel } from "@/lib/selectors";
 import { SORTED_CATEGORIES } from "@/lib/types";
 import { extraFieldsForCategory } from "@/lib/category";
 import { cn } from "@/lib/utils";
-import { loadReferenceItems, matchReferenceLocation, suggestReferenceItems, type ReferenceInventoryItem } from "@/lib/reference/up-home-inventory";
+import { loadReferenceItems, matchReferenceLocation, suggestReferenceItems, type ReferenceInventoryItem } from "@/lib/reference/starter-inventory";
 
 const HOUSEHOLD_OWNER_VALUE = "household";
 const ADD_PERSON_VALUE = "__add_person__";
@@ -78,7 +78,7 @@ function ManualAddItemInner() {
   const [error, setError] = useState<string | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  // United Policyholders reference item-name typeahead (Household Ledger
+  // Starter-inventory reference item-name typeahead (Household Ledger
   // Implementation Plan's deferred spreadsheet-import workstream). The full
   // ~2,662-row list is loaded lazily (loadReferenceItems caches it in
   // module scope after the first call) rather than up front, so opening

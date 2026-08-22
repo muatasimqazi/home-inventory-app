@@ -8,7 +8,7 @@ import { useInventoryStore } from "@/lib/store";
 import { activeLocations, directChildContainers } from "@/lib/selectors";
 import { cn } from "@/lib/utils";
 import type { Container } from "@/lib/types";
-import { REFERENCE_LOCATIONS } from "@/lib/reference/up-home-inventory";
+import { REFERENCE_LOCATIONS } from "@/lib/reference/starter-inventory";
 
 interface MoveSheetProps {
   open: boolean;
@@ -26,9 +26,10 @@ export function MoveSheet({ open, onOpenChange, currentLocationId, currentContai
   const createLocation = useInventoryStore((s) => s.createLocation);
   const createContainer = useInventoryStore((s) => s.createContainer);
   const excluded = excludeContainerIds ? new Set(excludeContainerIds) : null;
-  // Same UP reference suggestion list as Locations' own "Add Location" —
-  // this is the other real entry point that creates a Location (a
-  // brand-new household reaching this picker with zero locations yet).
+  // Same starter-inventory suggestion list as Locations' own "Add
+  // Location" — this is the other real entry point that creates a
+  // Location (a brand-new household reaching this picker with zero
+  // locations yet).
   const existingLocationNames = new Set(locations.map((l) => l.name.trim().toLowerCase()));
   const locationSuggestions = REFERENCE_LOCATIONS.filter((name) => !existingLocationNames.has(name.toLowerCase()));
 
