@@ -179,9 +179,12 @@ export default function TransactionsListPage() {
     setSelectedIds(new Set());
   }
 
-  /** Applies one category to every selected transaction (additive tag, never clears existing ones) via the same addTransactionCategory the single-transaction category picker uses, then clears the selection. */
+  /** Applies one category to every selected transaction (additive tag, never clears existing ones) via the same addTransactionCategory the single-transaction category picker uses, then clears the selection. Defensively re-excludes transfer/payment ids even though the checkbox UI already can't select one — a transaction's type could in principle change (e.g. a Realtime update) between when it was checked and when Apply is tapped, and those types never take a category (see the row-render comment above for why). */
   function handleBulkApplyCategory(categoryId: string) {
-    const ids = Array.from(selectedIds);
+    const ids = Array.from(selectedIds).filter((id) => {
+      const t = transactions.find((txn) => txn.id === id);
+      return t && t.type !== "transfer" && t.type !== "payment";
+    });
     for (const id of ids) addTransactionCategory(id, categoryId);
     const categoryName = financeCategories.find((c) => c.id === categoryId)?.name ?? "category";
     toast.success(`Added "${categoryName}" to ${ids.length} transaction${ids.length === 1 ? "" : "s"}`);
@@ -399,24 +402,28 @@ export default function TransactionsListPage() {
           <FilterChip label="Uncategorized" active={uncategorizedOnly} onClick={() => setUncategorizedOnly((v) => !v)} />
         </div>
         {/* Select-all convention mirrors Trash's InventoryTrashPanel — scoped to
-            the currently filtered+sorted list, not the whole account. */}
-        {selectMode && sorted.length > 0 && (
+            the currently filtered+sorted list, not the whole account. Also
+            scoped to categorizable transactions only — transfers/payments
+            never take a category (see the row-render comment below), so
+            they're excluded here the same way their checkbox is. */}
+        {selectMode && sorted.some((t) => t.type !== "transfer" && t.type !== "payment") && (
           <button
             type="button"
             onClick={() =>
               setSelectedIds((prev) => {
-                const allVisibleSelected = sorted.every((t) => prev.has(t.id));
+                const selectable = sorted.filter((t) => t.type !== "transfer" && t.type !== "payment");
+                const allVisibleSelected = selectable.every((t) => prev.has(t.id));
                 if (allVisibleSelected) {
                   const next = new Set(prev);
-                  for (const t of sorted) next.delete(t.id);
+                  for (const t of selectable) next.delete(t.id);
                   return next;
                 }
-                return new Set([...prev, ...sorted.map((t) => t.id)]);
+                return new Set([...prev, ...selectable.map((t) => t.id)]);
               })
             }
             className="shrink-0 text-caption font-medium text-ink underline underline-offset-2"
           >
-            {sorted.every((t) => selectedIds.has(t.id)) ? "Deselect all" : "Select all"}
+            {sorted.filter((t) => t.type !== "transfer" && t.type !== "payment").every((t) => selectedIds.has(t.id)) ? "Deselect all" : "Select all"}
           </button>
         )}
       </div>
@@ -464,23 +471,39 @@ export default function TransactionsListPage() {
                   // alongside the checkbox.
                   const isExpanded = isScanSourced && !selectMode && expandedIds.has(t.id);
                   const isSelected = selectedIds.has(t.id);
+                  // Transfers/payments never take a category — the single-
+                  // transaction form (transaction-form-sheet.tsx) already
+                  // excludes them from the category picker entirely (PRD
+                  // §15: "a transfer/payment is a shuffle between owned
+                  // accounts, not a categorized expense/income"). Bulk-
+                  // categorize is a category-tagging feature, so these
+                  // rows aren't selectable for it — no checkbox, and a tap
+                  // still opens the detail sheet rather than doing nothing.
+                  const isCategorizable = t.type !== "transfer" && t.type !== "payment";
                   return (
                     <div key={t.id} className={cn(isSelected && "bg-surface-muted")}>
                       <div className="flex items-center gap-1 pr-2">
                         {selectMode && (
                           <div className="flex shrink-0 items-center pl-4">
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={() => toggleSelected(t.id)}
-                              className="size-4 shrink-0"
-                              aria-label={`Select ${t.merchant ?? t.description ?? "transaction"}`}
-                            />
+                            {isCategorizable ? (
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleSelected(t.id)}
+                                className="size-4 shrink-0"
+                                aria-label={`Select ${t.merchant ?? t.description ?? "transaction"}`}
+                              />
+                            ) : (
+                              // Same footprint as the checkbox above, so a
+                              // transfer/payment row's merchant text still
+                              // lines up with every categorizable row's.
+                              <div className="size-4 shrink-0" aria-hidden="true" />
+                            )}
                           </div>
                         )}
                         <button
                           type="button"
-                          onClick={() => (selectMode ? toggleSelected(t.id) : setDetailId(t.id))}
+                          onClick={() => (selectMode && isCategorizable ? toggleSelected(t.id) : setDetailId(t.id))}
                           className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left"
                         >
                           <div className="min-w-0 flex-1">
