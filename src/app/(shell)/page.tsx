@@ -34,6 +34,12 @@ import { cn } from "@/lib/utils";
 
 const ONBOARDING_THRESHOLD = 5;
 const BILLS_DUE_SOON_DAYS = 7;
+// Same "at a glance, not the whole list" cap every other Overview preview
+// (e.g. recentContainers below) already applies — nothing currently
+// deletes a tag (getOrCreateTag only adds), so an unbounded list here
+// would only grow and eventually push the rest of the page below the
+// fold. "View all" (next to the heading) is the actual full list.
+const TAGS_PREVIEW_LIMIT = 8;
 
 /**
  * The former Home page was an inventory-only dashboard living at "/" —
@@ -256,7 +262,7 @@ export default function OverviewPage() {
               </Link>
             </div>
             <div className="flex flex-wrap gap-2">
-              {sortedTags.map((tag) => (
+              {sortedTags.slice(0, TAGS_PREVIEW_LIMIT).map((tag) => (
                 <Link
                   key={tag.id}
                   href={`/tags/${tag.id}`}

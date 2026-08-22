@@ -202,7 +202,19 @@ export function itemsForTag(items: Item[], tagId: string): Item[] {
  * against your own badge.
  */
 export function unreadActivityCount(activity: ActivityLogEntry[], currentUserId: string, lastViewedAt: string | null): number {
-  return activity.filter((a) => a.actorUserId !== currentUserId && (lastViewedAt === null || a.createdAt > lastViewedAt)).length;
+  // Date.getTime(), not a raw string compare — this file's other
+  // timestamp comparisons (transactionsForAccount, recentTransactions,
+  // upcomingRecurringBills, all above) deliberately avoid string
+  // comparison for exactly this reason: lastViewedAt is stamped
+  // client-side via nowIso()'s "Z"-suffixed toISOString(), but
+  // activity[].createdAt round-trips through Supabase/PostgREST, which
+  // can come back with a "+00:00"-style offset and/or different
+  // fractional-second precision. Two differently-formatted ISO strings
+  // don't sort the same as their real chronological order at that
+  // boundary — a raw ">" here could silently mark read activity as
+  // unread or vice versa.
+  const watermark = lastViewedAt ? new Date(lastViewedAt).getTime() : null;
+  return activity.filter((a) => a.actorUserId !== currentUserId && (watermark === null || new Date(a.createdAt).getTime() > watermark)).length;
 }
 
 /**
