@@ -12,6 +12,7 @@ import { EmptyState } from "@/components/empty-state";
 import { TransactionFormSheet } from "@/components/transaction-form-sheet";
 import { TransactionDetailSheet } from "@/components/transaction-detail-sheet";
 import { LineItemFormSheet } from "@/components/line-item-form-sheet";
+import { BulkCategorizeBar } from "@/components/bulk-categorize-bar";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { rowToScannedReceiptLineItem, type ScannedReceiptLineItemRow } from "@/lib/supabase/mappers";
@@ -71,6 +72,9 @@ export default function TransactionsListPage() {
   const trashTransaction = useInventoryStore((s) => s.trashTransaction);
   const createCategoryRule = useInventoryStore((s) => s.createCategoryRule);
   const deleteCategoryRule = useInventoryStore((s) => s.deleteCategoryRule);
+  // Bulk categorize workstream — the only store write this feature needs;
+  // additive tag-style add, same as the single-transaction category picker.
+  const addTransactionCategory = useInventoryStore((s) => s.addTransactionCategory);
 
   const searchParams = useSearchParams();
   const defaultAccountId = searchParams.get("accountId") ?? undefined;
@@ -115,6 +119,11 @@ export default function TransactionsListPage() {
     return map;
   }, [transactionCategoryLinks]);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  // Bulk categorize (bulk-select) — same selectMode + Set<id> convention
+  // Trash's InventoryTrashPanel uses for its own multi-select (see
+  // src/app/(shell)/trash/page.tsx), not a new pattern invented here.
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [editingLineItem, setEditingLineItem] = useState<ScannedReceiptLineItem | null>(null);
   const [deleteLineItemConfirm, setDeleteLineItemConfirm] = useState<ScannedReceiptLineItem | null>(null);
   const [addingItemForTransactionId, setAddingItemForTransactionId] = useState<string | null>(null);
@@ -154,6 +163,32 @@ export default function TransactionsListPage() {
       else next.add(id);
       return next;
     });
+  }
+
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function exitSelectMode() {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  }
+
+  /** Applies one category to every selected transaction (additive tag, never clears existing ones) via the same addTransactionCategory the single-transaction category picker uses, then clears the selection. Defensively re-excludes transfer/payment ids even though the checkbox UI already can't select one — a transaction's type could in principle change (e.g. a Realtime update) between when it was checked and when Apply is tapped, and those types never take a category (see the row-render comment above for why). */
+  function handleBulkApplyCategory(categoryId: string) {
+    const ids = Array.from(selectedIds).filter((id) => {
+      const t = transactions.find((txn) => txn.id === id);
+      return t && t.type !== "transfer" && t.type !== "payment";
+    });
+    for (const id of ids) addTransactionCategory(id, categoryId);
+    const categoryName = financeCategories.find((c) => c.id === categoryId)?.name ?? "category";
+    toast.success(`Added "${categoryName}" to ${ids.length} transaction${ids.length === 1 ? "" : "s"}`);
+    exitSelectMode();
   }
 
   async function handleSaveLineItem(patch: {
@@ -346,17 +381,51 @@ export default function TransactionsListPage() {
         </div>
       </div>
 
-      <SearchBar value={query} onChange={setQuery} placeholder="Search by vendor or item…" />
+      <div className="flex items-start gap-3">
+        <SearchBar value={query} onChange={setQuery} placeholder="Search by vendor or item…" />
+        {active.length > 0 && (
+          <Button variant="outline" size="sm" onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}>
+            {selectMode ? "Cancel" : "Select"}
+          </Button>
+        )}
+      </div>
 
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {([
-          ["all", "All"],
-          ["month", "This month"],
-          ["custom", "Custom dates"],
-        ] as [DateScope, string][]).map(([value, label]) => (
-          <FilterChip key={value} label={label} active={dateScope === value} onClick={() => setDateScope(value)} />
-        ))}
-        <FilterChip label="Uncategorized" active={uncategorizedOnly} onClick={() => setUncategorizedOnly((v) => !v)} />
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {([
+            ["all", "All"],
+            ["month", "This month"],
+            ["custom", "Custom dates"],
+          ] as [DateScope, string][]).map(([value, label]) => (
+            <FilterChip key={value} label={label} active={dateScope === value} onClick={() => setDateScope(value)} />
+          ))}
+          <FilterChip label="Uncategorized" active={uncategorizedOnly} onClick={() => setUncategorizedOnly((v) => !v)} />
+        </div>
+        {/* Select-all convention mirrors Trash's InventoryTrashPanel — scoped to
+            the currently filtered+sorted list, not the whole account. Also
+            scoped to categorizable transactions only — transfers/payments
+            never take a category (see the row-render comment below), so
+            they're excluded here the same way their checkbox is. */}
+        {selectMode && sorted.some((t) => t.type !== "transfer" && t.type !== "payment") && (
+          <button
+            type="button"
+            onClick={() =>
+              setSelectedIds((prev) => {
+                const selectable = sorted.filter((t) => t.type !== "transfer" && t.type !== "payment");
+                const allVisibleSelected = selectable.every((t) => prev.has(t.id));
+                if (allVisibleSelected) {
+                  const next = new Set(prev);
+                  for (const t of selectable) next.delete(t.id);
+                  return next;
+                }
+                return new Set([...prev, ...selectable.map((t) => t.id)]);
+              })
+            }
+            className="shrink-0 text-caption font-medium text-ink underline underline-offset-2"
+          >
+            {sorted.filter((t) => t.type !== "transfer" && t.type !== "payment").every((t) => selectedIds.has(t.id)) ? "Deselect all" : "Select all"}
+          </button>
+        )}
       </div>
 
       {dateScope === "custom" && (
@@ -395,11 +464,48 @@ export default function TransactionsListPage() {
                   // old hasItems-only gate meant there was no way to reach
                   // "Add Item" for it short of a full re-scan.
                   const isScanSourced = t.source === "receipt_scan";
-                  const isExpanded = isScanSourced && expandedIds.has(t.id);
+                  // Collapsed and non-interactive while selecting — bulk
+                  // select is about picking rows, not diving into a
+                  // receipt's line items, so the expand chevron is hidden
+                  // for the duration (see below) rather than left active
+                  // alongside the checkbox.
+                  const isExpanded = isScanSourced && !selectMode && expandedIds.has(t.id);
+                  const isSelected = selectedIds.has(t.id);
+                  // Transfers/payments never take a category — the single-
+                  // transaction form (transaction-form-sheet.tsx) already
+                  // excludes them from the category picker entirely (PRD
+                  // §15: "a transfer/payment is a shuffle between owned
+                  // accounts, not a categorized expense/income"). Bulk-
+                  // categorize is a category-tagging feature, so these
+                  // rows aren't selectable for it — no checkbox, and a tap
+                  // still opens the detail sheet rather than doing nothing.
+                  const isCategorizable = t.type !== "transfer" && t.type !== "payment";
                   return (
-                    <div key={t.id}>
+                    <div key={t.id} className={cn(isSelected && "bg-surface-muted")}>
                       <div className="flex items-center gap-1 pr-2">
-                        <button type="button" onClick={() => setDetailId(t.id)} className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left">
+                        {selectMode && (
+                          <div className="flex shrink-0 items-center pl-4">
+                            {isCategorizable ? (
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleSelected(t.id)}
+                                className="size-4 shrink-0"
+                                aria-label={`Select ${t.merchant ?? t.description ?? "transaction"}`}
+                              />
+                            ) : (
+                              // Same footprint as the checkbox above, so a
+                              // transfer/payment row's merchant text still
+                              // lines up with every categorizable row's.
+                              <div className="size-4 shrink-0" aria-hidden="true" />
+                            )}
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => (selectMode && isCategorizable ? toggleSelected(t.id) : setDetailId(t.id))}
+                          className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left"
+                        >
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-body font-medium text-ink">{t.merchant ?? t.description ?? "Transaction"}</p>
                             <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
@@ -423,7 +529,7 @@ export default function TransactionsListPage() {
                             {formatCurrency(t.amount, { showPositiveSign: true })}
                           </span>
                         </button>
-                        {isScanSourced && (
+                        {isScanSourced && !selectMode && (
                           <button
                             type="button"
                             onClick={() => toggleExpanded(t.id)}
@@ -488,6 +594,10 @@ export default function TransactionsListPage() {
             </div>
           ))}
         </div>
+      )}
+
+      {selectMode && (
+        <BulkCategorizeBar selectedCount={selectedIds.size} categories={financeCategories} onApply={handleBulkApplyCategory} />
       )}
 
       <TransactionFormSheet
