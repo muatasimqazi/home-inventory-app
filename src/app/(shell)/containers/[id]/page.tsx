@@ -44,6 +44,7 @@ export default function ContainerDetailPage() {
   const moveContainer = useInventoryStore((s) => s.moveContainer);
   const trashContainer = useInventoryStore((s) => s.trashContainer);
   const trashItem = useInventoryStore((s) => s.trashItem);
+  const moveItem = useInventoryStore((s) => s.moveItem);
   const setContainerCoverPhoto = useInventoryStore((s) => s.setContainerCoverPhoto);
   const removeContainerCoverPhoto = useInventoryStore((s) => s.removeContainerCoverPhoto);
 
@@ -60,6 +61,9 @@ export default function ContainerDetailPage() {
   const [itemSelectMode, setItemSelectMode] = useState(false);
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
   const [bulkTrashOpen, setBulkTrashOpen] = useState(false);
+  // Distinct from `moveOpen` above (that one moves this container itself)
+  // — this one bulk-moves whichever items are currently selected.
+  const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
 
   const container = containers.find((c) => c.id === params.id);
   if (!container) return notFound();
@@ -115,6 +119,13 @@ export default function ContainerDetailPage() {
     const count = selectedItemIds.size;
     selectedItemIds.forEach((id) => trashItem(id));
     toast(`Moved ${count} item${count === 1 ? "" : "s"} to Trash`, { description: "Recoverable for 30 days." });
+    exitItemSelectMode();
+  }
+
+  function bulkMoveItems(dest: { locationId: string | null; containerId: string | null }) {
+    const count = selectedItemIds.size;
+    selectedItemIds.forEach((id) => moveItem(id, dest));
+    toast.success(`Moved ${count} item${count === 1 ? "" : "s"}`);
     exitItemSelectMode();
   }
 
@@ -321,6 +332,9 @@ export default function ContainerDetailPage() {
             <Button variant="outline" size="sm" className="border-white/30 bg-transparent text-white hover:bg-white/10" onClick={exitItemSelectMode}>
               Cancel
             </Button>
+            <Button variant="outline" size="sm" className="border-white/30 bg-transparent text-white hover:bg-white/10" onClick={() => setBulkMoveOpen(true)}>
+              <Icon name="move" size={14} /> Move
+            </Button>
             <Button size="sm" variant="destructive" onClick={() => setBulkTrashOpen(true)}>
               <Icon name="trash" size={14} /> Trash
             </Button>
@@ -378,6 +392,14 @@ export default function ContainerDetailPage() {
           moveContainer(container.id, { locationId: dest.locationId, parentContainerId: dest.containerId });
           toast.success(`Moved ${container.name}`);
         }}
+      />
+
+      <MoveSheet
+        open={bulkMoveOpen}
+        onOpenChange={setBulkMoveOpen}
+        currentLocationId={container.locationId}
+        currentContainerId={container.id}
+        onMove={bulkMoveItems}
       />
 
       <DisplayCodeSheet open={displayCodeOpen} onOpenChange={setDisplayCodeOpen} container={container} />

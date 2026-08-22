@@ -13,6 +13,7 @@ import { PhotoThumb } from "@/components/photo-thumb";
 import { ViewToggle, type ViewMode } from "@/components/view-toggle";
 import { EmptyState } from "@/components/empty-state";
 import { EntityFormSheet } from "@/components/entity-form-sheet";
+import { MoveSheet } from "@/components/move-sheet";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { useInventoryStore } from "@/lib/store";
@@ -33,6 +34,8 @@ export default function LocationDetailPage() {
   const trashLocation = useInventoryStore((s) => s.trashLocation);
   const setLocationCoverPhoto = useInventoryStore((s) => s.setLocationCoverPhoto);
   const removeLocationCoverPhoto = useInventoryStore((s) => s.removeLocationCoverPhoto);
+  const trashItem = useInventoryStore((s) => s.trashItem);
+  const moveItem = useInventoryStore((s) => s.moveItem);
 
   const [addContainerOpen, setAddContainerOpen] = useState(false);
   const [addContainerKey, bumpAddContainerKey] = useRemountKey();
@@ -42,12 +45,48 @@ export default function LocationDetailPage() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [rotatingPhoto, setRotatingPhoto] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  // Bulk select for "Items directly here" — same itemSelectMode +
+  // Set<id> + Move/Trash bulk-action-bar convention as the Container
+  // detail page's own item list (containers/[id]/page.tsx), reused here
+  // rather than reinvented.
+  const [itemSelectMode, setItemSelectMode] = useState(false);
+  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
+  const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
+  const [bulkTrashOpen, setBulkTrashOpen] = useState(false);
 
   const location = locations.find((l) => l.id === params.id);
   if (!location) return notFound();
 
   const childContainers = directChildContainers(containers, null, location.id);
   const directItems = itemsIn(items, location.id, null);
+
+  function toggleItemSelected(itemId: string) {
+    setSelectedItemIds((s) => {
+      const next = new Set(s);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
+  }
+
+  function exitItemSelectMode() {
+    setItemSelectMode(false);
+    setSelectedItemIds(new Set());
+  }
+
+  function bulkTrashItems() {
+    const count = selectedItemIds.size;
+    selectedItemIds.forEach((id) => trashItem(id));
+    toast(`Moved ${count} item${count === 1 ? "" : "s"} to Trash`, { description: "Recoverable for 30 days." });
+    exitItemSelectMode();
+  }
+
+  function bulkMoveItems(dest: { locationId: string | null; containerId: string | null }) {
+    const count = selectedItemIds.size;
+    selectedItemIds.forEach((id) => moveItem(id, dest));
+    toast.success(`Moved ${count} item${count === 1 ? "" : "s"}`);
+    exitItemSelectMode();
+  }
 
   async function handlePhotoChosen(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -201,7 +240,12 @@ export default function LocationDetailPage() {
 
       {directItems.length > 0 && (
         <section className="flex flex-col gap-3">
-          <h2 className="text-section-title font-medium text-ink">Items directly here</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-section-title font-medium text-ink">Items directly here</h2>
+            <Button variant="outline" size="sm" onClick={() => (itemSelectMode ? exitItemSelectMode() : setItemSelectMode(true))}>
+              {itemSelectMode ? "Cancel" : "Select"}
+            </Button>
+          </div>
           {view === "grid" ? (
             <div className="grid grid-cols-2 gap-3">
               {directItems.map((item) => (
@@ -209,6 +253,8 @@ export default function LocationDetailPage() {
                   key={item.id}
                   item={item}
                   breadcrumbLabel={breadcrumbLabel(buildBreadcrumb(item.locationId, item.containerId, locations, containers))}
+                  selected={selectedItemIds.has(item.id)}
+                  onToggleSelect={itemSelectMode ? () => toggleItemSelected(item.id) : undefined}
                 />
               ))}
             </div>
@@ -219,11 +265,30 @@ export default function LocationDetailPage() {
                   key={item.id}
                   item={item}
                   breadcrumbLabel={breadcrumbLabel(buildBreadcrumb(item.locationId, item.containerId, locations, containers))}
+                  selected={selectedItemIds.has(item.id)}
+                  onToggleSelect={itemSelectMode ? () => toggleItemSelected(item.id) : undefined}
                 />
               ))}
             </div>
           )}
         </section>
+      )}
+
+      {itemSelectMode && selectedItemIds.size > 0 && (
+        <div className="fixed inset-x-4 bottom-[calc(5.125rem+env(safe-area-inset-bottom))] z-40 flex items-center justify-between rounded-2xl bg-ink px-4 py-3 text-white shadow-lg md:bottom-4">
+          <span className="text-body">{selectedItemIds.size} selected</span>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" className="border-white/30 bg-transparent text-white hover:bg-white/10" onClick={exitItemSelectMode}>
+              Cancel
+            </Button>
+            <Button variant="outline" size="sm" className="border-white/30 bg-transparent text-white hover:bg-white/10" onClick={() => setBulkMoveOpen(true)}>
+              <Icon name="move" size={14} /> Move
+            </Button>
+            <Button size="sm" variant="destructive" onClick={() => setBulkTrashOpen(true)}>
+              <Icon name="trash" size={14} /> Trash
+            </Button>
+          </div>
+        </div>
       )}
 
       <EntityFormSheet
@@ -278,6 +343,25 @@ export default function LocationDetailPage() {
           toast("Moved to Trash", { description: "Recoverable for 30 days." });
           router.push("/locations");
         }}
+      />
+
+      <MoveSheet
+        open={bulkMoveOpen}
+        onOpenChange={setBulkMoveOpen}
+        currentLocationId={location.id}
+        currentContainerId={null}
+        onMove={bulkMoveItems}
+      />
+
+      <ConfirmDialog
+        open={bulkTrashOpen}
+        onOpenChange={setBulkTrashOpen}
+        tone="default"
+        icon="trash"
+        title={`Move ${selectedItemIds.size} item${selectedItemIds.size === 1 ? "" : "s"} to Trash?`}
+        description="Recoverable for 30 days."
+        confirmLabel="Move to Trash"
+        onConfirm={bulkTrashItems}
       />
     </div>
   );
