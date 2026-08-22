@@ -17,7 +17,7 @@ export interface RecurringCandidate {
   alreadyTracked: boolean;
 }
 
-const DAY_MS = 24 * 60 * 60 * 1000;
+export const DAY_MS = 24 * 60 * 60 * 1000;
 
 // [min, max] gap-in-days windows a frequency's *typical* cadence falls
 // into, generous enough to absorb a bill landing on a weekend/holiday a
@@ -32,7 +32,7 @@ const FREQUENCY_WINDOWS: { frequency: RecurringBillFrequency; min: number; max: 
   { frequency: "yearly", min: 350, max: 380 },
 ];
 
-const FREQUENCY_DAYS: Record<RecurringBillFrequency, number> = {
+export const FREQUENCY_DAYS: Record<RecurringBillFrequency, number> = {
   weekly: 7,
   biweekly: 14,
   monthly: 30,
@@ -41,13 +41,13 @@ const FREQUENCY_DAYS: Record<RecurringBillFrequency, number> = {
 };
 
 /** Noon-anchors a bare "YYYY-MM-DD" so it round-trips through any timezone without shifting a day (see the call site's comment). Falls back to the raw string on anything that doesn't parse — an occasional malformed date from the model shouldn't crash the whole detection pass, just fail to match a pattern gracefully like it always did before this normalization existed. */
-function toNoonIso(dateOnly: string): string {
+export function toNoonIso(dateOnly: string): string {
   const d = new Date(`${dateOnly}T12:00:00`);
   return Number.isNaN(d.getTime()) ? dateOnly : d.toISOString();
 }
 
-/** Loose enough to match "NETFLIX.COM", "NETFLIX.COM 855-4491", "Netflix.com*Sub" as the same merchant, without collapsing genuinely different merchants into one. Strips trailing reference numbers/phone numbers and non-letters, lowercases, trims. */
-function normalizeMerchant(raw: string): string {
+/** Loose enough to match "NETFLIX.COM", "NETFLIX.COM 855-4491", "Netflix.com*Sub" as the same merchant, without collapsing genuinely different merchants into one. Strips trailing reference numbers/phone numbers and non-letters, lowercases, trims. Exported — reused as-is by lib/recurring-transaction-detection.ts (the transaction-history variant of this same detector) so both share one definition of "same merchant." */
+export function normalizeMerchant(raw: string): string {
   return raw
     .toLowerCase()
     .replace(/\d{3,}/g, "") // drop long digit runs — reference/phone numbers, not part of the merchant's identity
@@ -57,14 +57,14 @@ function normalizeMerchant(raw: string): string {
 }
 
 /** How close two amounts are, as a fraction of the larger — a subscription price bump ($15.49 -> $16.49) should still read as "the same bill," a coincidentally-similar one-off purchase shouldn't. */
-function amountsClose(a: number, b: number): boolean {
+export function amountsClose(a: number, b: number): boolean {
   const diff = Math.abs(Math.abs(a) - Math.abs(b));
   const larger = Math.max(Math.abs(a), Math.abs(b));
   if (larger === 0) return diff === 0;
   return diff / larger <= 0.15 || diff <= 3; // whichever's more forgiving for small-dollar bills
 }
 
-function classifyFrequency(gapDays: number[]): RecurringBillFrequency | null {
+export function classifyFrequency(gapDays: number[]): RecurringBillFrequency | null {
   const avgGap = gapDays.reduce((a, b) => a + b, 0) / gapDays.length;
   for (const window of FREQUENCY_WINDOWS) {
     if (avgGap >= window.min && avgGap <= window.max) {
