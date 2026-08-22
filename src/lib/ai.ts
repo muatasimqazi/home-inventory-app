@@ -105,7 +105,15 @@ export interface ApplianceLabelDetection {
 }
 
 export interface VisionProvider {
-  detectItems(photos: string[]): Promise<DetectedItem[]>;
+  /**
+   * `locationName` is an optional hint — the household's own name for the
+   * capture's current destination Location (e.g. "Garage", "Kids Room") —
+   * used server-side to softly steer detection toward that location's
+   * typical items in the bundled reference catalog (lib/reference/
+   * starter-inventory.ts) when one matches, never to force a match. Omit or
+   * pass null/undefined for exactly today's unscoped behavior.
+   */
+  detectItems(photos: string[], locationName?: string | null): Promise<DetectedItem[]>;
   /** One scan batch (a statement, a stack of receipts) can contain multiple receipts — array, not a single result. */
   extractReceipts(photos: string[]): Promise<ReceiptExtraction[]>;
   /** One PDF statement -> every transaction line found across all its pages. */
@@ -202,7 +210,11 @@ const CANNED_RECEIPTS: ReceiptExtraction[] = [
 ];
 
 export class MockVisionProvider implements VisionProvider {
-  async detectItems(photos: string[]): Promise<DetectedItem[]> {
+  // locationName is accepted (to satisfy VisionProvider) and intentionally
+  // ignored — the canned pool has no notion of a reference catalog, so mock
+  // mode stays exactly as it was.
+  async detectItems(photos: string[], locationName?: string | null): Promise<DetectedItem[]> {
+    void locationName;
     await new Promise((resolve) => setTimeout(resolve, 1100));
 
     // One item per photo when there are several (each gets its own
@@ -274,13 +286,16 @@ function weightedSingleOrFew(): number {
  * routes both the primary and fallback models through Vercel AI Gateway).
  */
 export class HttpVisionProvider implements VisionProvider {
-  async detectItems(photos: string[]): Promise<DetectedItem[]> {
+  async detectItems(photos: string[], locationName?: string | null): Promise<DetectedItem[]> {
     let res: Response;
     try {
       res = await fetch("/api/v1/vision/detect", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ photos }),
+        // locationName only goes in the body when actually present, so the
+        // route sees exactly the same shape as before for every caller that
+        // doesn't pass one.
+        body: JSON.stringify(locationName ? { photos, locationName } : { photos }),
       });
     } catch {
       // fetch() itself only throws for a real network failure (offline,
