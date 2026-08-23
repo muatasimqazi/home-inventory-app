@@ -167,6 +167,17 @@ export interface NewItemInput {
   extraDetails?: Record<string, string>;
   /** null/omitted = shared household item, not owned by one person (PRD §9's "Household" default). */
   ownerPersonId?: string | null;
+  /**
+   * Already-uploaded Storage path for this item's cover photo — set by
+   * callers that upload the photo themselves *before* creating the item
+   * (the capture-review flow, via the exported uploadCoverPhotoFile) so the
+   * insert row already carries the right cover_photo_path from the start.
+   * Left unset by every other creation path (add/page.tsx's manual-entry
+   * photo picker, the container wizard, etc.), which still create the item
+   * first and call setItemCoverPhoto after — those don't have a photo to
+   * upload until the destination row already exists to attach it to.
+   */
+  coverPhotoPath?: string | null;
 }
 
 export interface NewPersonInput {
@@ -736,8 +747,18 @@ function persistOrRevert(op: PromiseLike<{ error: { message: string } | null }>,
  * storage policy in addition to INSERT, which the bucket's migration
  * deliberately doesn't grant). Callers own updating their own entity's
  * local state and row, and cleaning up `previousPath` once the new one is
- * confirmed live — this only handles validation + the upload itself. */
-async function uploadCoverPhotoFile(file: File, householdId: string): Promise<{ ok: true; path: string } | { ok: false; error: string }> {
+ * confirmed live — this only handles validation + the upload itself.
+ *
+ * Exported so the capture-review flow can call it directly for a
+ * newly-detected item's cropped cover photo, uploading it *before* the item
+ * row exists and passing the resulting path in via NewItemInput.coverPhotoPath
+ * — one insert with the right path already on it, instead of create-then-
+ * setItemCoverPhoto's separate insert-then-update, which raced against the
+ * batch insert for multi-item saves (the insert and each item's own
+ * cover-photo update could arrive at Postgres out of order, and an update
+ * against a row that doesn't exist yet just silently affects zero rows —
+ * no error, no photo, and nothing about it visible to the user). */
+export async function uploadCoverPhotoFile(file: File, householdId: string): Promise<{ ok: true; path: string } | { ok: false; error: string }> {
   const contentType = file.type || "application/octet-stream";
   if (!contentType.startsWith("image/")) {
     return { ok: false, error: "Only images can be used as a cover photo." };
@@ -3429,7 +3450,7 @@ function buildItem(householdId: string, userId: string, input: NewItemInput): It
     quantity: clampQuantity(input.quantity ?? 1),
     notes: input.notes ?? "",
     photoEmoji: input.photoEmoji,
-    coverPhotoPath: null,
+    coverPhotoPath: input.coverPhotoPath ?? null,
     status: "active",
     needsReview: input.needsReview ?? false,
     reviewReason: input.reviewReason,

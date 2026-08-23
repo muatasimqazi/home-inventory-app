@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useApplianceCapture } from "@/lib/appliance-capture-store";
-import { useInventoryStore } from "@/lib/store";
+import { useInventoryStore, uploadCoverPhotoFile } from "@/lib/store";
 import { stopCameraStream } from "@/lib/camera-stream";
 import { dataUrlToFile } from "@/lib/crop-image";
 import { buildBreadcrumb } from "@/lib/selectors";
@@ -48,8 +48,8 @@ export default function ApplianceReviewPage() {
 
   const locations = useInventoryStore((s) => s.locations);
   const containers = useInventoryStore((s) => s.containers);
+  const currentHouseholdId = useInventoryStore((s) => s.currentHouseholdId);
   const createItem = useInventoryStore((s) => s.createItem);
-  const setItemCoverPhoto = useInventoryStore((s) => s.setItemCoverPhoto);
 
   const [moveOpen, setMoveOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -88,12 +88,24 @@ export default function ApplianceReviewPage() {
     if (fields.serialNumber.trim()) extraDetails.serialNumber = fields.serialNumber.trim();
     if (fields.manufactureDate.trim()) extraDetails.manufactureDate = fields.manufactureDate.trim();
 
+    // Uploaded *before* createItem, not after — see NewItemInput.coverPhotoPath's
+    // doc comment in lib/store.ts for why a separate post-create
+    // setItemCoverPhoto update is a race against createItem's own insert.
+    let coverPhotoPath: string | null = null;
+    if (photo && currentHouseholdId) {
+      const file = await dataUrlToFile(photo);
+      const uploaded = await uploadCoverPhotoFile(file, currentHouseholdId);
+      if (uploaded.ok) coverPhotoPath = uploaded.path;
+      else toast.error(uploaded.error ?? "Item saved, but the photo couldn't be uploaded.");
+    }
+
     const item = createItem({
       name: fields.name.trim(),
       originalDetectedName: detection.suggestedName || null,
       category: fields.category,
       quantity: 1,
       photoEmoji,
+      coverPhotoPath,
       locationId: destination?.locationId ?? null,
       containerId: destination?.containerId ?? null,
       needsReview: lowConfidence && fields.name.trim() === detection.suggestedName,
@@ -101,11 +113,6 @@ export default function ApplianceReviewPage() {
       extraDetails,
     });
 
-    if (photo) {
-      const file = await dataUrlToFile(photo);
-      const result = await setItemCoverPhoto(item.id, file);
-      if (!result.ok) toast.error(result.error ?? "Item saved, but the photo couldn't be uploaded.");
-    }
     toast.success(`Saved ${item.name}`);
     router.replace(`/items/${item.id}`);
   }

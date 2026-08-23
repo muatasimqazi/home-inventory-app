@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useBarcodeCapture } from "@/lib/barcode-capture-store";
-import { useInventoryStore } from "@/lib/store";
+import { useInventoryStore, uploadCoverPhotoFile } from "@/lib/store";
 import { stopCameraStream } from "@/lib/camera-stream";
 import { dataUrlToFile } from "@/lib/crop-image";
 import { buildBreadcrumb } from "@/lib/selectors";
@@ -48,8 +48,8 @@ export default function BarcodeReviewPage() {
 
   const locations = useInventoryStore((s) => s.locations);
   const containers = useInventoryStore((s) => s.containers);
+  const currentHouseholdId = useInventoryStore((s) => s.currentHouseholdId);
   const createItem = useInventoryStore((s) => s.createItem);
-  const setItemCoverPhoto = useInventoryStore((s) => s.setItemCoverPhoto);
 
   const [moveOpen, setMoveOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -83,6 +83,17 @@ export default function BarcodeReviewPage() {
     stopCameraStream();
     const extraDetails: Record<string, string> = { barcode: result.code };
 
+    // Uploaded *before* createItem, not after — see NewItemInput.coverPhotoPath's
+    // doc comment in lib/store.ts for why a separate post-create
+    // setItemCoverPhoto update is a race against createItem's own insert.
+    let coverPhotoPath: string | null = null;
+    if (result.photo && currentHouseholdId) {
+      const file = await dataUrlToFile(result.photo);
+      const uploaded = await uploadCoverPhotoFile(file, currentHouseholdId);
+      if (uploaded.ok) coverPhotoPath = uploaded.path;
+      else toast.error(uploaded.error ?? "Item saved, but the photo couldn't be uploaded.");
+    }
+
     const item = createItem({
       name: fields.name.trim(),
       originalDetectedName: result.found ? result.suggestedName || null : null,
@@ -90,6 +101,7 @@ export default function BarcodeReviewPage() {
       quantity: 1,
       notes: fields.notes.trim(),
       photoEmoji,
+      coverPhotoPath,
       locationId: destination?.locationId ?? null,
       containerId: destination?.containerId ?? null,
       // The only way to reach here with an unedited, found match is via
@@ -105,11 +117,6 @@ export default function BarcodeReviewPage() {
       extraDetails,
     });
 
-    if (result.photo) {
-      const file = await dataUrlToFile(result.photo);
-      const uploadResult = await setItemCoverPhoto(item.id, file);
-      if (!uploadResult.ok) toast.error(uploadResult.error ?? "Item saved, but the photo couldn't be uploaded.");
-    }
     toast.success(`Saved ${item.name}`);
     router.replace(`/items/${item.id}`);
   }

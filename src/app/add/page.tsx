@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useInventoryStore } from "@/lib/store";
+import { useInventoryStore, uploadCoverPhotoFile } from "@/lib/store";
 import { buildBreadcrumb, sortByLabel, suggestBetterContainer } from "@/lib/selectors";
 import { SORTED_CATEGORIES } from "@/lib/types";
 import { extraFieldsForCategory } from "@/lib/category";
@@ -53,8 +53,8 @@ function ManualAddItemInner() {
   const items = useInventoryStore((s) => s.items);
   const people = sortByLabel(useInventoryStore((s) => s.people), (p) => p.displayName);
   const isOwner = useInventoryStore((s) => s.members.find((m) => m.userId === s.currentUserId)?.role === "owner");
+  const currentHouseholdId = useInventoryStore((s) => s.currentHouseholdId);
   const createItem = useInventoryStore((s) => s.createItem);
-  const setItemCoverPhoto = useInventoryStore((s) => s.setItemCoverPhoto);
   const getOrCreateTag = useInventoryStore((s) => s.getOrCreateTag);
   const lastUsedDestination = useInventoryStore((s) => s.lastUsedDestination);
 
@@ -155,6 +155,19 @@ function ManualAddItemInner() {
       return;
     }
     setSaving(true);
+    // Uploaded *before* createItem, not after — a separate post-create
+    // setItemCoverPhoto update raced against createItem's own (also
+    // fire-and-forget) insert reaching Postgres, and an update against a
+    // row that doesn't exist yet silently affects zero rows: no error, no
+    // photo, nothing surfaced to the user. Passing the path straight into
+    // createItem's own insert avoids the race entirely — see
+    // NewItemInput.coverPhotoPath's doc comment in lib/store.ts.
+    let coverPhotoPath: string | null = null;
+    if (photoFile && currentHouseholdId) {
+      const uploaded = await uploadCoverPhotoFile(photoFile, currentHouseholdId);
+      if (uploaded.ok) coverPhotoPath = uploaded.path;
+      else toast.error(uploaded.error ?? "Item saved, but the photo couldn't be uploaded.");
+    }
     const ownerPerson = ownerPersonId === HOUSEHOLD_OWNER_VALUE ? null : (people.find((p) => p.id === ownerPersonId) ?? null);
     const item = createItem({
       name: name.trim(),
@@ -162,16 +175,13 @@ function ManualAddItemInner() {
       quantity: Math.max(0, Math.min(9999, Number(quantity) || 0)),
       notes: notes.trim(),
       photoEmoji: CATEGORY_EMOJI[category] ?? "📦",
+      coverPhotoPath,
       locationId: destination.locationId,
       containerId: destination.containerId,
       tagIds: tags.map((t) => getOrCreateTag(t).id),
       extraDetails,
       ownerPersonId: ownerPerson?.id ?? null,
     });
-    if (photoFile) {
-      const result = await setItemCoverPhoto(item.id, photoFile);
-      if (!result.ok) toast.error(result.error ?? "Item saved, but the photo couldn't be uploaded.");
-    }
     toast.success(`Added ${item.name}`);
     // replace, not push — this page can be reached one hop deep (capture's
     // camera-denied fallback), and either way the item page's back button

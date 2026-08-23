@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCaptureSession, type DetectionRow } from "@/lib/capture-session-store";
-import { useInventoryStore, type NewItemInput } from "@/lib/store";
+import { useInventoryStore, uploadCoverPhotoFile, type NewItemInput } from "@/lib/store";
 import { stopCameraStream } from "@/lib/camera-stream";
 import { cropToItem, dataUrlToFile } from "@/lib/crop-image";
 import { buildBreadcrumb, sortByLabel } from "@/lib/selectors";
@@ -49,9 +49,9 @@ export default function CaptureReviewPage() {
   const transactions = useInventoryStore((s) => s.transactions);
   const people = sortByLabel(useInventoryStore((s) => s.people), (p) => p.displayName);
   const isOwner = useInventoryStore((s) => s.members.find((m) => m.userId === s.currentUserId)?.role === "owner");
+  const currentHouseholdId = useInventoryStore((s) => s.currentHouseholdId);
   const createItem = useInventoryStore((s) => s.createItem);
   const createItemsBatch = useInventoryStore((s) => s.createItemsBatch);
-  const setItemCoverPhoto = useInventoryStore((s) => s.setItemCoverPhoto);
   const getOrCreateTag = useInventoryStore((s) => s.getOrCreateTag);
   const saveNormalizationRule = useInventoryStore((s) => s.saveNormalizationRule);
   const linkItemPurchase = useInventoryStore((s) => s.linkItemPurchase);
@@ -127,7 +127,7 @@ export default function CaptureReviewPage() {
   const isBulk = detections.length > 1;
   const blockedCount = included.filter(needsCorrection).length;
 
-  function buildInput(row: DetectionRow): NewItemInput {
+  function buildInput(row: DetectionRow, coverPhotoPath: string | null): NewItemInput {
     const ownerPerson = ownerPersonId === HOUSEHOLD_OWNER_VALUE ? null : (people.find((p) => p.id === ownerPersonId) ?? null);
     return {
       name: row.name.trim(),
@@ -135,6 +135,7 @@ export default function CaptureReviewPage() {
       category: row.category,
       quantity: row.quantity,
       photoEmoji: row.photoEmoji,
+      coverPhotoPath,
       locationId: destination?.locationId ?? null,
       containerId: destination?.containerId ?? null,
       ownerPersonId: ownerPerson?.id ?? null,
@@ -172,43 +173,57 @@ export default function CaptureReviewPage() {
 
   // Crops just this row's own item out of whichever photo it was detected
   // in (row.photoIndex), instead of every item in a photo sharing one full
-  // copy of it. Falls back to the (resized) whole photo when there's no
-  // usable box — see isUsableBoundingBox in lib/crop-image.ts — so a model
-  // that can't localize an item, or a genuinely single-item photo, still
-  // gets a real cover instead of none at all.
-  async function buildCoverFile(row: DetectionRow): Promise<File | null> {
+  // copy of it, and uploads the crop right away — *before* the item row
+  // exists — so createItem/createItemsBatch's own insert can carry the
+  // right cover_photo_path from the start instead of a separate post-create
+  // update. That update used to race the item's own insert (a multi-item
+  // batch's insert and each row's own cover-photo update could reach
+  // Postgres out of order — an update against a row that doesn't exist yet
+  // just silently affects zero rows, no error, no photo, nothing surfaced
+  // to the user), which is exactly why some detected items were saving with
+  // their emoji fallback still showing on the item detail page afterward
+  // instead of the real cropped photo. Falls back to the (resized) whole
+  // photo when there's no usable box — see isUsableBoundingBox in
+  // lib/crop-image.ts — so a model that can't localize an item, or a
+  // genuinely single-item photo, still gets a real cover instead of none at
+  // all. A failed upload doesn't block saving the item itself — it just
+  // keeps the emoji fallback for that one row, and is reported once, after
+  // Save, instead of per-row (see failedCovers in handleSave).
+  async function buildCoverPhotoPath(row: DetectionRow): Promise<{ path: string | null; failed: boolean }> {
     const sourcePhoto = photos[row.photoIndex] ?? photos[0];
-    if (!sourcePhoto) return null;
+    if (!sourcePhoto || !currentHouseholdId) return { path: null, failed: false };
     const cropped = await cropToItem(sourcePhoto, row.boundingBox);
-    return dataUrlToFile(cropped);
+    const file = await dataUrlToFile(cropped);
+    const uploaded = await uploadCoverPhotoFile(file, currentHouseholdId);
+    return uploaded.ok ? { path: uploaded.path, failed: false } : { path: null, failed: true };
   }
 
   async function handleSave() {
     if (included.length === 0 || blockedCount > 0 || missingDestination) return;
     setSaving(true);
-    const coverFiles = await Promise.all(included.map(buildCoverFile));
+    const coverResults = await Promise.all(included.map(buildCoverPhotoPath));
+    const failedCovers = coverResults.filter((r) => r.failed).length;
     // The capture flow is done at this point — release the camera for real
     // (it's kept alive across /capture <-> /capture/review round trips up
     // to now so "Add another photo" doesn't re-prompt for permission).
     stopCameraStream();
     if (included.length === 1) {
-      const item = createItem(buildInput(included[0]));
+      const item = createItem(buildInput(included[0], coverResults[0].path));
       persistNormalizationRules(included);
-      if (coverFiles[0]) await setItemCoverPhoto(item.id, coverFiles[0]);
       if (linkTransaction) {
         const linkRes = await linkItemPurchase({ itemId: item.id, transactionId: linkTransaction.id, source: "finance_nudge" });
         if (!linkRes.ok) toast.error(linkRes.error ?? "Saved, but couldn't link the purchase — link it manually from the item page.");
       }
       toast.success(`Saved ${item.name}`);
+      if (failedCovers > 0) toast.error("Couldn't upload the photo — add one from the item page.");
       // replace, not push — closes out the whole capture flow's single
       // history slot instead of adding yet another one on top of it, so
       // the item page's own back button returns straight to wherever the
       // flow was actually started from (a Container/Location page).
       router.replace(`/items/${item.id}`);
     } else {
-      const created = createItemsBatch(included.map(buildInput));
+      const created = createItemsBatch(included.map((row, i) => buildInput(row, coverResults[i].path)));
       persistNormalizationRules(included);
-      await Promise.all(created.map((it, i) => (coverFiles[i] ? setItemCoverPhoto(it.id, coverFiles[i]!) : null)));
       // A capture-nudge is keyed to one transaction, but the user may have
       // photographed more than one thing from that same purchase (e.g. a
       // multi-item Home Depot run) — link every item created in this batch
@@ -221,6 +236,11 @@ export default function CaptureReviewPage() {
         if (linkResults.some((r) => !r.ok)) toast.error("Saved, but couldn't link one or more items to the purchase — link them manually from the item page.");
       }
       toast.success(`Saved ${included.length} items`);
+      if (failedCovers > 0) {
+        toast.error(
+          `${failedCovers} photo${failedCovers > 1 ? "s" : ""} couldn't be uploaded — add ${failedCovers > 1 ? "them" : "one"} from the item page${failedCovers > 1 ? "s" : ""}.`
+        );
+      }
       router.replace(destination?.containerId ? `/containers/${destination.containerId}` : "/");
     }
     setSaving(false);
