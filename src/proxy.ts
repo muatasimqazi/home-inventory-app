@@ -15,7 +15,12 @@ import { NextResponse, type NextRequest } from "next/server";
 // job silently 307'd to /sign-in before the route's own CRON_SECRET check
 // ever ran, i.e. the cron fallback never actually fired. Applying that
 // lesson to the push job's route up front rather than rediscovering it.
-const PUBLIC_PATHS = ["/sign-in", "/auth/callback", "/api/v1/webhooks", "/api/v1/plaid/sync-all", "/api/v1/push/send-due-bills"];
+// /api/v1/public/* (Settings > API Keys) is the same shape again: Home
+// Assistant/Shortcuts authenticate with `Authorization: Bearer shz_...`
+// (see requireApiKey), never a browser session — caught this one in a
+// local smoke test *before* shipping it broken, unlike the Plaid case,
+// which had to learn it live in production first.
+const PUBLIC_PATHS = ["/sign-in", "/auth/callback", "/api/v1/webhooks", "/api/v1/plaid/sync-all", "/api/v1/push/send-due-bills", "/api/v1/public"];
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });

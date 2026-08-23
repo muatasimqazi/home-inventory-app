@@ -49,3 +49,28 @@ export const CATEGORY_EXTRA_FIELDS: Record<string, CategoryExtraField[]> = {
 export function extraFieldsForCategory(category: string): CategoryExtraField[] {
   return CATEGORY_EXTRA_FIELDS[category] ?? [];
 }
+
+// Fallback cover emoji when an item has no real photo — one per category,
+// "Miscellaneous"'s bucket and every unrecognized category falling back to
+// a plain box. Shared between the manual add form and the public API's
+// item-create endpoint (src/app/api/v1/public/items/route.ts), which has
+// no photo to derive one from and previously would have needed its own
+// copy of this exact map.
+export const CATEGORY_EMOJI: Record<string, string> = {
+  Tool: "🛠️",
+  Electronics: "🔌",
+  Document: "📄",
+  Clothing: "🧥",
+  Kitchen: "🍶",
+  "Sporting Goods": "🏸",
+  Toy: "🎲",
+  Decor: "🖼️",
+  Hardware: "🔩",
+  Outdoor: "⛺",
+  Appliance: "🔌",
+  Miscellaneous: "📦",
+};
+
+export function categoryEmoji(category: string): string {
+  return CATEGORY_EMOJI[category] ?? "📦";
+}

@@ -15,27 +15,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useInventoryStore, uploadCoverPhotoFile } from "@/lib/store";
 import { buildBreadcrumb, sortByLabel, suggestBetterContainer } from "@/lib/selectors";
 import { SORTED_CATEGORIES } from "@/lib/types";
-import { extraFieldsForCategory } from "@/lib/category";
+import { extraFieldsForCategory, CATEGORY_EMOJI } from "@/lib/category";
 import { cn } from "@/lib/utils";
 import { loadReferenceItems, matchReferenceLocation, suggestReferenceItems, type ReferenceInventoryItem } from "@/lib/reference/starter-inventory";
 
 const HOUSEHOLD_OWNER_VALUE = "household";
 const ADD_PERSON_VALUE = "__add_person__";
-
-const CATEGORY_EMOJI: Record<string, string> = {
-  Tool: "🛠️",
-  Electronics: "🔌",
-  Document: "📄",
-  Clothing: "🧥",
-  Kitchen: "🍶",
-  "Sporting Goods": "🏸",
-  Toy: "🎲",
-  Decor: "🖼️",
-  Hardware: "🔩",
-  Outdoor: "⛺",
-  Appliance: "🔌",
-  Miscellaneous: "📦",
-};
 
 export default function ManualAddItemPage() {
   return (

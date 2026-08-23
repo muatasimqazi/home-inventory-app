@@ -41,6 +41,28 @@ export interface Invite {
   targetPersonId: string | null;
 }
 
+/**
+ * A generated, revocable credential for external automations (Home
+ * Assistant, Apple Shortcuts) to call the public inventory API
+ * (src/app/api/v1/public/*) without a Supabase Auth session. The full
+ * secret is never stored anywhere, this app included — keyPrefix/lastFour
+ * are display-only fragments shown once the real secret is gone, same as
+ * how a GitHub personal access token is shown. See
+ * src/lib/api-keys.ts for generation/hashing and
+ * src/lib/api-key-auth.ts for how a request authenticates with one.
+ */
+export interface ApiKey {
+  id: string;
+  householdId: string;
+  createdByUserId: string;
+  label: string;
+  keyPrefix: string;
+  lastFour: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+}
+
 // Household Ledger — People (supabase/migrations/0017_household_ledger_core.sql,
 // docs/v4 - Enhanced Features §8/§9/§23). A Person is a household member who
 // may or may not have an Account: every authenticated Member also has a

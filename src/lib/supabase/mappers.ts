@@ -62,6 +62,7 @@ import type {
   PlaidItemStatus,
   PushDeviceSubscription,
   NotificationPreference,
+  ApiKey,
 } from "../types";
 
 export interface HouseholdRow {
@@ -133,6 +134,40 @@ export function inviteToInsertRow(invite: Invite): InviteRow {
     created_at: invite.createdAt,
     expires_at: invite.expiresAt,
     target_person_id: invite.targetPersonId,
+  };
+}
+
+// Deliberately no `key_hash` field here, unlike every other *Row type in
+// this file — the client-side household bundle fetch (store.ts) never
+// selects that column in the first place (see the api_keys query there),
+// so there's nothing for this shape to carry. The one place that does
+// touch key_hash — generating a key — is a one-off server-side insert in
+// src/app/api/v1/api-keys/route.ts, written inline rather than through an
+// apiKeyToInsertRow() here, so a hash never has a typed path into
+// anything client bundles could import.
+export interface ApiKeyRow {
+  id: string;
+  household_id: string;
+  created_by_user_id: string;
+  label: string;
+  key_prefix: string;
+  last_four: string;
+  created_at: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
+}
+
+export function rowToApiKey(row: ApiKeyRow): ApiKey {
+  return {
+    id: row.id,
+    householdId: row.household_id,
+    createdByUserId: row.created_by_user_id,
+    label: row.label,
+    keyPrefix: row.key_prefix,
+    lastFour: row.last_four,
+    createdAt: row.created_at,
+    lastUsedAt: row.last_used_at,
+    revokedAt: row.revoked_at,
   };
 }
 

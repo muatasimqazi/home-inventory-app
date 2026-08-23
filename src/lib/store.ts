@@ -13,6 +13,7 @@ import {
   rowToMember,
   rowToInvite,
   inviteToInsertRow,
+  rowToApiKey,
   rowToPerson,
   personToInsertRow,
   rowToLocation,
@@ -67,6 +68,7 @@ import {
   type HouseholdRow,
   type MemberRow,
   type InviteRow,
+  type ApiKeyRow,
   type PersonRow,
   type LocationRow,
   type ContainerRow,
@@ -106,6 +108,7 @@ import type {
   FinanceCategory,
   Household,
   Invite,
+  ApiKey,
   Item,
   LabelBatch,
   LabelBatchEntry,
@@ -243,6 +246,8 @@ interface InventoryState {
   currentHouseholdId: string;
   members: Member[];
   invites: Invite[];
+  /** Metadata only — never the secret itself, which is never stored anywhere after the one generation response. Owner-only per RLS; empty for any non-owner member. */
+  apiKeys: ApiKey[];
   /** Household Ledger People (PRD §8/§9/§23) — every authenticated Member plus every managed profile. Ownership (Item.ownerPersonId) and the People list in Settings read from here, not `members`. */
   people: Person[];
   locations: Location[];
@@ -493,6 +498,10 @@ interface InventoryState {
   transferOwnership: (toUserId: string) => void;
   /** Updates the caller's own membership row in the current household (display name, avatar). Real, awaited. */
   updateMyProfile: (patch: { displayName?: string; avatarUrl?: string }) => Promise<{ ok: boolean; error?: string }>;
+  /** Owner-only (server-enforced, see api-keys/route.ts). Real, awaited — the raw secret only ever exists in this one response, so unlike almost everything else in this store there's nothing to show optimistically before the round trip completes. */
+  generateApiKey: (label: string) => Promise<{ ok: true; apiKey: ApiKey; secret: string } | { ok: false; error: string }>;
+  /** Soft-revoke (sets revokedAt, doesn't delete the row) — plain RLS-backed update via the browser client, same shape as cancelInvite, no server route needed. */
+  revokeApiKey: (id: string) => void;
 
   // People (PRD §8/§9/§23) — both authenticated members (linkedUserId set,
   // created automatically by create_household()/accept_invite()) and
@@ -547,6 +556,7 @@ function purgeAfter(from: Date): string {
 interface HouseholdBundle {
   members: Member[];
   invites: Invite[];
+  apiKeys: ApiKey[];
   people: Person[];
   locations: Location[];
   containers: Container[];
@@ -578,6 +588,7 @@ function snapshotBundle(state: InventoryState): HouseholdBundle {
   return {
     members: state.members,
     invites: state.invites,
+    apiKeys: state.apiKeys,
     people: state.people,
     locations: state.locations,
     containers: state.containers,
@@ -615,6 +626,7 @@ async function fetchHouseholdBundle(
   const [
     membersRes,
     invitesRes,
+    apiKeysRes,
     peopleRes,
     locationsRes,
     containersRes,
@@ -641,6 +653,13 @@ async function fetchHouseholdBundle(
   ] = await Promise.all([
     supabase.from("members").select("*").eq("household_id", householdId),
     supabase.from("invites").select("*").eq("household_id", householdId),
+    // Never `select("*")` here — key_hash has no business in a client
+    // bundle even for the owner it belongs to (RLS already limits reads to
+    // the owner; this is a second, independent reason it never leaves the
+    // server). Empty result for a non-owner member — RLS's "owner read"
+    // policy on api_keys, not an error, same as any other RLS-filtered
+    // query.
+    supabase.from("api_keys").select("id, household_id, created_by_user_id, label, key_prefix, last_four, created_at, last_used_at, revoked_at").eq("household_id", householdId),
     supabase.from("people").select("*").eq("household_id", householdId),
     supabase.from("locations").select("*").eq("household_id", householdId),
     supabase.from("containers").select("*").eq("household_id", householdId),
@@ -679,7 +698,7 @@ async function fetchHouseholdBundle(
   ]);
 
   const firstError =
-    membersRes.error ?? invitesRes.error ?? peopleRes.error ?? locationsRes.error ?? containersRes.error ?? itemsRes.error ?? tagsRes.error ?? favoritesRes.error ?? activityRes.error ??
+    membersRes.error ?? invitesRes.error ?? apiKeysRes.error ?? peopleRes.error ?? locationsRes.error ?? containersRes.error ?? itemsRes.error ?? tagsRes.error ?? favoritesRes.error ?? activityRes.error ??
     attachmentsRes.error ?? pinnedLocationsRes.error ?? labelBatchesRes.error ?? labelBatchEntriesRes.error ?? normalizationRulesRes.error ??
     accountsRes.error ?? financeAccountSharesRes.error ?? transactionsRes.error ?? financeCategoriesRes.error ?? categoryRulesRes.error ?? recurringBillsRes.error ?? financeBillSharesRes.error ??
     recurringCandidateDismissalsRes.error ??
@@ -703,6 +722,7 @@ async function fetchHouseholdBundle(
   return {
     members: ((membersRes.data ?? []) as MemberRow[]).map(rowToMember),
     invites: ((invitesRes.data ?? []) as InviteRow[]).map(rowToInvite),
+    apiKeys: ((apiKeysRes.data ?? []) as ApiKeyRow[]).map(rowToApiKey),
     people: ((peopleRes.data ?? []) as PersonRow[]).map(rowToPerson),
     locations: ((locationsRes.data ?? []) as LocationRow[]).map(rowToLocation),
     containers: ((containersRes.data ?? []) as ContainerRow[]).map(rowToContainer),
@@ -887,6 +907,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
   currentHouseholdId: "",
   members: [],
   invites: [],
+  apiKeys: [],
   people: [],
   locations: [],
   containers: [],
@@ -3124,6 +3145,33 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       supabase.from("invites").delete().eq("id", inviteId),
       () => { if (previous) set((s) => ({ invites: [...s.invites, previous] })); },
       "Couldn't cancel invite"
+    );
+  },
+
+  generateApiKey: async (label) => {
+    const householdId = get().currentHouseholdId;
+    const res = await fetch("/api/v1/api-keys", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ householdId, label }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) return { ok: false, error: body.error ?? "Couldn't create the API key." };
+    const apiKey = body.apiKey as ApiKey;
+    set((s) => ({ apiKeys: [...s.apiKeys, apiKey] }));
+    return { ok: true, apiKey, secret: body.secret as string };
+  },
+
+  revokeApiKey: (id) => {
+    const supabase = getSupabaseBrowserClient();
+    const previous = get().apiKeys.find((k) => k.id === id);
+    if (!previous || previous.revokedAt) return;
+    const revokedAt = nowIso();
+    set((s) => ({ apiKeys: s.apiKeys.map((k) => (k.id === id ? { ...k, revokedAt } : k)) }));
+    persistOrRevert(
+      supabase.from("api_keys").update({ revoked_at: revokedAt }).eq("id", id),
+      () => set((s) => ({ apiKeys: s.apiKeys.map((k) => (k.id === id ? previous : k)) })),
+      "Couldn't revoke key"
     );
   },
 
