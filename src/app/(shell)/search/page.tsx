@@ -16,7 +16,8 @@ import { categoryAccentClass } from "@/lib/category";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { rowToScannedReceiptLineItem, type ScannedReceiptLineItemRow } from "@/lib/supabase/mappers";
 import { useInventoryStore } from "@/lib/store";
-import { searchInventory, searchFinance, type SearchResult } from "@/lib/search";
+import { searchInventory, searchContainers, searchFinance, type SearchResult } from "@/lib/search";
+import { PhotoThumb } from "@/components/photo-thumb";
 import { accountTypeIcon, activeLocations } from "@/lib/selectors";
 import { formatCurrency, formatShortDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -129,24 +130,32 @@ function SearchPageInner() {
   }, []);
 
   const inventoryResults = useMemo(() => searchInventory(query, items, containers, locations, tags), [query, items, containers, locations, tags]);
+  // Own result kind, own pool — a container is a real thing you open (its
+  // own detail page), not an attribute of an item result the way its name
+  // already was via items' own breadcrumb matching. Kept separate from
+  // inventoryResults (not merged into one array) so usedCategories below
+  // can keep mapping over item results only without a kind guard.
+  const containerResults = useMemo(() => searchContainers(query, containers, locations, items), [query, containers, locations, items]);
   const financeResults = useMemo(
     () => searchFinance(query, transactions, accounts, financeCategories, lineItemsByTransaction),
     [query, transactions, accounts, financeCategories, lineItemsByTransaction]
   );
 
   const combined: SearchResult[] = useMemo(() => {
-    const pool: SearchResult[] = domain === "finance" ? financeResults : domain === "inventory" ? inventoryResults : [...inventoryResults, ...financeResults];
+    const inventoryPool = [...inventoryResults, ...containerResults];
+    const pool: SearchResult[] = domain === "finance" ? financeResults : domain === "inventory" ? inventoryPool : [...inventoryPool, ...financeResults];
     return [...pool].sort((a, b) => b.score - a.score);
-  }, [domain, inventoryResults, financeResults]);
+  }, [domain, inventoryResults, containerResults, financeResults]);
 
-  // Category chip filter only makes sense against inventory results —
-  // finance results don't have an item category. Hidden entirely once
-  // Finance-only results are in view, or once there's nothing to filter.
+  // Category chip filter only makes sense against item results — finance
+  // results don't have an item category, and neither do containers. Hidden
+  // entirely once Finance-only results are in view, or once there's
+  // nothing to filter.
   const usedCategories = domain === "finance" ? [] : Array.from(new Set(inventoryResults.map((r) => r.item.category)));
   const filteredResults =
     categoryFilter && domain !== "finance" ? combined.filter((r) => r.kind === "item" && r.item.category === categoryFilter) : combined;
 
-  const hasAnyResults = inventoryResults.length > 0 || financeResults.length > 0;
+  const hasAnyResults = inventoryResults.length > 0 || containerResults.length > 0 || financeResults.length > 0;
   const { visible: paginatedResults, hasMore, remaining, pageSize, loadMore } = usePaginated(filteredResults, `${domain}:${categoryFilter}:${query}`);
 
   // Names the household already has, active items only — exact
@@ -241,7 +250,7 @@ function SearchPageInner() {
         <EmptyState
           icon="search"
           title="Search your household"
-          description="Try an item name, a vendor, an account, or a location like “garage.” Or ask a question, like “where did I keep my measuring tape?”"
+          description="Try an item name, a container or its Container ID, a vendor, an account, or a location like “garage.” Or ask a question, like “where did I keep my measuring tape?”"
         />
       ) : filteredResults.length === 0 ? (
         <EmptyState
@@ -260,7 +269,10 @@ function SearchPageInner() {
           </p>
           <div className="flex flex-col gap-2">
             {paginatedResults.map((r) => (
-              <SearchResultRow key={`${r.kind}-${r.kind === "item" ? r.item.id : r.kind === "transaction" ? r.transaction.id : r.account.id}`} result={r} />
+              <SearchResultRow
+                key={`${r.kind}-${r.kind === "item" ? r.item.id : r.kind === "container" ? r.container.id : r.kind === "transaction" ? r.transaction.id : r.account.id}`}
+                result={r}
+              />
             ))}
           </div>
           {hasMore && <LoadMoreButton remaining={remaining} pageSize={pageSize} onClick={loadMore} />}
@@ -320,14 +332,43 @@ function SearchResultRow({ result }: { result: SearchResult }) {
     const { item, breadcrumbLabel } = result;
     return (
       <Link href={`/items/${item.id}`} className="flex items-center gap-3 rounded-2xl border border-border bg-white p-3 shadow-sm">
-        <span className="flex size-11 shrink-0 items-center justify-center rounded-md bg-surface-muted">
-          <Icon name="box" size={20} className="text-ink" />
-        </span>
+        <PhotoThumb
+          emoji={item.photoEmoji}
+          coverPhotoPath={item.coverPhotoPath}
+          className="size-11 shrink-0 rounded-md"
+          emojiClassName="text-lg"
+        />
         <div className="min-w-0 flex-1">
           <p className="truncate text-item-title font-medium text-ink">{item.name}</p>
           <p className="truncate text-caption text-muted-foreground">{breadcrumbLabel}</p>
         </div>
         <span className={cn("h-1 w-6 shrink-0 rounded-full", categoryAccentClass(item.category))} />
+      </Link>
+    );
+  }
+
+  if (result.kind === "container") {
+    const { container, breadcrumbLabel, itemCount } = result;
+    return (
+      <Link href={`/containers/${container.id}`} className="flex items-center gap-3 rounded-2xl border border-border bg-white p-3 shadow-sm">
+        <PhotoThumb
+          emoji={container.coverPhotoEmoji ?? "📦"}
+          coverPhotoPath={container.coverPhotoPath}
+          className="size-11 shrink-0 rounded-md"
+          emojiClassName="text-lg"
+        />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-item-title font-medium text-ink">{container.name}</p>
+          <p className="truncate text-caption text-muted-foreground">
+            {breadcrumbLabel}
+            {itemCount > 0 ? ` · ${itemCount} item${itemCount === 1 ? "" : "s"}` : ""}
+          </p>
+        </div>
+        {container.displayCode && (
+          <span className="shrink-0 rounded-full bg-surface-muted px-2 py-0.5 text-micro font-semibold text-muted-foreground">
+            {container.displayCode}
+          </span>
+        )}
       </Link>
     );
   }

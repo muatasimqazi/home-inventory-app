@@ -1,4 +1,4 @@
-import { buildBreadcrumb, breadcrumbLabel } from "./selectors";
+import { buildBreadcrumb, breadcrumbLabel, activeItemCountForContainer } from "./selectors";
 import type { Account, Container, FinanceCategory, Item, Location, ScannedReceiptLineItem, Tag, Transaction } from "./types";
 
 // Weighted, token-based ranking, in the spirit of PRD §11 (typo-tolerant-ish,
@@ -30,7 +30,16 @@ export interface AccountSearchResult {
   account: Account;
 }
 
-export type SearchResult = ItemSearchResult | TransactionSearchResult | AccountSearchResult;
+export interface ContainerSearchResult {
+  kind: "container";
+  score: number;
+  container: Container;
+  /** Path to this container's parent (Location, plus any parent containers) — same "where this lives" shape as ItemSearchResult's breadcrumbLabel, deliberately excluding the container's own name since that's already the result row's primary text. */
+  breadcrumbLabel: string;
+  itemCount: number;
+}
+
+export type SearchResult = ItemSearchResult | TransactionSearchResult | AccountSearchResult | ContainerSearchResult;
 
 function tokenize(value: string): string[] {
   return value
@@ -91,6 +100,65 @@ export function searchInventory(query: string, items: Item[], containers: Contai
     })
     .filter((r) => r.score > 0)
     .sort((a, b) => b.score - a.score || a.item.name.localeCompare(b.item.name));
+}
+
+/**
+ * Containers by name, description, Container ID, or where they live —
+ * previously the only way a container's name surfaced in Search was
+ * indirectly, as part of an *item's* breadcrumb (so a match there only
+ * ever produced item results, never the container itself as a result you
+ * could open). Same scoring shape as searchInventory above, just without
+ * a tags dimension (containers don't carry tags, only items do).
+ */
+export function searchContainers(query: string, containers: Container[], locations: Location[], items: Item[]): ContainerSearchResult[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  const queryTokens = tokenize(q);
+
+  return containers
+    .filter((c) => c.status === "active")
+    .map((c) => {
+      // Path to this container's *parent* (location, plus any parent
+      // containers) — buildBreadcrumb(locationId, containerId, ...) walks
+      // down to and including `containerId`, so passing parentContainerId
+      // here (not c.id) naturally excludes the container itself, same as
+      // containers/[id]/page.tsx's own breadcrumb.slice(0, -1) does for
+      // the same reason.
+      const breadcrumb = buildBreadcrumb(c.locationId, c.parentContainerId ?? null, locations, containers);
+      const breadcrumbText = breadcrumbLabel(breadcrumb).toLowerCase();
+
+      const name = c.name.toLowerCase();
+      const description = (c.description ?? "").toLowerCase();
+      const displayCode = (c.displayCode ?? "").toLowerCase();
+
+      const searchable = [name, description, displayCode, breadcrumbText].join(" ");
+
+      let score = 0;
+      if (matchesAllTokens(searchable, queryTokens)) {
+        if (name === q) score += 100;
+        if (name.includes(q)) score += 60;
+        if (displayCode && displayCode === q) score += 80;
+        else if (displayCode.includes(q)) score += 40;
+        if (breadcrumbText.includes(q)) score += 30;
+        if (description.includes(q)) score += 15;
+
+        for (const token of queryTokens) {
+          if (name.includes(token)) score += 12;
+          if (breadcrumbText.includes(token)) score += 8;
+          if (searchable.includes(token)) score += 3;
+        }
+      }
+
+      return {
+        kind: "container" as const,
+        container: c,
+        score,
+        breadcrumbLabel: breadcrumbLabel(breadcrumb),
+        itemCount: activeItemCountForContainer(items, containers, c.id),
+      };
+    })
+    .filter((r) => r.score > 0)
+    .sort((a, b) => b.score - a.score || a.container.name.localeCompare(b.container.name));
 }
 
 /**
