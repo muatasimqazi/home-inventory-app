@@ -185,18 +185,25 @@ export default function LocationDetailPage() {
         {location.description && <p className="text-caption text-muted-foreground">{location.description}</p>}
       </div>
 
+      <Link
+        href={`/capture?locationId=${location.id}`}
+        className="tap-target flex items-center justify-center gap-2 rounded-2xl bg-yellow py-3 text-body font-medium text-white shadow-lg"
+      >
+        <Icon name="camera" size={16} /> Add items
+      </Link>
+
       <div className="grid grid-cols-2 gap-2">
-        <Link
-          href={`/capture?locationId=${location.id}`}
-          className="tap-target flex items-center justify-center gap-2 rounded-2xl bg-yellow py-3 text-body font-medium text-white shadow-lg"
-        >
-          <Icon name="camera" size={16} /> Add items
-        </Link>
         <Link
           href={`/add?locationId=${location.id}`}
           className="tap-target flex items-center justify-center gap-2 rounded-2xl border border-border bg-white py-3 text-body font-medium text-ink shadow-sm"
         >
           <Icon name="edit" size={16} /> Add manually
+        </Link>
+        <Link
+          href={`/capture/barcode?locationId=${location.id}`}
+          className="tap-target flex items-center justify-center gap-2 rounded-2xl border border-border bg-white py-3 text-body font-medium text-ink shadow-sm"
+        >
+          <Icon name="scanBarcode" size={16} /> Scan Barcode
         </Link>
       </div>
 

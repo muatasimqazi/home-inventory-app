@@ -225,12 +225,20 @@ export default function ContainerDetailPage() {
         <Icon name="camera" size={18} /> Add items here
       </Link>
 
-      <Link
-        href={`/add?locationId=${container.locationId}&containerId=${container.id}`}
-        className="tap-target flex items-center justify-center gap-2 rounded-2xl border border-border bg-white py-3 text-body font-medium text-ink shadow-sm"
-      >
-        <Icon name="edit" size={16} /> Add manually
-      </Link>
+      <div className="grid grid-cols-2 gap-2">
+        <Link
+          href={`/add?locationId=${container.locationId}&containerId=${container.id}`}
+          className="tap-target flex items-center justify-center gap-2 rounded-2xl border border-border bg-white py-3 text-body font-medium text-ink shadow-sm"
+        >
+          <Icon name="edit" size={16} /> Add manually
+        </Link>
+        <Link
+          href={`/capture/barcode?locationId=${container.locationId}&containerId=${container.id}`}
+          className="tap-target flex items-center justify-center gap-2 rounded-2xl border border-border bg-white py-3 text-body font-medium text-ink shadow-sm"
+        >
+          <Icon name="scanBarcode" size={16} /> Scan Barcode
+        </Link>
+      </div>
 
       <div className="grid grid-cols-2 gap-2">
         <Button variant="secondary" size="lg" onClick={() => setMoveOpen(true)}>
@@ -245,7 +253,7 @@ export default function ContainerDetailPage() {
         <EmptyState
           icon="camera"
           title="This container is empty"
-          description="Use “Add items here” to scan, or “Add manually” to type items in one at a time — the destination is already set."
+          description="Use “Add items here” to scan a photo, “Scan Barcode” to look up a product, or “Add manually” to type items in one at a time — the destination is already set."
         />
       ) : (
         <>
