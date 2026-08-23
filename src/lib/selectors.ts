@@ -469,6 +469,27 @@ export function upcomingDebtPaymentBills(bills: RecurringBill[]): RecurringBill[
   return upcomingRecurringBills(bills).filter((b) => b.isDebtPayment);
 }
 
+/**
+ * A Finance category name that reads as "this bill IS a credit card/loan/
+ * mortgage payment" — e.g. "Card Payment," a category one real household
+ * had already built (with real bank-statement rules routing actual
+ * Capital One/Chase/Citi/Amex/Bank of America payment transactions to it)
+ * entirely independently of isDebtPayment existing at all. Used only to
+ * pre-check RecurringBillFormSheet's "This bill is a credit card, loan,
+ * or mortgage payment" checkbox as a convenience default when a matching
+ * category gets picked — never as the source of truth itself, which
+ * stays RecurringBill.isDebtPayment, explicit and always visible/
+ * correctable in the form. Picking a category with this pre-existing
+ * naming convention and having the checkbox visibly follow along is a
+ * genuinely different thing from the earlier account-type bug this
+ * flag replaced: that inferred silently and was wrong; this defaults
+ * visibly and can be un-checked in the same glance.
+ */
+export function looksLikeDebtPaymentCategory(categoryName: string): boolean {
+  const name = categoryName.toLowerCase();
+  return ["card payment", "credit card", "loan", "mortgage"].some((kw) => name.includes(kw));
+}
+
 export const ACCOUNT_TYPE_LABEL: Record<AccountType, string> = {
   checking: "Checking",
   savings: "Savings",

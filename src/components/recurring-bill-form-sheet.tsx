@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
-import { sortByLabel } from "@/lib/selectors";
+import { sortByLabel, looksLikeDebtPaymentCategory } from "@/lib/selectors";
 import type { Account, FinanceCategory, Member, RecurringBill, RecurringBillFrequency } from "@/lib/types";
 
 const FREQUENCIES: { value: RecurringBillFrequency; label: string }[] = [
@@ -74,6 +74,10 @@ export function RecurringBillFormSheet({
   const [categoryId, setCategoryId] = useState(initial?.categoryId ?? "");
   const [accountId, setAccountId] = useState(initial?.accountId ?? "");
   const [isDebtPayment, setIsDebtPayment] = useState(initial?.isDebtPayment ?? false);
+  // Once the user has touched the checkbox directly (either way), stop
+  // overriding it from category selection — the checkbox is always the
+  // real source of truth, this is just a one-time helpful default.
+  const [debtPaymentTouched, setDebtPaymentTouched] = useState(false);
   const [isPersonal, setIsPersonal] = useState(initial ? initial.ownerUserId !== null : false);
   const [sharedWithUserIds, setSharedWithUserIds] = useState<string[]>(initialSharedWithUserIds);
   const [error, setError] = useState<string | null>(null);
@@ -157,7 +161,22 @@ export function RecurringBillFormSheet({
           {categories.length > 0 && (
             <div>
               <label className="mb-1 block text-caption text-muted-foreground">Category (optional)</label>
-              <Select value={categoryId} onValueChange={setCategoryId}>
+              <Select
+                value={categoryId}
+                onValueChange={(id) => {
+                  setCategoryId(id);
+                  // A category named like "Card Payment"/"Credit Card"/
+                  // "Loan"/"Mortgage" is a strong hint this bill belongs
+                  // in Credit Cards & Loans — pre-check the box below to
+                  // match, but only as a starting point (see
+                  // debtPaymentTouched) and only if the user hasn't
+                  // already made their own call on it.
+                  if (!debtPaymentTouched) {
+                    const category = categories.find((c) => c.id === id);
+                    if (category && looksLikeDebtPaymentCategory(category.name)) setIsDebtPayment(true);
+                  }
+                }}
+              >
                 <SelectTrigger className="h-11 w-full">
                   <SelectValue placeholder="None" />
                 </SelectTrigger>
@@ -191,7 +210,14 @@ export function RecurringBillFormSheet({
           )}
 
           <label className="flex items-start gap-2 text-caption text-ink">
-            <Checkbox checked={isDebtPayment} onCheckedChange={(v) => setIsDebtPayment(v === true)} className="mt-0.5" />
+            <Checkbox
+              checked={isDebtPayment}
+              onCheckedChange={(v) => {
+                setIsDebtPayment(v === true);
+                setDebtPaymentTouched(true);
+              }}
+              className="mt-0.5"
+            />
             <span>
               This bill is a credit card, loan, or mortgage payment
               <span className="block text-micro text-muted-foreground">
