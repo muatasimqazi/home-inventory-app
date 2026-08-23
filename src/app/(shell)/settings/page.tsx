@@ -7,9 +7,17 @@ import { toast } from "sonner";
 import { Icon, type IconName } from "@/components/icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useInventoryStore, useCurrentHousehold } from "@/lib/store";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { listTimeZones, detectedTimeZone } from "@/lib/format";
+
+// Sentinel for "no override, use this device's own zone" — Member.timezone
+// itself stays null in that case; Select just can't bind a literal empty
+// string reliably (same reasoning as HOUSEHOLD_OWNER_VALUE-style sentinels
+// elsewhere in this app, e.g. entity-form-sheet.tsx).
+const AUTO_TIMEZONE_VALUE = "__auto__";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -24,22 +32,27 @@ export default function SettingsPage() {
 
   const [editOpen, setEditOpen] = useState(false);
   const [nameInput, setNameInput] = useState(me?.displayName ?? "");
+  const [timezoneInput, setTimezoneInput] = useState(me?.timezone ?? AUTO_TIMEZONE_VALUE);
   const [nameError, setNameError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const timeZones = listTimeZones();
 
-  async function handleSaveName() {
+  async function handleSaveProfile() {
     if (!nameInput.trim()) {
       setNameError("Name is required.");
       return;
     }
     setSaving(true);
-    const result = await updateMyProfile({ displayName: nameInput.trim() });
+    const result = await updateMyProfile({
+      displayName: nameInput.trim(),
+      timezone: timezoneInput === AUTO_TIMEZONE_VALUE ? null : timezoneInput,
+    });
     setSaving(false);
     if (!result.ok) {
-      setNameError(result.error ?? "Couldn't save your name.");
+      setNameError(result.error ?? "Couldn't save your profile.");
       return;
     }
-    toast.success("Name updated");
+    toast.success("Profile updated");
     setEditOpen(false);
   }
 
@@ -54,6 +67,7 @@ export default function SettingsPage() {
         type="button"
         onClick={() => {
           setNameInput(me?.displayName ?? "");
+          setTimezoneInput(me?.timezone ?? AUTO_TIMEZONE_VALUE);
           setNameError(null);
           setEditOpen(true);
         }}
@@ -110,7 +124,7 @@ export default function SettingsPage() {
       <Sheet open={editOpen} onOpenChange={setEditOpen}>
         <SheetContent side="bottom" className="rounded-t-3xl">
           <SheetHeader>
-            <SheetTitle className="text-section-title font-medium text-ink">Your name</SheetTitle>
+            <SheetTitle className="text-section-title font-medium text-ink">Your profile</SheetTitle>
           </SheetHeader>
           <div className="flex flex-col gap-4 px-4 pb-6">
             <div>
@@ -126,7 +140,26 @@ export default function SettingsPage() {
               />
               {nameError && <p className="mt-1 text-caption text-danger">{nameError}</p>}
             </div>
-            <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={handleSaveName} disabled={saving}>
+            <div>
+              <label className="mb-1 block text-caption text-muted-foreground">Time zone</label>
+              <Select value={timezoneInput} onValueChange={setTimezoneInput}>
+                <SelectTrigger className="h-11 w-full bg-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={AUTO_TIMEZONE_VALUE}>Automatic ({detectedTimeZone()})</SelectItem>
+                  {timeZones.map((tz) => (
+                    <SelectItem key={tz} value={tz}>
+                      {tz}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="mt-1 text-micro text-muted-foreground">
+                Used for “today” — e.g. a scanned receipt with no readable date, or the day a bill reminder fires. Leave on Automatic unless this device&apos;s own time zone is wrong or you want a fixed “home” zone while traveling.
+              </p>
+            </div>
+            <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={handleSaveProfile} disabled={saving}>
               {saving ? <Icon name="spinner" size={16} className="animate-spin" /> : "Save"}
             </Button>
           </div>

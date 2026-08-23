@@ -499,7 +499,7 @@ interface InventoryState {
   removeMember: (userId: string) => void;
   transferOwnership: (toUserId: string) => void;
   /** Updates the caller's own membership row in the current household (display name, avatar). Real, awaited. */
-  updateMyProfile: (patch: { displayName?: string; avatarUrl?: string }) => Promise<{ ok: boolean; error?: string }>;
+  updateMyProfile: (patch: { displayName?: string; avatarUrl?: string; timezone?: string | null }) => Promise<{ ok: boolean; error?: string }>;
   /** Owner-only (server-enforced, see api-keys/route.ts). Real, awaited — the raw secret only ever exists in this one response, so unlike almost everything else in this store there's nothing to show optimistically before the round trip completes. */
   generateApiKey: (label: string) => Promise<{ ok: true; apiKey: ApiKey; secret: string } | { ok: false; error: string }>;
   /** Soft-revoke (sets revokedAt, doesn't delete the row) — plain RLS-backed update via the browser client, same shape as cancelInvite, no server route needed. */
@@ -3245,9 +3245,10 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     set((s) => ({ members: s.members.map((m) => (m.userId === state.currentUserId ? merged : m)) }));
 
     const supabase = getSupabaseBrowserClient();
-    const row: { display_name?: string; avatar_url?: string | null } = {};
+    const row: { display_name?: string; avatar_url?: string | null; timezone?: string | null } = {};
     if (patch.displayName !== undefined) row.display_name = patch.displayName;
     if (patch.avatarUrl !== undefined) row.avatar_url = patch.avatarUrl;
+    if (patch.timezone !== undefined) row.timezone = patch.timezone;
     const { error } = await supabase
       .from("members")
       .update(row)

@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useInventoryStore } from "@/lib/store";
 import { parseCsv } from "@/lib/csv";
 import { findDuplicateTransaction } from "@/lib/csv-import-resolution";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatDate } from "@/lib/format";
 import { sortByLabel } from "@/lib/selectors";
 import { cn } from "@/lib/utils";
 import type { Transaction } from "@/lib/types";
@@ -301,7 +301,7 @@ export default function FinanceCsvImportPage() {
                         <TableCell>
                           <input type="checkbox" checked={!c.skip} onChange={() => toggleSkip(c.rowIndex)} className="size-4" aria-label="Import this row" />
                         </TableCell>
-                        <TableCell className="text-muted-foreground">{new Date(c.occurredAt).toLocaleDateString()}</TableCell>
+                        <TableCell className="text-muted-foreground">{formatDate(c.occurredAt)}</TableCell>
                         <TableCell>{c.description}</TableCell>
                         <TableCell className={cn(c.amount < 0 ? "text-money-negative-text" : "text-badge-green-text")}>{formatCurrency(c.amount, { showPositiveSign: true })}</TableCell>
                         <TableCell className="text-caption text-muted-foreground">{c.duplicateOf ? "Possible duplicate" : "New"}</TableCell>

@@ -11,7 +11,7 @@ import { LinkPurchaseSheet } from "@/components/link-purchase-sheet";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useInventoryStore } from "@/lib/store";
 import { useReceiptScanSession } from "@/lib/receipt-scan-session-store";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, getLocalTodayIso } from "@/lib/format";
 import { sortByLabel } from "@/lib/selectors";
 import { cn } from "@/lib/utils";
 
@@ -37,6 +37,9 @@ export default function SingleReceiptReviewPage() {
 
   const accounts = sortByLabel(useInventoryStore((s) => s.accounts), (a) => a.name);
   const financeCategories = useInventoryStore((s) => s.financeCategories);
+  const members = useInventoryStore((s) => s.members);
+  const currentUserId = useInventoryStore((s) => s.currentUserId);
+  const myTimezone = members.find((m) => m.userId === currentUserId)?.timezone ?? null;
   const linkTransactionAttachment = useInventoryStore((s) => s.linkTransactionAttachment);
   const items = useInventoryStore((s) => s.items);
   const itemPurchases = useInventoryStore((s) => s.itemPurchases);
@@ -83,6 +86,13 @@ export default function SingleReceiptReviewPage() {
         p_draft_id: draft.id,
         p_account_id: draft.accountId,
         p_category_id: draft.suggestedCategoryId,
+        // Only actually used server-side when the AI couldn't read a date
+        // off the receipt at all (draft.suggested_date is null) — see the
+        // migration's own comment. Computed here, not left to the RPC's
+        // `current_date` fallback, so "today" means the scanning member's
+        // own calendar day (their Settings > your profile timezone, or
+        // this device's) instead of the database server's (UTC).
+        p_today: getLocalTodayIso(myTimezone),
       });
       if (error) {
         toast.error(`Couldn't confirm: ${error.message}`);

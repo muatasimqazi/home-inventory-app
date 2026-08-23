@@ -85,6 +85,7 @@ export interface MemberRow {
   email: string;
   avatar_url: string | null;
   last_activity_viewed_at: string | null;
+  timezone: string | null;
 }
 
 export function rowToMember(row: MemberRow): Member {
@@ -97,6 +98,7 @@ export function rowToMember(row: MemberRow): Member {
     email: row.email,
     avatarUrl: row.avatar_url ?? undefined,
     lastActivityViewedAt: row.last_activity_viewed_at,
+    timezone: row.timezone,
   };
 }
 

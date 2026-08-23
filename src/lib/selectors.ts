@@ -1,4 +1,5 @@
 import type { Account, AccountType, ActivityLogEntry, Container, FinanceCategory, Item, Location, RecurringBill, Tag, Transaction } from "./types";
+import { parseCalendarDate } from "./format";
 
 /**
  * The full tag-style category set for one transaction (Categories
@@ -358,7 +359,11 @@ export function cashFlowForMonth(transactions: Transaction[], month: Date): Cash
   const m = month.getMonth();
   const inMonth = transactions.filter((t) => {
     if (t.trashedAt || t.excludedFromReports) return false;
-    const d = new Date(t.occurredAt);
+    // parseCalendarDate, not `new Date(t.occurredAt)` — occurredAt is a
+    // bare "YYYY-MM-DD", and the raw constructor parses that as UTC
+    // midnight; for anyone west of UTC, a transaction on the 1st of the
+    // month got bucketed into the *previous* month's chart data.
+    const d = parseCalendarDate(t.occurredAt);
     return d.getFullYear() === y && d.getMonth() === m;
   });
   const income = inMonth.filter((t) => t.type === "income").reduce((sum, t) => sum + t.amount, 0);
@@ -399,7 +404,8 @@ export function categoryBreakdownForMonth(transactions: Transaction[], categorie
   const totals = new Map<string | null, number>();
   for (const t of transactions) {
     if (t.trashedAt || t.excludedFromReports || t.type !== "expense") continue;
-    const d = new Date(t.occurredAt);
+    // Same bare-date fix as cashFlowForMonth above.
+    const d = parseCalendarDate(t.occurredAt);
     if (d.getFullYear() !== y || d.getMonth() !== m) continue;
     const key = t.categoryId;
     totals.set(key, (totals.get(key) ?? 0) + Math.abs(t.amount));

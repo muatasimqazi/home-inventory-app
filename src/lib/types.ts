@@ -25,6 +25,8 @@ export interface Member {
   avatarUrl?: string;
   /** Watermark for the Overview page's notification-bell unread badge (0025_activity_last_viewed.sql) — set to now() whenever this member visits /activity. Null means they've never visited: treat every activity_log row as unread. */
   lastActivityViewedAt: string | null;
+  /** IANA zone name (e.g. "America/Los_Angeles"), user-set in Settings > your profile. Null = not set, use this device's own detected zone (see lib/format.ts's getLocalTodayIso). */
+  timezone: string | null;
 }
 
 export type InviteStatus = "pending" | "accepted" | "expired";

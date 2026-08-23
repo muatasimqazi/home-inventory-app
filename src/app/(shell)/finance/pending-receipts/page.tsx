@@ -12,7 +12,7 @@ import { EmptyState } from "@/components/empty-state";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { rowToReceiptScanBatch, rowToScannedTransactionDraft, rowToScannedReceiptLineItem } from "@/lib/supabase/mappers";
 import { useInventoryStore } from "@/lib/store";
-import { formatCurrency, formatShortDate } from "@/lib/format";
+import { formatCurrency, formatShortDate, getLocalTodayIso } from "@/lib/format";
 import { sortByLabel } from "@/lib/selectors";
 import type { ReceiptScanBatch, ScannedTransactionDraft, ScannedReceiptLineItem } from "@/lib/types";
 
@@ -40,6 +40,9 @@ export default function PendingReceiptsPage() {
   const router = useRouter();
   const currentHouseholdId = useInventoryStore((s) => s.currentHouseholdId);
   const accounts = sortByLabel(useInventoryStore((s) => s.accounts), (a) => a.name);
+  const members = useInventoryStore((s) => s.members);
+  const currentUserId = useInventoryStore((s) => s.currentUserId);
+  const myTimezone = members.find((m) => m.userId === currentUserId)?.timezone ?? null;
 
   const [groups, setGroups] = useState<PendingGroup[] | null>(null);
   const [selectedAccountId, setSelectedAccountId] = useState<Record<string, string>>({});
@@ -105,6 +108,8 @@ export default function PendingReceiptsPage() {
         p_draft_id: group.draft.id,
         p_account_id: accountId,
         p_category_id: group.draft.suggestedCategoryId,
+        // Same reasoning as the in-session scan review pages' own call.
+        p_today: getLocalTodayIso(myTimezone),
       });
       if (error) {
         toast.error(`Couldn't confirm: ${error.message}`);

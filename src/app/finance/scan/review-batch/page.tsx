@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useInventoryStore } from "@/lib/store";
 import { useReceiptScanSession, type DraftRow } from "@/lib/receipt-scan-session-store";
-import { formatCurrency, formatShortDate } from "@/lib/format";
+import { formatCurrency, formatShortDate, getLocalTodayIso } from "@/lib/format";
 import { sortByLabel } from "@/lib/selectors";
 import { cn } from "@/lib/utils";
 
@@ -40,6 +40,9 @@ export default function BulkStatementReviewPage() {
   const accounts = sortByLabel(useInventoryStore((s) => s.accounts), (a) => a.name);
   const financeCategories = useInventoryStore((s) => s.financeCategories);
   const linkTransactionAttachment = useInventoryStore((s) => s.linkTransactionAttachment);
+  const members = useInventoryStore((s) => s.members);
+  const currentUserId = useInventoryStore((s) => s.currentUserId);
+  const myTimezone = members.find((m) => m.userId === currentUserId)?.timezone ?? null;
 
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [confirmingAll, setConfirmingAll] = useState(false);
@@ -114,6 +117,8 @@ export default function BulkStatementReviewPage() {
       p_draft_id: draft.id,
       p_account_id: draft.accountId,
       p_category_id: draft.suggestedCategoryId,
+      // Same reasoning as the single-receipt review page's own call.
+      p_today: getLocalTodayIso(myTimezone),
     });
     if (error) {
       toast.error(`Couldn't confirm ${draft.store ?? "receipt"}: ${error.message}`);

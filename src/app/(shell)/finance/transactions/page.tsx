@@ -29,7 +29,7 @@ import { decideCategoryRuleLearnAction } from "@/lib/receipt-resolution";
 import { useInventoryStore } from "@/lib/store";
 import { displayCodeBadgeClasses } from "@/lib/badge-color";
 import { categoriesForTransaction } from "@/lib/selectors";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, parseCalendarDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useRemountKey } from "@/hooks/use-remount-key";
 import { usePaginated } from "@/hooks/use-paginated";
@@ -54,7 +54,14 @@ function groupByDay(transactions: Transaction[]): [string, Transaction[]][] {
   const yesterday = new Date(Date.now() - 86400000).toDateString();
   const map = new Map<string, Transaction[]>();
   for (const t of transactions) {
-    const d = new Date(t.occurredAt);
+    // parseCalendarDate, not `new Date(t.occurredAt)` directly —
+    // occurredAt is a bare "YYYY-MM-DD" (Postgres `date` column), and the
+    // raw Date constructor parses that as UTC midnight; today/yesterday
+    // above are real local-time boundaries, so comparing a UTC-midnight
+    // date against them showed anyone west of UTC their receipt from
+    // today under "Yesterday". See lib/format.ts's own comment on this
+    // exact bug class.
+    const d = parseCalendarDate(t.occurredAt);
     const label =
       d.toDateString() === today
         ? "Today"
@@ -348,10 +355,13 @@ export default function TransactionsListPage() {
 
   const filtered = active.filter((t) => {
     if (dateScope === "month") {
-      const d = new Date(t.occurredAt);
+      // parseCalendarDate — see groupByDay's own comment above; the raw
+      // Date constructor on a bare "YYYY-MM-DD" parses as UTC midnight and
+      // could silently drop the 1st of the month from "This month".
+      const d = parseCalendarDate(t.occurredAt);
       if (d.getFullYear() !== now.getFullYear() || d.getMonth() !== now.getMonth()) return false;
     } else if (dateScope === "custom") {
-      const occurred = new Date(t.occurredAt).getTime();
+      const occurred = parseCalendarDate(t.occurredAt).getTime();
       if (fromTime !== null && occurred < fromTime) return false;
       if (toTime !== null && occurred > toTime) return false;
     }

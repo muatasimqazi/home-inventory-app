@@ -34,7 +34,7 @@ export function relativeTime(iso: string): string {
 // needs precise to the hour, and it's a small, edge-case-only trade-off
 // against a bug that was previously wrong by a day for every finance date
 // in the app, every time, for roughly half the world's timezones.
-function parseCalendarDate(iso: string): Date {
+export function parseCalendarDate(iso: string): Date {
   const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
   if (!match) return new Date(iso);
   const [, y, m, d] = match;
@@ -43,6 +43,76 @@ function parseCalendarDate(iso: string): Date {
 
 export function formatDate(iso: string): string {
   return parseCalendarDate(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
+/**
+ * "Today" as a plain YYYY-MM-DD, in a specific IANA zone (Member.timezone,
+ * Settings > your profile) if given, else whatever zone this device/
+ * browser is already in. For anything that needs to default a date to
+ * "today" in a way that means the *user's* calendar day — not the
+ * server's (Vercel/Supabase both run UTC) and not a naive
+ * `new Date().toISOString().slice(0,10)`, which is exactly the UTC "today"
+ * this function exists to avoid. First real caller: finance/scan/review/
+ * page.tsx passes this to confirm_scanned_transaction_draft as the
+ * fallback for a receipt whose date the AI couldn't read at all — the
+ * RPC's own `current_date` fallback runs on Postgres' session clock
+ * (UTC), which could land on the wrong day by itself, same underlying
+ * class of bug as parseCalendarDate exists to fix on the read side.
+ */
+export function getLocalTodayIso(timezone?: string | null): string {
+  const opts: Intl.DateTimeFormatOptions = { year: "numeric", month: "2-digit", day: "2-digit" };
+  try {
+    // en-CA formats as YYYY-MM-DD — a locale chosen for its date format,
+    // not because it's meaningful to the user (nothing here is displayed).
+    return new Intl.DateTimeFormat("en-CA", { ...opts, timeZone: timezone || undefined }).format(new Date());
+  } catch {
+    // Invalid/unrecognized IANA zone string — fall back to this device's
+    // own zone rather than throwing and blocking whatever flow called this.
+    return new Intl.DateTimeFormat("en-CA", opts).format(new Date());
+  }
+}
+
+// A short, common-case fallback for the rare browser without
+// Intl.supportedValuesOf (older Safari/Firefox) — not exhaustive, just
+// enough that the timezone picker isn't empty there.
+const FALLBACK_TIMEZONES = [
+  "Pacific/Honolulu",
+  "America/Anchorage",
+  "America/Los_Angeles",
+  "America/Denver",
+  "America/Chicago",
+  "America/New_York",
+  "America/Sao_Paulo",
+  "UTC",
+  "Europe/London",
+  "Europe/Paris",
+  "Europe/Berlin",
+  "Europe/Moscow",
+  "Africa/Cairo",
+  "Asia/Dubai",
+  "Asia/Karachi",
+  "Asia/Kolkata",
+  "Asia/Dhaka",
+  "Asia/Bangkok",
+  "Asia/Shanghai",
+  "Asia/Tokyo",
+  "Australia/Sydney",
+  "Pacific/Auckland",
+];
+
+/** Every IANA zone name this browser knows about, for the Settings timezone picker. */
+export function listTimeZones(): string[] {
+  try {
+    if (typeof Intl.supportedValuesOf === "function") return Intl.supportedValuesOf("timeZone");
+  } catch {
+    // fall through to the fallback list below
+  }
+  return FALLBACK_TIMEZONES;
+}
+
+/** This device's own detected zone (Intl's own resolved default) — used as the placeholder/preview for the "Automatic" option in the timezone picker. */
+export function detectedTimeZone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 
 export function formatBytes(bytes: number): string {
