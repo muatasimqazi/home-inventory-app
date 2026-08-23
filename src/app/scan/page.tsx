@@ -6,19 +6,10 @@ import { Icon } from "@/components/icon";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useInventoryStore } from "@/lib/store";
+import { useBarcodeDetectorSupport } from "@/hooks/use-barcode-detector-support";
 import { cn } from "@/lib/utils";
 
 type Mode = "requesting" | "scanning" | "denied" | "not-found";
-
-// BarcodeDetector isn't in the standard DOM lib types yet.
-interface BarcodeDetectorLike {
-  detect(source: CanvasImageSource): Promise<{ rawValue: string }[]>;
-}
-declare global {
-  interface Window {
-    BarcodeDetector?: new (opts: { formats: string[] }) => BarcodeDetectorLike;
-  }
-}
 
 export default function QrScannerPage() {
   const router = useRouter();
@@ -28,7 +19,7 @@ export default function QrScannerPage() {
 
   const [mode, setMode] = useState<Mode>("requesting");
   const [manualCode, setManualCode] = useState("");
-  const supportsDetection = typeof window !== "undefined" && "BarcodeDetector" in window;
+  const detectionSupport = useBarcodeDetectorSupport();
 
   useEffect(() => {
     let cancelled = false;
@@ -57,7 +48,13 @@ export default function QrScannerPage() {
     if (mode !== "scanning" || !videoRef.current || !streamRef.current) return;
     videoRef.current.srcObject = streamRef.current;
 
-    if (!supportsDetection || !window.BarcodeDetector) return;
+    // "checking" (still loading the WASM polyfill on a browser without a
+    // native BarcodeDetector — every iOS browser) falls through to here
+    // too: this effect just doesn't start yet, and re-runs once
+    // detectionSupport flips to "ready" or "unavailable" (both are deps
+    // below). The video keeps playing either way — there's just nothing
+    // reading frames off it until detection is actually ready.
+    if (detectionSupport !== "ready" || !window.BarcodeDetector) return;
     const detector = new window.BarcodeDetector({ formats: ["qr_code"] });
     let raf = 0;
     let cancelled = false;
@@ -81,7 +78,7 @@ export default function QrScannerPage() {
       cancelAnimationFrame(raf);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode]);
+  }, [mode, detectionSupport]);
 
   function handleResolve(rawValue: string) {
     const token = rawValue.split("/").pop()?.trim().toUpperCase() ?? "";
@@ -127,7 +124,7 @@ export default function QrScannerPage() {
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
               <div className="size-56 rounded-2xl border-2 border-yellow" />
             </div>
-            {!supportsDetection && (
+            {detectionSupport === "unavailable" && (
               <div className="absolute inset-x-0 bottom-0 bg-ink/90 px-6 py-4 text-center text-caption text-white/80">
                 Automatic scanning isn&apos;t supported in this browser — enter the code below instead.
               </div>
@@ -135,7 +132,7 @@ export default function QrScannerPage() {
           </>
         )}
 
-        {(mode === "denied" || mode === "not-found" || !supportsDetection) && mode !== "requesting" && (
+        {(mode === "denied" || mode === "not-found" || detectionSupport === "unavailable") && mode !== "requesting" && (
           <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 px-6 pb-8 pt-4">
             {mode === "denied" && <p className="text-center text-body text-muted-foreground">Camera access is off. Enter the label code manually.</p>}
             {mode === "not-found" && <p className="text-center text-body text-danger">No container matches that code.</p>}

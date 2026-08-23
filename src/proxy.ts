@@ -102,5 +102,12 @@ export const config = {
   // gated behind auth at all (it's a static asset, not user data), so it
   // shouldn't depend on that timing working out. Caught this one before
   // it shipped broken, unlike the manifest case above.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw\\.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  //
+  // .wasm is the same shape again, caught the same way (a local smoke
+  // test — curling /wasm/zxing_reader.wasm unauthenticated came back a
+  // 307 instead of the binary) before it shipped broken: the
+  // barcode-detector polyfill (src/lib/barcode-detector.ts) fetches
+  // public/wasm/zxing_reader.wasm as a plain same-origin request too, and
+  // it's the same "static asset, not user data" case as sw.js.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|sw\\.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp|wasm)$).*)"],
 };

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useBarcodeCapture } from "@/lib/barcode-capture-store";
 import { useInventoryStore } from "@/lib/store";
 import { getSharedStream, setSharedStream, hasLiveTracks, stopCameraStream } from "@/lib/camera-stream";
+import { useBarcodeDetectorSupport } from "@/hooks/use-barcode-detector-support";
 import { cn } from "@/lib/utils";
 
 // Barcode-scan capture entry point — a separate, addressable route from
@@ -39,18 +40,8 @@ type Mode = "requesting" | "scanning" | "denied" | "looking";
 const CAMERA_CONSTRAINTS: MediaStreamConstraints = { video: { facingMode: "environment" }, audio: false };
 
 // Retail product barcode symbologies — UPC/EAN cover the vast majority of
-// packaged goods. BarcodeDetector isn't in the standard DOM lib types yet
-// (same gap src/app/scan/page.tsx works around).
+// packaged goods.
 const BARCODE_FORMATS = ["ean_13", "ean_8", "upc_a", "upc_e"];
-
-interface BarcodeDetectorLike {
-  detect(source: CanvasImageSource): Promise<{ rawValue: string }[]>;
-}
-declare global {
-  interface Window {
-    BarcodeDetector?: new (opts: { formats: string[] }) => BarcodeDetectorLike;
-  }
-}
 
 export default function BarcodeCapturePage() {
   return (
@@ -68,7 +59,7 @@ function BarcodeCaptureInner() {
 
   const [mode, setMode] = useState<Mode>("requesting");
   const [manualCode, setManualCode] = useState("");
-  const supportsDetection = typeof window !== "undefined" && "BarcodeDetector" in window;
+  const detectionSupport = useBarcodeDetectorSupport();
 
   const setCode = useBarcodeCapture((s) => s.setCode);
   const setDestination = useBarcodeCapture((s) => s.setDestination);
@@ -130,7 +121,11 @@ function BarcodeCaptureInner() {
 
   useEffect(() => {
     if (mode !== "scanning" || !videoRef.current || !streamRef.current) return;
-    if (!supportsDetection || !window.BarcodeDetector) return;
+    // "checking" (still loading the WASM polyfill — see
+    // useBarcodeDetectorSupport's own comment) falls through to here too:
+    // this effect just doesn't start yet, and re-runs once detectionSupport
+    // settles to "ready" or "unavailable."
+    if (detectionSupport !== "ready" || !window.BarcodeDetector) return;
     const detector = new window.BarcodeDetector({ formats: BARCODE_FORMATS });
     let raf = 0;
     let cancelled = false;
@@ -154,7 +149,7 @@ function BarcodeCaptureInner() {
       cancelAnimationFrame(raf);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode]);
+  }, [mode, detectionSupport]);
 
   async function handleResolve(rawValue: string) {
     const trimmed = rawValue.trim();
@@ -285,7 +280,7 @@ function BarcodeCaptureInner() {
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
               <div className="h-24 w-64 rounded-2xl border-2 border-yellow" />
             </div>
-            {!supportsDetection && (
+            {detectionSupport === "unavailable" && (
               <div className="absolute inset-x-0 bottom-0 bg-ink/90 px-6 py-4 text-center text-caption text-white/80">
                 Automatic scanning isn&apos;t supported in this browser — enter the barcode below instead.
               </div>
@@ -293,7 +288,7 @@ function BarcodeCaptureInner() {
           </>
         )}
 
-        {(mode === "denied" || (mode === "scanning" && !supportsDetection)) && (
+        {(mode === "denied" || (mode === "scanning" && detectionSupport === "unavailable")) && (
           <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 px-6 pb-8 pt-4">
             <div className="flex gap-2">
               <Input
