@@ -1,10 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Icon, type IconName } from "@/components/icon";
-import { useInventoryStore } from "@/lib/store";
-import { activeLocations } from "@/lib/selectors";
+import { ContainerWizardSheet } from "@/components/container-wizard-sheet";
 
 interface CreateChooserSheetProps {
   open: boolean;
@@ -39,61 +39,52 @@ function ChooserRow({ icon, label, description, onClick }: { icon: IconName; lab
  * already established, now also wired into finance/accounts/page.tsx and
  * locations/page.tsx). Container is the one genuine exception: a container
  * always belongs to a real Location, so there's no context-free "create a
- * container" destination to deep-link into. When the household has exactly
- * one Location, this skips straight to it (its detail page's own "Add
- * Container" button is right there); otherwise it lands on the Locations
- * list to choose one first — an honest extra step for a case that
- * genuinely needs it, not a missing feature.
+ * container" destination to deep-link into — instead it opens
+ * ContainerWizardSheet, a real guided flow (pick or create a Location,
+ * then create the container, then land on that container's own detail
+ * page ready to add items) rather than just dropping the user on the
+ * Locations list to find "Add Container" themselves.
  */
 export function CreateChooserSheet({ open, onOpenChange }: CreateChooserSheetProps) {
   const router = useRouter();
-  // activeLocations() applied to the raw selector result, not an inline
-  // .filter() inside the selector itself — a selector returning a new
-  // array on every call breaks Zustand's useSyncExternalStore snapshot
-  // comparison and causes an infinite render loop (this codebase's own
-  // display-code-sheet.tsx has a comment on this exact pitfall). This
-  // component is unconditionally mounted on the Overview page (only its
-  // Sheet's `open` prop toggles visibility), so getting this wrong crashed
-  // that page outright rather than just this sheet.
-  const locations = activeLocations(useInventoryStore((s) => s.locations));
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   function go(href: string) {
     onOpenChange(false);
     router.push(href);
   }
 
-  function goCreateContainer() {
-    if (locations.length === 1) {
-      go(`/locations/${locations[0].id}`);
-    } else {
-      go("/locations");
-    }
-  }
-
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-3xl">
-        <SheetHeader>
-          <SheetTitle className="text-section-title font-medium text-ink">Add</SheetTitle>
-        </SheetHeader>
-        <div className="flex flex-col gap-2 px-4 pb-6">
-          <ChooserRow icon="box" label="Item" description="Add something to your inventory" onClick={() => go("/add")} />
-          <ChooserRow icon="pin" label="Location" description="A room or area you store things in" onClick={() => go("/locations?open=new")} />
-          <ChooserRow
-            icon="archive"
-            label="Container"
-            description={locations.length === 0 ? "You'll need a Location first" : "A bin, box, or shelf inside a Location"}
-            onClick={goCreateContainer}
-          />
-          <ChooserRow
-            icon="receipt"
-            label="Transaction"
-            description="A purchase, payment, or transfer"
-            onClick={() => go("/finance/transactions?open=new")}
-          />
-          <ChooserRow icon="wallet" label="Account" description="A bank, card, or investment account" onClick={() => go("/finance/accounts?open=new")} />
-        </div>
-      </SheetContent>
-    </Sheet>
+    <>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent side="bottom" className="rounded-t-3xl">
+          <SheetHeader>
+            <SheetTitle className="text-section-title font-medium text-ink">Add</SheetTitle>
+          </SheetHeader>
+          <div className="flex flex-col gap-2 px-4 pb-6">
+            <ChooserRow icon="box" label="Item" description="Add something to your inventory" onClick={() => go("/add")} />
+            <ChooserRow icon="pin" label="Location" description="A room or area you store things in" onClick={() => go("/locations?open=new")} />
+            <ChooserRow
+              icon="archive"
+              label="Container"
+              description="A bin, box, or shelf inside a Location"
+              onClick={() => {
+                onOpenChange(false);
+                setWizardOpen(true);
+              }}
+            />
+            <ChooserRow
+              icon="receipt"
+              label="Transaction"
+              description="A purchase, payment, or transfer"
+              onClick={() => go("/finance/transactions?open=new")}
+            />
+            <ChooserRow icon="wallet" label="Account" description="A bank, card, or investment account" onClick={() => go("/finance/accounts?open=new")} />
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <ContainerWizardSheet open={wizardOpen} onOpenChange={setWizardOpen} />
+    </>
   );
 }
