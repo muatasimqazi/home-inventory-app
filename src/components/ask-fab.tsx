@@ -72,7 +72,7 @@ export function AskFab() {
         onClick={() => setOpen((v) => !v)}
         aria-label={open ? "Close Ask" : "Ask"}
         className={cn(
-          "tap-target fixed z-40 flex size-14 items-center justify-center rounded-full bg-ink text-white shadow-lg transition-transform active:scale-95",
+          "tap-target fixed z-40 flex size-14 items-center justify-center rounded-full bg-ink text-white shadow-lg transition-transform active:scale-95 print:hidden",
           "right-4 bottom-[calc(4.375rem+env(safe-area-inset-bottom)+0.75rem)]",
           "md:right-6 md:bottom-6"
         )}
@@ -83,7 +83,7 @@ export function AskFab() {
       {open && (
         <div
           className={cn(
-            "fixed z-40 flex flex-col overflow-hidden rounded-3xl border border-border bg-background shadow-2xl",
+            "fixed z-40 flex flex-col overflow-hidden rounded-3xl border border-border bg-background shadow-2xl print:hidden",
             "inset-x-3 top-[max(3.5rem,env(safe-area-inset-top))] bottom-[calc(4.375rem+env(safe-area-inset-bottom)+5rem)]",
             "md:inset-x-auto md:inset-y-auto md:top-auto md:right-6 md:bottom-24 md:h-[32rem] md:w-96"
           )}

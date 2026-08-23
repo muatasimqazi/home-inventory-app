@@ -59,7 +59,7 @@ export function DesktopSidebar() {
   return (
     <aside
       className={cn(
-        "hidden md:flex md:shrink-0 md:flex-col md:gap-6 md:border-r md:border-border md:bg-white md:py-6 md:transition-[width] md:duration-200",
+        "hidden md:flex md:shrink-0 md:flex-col md:gap-6 md:border-r md:border-border md:bg-white md:py-6 md:transition-[width] md:duration-200 print:hidden",
         collapsed ? "md:w-16 md:px-2" : "md:w-64 md:px-4"
       )}
     >

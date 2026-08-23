@@ -82,7 +82,7 @@ export function BottomNav() {
         // the FAB stays visually centered even with an unequal tab count
         // on each side (2 left, 1 right) — a flat row would put it at the
         // 3rd-of-4 position, off-center.
-        className="fixed inset-x-0 bottom-0 z-40 flex min-h-17.5 items-center border-t border-border bg-white px-2 pb-[env(safe-area-inset-bottom)] md:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 flex min-h-17.5 items-center border-t border-border bg-white px-2 pb-[env(safe-area-inset-bottom)] md:hidden print:hidden"
       >
         <div className="flex flex-1 items-center justify-around">{LEFT_TABS.map(renderTab)}</div>
 

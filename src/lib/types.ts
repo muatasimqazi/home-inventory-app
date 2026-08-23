@@ -273,7 +273,7 @@ export interface Favorite {
   createdAt: string;
 }
 
-export type LabelPaperPreset = "small-3up" | "medium-2up" | "large-1up";
+export type LabelPaperPreset = "small-3up" | "small-4up" | "medium-2up" | "large-1up";
 export type LabelToggle = "qr" | "qr-code" | "qr-code-name";
 /** 'draft' isn't reachable via the current UI (createLabelBatch always finalizes a batch in one step — there's no save-for-later flow) but the type/schema still support it as the PRD-specified starting state, not just what today's one screen happens to produce. */
 export type LabelBatchStatus = "draft" | "generated" | "printed";

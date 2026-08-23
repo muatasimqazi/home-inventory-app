@@ -284,7 +284,10 @@ export default function LabelPrintingPage() {
             {previewEntries.length === 0 ? (
               <p className="text-caption text-muted-foreground">Select containers or add unassigned labels to preview the sheet.</p>
             ) : (
-              <div className="flex flex-wrap gap-2">
+              <div
+                className="grid gap-2"
+                style={{ gridTemplateColumns: `repeat(${preset.columns}, ${preset.widthMm}mm)` }}
+              >
                 {previewEntries.map((entry, i) => (
                   <LabelCard
                     key={i}
@@ -337,7 +340,22 @@ export default function LabelPrintingPage() {
         </div>
       </div>
 
-      <div className="hidden print:flex print:flex-wrap print:gap-2" style={{ marginLeft: `${Number(offsetX) || 0}mm`, marginTop: `${Number(offsetY) || 0}mm` }}>
+      {/* An explicit `repeat(preset.columns, widthMm)` grid, not flex-wrap —
+          flex-wrap doesn't know or care what a preset's own "N per row"
+          name promises, it just reflows to whatever width the print
+          destination happens to hand it (page size, orientation, margins —
+          all outside this app's control), so "Small labels — 3 per row"
+          could print 2, 3, or 4 up depending on the print dialog's own
+          settings. A fixed column count makes the row count deterministic
+          regardless of any of that. */}
+      <div
+        className="hidden print:grid print:gap-2"
+        style={{
+          gridTemplateColumns: `repeat(${preset.columns}, ${preset.widthMm}mm)`,
+          marginLeft: `${Number(offsetX) || 0}mm`,
+          marginTop: `${Number(offsetY) || 0}mm`,
+        }}
+      >
         {(printEntries ?? []).map((entry, i) => (
           <LabelCard
             key={i}
