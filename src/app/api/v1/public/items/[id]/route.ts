@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireApiKey } from "@/lib/api-key-auth";
+import { requireApiKey, itemVisibilityFilter } from "@/lib/api-key-auth";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { rowToItem, type ItemRow } from "@/lib/supabase/mappers";
 import { CATEGORIES, TRASH_RETENTION_DAYS } from "@/lib/types";
@@ -14,7 +14,14 @@ export async function GET(request: Request, ctx: RouteContext<"/api/v1/public/it
   const { id } = await ctx.params;
 
   const admin = getSupabaseAdminClient();
-  const { data, error } = await admin.from("items").select("*, item_tags(tag_id)").eq("id", id).eq("household_id", auth.householdId).maybeSingle();
+  const visibilityFilter = await itemVisibilityFilter(admin, auth.householdId, auth.createdByUserId);
+  const { data, error } = await admin
+    .from("items")
+    .select("*, item_tags(tag_id)")
+    .eq("id", id)
+    .eq("household_id", auth.householdId)
+    .or(visibilityFilter)
+    .maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data) return NextResponse.json({ error: "Item not found." }, { status: 404 });
 
@@ -106,11 +113,13 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/v1/public/
 
   if (Object.keys(patch).length <= 1) return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
 
+  const visibilityFilter = await itemVisibilityFilter(admin, auth.householdId, auth.createdByUserId);
   const { data, error } = await admin
     .from("items")
     .update(patch)
     .eq("id", id)
     .eq("household_id", auth.householdId)
+    .or(visibilityFilter)
     .neq("status", "trashed")
     .select("*, item_tags(tag_id)")
     .maybeSingle();
@@ -139,6 +148,7 @@ export async function DELETE(request: Request, ctx: RouteContext<"/api/v1/public
   permanentlyDeleteAfter.setDate(permanentlyDeleteAfter.getDate() + TRASH_RETENTION_DAYS);
 
   const admin = getSupabaseAdminClient();
+  const visibilityFilter = await itemVisibilityFilter(admin, auth.householdId, auth.createdByUserId);
   const { data, error } = await admin
     .from("items")
     .update({
@@ -149,6 +159,7 @@ export async function DELETE(request: Request, ctx: RouteContext<"/api/v1/public
     })
     .eq("id", id)
     .eq("household_id", auth.householdId)
+    .or(visibilityFilter)
     .neq("status", "trashed")
     .select("*, item_tags(tag_id)")
     .maybeSingle();

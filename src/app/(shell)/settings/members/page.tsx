@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
@@ -83,19 +84,21 @@ export default function PeoplePage() {
           const isLast = i === people.length - 1 && invites.length === 0;
           return (
             <div key={p.id} className={`flex items-center gap-3 px-4 py-3 ${isLast ? "" : "border-b border-border"}`}>
-              <Avatar className="size-10">
-                {p.avatarPath ? (
-                  <AvatarImage src={coverPhotoUrl(p.avatarPath)} alt="" />
-                ) : (
-                  <AvatarFallback className="bg-brand-100 text-yellow">{p.displayName.slice(0, 1).toUpperCase()}</AvatarFallback>
-                )}
-              </Avatar>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-body text-ink">
-                  {p.displayName} {p.linkedUserId === currentUserId && <span className="text-caption text-muted-foreground">(you)</span>}
-                </p>
-                <p className="truncate text-caption text-muted-foreground">{member ? member.email : PERSON_RELATIONSHIP_LABEL[p.relationship]}</p>
-              </div>
+              <Link href={`/people/${p.id}`} className="flex min-w-0 flex-1 items-center gap-3">
+                <Avatar className="size-10 shrink-0">
+                  {p.avatarPath ? (
+                    <AvatarImage src={coverPhotoUrl(p.avatarPath)} alt="" />
+                  ) : (
+                    <AvatarFallback className="bg-brand-100 text-yellow">{p.displayName.slice(0, 1).toUpperCase()}</AvatarFallback>
+                  )}
+                </Avatar>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-body text-ink">
+                    {p.displayName} {p.linkedUserId === currentUserId && <span className="text-caption text-muted-foreground">(you)</span>}
+                  </p>
+                  <p className="truncate text-caption text-muted-foreground">{member ? member.email : PERSON_RELATIONSHIP_LABEL[p.relationship]}</p>
+                </div>
+              </Link>
               <span className="rounded-full bg-surface-muted px-2 py-1 text-micro font-medium uppercase tracking-wide text-ink">
                 {member ? member.role : "Managed"}
               </span>

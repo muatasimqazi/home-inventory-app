@@ -11,6 +11,7 @@ import { AddPersonSheet } from "@/components/add-person-sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useInventoryStore, uploadCoverPhotoFile } from "@/lib/store";
 import { buildBreadcrumb, sortByLabel, suggestBetterContainer } from "@/lib/selectors";
@@ -64,6 +65,7 @@ function ManualAddItemInner() {
   const [tags, setTags] = useState<string[]>([]);
   const [extraDetails, setExtraDetails] = useState<Record<string, string>>({});
   const [ownerPersonId, setOwnerPersonId] = useState(HOUSEHOLD_OWNER_VALUE);
+  const [isShared, setIsShared] = useState(false);
   const [addPersonOpen, setAddPersonOpen] = useState(false);
   const [destination, setDestinationState] = useState<{ locationId: string | null; containerId: string | null }>(() => {
     const locationId = searchParams.get("locationId");
@@ -166,6 +168,7 @@ function ManualAddItemInner() {
       tagIds: tags.map((t) => getOrCreateTag(t).id),
       extraDetails,
       ownerPersonId: ownerPerson?.id ?? null,
+      isShared: ownerPerson ? isShared : false,
     });
     toast.success(`Added ${item.name}`);
     // replace, not push — this page can be reached one hop deep (capture's
@@ -311,6 +314,16 @@ function ManualAddItemInner() {
             </SelectContent>
           </Select>
         </Field>
+
+        {ownerPersonId !== HOUSEHOLD_OWNER_VALUE && (
+          <label className="flex items-start gap-2 text-caption text-ink">
+            <Checkbox checked={isShared} onCheckedChange={(v) => setIsShared(v === true)} className="mt-0.5" />
+            <span>
+              Share with household
+              <span className="block text-micro text-muted-foreground">Others can see this item. Off by default — a personal item stays visible only to you.</span>
+            </span>
+          </label>
+        )}
 
         <Field label="Location" required>
           <button

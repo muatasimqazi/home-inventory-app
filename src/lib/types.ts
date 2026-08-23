@@ -187,6 +187,8 @@ export interface Item {
   extraDetails: Record<string, string>;
   /** Which Person this item personally belongs to. null = shared/household item, not owned by one person (PRD §9's "Household" default). */
   ownerPersonId: string | null;
+  /** Only meaningful when ownerPersonId is set: false (default) = private to the owner, invisible to everyone else. true = owner opted to share this personal item with the whole household. Ignored/always false when ownerPersonId is null — household items are already visible to everyone (supabase/migrations/0031_item_sharing.sql). */
+  isShared: boolean;
   createdByUserId: string;
   createdAt: string;
   updatedAt: string;

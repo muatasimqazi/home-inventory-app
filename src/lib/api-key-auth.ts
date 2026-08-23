@@ -50,3 +50,29 @@ export async function requireApiKey(request: Request): Promise<ApiKeyAuthResult>
     createdByUserId: key.created_by_user_id as string,
   };
 }
+
+/**
+ * The admin-client equivalent of items' can_view_item() RLS gate
+ * (supabase/migrations/0031_item_sharing.sql) — every /api/v1/public/items
+ * route runs on the admin client (this file's own module comment: RLS
+ * isn't in effect, so nothing is filtered by default), so each one has to
+ * redo that same visibility check itself, scoped to whichever member
+ * generated the key, or a personal, unshared item would leak to anyone
+ * holding the API secret. Pass the result to a `.or()` call on an `items`
+ * query already `.eq("household_id", ...)`-scoped.
+ */
+export async function itemVisibilityFilter(
+  admin: ReturnType<typeof getSupabaseAdminClient>,
+  householdId: string,
+  createdByUserId: string
+): Promise<string> {
+  const { data: ownerPerson } = await admin
+    .from("people")
+    .select("id")
+    .eq("household_id", householdId)
+    .eq("linked_user_id", createdByUserId)
+    .maybeSingle();
+  return ownerPerson
+    ? `owner_person_id.is.null,is_shared.eq.true,owner_person_id.eq.${ownerPerson.id}`
+    : `owner_person_id.is.null,is_shared.eq.true`;
+}

@@ -7,7 +7,7 @@ import { newId, tagToken } from "./id";
 import { isDisplayCodeTaken, nextDisplayCode, normalizeDisplayCode } from "./display-code";
 import { ATTACHMENT_MAX_SIZE_BYTES, ATTACHMENT_MAX_SIZE_LABEL, isAttachmentTypeAllowed } from "./attachment-limits";
 import { normalizeUploadedPhoto } from "./crop-image";
-import { normalizeAccountBalance } from "./selectors";
+import { normalizeAccountBalance, buildBreadcrumb, breadcrumbLabel } from "./selectors";
 import {
   rowToHousehold,
   rowToMember,
@@ -170,6 +170,8 @@ export interface NewItemInput {
   extraDetails?: Record<string, string>;
   /** null/omitted = shared household item, not owned by one person (PRD §9's "Household" default). */
   ownerPersonId?: string | null;
+  /** Only meaningful alongside a set ownerPersonId. Omitted/false (default) = private to the owner. true = shared with the whole household. */
+  isShared?: boolean;
   /**
    * Already-uploaded Storage path for this item's cover photo — set by
    * callers that upload the photo themselves *before* creating the item
@@ -1346,6 +1348,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
 
   moveItem: (itemId, dest) => {
     const supabase = getSupabaseBrowserClient();
+    const { locations, containers } = get();
     const previous = get().items.find((it) => it.id === itemId);
     if (!previous) return;
     const merged: Item = { ...previous, locationId: dest.locationId, containerId: dest.containerId, updatedAt: nowIso() };
@@ -1355,7 +1358,20 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       () => set((s) => ({ items: s.items.map((it) => (it.id === itemId ? previous : it)) })),
       "Couldn't move item"
     );
-    get().logActivity({ entityType: "item", entityId: merged.id, entityName: merged.name, action: "moved" });
+    // "From X to Y", not the breadcrumb's own "→" separator (buildBreadcrumb's
+    // own segments already join with "→" — reusing it here for the from/to
+    // pair too would read as one ambiguous chain instead of two places) — so
+    // the item's Activity/History section actually says where it came from
+    // and went to, not just the bare verb "moved" ActivityRow already shows.
+    const fromLabel = breadcrumbLabel(buildBreadcrumb(previous.locationId, previous.containerId, locations, containers));
+    const toLabel = breadcrumbLabel(buildBreadcrumb(dest.locationId, dest.containerId, locations, containers));
+    get().logActivity({
+      entityType: "item",
+      entityId: merged.id,
+      entityName: merged.name,
+      action: "moved",
+      detail: fromLabel === toLabel ? undefined : `From ${fromLabel} to ${toLabel}`,
+    });
   },
 
   archiveItem: (itemId) => {
@@ -3509,6 +3525,7 @@ function buildItem(householdId: string, userId: string, input: NewItemInput): It
     tagIds: input.tagIds ?? [],
     extraDetails: input.extraDetails ?? {},
     ownerPersonId: input.ownerPersonId ?? null,
+    isShared: input.ownerPersonId ? (input.isShared ?? false) : false,
     createdByUserId: userId,
     createdAt: timestamp,
     updatedAt: timestamp,

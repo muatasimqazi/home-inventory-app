@@ -8,6 +8,7 @@ import { AddPersonSheet } from "@/components/add-person-sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useInventoryStore } from "@/lib/store";
 import { sortByLabel } from "@/lib/selectors";
@@ -50,12 +51,28 @@ function EditItemForm({
   onDone,
 }: {
   itemId: string;
-  initial: { name: string; category: string; quantity: number; notes: string; extraDetails: Record<string, string>; ownerPersonId: string | null };
+  initial: {
+    name: string;
+    category: string;
+    quantity: number;
+    notes: string;
+    extraDetails: Record<string, string>;
+    ownerPersonId: string | null;
+    isShared: boolean;
+  };
   people: Person[];
   canInvite: boolean;
   onSave: (
     id: string,
-    patch: Partial<{ name: string; category: string; quantity: number; notes: string; extraDetails: Record<string, string>; ownerPersonId: string | null }>
+    patch: Partial<{
+      name: string;
+      category: string;
+      quantity: number;
+      notes: string;
+      extraDetails: Record<string, string>;
+      ownerPersonId: string | null;
+      isShared: boolean;
+    }>
   ) => void;
   onDone: () => void;
 }) {
@@ -66,6 +83,7 @@ function EditItemForm({
   const [notes, setNotes] = useState(initial.notes);
   const [extraDetails, setExtraDetails] = useState<Record<string, string>>(initial.extraDetails);
   const [ownerPersonId, setOwnerPersonId] = useState(initial.ownerPersonId ?? HOUSEHOLD_OWNER_VALUE);
+  const [isShared, setIsShared] = useState(initial.isShared);
   const [addPersonOpen, setAddPersonOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -82,6 +100,7 @@ function EditItemForm({
       notes: notes.trim(),
       extraDetails,
       ownerPersonId: ownerPerson?.id ?? null,
+      isShared: ownerPerson ? isShared : false,
     });
     toast.success("Item updated");
     onDone();
@@ -169,6 +188,16 @@ function EditItemForm({
             </SelectContent>
           </Select>
         </Field>
+
+        {ownerPersonId !== HOUSEHOLD_OWNER_VALUE && (
+          <label className="flex items-start gap-2 text-caption text-ink">
+            <Checkbox checked={isShared} onCheckedChange={(v) => setIsShared(v === true)} className="mt-0.5" />
+            <span>
+              Share with household
+              <span className="block text-micro text-muted-foreground">Others can see this item. Off by default — a personal item stays visible only to you.</span>
+            </span>
+          </label>
+        )}
 
         {extraFieldsForCategory(category).length > 0 && (
           <Field label="Details">

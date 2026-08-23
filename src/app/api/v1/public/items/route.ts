@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireApiKey } from "@/lib/api-key-auth";
+import { requireApiKey, itemVisibilityFilter } from "@/lib/api-key-auth";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { newId } from "@/lib/id";
 import { categoryEmoji } from "@/lib/category";
@@ -21,7 +21,15 @@ export async function GET(request: Request) {
   const category = searchParams.get("category");
 
   const admin = getSupabaseAdminClient();
-  let query = admin.from("items").select("*, item_tags(tag_id)").eq("household_id", auth.householdId).eq("status", "active").order("name");
+  const visibilityFilter = await itemVisibilityFilter(admin, auth.householdId, auth.createdByUserId);
+
+  let query = admin
+    .from("items")
+    .select("*, item_tags(tag_id)")
+    .eq("household_id", auth.householdId)
+    .eq("status", "active")
+    .or(visibilityFilter)
+    .order("name");
   if (locationId) query = query.eq("location_id", locationId);
   if (containerId) query = query.eq("container_id", containerId);
   if (category) query = query.eq("category", category);
@@ -101,6 +109,7 @@ export async function POST(request: Request) {
     tagIds: [],
     extraDetails: {},
     ownerPersonId: null,
+    isShared: false,
     createdByUserId: auth.createdByUserId,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),

@@ -10,6 +10,7 @@ import { MoveSheet } from "@/components/move-sheet";
 import { AddPersonSheet } from "@/components/add-person-sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCaptureSession, type DetectionRow } from "@/lib/capture-session-store";
 import { useInventoryStore, uploadCoverPhotoFile, type NewItemInput } from "@/lib/store";
@@ -75,6 +76,11 @@ export default function CaptureReviewPage() {
   // at all, the last piece of the onboarding "who does this belong to"
   // moment that wasn't wired up (Household Ledger Implementation Plan §9).
   const [ownerPersonId, setOwnerPersonId] = useState(HOUSEHOLD_OWNER_VALUE);
+  // Same one-shared-toggle-for-the-session reasoning as ownerPersonId
+  // above — meaningless (and hidden) while ownerPersonId is still
+  // HOUSEHOLD_OWNER_VALUE, since a household item is already visible to
+  // everyone (0031_item_sharing.sql).
+  const [isShared, setIsShared] = useState(false);
   const [addPersonOpen, setAddPersonOpen] = useState(false);
 
   useEffect(() => {
@@ -139,6 +145,7 @@ export default function CaptureReviewPage() {
       locationId: destination?.locationId ?? null,
       containerId: destination?.containerId ?? null,
       ownerPersonId: ownerPerson?.id ?? null,
+      isShared: ownerPerson ? isShared : false,
       // Bug fix: this used to be `row.needsReview && row.name.trim() === ""`
       // — since needsCorrection() (above) already blocks Save until every
       // flagged row has a non-empty name, that condition was never true in
@@ -301,6 +308,15 @@ export default function CaptureReviewPage() {
               <SelectItem value={ADD_PERSON_VALUE}>+ Add someone</SelectItem>
             </SelectContent>
           </Select>
+          {ownerPersonId !== HOUSEHOLD_OWNER_VALUE && (
+            <label className="mt-2 flex items-start gap-2 text-caption text-ink">
+              <Checkbox checked={isShared} onCheckedChange={(v) => setIsShared(v === true)} className="mt-0.5" />
+              <span>
+                Share with household
+                <span className="block text-micro text-muted-foreground">Others can see these items. Off by default.</span>
+              </span>
+            </label>
+          )}
         </div>
 
         {linkTransaction && (

@@ -255,6 +255,20 @@ export function itemsForTag(items: Item[], tagId: string): Item[] {
 }
 
 /**
+ * Items on a Person's profile page (0031_item_sharing.sql). No visibility
+ * filtering happens here — `items` itself already only ever contains what
+ * the viewer can see (their own items, household items, and other
+ * members' items explicitly shared with the household); a private item
+ * belonging to someone else never reaches this array in the first place.
+ * So viewing your own profile shows everything you own, and viewing
+ * someone else's shows only what they've shared — same list, same
+ * filter, the privacy boundary is already enforced upstream.
+ */
+export function itemsForPerson(items: Item[], personId: string): Item[] {
+  return items.filter((it) => it.status === "active" && it.ownerPersonId === personId);
+}
+
+/**
  * Overview page's notification-bell badge (`members.last_activity_viewed_at`,
  * 0025_activity_last_viewed.sql). `null` lastViewedAt means the current
  * member has never opened /activity — every row counts as unread rather

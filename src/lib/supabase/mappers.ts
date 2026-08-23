@@ -371,6 +371,7 @@ export interface ItemRow {
   review_reason: string | null;
   extra_details: Record<string, string>;
   owner_person_id: string | null;
+  is_shared: boolean;
   created_by_user_id: string;
   created_at: string;
   updated_at: string;
@@ -398,6 +399,7 @@ export function rowToItem(row: ItemRow, tagIds: string[]): Item {
     tagIds,
     extraDetails: row.extra_details,
     ownerPersonId: row.owner_person_id,
+    isShared: row.is_shared,
     createdByUserId: row.created_by_user_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -424,6 +426,7 @@ export function itemToInsertRow(it: Item): ItemRow {
     review_reason: it.reviewReason ?? null,
     extra_details: it.extraDetails,
     owner_person_id: it.ownerPersonId,
+    is_shared: it.isShared,
     created_by_user_id: it.createdByUserId,
     created_at: it.createdAt,
     updated_at: it.updatedAt,
