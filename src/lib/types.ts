@@ -189,6 +189,10 @@ export interface Item {
   ownerPersonId: string | null;
   /** Only meaningful when ownerPersonId is set: false (default) = private to the owner, invisible to everyone else. true = owner opted to share this personal item with the whole household. Ignored/always false when ownerPersonId is null — household items are already visible to everyone (supabase/migrations/0031_item_sharing.sql). */
   isShared: boolean;
+  /** null (default) = not tracked, no low-stock alert. Set = alert once quantity drops to or below this (supabase/migrations/0032_low_stock_alerts.sql). */
+  minQuantity: number | null;
+  /** Server-computed — the trigger recomputes this on every write, so don't try to set it directly. null = not currently low. Set = when it most recently became low; also doubles as the low-stock push's dedupe key, so restocking then dropping low again re-alerts. */
+  lowStockSince: string | null;
   createdByUserId: string;
   createdAt: string;
   updatedAt: string;

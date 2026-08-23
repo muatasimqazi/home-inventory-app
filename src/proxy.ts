@@ -27,6 +27,9 @@ import { NextResponse, type NextRequest } from "next/server";
 // every run, found while adding the debt-payment job below and checking
 // this list for what else might be missing from it) rather than a new one
 // introduced here.
+// /api/v1/push/send-low-stock-alerts is the same shape again — added
+// here up front alongside vercel.json's own cron entry this time, not
+// discovered after the fact.
 const PUBLIC_PATHS = [
   "/sign-in",
   "/auth/callback",
@@ -35,6 +38,7 @@ const PUBLIC_PATHS = [
   "/api/v1/push/send-due-bills",
   "/api/v1/push/send-capture-nudges",
   "/api/v1/push/send-debt-payments-due-today",
+  "/api/v1/push/send-low-stock-alerts",
   "/api/v1/public",
 ];
 

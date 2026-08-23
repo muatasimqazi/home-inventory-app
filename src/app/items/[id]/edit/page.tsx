@@ -59,6 +59,7 @@ function EditItemForm({
     extraDetails: Record<string, string>;
     ownerPersonId: string | null;
     isShared: boolean;
+    minQuantity: number | null;
   };
   people: Person[];
   canInvite: boolean;
@@ -72,6 +73,7 @@ function EditItemForm({
       extraDetails: Record<string, string>;
       ownerPersonId: string | null;
       isShared: boolean;
+      minQuantity: number | null;
     }>
   ) => void;
   onDone: () => void;
@@ -84,6 +86,7 @@ function EditItemForm({
   const [extraDetails, setExtraDetails] = useState<Record<string, string>>(initial.extraDetails);
   const [ownerPersonId, setOwnerPersonId] = useState(initial.ownerPersonId ?? HOUSEHOLD_OWNER_VALUE);
   const [isShared, setIsShared] = useState(initial.isShared);
+  const [minQuantity, setMinQuantity] = useState(initial.minQuantity === null ? "" : String(initial.minQuantity));
   const [addPersonOpen, setAddPersonOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -93,6 +96,7 @@ function EditItemForm({
       return;
     }
     const ownerPerson = ownerPersonId === HOUSEHOLD_OWNER_VALUE ? null : (people.find((p) => p.id === ownerPersonId) ?? null);
+    const trimmedMinQuantity = minQuantity.trim();
     onSave(itemId, {
       name: name.trim(),
       category,
@@ -101,6 +105,7 @@ function EditItemForm({
       extraDetails,
       ownerPersonId: ownerPerson?.id ?? null,
       isShared: ownerPerson ? isShared : false,
+      minQuantity: trimmedMinQuantity === "" ? null : Math.max(0, Math.min(9999, Number(trimmedMinQuantity) || 0)),
     });
     toast.success("Item updated");
     onDone();
@@ -152,16 +157,33 @@ function EditItemForm({
           </Select>
         </Field>
 
-        <Field label="Quantity">
-          <Input
-            type="number"
-            min={0}
-            max={9999}
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
-            className="h-11 w-28"
-          />
-        </Field>
+        <div className="flex gap-3">
+          <Field label="Quantity">
+            <Input
+              type="number"
+              min={0}
+              max={9999}
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              className="h-11 w-28"
+            />
+          </Field>
+
+          <Field label="Minimum quantity">
+            <Input
+              type="number"
+              min={0}
+              max={9999}
+              placeholder="Not tracked"
+              value={minQuantity}
+              onChange={(e) => setMinQuantity(e.target.value)}
+              className="h-11 w-28"
+            />
+          </Field>
+        </div>
+        {minQuantity.trim() !== "" && (
+          <p className="-mt-2 text-caption text-muted-foreground">You&apos;ll get a push notification once quantity drops to {minQuantity.trim() || 0} or below.</p>
+        )}
 
         <Field label="Belongs to">
           <Select

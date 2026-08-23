@@ -110,6 +110,8 @@ export async function POST(request: Request) {
     extraDetails: {},
     ownerPersonId: null,
     isShared: false,
+    minQuantity: null,
+    lowStockSince: null,
     createdByUserId: auth.createdByUserId,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),

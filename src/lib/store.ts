@@ -172,6 +172,8 @@ export interface NewItemInput {
   ownerPersonId?: string | null;
   /** Only meaningful alongside a set ownerPersonId. Omitted/false (default) = private to the owner. true = shared with the whole household. */
   isShared?: boolean;
+  /** null/omitted (default) = not tracked, no low-stock alert (supabase/migrations/0032_low_stock_alerts.sql). */
+  minQuantity?: number | null;
   /**
    * Already-uploaded Storage path for this item's cover photo — set by
    * callers that upload the photo themselves *before* creating the item
@@ -197,6 +199,22 @@ const QUANTITY_MAX = 9999;
 
 function clampQuantity(value: number): number {
   return Math.min(QUANTITY_MAX, Math.max(QUANTITY_MIN, Math.round(value)));
+}
+
+/**
+ * Client-side mirror of sync_item_location()'s low-stock derivation
+ * (supabase/migrations/0032_low_stock_alerts.sql) — the trigger is the
+ * authoritative source (recomputes this on every server write regardless
+ * of what a client sends), this exists purely so an optimistic update
+ * shows "Running low" the same frame a quantity/minQuantity edit lands,
+ * not just after the write round-trips back or a Realtime event arrives.
+ * `wasLow` comes from the *previous* row so an unrelated edit while
+ * already low doesn't reset the since-when timestamp — same "preserve
+ * across incidental writes" behavior the trigger gives via OLD.
+ */
+function deriveLowStockSince(wasLow: boolean, previousSince: string | null, quantity: number, minQuantity: number | null, timestamp: string): string | null {
+  if (minQuantity === null || quantity > minQuantity) return null;
+  return wasLow ? previousSince : timestamp;
 }
 
 export interface NewAccountInput {
@@ -1336,7 +1354,16 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     const previous = get().items.find((it) => it.id === itemId);
     if (!previous) return;
     const normalizedPatch = patch.quantity !== undefined ? { ...patch, quantity: clampQuantity(patch.quantity) } : patch;
-    const merged: Item = { ...previous, ...normalizedPatch, updatedAt: nowIso() };
+    const nextQuantity = normalizedPatch.quantity ?? previous.quantity;
+    const nextMinQuantity = normalizedPatch.minQuantity !== undefined ? normalizedPatch.minQuantity : previous.minQuantity;
+    const wasLow = previous.minQuantity !== null && previous.quantity <= previous.minQuantity;
+    const timestamp = nowIso();
+    const merged: Item = {
+      ...previous,
+      ...normalizedPatch,
+      lowStockSince: deriveLowStockSince(wasLow, previous.lowStockSince, nextQuantity, nextMinQuantity, timestamp),
+      updatedAt: timestamp,
+    };
     set((s) => ({ items: s.items.map((it) => (it.id === itemId ? merged : it)) }));
     persistOrRevert(
       supabase.from("items").update(itemToInsertRow(merged)).eq("id", itemId),
@@ -3507,6 +3534,8 @@ export function useCurrentHousehold(): Household {
 
 function buildItem(householdId: string, userId: string, input: NewItemInput): Item {
   const timestamp = nowIso();
+  const quantity = clampQuantity(input.quantity ?? 1);
+  const minQuantity = input.minQuantity ?? null;
   return {
     id: newId(),
     householdId,
@@ -3515,7 +3544,7 @@ function buildItem(householdId: string, userId: string, input: NewItemInput): It
     name: input.name,
     originalDetectedName: input.originalDetectedName ?? null,
     category: input.category,
-    quantity: clampQuantity(input.quantity ?? 1),
+    quantity,
     notes: input.notes ?? "",
     photoEmoji: input.photoEmoji,
     coverPhotoPath: input.coverPhotoPath ?? null,
@@ -3526,6 +3555,8 @@ function buildItem(householdId: string, userId: string, input: NewItemInput): It
     extraDetails: input.extraDetails ?? {},
     ownerPersonId: input.ownerPersonId ?? null,
     isShared: input.ownerPersonId ? (input.isShared ?? false) : false,
+    minQuantity,
+    lowStockSince: deriveLowStockSince(false, null, quantity, minQuantity, timestamp),
     createdByUserId: userId,
     createdAt: timestamp,
     updatedAt: timestamp,

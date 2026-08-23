@@ -60,6 +60,7 @@ function ManualAddItemInner() {
     return param && (SORTED_CATEGORIES as readonly string[]).includes(param) ? param : SORTED_CATEGORIES[0];
   });
   const [quantity, setQuantity] = useState("1");
+  const [minQuantity, setMinQuantity] = useState("");
   const [notes, setNotes] = useState("");
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>([]);
@@ -169,6 +170,7 @@ function ManualAddItemInner() {
       extraDetails,
       ownerPersonId: ownerPerson?.id ?? null,
       isShared: ownerPerson ? isShared : false,
+      minQuantity: minQuantity.trim() === "" ? null : Math.max(0, Math.min(9999, Number(minQuantity.trim()) || 0)),
     });
     toast.success(`Added ${item.name}`);
     // replace, not push — this page can be reached one hop deep (capture's
@@ -362,16 +364,30 @@ function ManualAddItemInner() {
           </div>
         )}
 
-        <Field label="Quantity">
-          <Input
-            type="number"
-            min={0}
-            max={9999}
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
-            className="h-11 w-28 bg-white"
-          />
-        </Field>
+        <div className="flex gap-3">
+          <Field label="Quantity">
+            <Input
+              type="number"
+              min={0}
+              max={9999}
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              className="h-11 w-28 bg-white"
+            />
+          </Field>
+
+          <Field label="Minimum quantity">
+            <Input
+              type="number"
+              min={0}
+              max={9999}
+              placeholder="Not tracked"
+              value={minQuantity}
+              onChange={(e) => setMinQuantity(e.target.value)}
+              className="h-11 w-28 bg-white"
+            />
+          </Field>
+        </div>
 
         {extraFieldsForCategory(category).length > 0 && (
           <Field label="Details">

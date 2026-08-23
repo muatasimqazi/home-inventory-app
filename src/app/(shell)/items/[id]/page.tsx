@@ -165,11 +165,18 @@ export default function ItemDetailPage() {
       <div className="flex flex-col gap-1">
         <div className="flex items-start justify-between gap-2">
           <h1 className="text-screen-title font-semibold text-ink">{item.name}</h1>
-          {item.needsReview && (
-            <span className="flex shrink-0 items-center gap-1.5 text-micro font-medium text-muted-foreground">
-              <span className="size-1.5 rounded-full bg-yellow" aria-hidden /> Needs review
-            </span>
-          )}
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-x-3 gap-y-1">
+            {item.lowStockSince && (
+              <span className="flex items-center gap-1.5 text-micro font-medium text-danger">
+                <span className="size-1.5 rounded-full bg-danger" aria-hidden /> Running low
+              </span>
+            )}
+            {item.needsReview && (
+              <span className="flex items-center gap-1.5 text-micro font-medium text-muted-foreground">
+                <span className="size-1.5 rounded-full bg-yellow" aria-hidden /> Needs review
+              </span>
+            )}
+          </div>
         </div>
         <BreadcrumbTrail segments={breadcrumb} />
       </div>
@@ -198,6 +205,7 @@ export default function ItemDetailPage() {
               +
             </button>
           </dd>
+          {item.minQuantity !== null && <p className="mt-1 text-micro text-muted-foreground">Minimum {item.minQuantity}</p>}
         </div>
         <Field label="Category" value={item.category} />
         <ItemOwnershipSection itemId={item.id} />
