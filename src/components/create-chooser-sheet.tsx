@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Icon, type IconName } from "@/components/icon";
 import { useInventoryStore } from "@/lib/store";
+import { activeLocations } from "@/lib/selectors";
 
 interface CreateChooserSheetProps {
   open: boolean;
@@ -46,7 +47,15 @@ function ChooserRow({ icon, label, description, onClick }: { icon: IconName; lab
  */
 export function CreateChooserSheet({ open, onOpenChange }: CreateChooserSheetProps) {
   const router = useRouter();
-  const locations = useInventoryStore((s) => s.locations.filter((l) => l.status === "active"));
+  // activeLocations() applied to the raw selector result, not an inline
+  // .filter() inside the selector itself — a selector returning a new
+  // array on every call breaks Zustand's useSyncExternalStore snapshot
+  // comparison and causes an infinite render loop (this codebase's own
+  // display-code-sheet.tsx has a comment on this exact pitfall). This
+  // component is unconditionally mounted on the Overview page (only its
+  // Sheet's `open` prop toggles visibility), so getting this wrong crashed
+  // that page outright rather than just this sheet.
+  const locations = activeLocations(useInventoryStore((s) => s.locations));
 
   function go(href: string) {
     onOpenChange(false);
