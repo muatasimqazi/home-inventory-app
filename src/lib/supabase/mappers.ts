@@ -18,6 +18,8 @@ import type {
   Favorite,
   ActivityLogEntry,
   Attachment,
+  ItemDocumentLink,
+  ItemDocumentLinkKind,
   AttachmentKind,
   PinnedLocation,
   PinnedLocationCategory,
@@ -564,6 +566,40 @@ export function attachmentToInsertRow(att: Attachment): AttachmentRow {
     size_bytes: att.sizeBytes,
     created_by_user_id: att.createdByUserId,
     created_at: att.createdAt,
+  };
+}
+
+export interface ItemDocumentLinkRow {
+  id: string;
+  household_id: string;
+  item_id: string;
+  kind: string;
+  url: string;
+  label: string;
+  created_at: string;
+}
+
+export function rowToItemDocumentLink(row: ItemDocumentLinkRow): ItemDocumentLink {
+  return {
+    id: row.id,
+    householdId: row.household_id,
+    itemId: row.item_id,
+    kind: row.kind as ItemDocumentLinkKind,
+    url: row.url,
+    label: row.label,
+    createdAt: row.created_at,
+  };
+}
+
+export function itemDocumentLinkToInsertRow(link: ItemDocumentLink): ItemDocumentLinkRow {
+  return {
+    id: link.id,
+    household_id: link.householdId,
+    item_id: link.itemId,
+    kind: link.kind,
+    url: link.url,
+    label: link.label,
+    created_at: link.createdAt,
   };
 }
 

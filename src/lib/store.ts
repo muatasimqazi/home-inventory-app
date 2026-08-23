@@ -28,6 +28,8 @@ import {
   rowToActivityLogEntry,
   activityLogEntryToInsertRow,
   rowToAttachment,
+  rowToItemDocumentLink,
+  itemDocumentLinkToInsertRow,
   attachmentToInsertRow,
   rowToPinnedLocation,
   pinnedLocationToInsertRow,
@@ -77,6 +79,7 @@ import {
   type FavoriteRow,
   type ActivityLogRow,
   type AttachmentRow,
+  type ItemDocumentLinkRow,
   type PinnedLocationRow,
   type LabelBatchRow,
   type LabelBatchEntryRow,
@@ -99,6 +102,7 @@ import type {
   ActivityEntityType,
   ActivityLogEntry,
   Attachment,
+  ItemDocumentLink,
   AttachmentKind,
   CategoryRule,
   Container,
@@ -284,6 +288,8 @@ interface InventoryState {
   activity: ActivityLogEntry[];
   favorites: Favorite[];
   attachments: Attachment[];
+  /** AI-suggested manual/warranty links for Appliance items (0035_item_document_links.sql) — see ItemDocumentLink's own doc comment. */
+  itemDocumentLinks: ItemDocumentLink[];
   /** Simple Home Map (PRD §29) — pinned critical locations (water shutoff, panel, etc.) plus renovation wall photos. Hydrated/Realtime-synced like every other per-household array above. */
   pinnedLocations: PinnedLocation[];
   labelBatches: LabelBatch[];
@@ -375,6 +381,18 @@ interface InventoryState {
     file: File;
   }) => Promise<{ ok: boolean; error?: string; attachment?: Attachment }>;
   deleteAttachment: (attachmentId: string) => void;
+
+  /**
+   * Calls /api/v1/vision/suggest-appliance-documents with the item's own
+   * manufacturer/modelNumber extraDetails, replaces any existing
+   * item_document_links rows for this item with whatever the model
+   * suggested (regenerating drops stale ones rather than accumulating
+   * duplicates), and returns how many links it actually found — 0 is a
+   * normal outcome (the model had nothing it was confident enough to
+   * suggest), not an error.
+   */
+  findApplianceDocuments: (itemId: string) => Promise<{ ok: boolean; error?: string; count?: number }>;
+  deleteItemDocumentLink: (linkId: string) => void;
 
   // Home Map (pinned locations) — real Supabase Storage (private
   // "attachments" bucket, same one Attachments uses — see PinnedLocation's
@@ -606,6 +624,7 @@ interface HouseholdBundle {
   favorites: Favorite[];
   activity: ActivityLogEntry[];
   attachments: Attachment[];
+  itemDocumentLinks: ItemDocumentLink[];
   pinnedLocations: PinnedLocation[];
   labelBatches: LabelBatch[];
   labelBatchEntries: LabelBatchEntry[];
@@ -638,6 +657,7 @@ function snapshotBundle(state: InventoryState): HouseholdBundle {
     favorites: state.favorites,
     activity: state.activity,
     attachments: state.attachments,
+    itemDocumentLinks: state.itemDocumentLinks,
     pinnedLocations: state.pinnedLocations,
     labelBatches: state.labelBatches,
     labelBatchEntries: state.labelBatchEntries,
@@ -676,6 +696,7 @@ async function fetchHouseholdBundle(
     favoritesRes,
     activityRes,
     attachmentsRes,
+    itemDocumentLinksRes,
     pinnedLocationsRes,
     labelBatchesRes,
     labelBatchEntriesRes,
@@ -709,6 +730,7 @@ async function fetchHouseholdBundle(
     supabase.from("favorites").select("*, items!inner(household_id)").eq("user_id", userId).eq("items.household_id", householdId),
     supabase.from("activity_log").select("*").eq("household_id", householdId).order("created_at", { ascending: false }).limit(500),
     supabase.from("attachments").select("*").eq("household_id", householdId),
+    supabase.from("item_document_links").select("*").eq("household_id", householdId),
     supabase.from("pinned_locations").select("*").eq("household_id", householdId),
     supabase.from("label_batches").select("*").eq("household_id", householdId).order("created_at", { ascending: false }),
     supabase.from("label_batch_entries").select("*").eq("household_id", householdId),
@@ -740,7 +762,7 @@ async function fetchHouseholdBundle(
 
   const firstError =
     membersRes.error ?? invitesRes.error ?? apiKeysRes.error ?? peopleRes.error ?? locationsRes.error ?? containersRes.error ?? itemsRes.error ?? tagsRes.error ?? favoritesRes.error ?? activityRes.error ??
-    attachmentsRes.error ?? pinnedLocationsRes.error ?? labelBatchesRes.error ?? labelBatchEntriesRes.error ?? normalizationRulesRes.error ??
+    attachmentsRes.error ?? itemDocumentLinksRes.error ?? pinnedLocationsRes.error ?? labelBatchesRes.error ?? labelBatchEntriesRes.error ?? normalizationRulesRes.error ??
     accountsRes.error ?? financeAccountSharesRes.error ?? transactionsRes.error ?? financeCategoriesRes.error ?? categoryRulesRes.error ?? recurringBillsRes.error ?? financeBillSharesRes.error ??
     recurringCandidateDismissalsRes.error ??
     transactionAttachmentsRes.error ?? transactionCategoriesRes.error ?? itemPurchasesRes.error;
@@ -772,6 +794,7 @@ async function fetchHouseholdBundle(
     favorites: ((favoritesRes.data ?? []) as FavoriteRow[]).map(rowToFavorite),
     activity: ((activityRes.data ?? []) as ActivityLogRow[]).map(rowToActivityLogEntry),
     attachments: ((attachmentsRes.data ?? []) as AttachmentRow[]).map(rowToAttachment),
+    itemDocumentLinks: ((itemDocumentLinksRes.data ?? []) as ItemDocumentLinkRow[]).map(rowToItemDocumentLink),
     pinnedLocations: ((pinnedLocationsRes.data ?? []) as PinnedLocationRow[]).map(rowToPinnedLocation),
     labelBatches: ((labelBatchesRes.data ?? []) as LabelBatchRow[]).map(rowToLabelBatch),
     labelBatchEntries: ((labelBatchEntriesRes.data ?? []) as LabelBatchEntryRow[]).map(rowToLabelBatchEntry),
@@ -958,6 +981,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
   activity: [],
   favorites: [],
   attachments: [],
+  itemDocumentLinks: [],
   pinnedLocations: [],
   labelBatches: [],
   labelBatchEntries: [],
@@ -1061,7 +1085,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       keyOf: (item: TDomain) => string,
       rowKeyOf: (row: Record<string, unknown>) => string,
       stateKey:
-        | "members" | "invites" | "people" | "locations" | "containers" | "tags" | "activity" | "attachments" | "pinnedLocations"
+        | "members" | "invites" | "people" | "locations" | "containers" | "tags" | "activity" | "attachments" | "itemDocumentLinks" | "pinnedLocations"
         | "labelBatches" | "labelBatchEntries" | "normalizationRules"
         | "accounts" | "financeAccountShares" | "transactions" | "financeCategories" | "categoryRules"
         | "recurringBills" | "financeBillShares" | "recurringCandidateDismissals" | "transactionAttachments" | "transactionCategories" | "itemPurchases"
@@ -1090,6 +1114,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     bind<TagRow, Tag>("tags", householdFilter, rowToTag, (t) => t.id, (r) => r.id as string, "tags");
     bind<ActivityLogRow, ActivityLogEntry>("activity_log", householdFilter, rowToActivityLogEntry, (a) => a.id, (r) => r.id as string, "activity");
     bind<AttachmentRow, Attachment>("attachments", householdFilter, rowToAttachment, (a) => a.id, (r) => r.id as string, "attachments");
+    bind<ItemDocumentLinkRow, ItemDocumentLink>("item_document_links", householdFilter, rowToItemDocumentLink, (l) => l.id, (r) => r.id as string, "itemDocumentLinks");
     bind<PinnedLocationRow, PinnedLocation>("pinned_locations", householdFilter, rowToPinnedLocation, (p) => p.id, (r) => r.id as string, "pinnedLocations");
     bind<LabelBatchRow, LabelBatch>("label_batches", householdFilter, rowToLabelBatch, (b) => b.id, (r) => r.id as string, "labelBatches");
     bind<LabelBatchEntryRow, LabelBatchEntry>("label_batch_entries", householdFilter, rowToLabelBatchEntry, (e) => e.id, (r) => r.id as string, "labelBatchEntries");
@@ -2051,6 +2076,76 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       supabase.from("attachments").delete().eq("id", attachmentId),
       () => set((s) => ({ attachments: [...s.attachments, previous] })),
       "Couldn't delete attachment"
+    );
+  },
+
+  findApplianceDocuments: async (itemId) => {
+    const state = get();
+    const item = state.items.find((it) => it.id === itemId);
+    if (!item) return { ok: false, error: "Item not found." };
+    const manufacturer = item.extraDetails.manufacturer?.trim();
+    const modelNumber = item.extraDetails.modelNumber?.trim();
+    if (!manufacturer || !modelNumber) {
+      return { ok: false, error: "Set a manufacturer and model number first." };
+    }
+
+    let suggestion: { manualUrl: string | null; manualLabel: string; warrantyUrl: string | null; warrantyLabel: string };
+    try {
+      const res = await fetch("/api/v1/vision/suggest-appliance-documents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ manufacturer, modelNumber }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        return { ok: false, error: body?.error ?? `Couldn't look up documents (${res.status}).` };
+      }
+      ({ suggestion } = await res.json());
+    } catch {
+      return { ok: false, error: "Couldn't reach the server. Check your connection and try again." };
+    }
+
+    const timestamp = nowIso();
+    const householdId = item.householdId;
+    const newLinks: ItemDocumentLink[] = [];
+    if (suggestion.manualUrl) {
+      newLinks.push({ id: newId(), householdId, itemId, kind: "manual", url: suggestion.manualUrl, label: suggestion.manualLabel || "Manual", createdAt: timestamp });
+    }
+    if (suggestion.warrantyUrl) {
+      newLinks.push({ id: newId(), householdId, itemId, kind: "warranty", url: suggestion.warrantyUrl, label: suggestion.warrantyLabel || "Warranty", createdAt: timestamp });
+    }
+
+    const supabase = getSupabaseBrowserClient();
+    // Regenerating replaces rather than accumulates — a stale suggestion
+    // sitting alongside a fresh one for the same kind would just be
+    // confusing, and there's nothing worth keeping from the old guess once
+    // a new one's been asked for.
+    const staleIds = state.itemDocumentLinks.filter((l) => l.itemId === itemId).map((l) => l.id);
+    set((s) => ({ itemDocumentLinks: [...s.itemDocumentLinks.filter((l) => l.itemId !== itemId), ...newLinks] }));
+
+    if (staleIds.length > 0) {
+      const { error: deleteError } = await supabase.from("item_document_links").delete().in("id", staleIds);
+      if (deleteError) console.error("Couldn't clear previous document suggestions:", deleteError.message);
+    }
+    if (newLinks.length > 0) {
+      const { error: insertError } = await supabase.from("item_document_links").insert(newLinks.map(itemDocumentLinkToInsertRow));
+      if (insertError) {
+        set((s) => ({ itemDocumentLinks: s.itemDocumentLinks.filter((l) => !newLinks.some((n) => n.id === l.id)) }));
+        return { ok: false, error: insertError.message };
+      }
+    }
+    return { ok: true, count: newLinks.length };
+  },
+
+  deleteItemDocumentLink: (linkId) => {
+    const supabase = getSupabaseBrowserClient();
+    const previous = get().itemDocumentLinks.find((l) => l.id === linkId);
+    set((s) => ({ itemDocumentLinks: s.itemDocumentLinks.filter((l) => l.id !== linkId) }));
+    if (!previous) return;
+    persistOrRevert(
+      supabase.from("item_document_links").delete().eq("id", linkId),
+      () => set((s) => ({ itemDocumentLinks: [...s.itemDocumentLinks, previous] })),
+      "Couldn't remove that suggestion"
     );
   },
 

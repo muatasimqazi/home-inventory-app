@@ -386,3 +386,93 @@ export async function detectApplianceLabel(photos: string[]): Promise<ApplianceL
     }
   }
 }
+
+// ---------------------------------------------------------------------------
+// Appliance document links — text-only (no photo input, unlike every other
+// function in this file), but kept here rather than a separate module:
+// same PRIMARY_MODEL/FALLBACK_MODEL pair, same reliability engineering
+// (Gateway routing, bounded timeout, single-retry-via-fallback).
+//
+// The model has no live web-browsing/search tool here — this is a single
+// generateText call against its own training data, nothing more. Any URL
+// it gives back can be wrong, outdated, or (despite the prompt explicitly
+// forbidding it) fabricated. That's why this only ever produces *links*
+// the user opens and judges for themselves (item_document_links,
+// 0035_item_document_links.sql) — never a downloaded/rehosted file, and
+// never presented as verified.
+// ---------------------------------------------------------------------------
+
+const documentLinkSchema = z.object({
+  manualUrl: z
+    .string()
+    .nullable()
+    .describe(
+      "Your best-guess direct URL to this exact product's official user manual or documentation page, " +
+        "from what you know of this manufacturer's website. Null if you don't have a specific, plausible " +
+        "URL in mind for this model — never invent a URL that merely looks right."
+    ),
+  manualLabel: z.string().describe("Short label for the manual link, e.g. 'Samsung Support — RF28 Manual'. Empty string if manualUrl is null."),
+  warrantyUrl: z
+    .string()
+    .nullable()
+    .describe(
+      "Your best-guess direct URL to this manufacturer's warranty registration or warranty-terms page for " +
+        "this product line. Null if you don't have a specific, plausible URL in mind — never invent one."
+    ),
+  warrantyLabel: z.string().describe("Short label for the warranty link, e.g. 'Samsung Warranty Info'. Empty string if warrantyUrl is null."),
+});
+
+export type DocumentLinkSuggestion = z.infer<typeof documentLinkSchema>;
+
+function buildDocumentLinkMessages(manufacturer: string, modelNumber: string): ModelMessage[] {
+  return [
+    {
+      role: "user",
+      content: [
+        {
+          type: "text",
+          text:
+            `A household is cataloging a "${manufacturer} ${modelNumber}" appliance and wants to find its ` +
+            "official manual and warranty information online. Based on your own knowledge of this " +
+            "manufacturer and product, suggest the most likely URL for its manual/documentation page and " +
+            "for its warranty page. You have no ability to browse the web or verify these right now — only " +
+            "suggest a URL when you have a specific, genuine reason to believe it's roughly right (e.g. you " +
+            "know this manufacturer's support site is structured a particular way); leave a field null " +
+            "rather than guessing something plausible-looking. Being right less often but never fabricating " +
+            "is much more useful here than always returning a confident-looking URL.",
+        },
+      ],
+    },
+  ];
+}
+
+async function runDocumentLinkSuggestion(model: LanguageModel, manufacturer: string, modelNumber: string): Promise<DocumentLinkSuggestion> {
+  const { output } = await generateText({
+    model,
+    output: Output.object({ schema: documentLinkSchema }),
+    messages: buildDocumentLinkMessages(manufacturer, modelNumber),
+    timeout: CALL_TIMEOUT_MS,
+    maxRetries: CALL_MAX_RETRIES,
+  });
+  return output;
+}
+
+/**
+ * Suggests likely manual/warranty document links for an Appliance item
+ * from its manufacturer + model number alone (both required — a vague
+ * guess without a specific model to anchor it isn't worth the call). Same
+ * primary-then-fallback-model shape as detectItems/detectApplianceLabel.
+ */
+export async function suggestApplianceDocumentLinks(manufacturer: string, modelNumber: string): Promise<DocumentLinkSuggestion> {
+  try {
+    return await runDocumentLinkSuggestion(PRIMARY_MODEL, manufacturer, modelNumber);
+  } catch (primaryError) {
+    console.error("Primary vision model failed (document links), falling back to", FALLBACK_MODEL, primaryError);
+    try {
+      return await runDocumentLinkSuggestion(FALLBACK_MODEL, manufacturer, modelNumber);
+    } catch (fallbackError) {
+      console.error(`Fallback model ${FALLBACK_MODEL} also failed (document links):`, fallbackError);
+      throw fallbackError;
+    }
+  }
+}

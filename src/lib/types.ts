@@ -223,6 +223,26 @@ export interface Attachment {
   createdAt: string;
 }
 
+export type ItemDocumentLinkKind = "manual" | "warranty";
+
+/**
+ * An AI-suggested link (not an uploaded file — see Attachment above for
+ * that) to an Appliance item's manual or warranty page, generated from its
+ * manufacturer/modelNumber extraDetails (supabase/migrations/0035_item_document_links.sql).
+ * The model has no live web access, so this is its best guess from
+ * training data — always show as "AI-suggested, verify before relying on
+ * this," never as a confirmed/official source.
+ */
+export interface ItemDocumentLink {
+  id: string;
+  householdId: string;
+  itemId: string;
+  kind: ItemDocumentLinkKind;
+  url: string;
+  label: string;
+  createdAt: string;
+}
+
 /** Simple Home Map (PRD §29, `pinned_locations` — supabase/migrations/0017_household_ledger_core.sql). One category per infrastructure/safety spot worth remembering (plus `wall_photo` for the renovation-photo case) — deliberately not a typed schema per category, see the migration's own comment. */
 export type PinnedLocationCategory =
   | "water_shutoff"
