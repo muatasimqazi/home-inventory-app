@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useRef, useState } from "react";
+import { Suspense, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useInventoryStore } from "@/lib/store";
-import { buildBreadcrumb, sortByLabel } from "@/lib/selectors";
+import { buildBreadcrumb, sortByLabel, suggestBetterContainer } from "@/lib/selectors";
 import { SORTED_CATEGORIES } from "@/lib/types";
 import { extraFieldsForCategory } from "@/lib/category";
 import { cn } from "@/lib/utils";
@@ -50,6 +50,7 @@ function ManualAddItemInner() {
   const searchParams = useSearchParams();
   const locations = useInventoryStore((s) => s.locations);
   const containers = useInventoryStore((s) => s.containers);
+  const items = useInventoryStore((s) => s.items);
   const people = sortByLabel(useInventoryStore((s) => s.people), (p) => p.displayName);
   const isOwner = useInventoryStore((s) => s.members.find((m) => m.userId === s.currentUserId)?.role === "owner");
   const createItem = useInventoryStore((s) => s.createItem);
@@ -88,6 +89,14 @@ function ManualAddItemInner() {
   const [error, setError] = useState<string | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // "There's a container that probably fits this item better" — tracks
+  // which container's own suggestion the user has already dismissed, not
+  // a blanket "stop suggesting anything" flag, so changing the Category
+  // (or the destination) to something that points at a *different*
+  // container's theme still surfaces that one. Reset implicitly just by
+  // being keyed to the container id: the suggestion recomputes below on
+  // every relevant change, and a dismissed id only suppresses itself.
+  const [dismissedSuggestionContainerId, setDismissedSuggestionContainerId] = useState<string | null>(null);
   // Starter-inventory reference item-name typeahead (Household Ledger
   // Implementation Plan's deferred spreadsheet-import workstream). The full
   // ~2,662-row list is loaded lazily (loadReferenceItems caches it in
@@ -101,6 +110,26 @@ function ManualAddItemInner() {
   const matchedReferenceLocation = currentLocationName ? matchReferenceLocation(currentLocationName) : null;
   const nameSuggestions =
     referenceItems && matchedReferenceLocation ? suggestReferenceItems(referenceItems, matchedReferenceLocation, name) : [];
+
+  // "You already have a container full of these" — only once a name's
+  // been typed (an untouched form defaulting to SORTED_CATEGORIES[0]
+  // shouldn't surface a suggestion before the user's really started),
+  // computed in a useMemo over the raw items/containers arrays rather than
+  // inline inside a Zustand selector — a selector returning a freshly
+  // computed object on every call breaks Zustand's snapshot comparison and
+  // causes an infinite render loop (this app's own real production
+  // incident, from getting exactly this wrong in create-chooser-sheet.tsx).
+  const containerSuggestion = useMemo(() => {
+    if (!name.trim()) return null;
+    return suggestBetterContainer(items, containers, category, destination.containerId);
+  }, [name, items, containers, category, destination.containerId]);
+  const showContainerSuggestion = containerSuggestion !== null && containerSuggestion.container.id !== dismissedSuggestionContainerId;
+
+  function acceptContainerSuggestion() {
+    if (!containerSuggestion) return;
+    setDestinationState({ locationId: containerSuggestion.container.locationId, containerId: containerSuggestion.container.id });
+    setLocationError(null);
+  }
 
   function addTag() {
     const value = tagInput.trim();
@@ -302,6 +331,28 @@ function ManualAddItemInner() {
           </button>
           {locationError && <p className="mt-1 text-caption text-danger">{locationError}</p>}
         </Field>
+
+        {showContainerSuggestion && containerSuggestion && (
+          <div className="flex items-start gap-2 rounded-lg border border-yellow/40 bg-yellow/10 p-3">
+            <Icon name="ai" size={16} className="mt-0.5 shrink-0 text-yellow" />
+            <div className="min-w-0 flex-1">
+              <p className="text-caption text-ink">
+                {containerSuggestion.matchingCount} {category} item{containerSuggestion.matchingCount === 1 ? " is" : "s are"} already in{" "}
+                <span className="font-semibold">{containerSuggestion.container.name}</span>
+                {containerSuggestion.container.displayCode ? ` (${containerSuggestion.container.displayCode})` : ""} — move this item there
+                instead?
+              </p>
+              <div className="mt-2 flex gap-2">
+                <Button size="sm" variant="outline" onClick={acceptContainerSuggestion}>
+                  Move there
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setDismissedSuggestionContainerId(containerSuggestion.container.id)}>
+                  Dismiss
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <Field label="Quantity">
           <Input

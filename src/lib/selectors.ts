@@ -112,6 +112,67 @@ export function activeItemCountForContainer(items: Item[], containers: Container
   return items.filter((it) => it.status === "active" && it.containerId && descendants.has(it.containerId)).length;
 }
 
+/** A container qualifying as a "this looks like it belongs there instead" suggestion. */
+export interface ContainerFitSuggestion {
+  container: Container;
+  matchingCount: number;
+  totalCount: number;
+}
+
+// At least this many of a container's own items must share the new item's
+// category before it's worth suggesting — one coincidental match isn't a
+// real theme.
+const MIN_MATCHING_ITEMS = 2;
+// ...and that category has to be a clear majority of what's in there, not
+// just present — a large mixed-bag container that happens to hold a
+// couple of the same category shouldn't outrank a genuinely themed one.
+const MIN_MATCH_RATIO = 0.5;
+
+/**
+ * When adding a new item, checks whether some OTHER existing container
+ * already holds a clear majority of items in the same category — a signal
+ * the household already has a themed container (e.g. a "Hand Tools" bin)
+ * this new item probably belongs in too, rather than wherever it's about
+ * to be filed. Assisted, not automatic, same posture as every AI/heuristic
+ * suggestion elsewhere in this app: this only ever returns a candidate for
+ * the UI to show and the user to accept or ignore, never moves anything on
+ * its own.
+ *
+ * "Miscellaneous" is deliberately excluded — it's this app's catch-all
+ * category (lib/types.ts's CATEGORIES), not a real theme, so two
+ * containers both holding some "Miscellaneous" items isn't a meaningful
+ * signal worth surfacing.
+ *
+ * Household-wide, not scoped to the current Location — the point is
+ * specifically to catch "you already have a Tools container, just not in
+ * the Location you're adding to right now," not just containers nearby.
+ * `currentContainerId` (the destination already selected, if any) is
+ * always excluded from consideration — there's nothing to suggest if the
+ * item's already headed somewhere with a matching theme.
+ */
+export function suggestBetterContainer(
+  items: Item[],
+  containers: Container[],
+  category: string,
+  currentContainerId: string | null
+): ContainerFitSuggestion | null {
+  if (category === "Miscellaneous") return null;
+
+  let best: ContainerFitSuggestion | null = null;
+  for (const container of containers) {
+    if (container.status !== "active" || container.id === currentContainerId) continue;
+    const containerItems = items.filter((it) => it.status === "active" && it.containerId === container.id);
+    if (containerItems.length === 0) continue;
+    const matchingCount = containerItems.filter((it) => it.category === category).length;
+    if (matchingCount < MIN_MATCHING_ITEMS) continue;
+    if (matchingCount / containerItems.length < MIN_MATCH_RATIO) continue;
+    if (!best || matchingCount > best.matchingCount) {
+      best = { container, matchingCount, totalCount: containerItems.length };
+    }
+  }
+  return best;
+}
+
 export function collectDescendantIds(containers: Container[], rootId: string): string[] {
   const out: string[] = [];
   const stack = [rootId];
