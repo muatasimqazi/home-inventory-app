@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
@@ -16,12 +17,16 @@ import { useRemountKey } from "@/hooks/use-remount-key";
 import { REFERENCE_LOCATIONS } from "@/lib/reference/starter-inventory";
 
 export default function LocationsListPage() {
+  const searchParams = useSearchParams();
   const locations = activeLocations(useInventoryStore((s) => s.locations));
   const items = useInventoryStore((s) => s.items);
   const containers = useInventoryStore((s) => s.containers);
   const createLocation = useInventoryStore((s) => s.createLocation);
   const setLocationCoverPhoto = useInventoryStore((s) => s.setLocationCoverPhoto);
-  const [createOpen, setCreateOpen] = useState(false);
+  // Deep-link (?open=new) so the new global "+" chooser (Overview page) can
+  // land straight on an open Add Location sheet — same convention
+  // finance/transactions/page.tsx already established for its own ?open=new.
+  const [createOpen, setCreateOpen] = useState(() => searchParams.get("open") === "new");
   const [createKey, bumpCreateKey] = useRemountKey();
   const [openLocationId, setOpenLocationId] = useState<string | null>(null);
   const [openContainerIds, setOpenContainerIds] = useState<Set<string>>(new Set());

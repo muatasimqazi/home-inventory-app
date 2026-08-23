@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { Icon } from "@/components/icon";
 import { IconChip } from "@/components/icon-chip";
@@ -16,13 +17,17 @@ import { cn } from "@/lib/utils";
 import { useRemountKey } from "@/hooks/use-remount-key";
 
 export default function AccountsListPage() {
+  const searchParams = useSearchParams();
   const accounts = useInventoryStore((s) => s.accounts);
   const householdId = useInventoryStore((s) => s.currentHouseholdId);
   const members = useInventoryStore((s) => s.members);
   const currentUserId = useInventoryStore((s) => s.currentUserId);
   const createAccount = useInventoryStore((s) => s.createAccount);
   const shareAccount = useInventoryStore((s) => s.shareAccount);
-  const [createOpen, setCreateOpen] = useState(false);
+  // Deep-link (?open=new) so the new global "+" chooser (Overview page) can
+  // land straight on an open Add Account sheet — same convention
+  // finance/transactions/page.tsx already established for its own ?open=new.
+  const [createOpen, setCreateOpen] = useState(() => searchParams.get("open") === "new");
   const [createKey, bumpCreateKey] = useRemountKey();
 
   function openCreate() {

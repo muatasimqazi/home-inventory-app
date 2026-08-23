@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { SearchBar } from "@/components/search-bar";
 import { ContainerCarousel } from "@/components/container-carousel";
+import { CreateChooserSheet } from "@/components/create-chooser-sheet";
 import { Icon } from "@/components/icon";
 import { IconChip } from "@/components/icon-chip";
 import { PhotoThumb } from "@/components/photo-thumb";
@@ -68,6 +69,7 @@ export default function OverviewPage() {
   const currentUserId = useInventoryStore((s) => s.currentUserId);
 
   const [view, setView] = useState<"mine" | "household">("mine");
+  const [createChooserOpen, setCreateChooserOpen] = useState(false);
 
   const activeItems = items.filter((it) => it.status === "active");
   const activeContainerList = activeContainers(containers);
@@ -106,9 +108,14 @@ export default function OverviewPage() {
           <h1 className="mt-0.5 text-screen-title font-semibold text-ink">{household.name}</h1>
         </div>
         <div className="flex items-center gap-2">
-          <Link href="/add" aria-label="Add item" className="tap-target flex size-11 items-center justify-center rounded-md bg-yellow text-white shadow-lg">
+          <button
+            type="button"
+            onClick={() => setCreateChooserOpen(true)}
+            aria-label="Add"
+            className="tap-target flex size-11 items-center justify-center rounded-md bg-yellow text-white shadow-lg"
+          >
             <Icon name="plus" size={20} />
-          </Link>
+          </button>
           <Link href="/activity" aria-label="Activity" className="tap-target relative flex size-11 items-center justify-center rounded-md border border-border bg-white">
             <Icon name="bell" size={20} className="text-ink" />
             <ReviewBadge count={unreadCount} className="absolute -right-1 -top-1 bg-danger" />
@@ -425,6 +432,8 @@ export default function OverviewPage() {
           )}
         </div>
       </section>
+
+      <CreateChooserSheet open={createChooserOpen} onOpenChange={setCreateChooserOpen} />
     </div>
   );
 }
