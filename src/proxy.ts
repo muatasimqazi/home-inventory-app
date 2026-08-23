@@ -20,7 +20,23 @@ import { NextResponse, type NextRequest } from "next/server";
 // (see requireApiKey), never a browser session — caught this one in a
 // local smoke test *before* shipping it broken, unlike the Plaid case,
 // which had to learn it live in production first.
-const PUBLIC_PATHS = ["/sign-in", "/auth/callback", "/api/v1/webhooks", "/api/v1/plaid/sync-all", "/api/v1/push/send-due-bills", "/api/v1/public"];
+// /api/v1/push/send-capture-nudges and /api/v1/push/send-debt-payments-
+// due-today are the same CRON_SECRET-bearer shape as send-due-bills right
+// above — send-capture-nudges was *already* a live instance of exactly
+// this bug (a real, shipped cron job silently 307'ing to /sign-in on
+// every run, found while adding the debt-payment job below and checking
+// this list for what else might be missing from it) rather than a new one
+// introduced here.
+const PUBLIC_PATHS = [
+  "/sign-in",
+  "/auth/callback",
+  "/api/v1/webhooks",
+  "/api/v1/plaid/sync-all",
+  "/api/v1/push/send-due-bills",
+  "/api/v1/push/send-capture-nudges",
+  "/api/v1/push/send-debt-payments-due-today",
+  "/api/v1/public",
+];
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });

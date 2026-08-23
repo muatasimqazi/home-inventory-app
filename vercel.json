@@ -9,6 +9,10 @@
       "schedule": "0 15 * * *"
     },
     {
+      "path": "/api/v1/push/send-debt-payments-due-today",
+      "schedule": "0 15 * * *"
+    },
+    {
       "path": "/api/v1/push/send-capture-nudges",
       "schedule": "0 16 * * *"
     }

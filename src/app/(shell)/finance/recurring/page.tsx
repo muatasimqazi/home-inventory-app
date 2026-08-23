@@ -12,9 +12,10 @@ import { EmptyState } from "@/components/empty-state";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { RecurringBillFormSheet } from "@/components/recurring-bill-form-sheet";
 import { useInventoryStore } from "@/lib/store";
-import { upcomingRecurringBills, daysUntil } from "@/lib/selectors";
+import { upcomingRecurringBills, upcomingDebtPaymentBills, daysUntil } from "@/lib/selectors";
 import { formatCurrency } from "@/lib/format";
 import { useRemountKey } from "@/hooks/use-remount-key";
+import type { RecurringBill } from "@/lib/types";
 
 export default function RecurringBillsPage() {
   const recurringBills = useInventoryStore((s) => s.recurringBills);
@@ -40,6 +41,9 @@ export default function RecurringBillsPage() {
   const [trashConfirmId, setTrashConfirmId] = useState<string | null>(null);
 
   const bills = upcomingRecurringBills(recurringBills);
+  const debtBills = upcomingDebtPaymentBills(recurringBills, accounts);
+  const debtBillIds = new Set(debtBills.map((b) => b.id));
+  const otherBills = bills.filter((b) => !debtBillIds.has(b.id));
   const otherMembers = members.filter((m) => m.userId !== currentUserId);
   const editingBill = recurringBills.find((b) => b.id === editingId);
   const editingShares = financeBillShares.filter((s) => s.billId === editingId);
@@ -86,28 +90,34 @@ export default function RecurringBillsPage() {
       {bills.length === 0 ? (
         <EmptyState icon="repeat" title="No recurring bills" description="Track mortgage payments, subscriptions, and other regular bills." />
       ) : (
-        <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
-          {bills.map((b) => (
-            <div key={b.id} className="flex items-center gap-3 px-4 py-3.5">
-              <button type="button" onClick={() => setEditingId(b.id)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-                <IconChip icon="repeat" tone="muted" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <p className="truncate text-item-title font-medium text-ink">{b.name}</p>
-                    {b.ownerUserId !== null && <Badge className="bg-badge-purple-bg text-badge-purple-text">Personal</Badge>}
-                  </div>
-                  <p className="truncate text-caption text-muted-foreground">
-                    {b.frequency.charAt(0).toUpperCase() + b.frequency.slice(1)} · Due in {daysUntil(b.nextDueDate)} days
-                  </p>
-                </div>
-              </button>
-              <span className="shrink-0 text-body font-semibold text-ink">{formatCurrency(b.expectedAmount)}</span>
-              <button type="button" onClick={() => setTrashConfirmId(b.id)} aria-label={`Trash ${b.name}`} className="shrink-0 text-muted-foreground">
-                <Icon name="trash" size={16} />
-              </button>
-            </div>
-          ))}
-        </div>
+        <>
+          {debtBills.length > 0 && (
+            <section className="flex flex-col gap-2">
+              <div>
+                <h2 className="text-section-title font-medium text-ink">Credit Cards &amp; Loans</h2>
+                <p className="text-caption text-muted-foreground">
+                  Linked to a credit card, loan, or mortgage account — you&apos;ll get a push reminder the day each of these is due.
+                </p>
+              </div>
+              <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
+                {debtBills.map((b) => (
+                  <BillRow key={b.id} bill={b} icon="creditCard" tone="yellow" onEdit={() => setEditingId(b.id)} onTrash={() => setTrashConfirmId(b.id)} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {otherBills.length > 0 && (
+            <section className="flex flex-col gap-2">
+              {debtBills.length > 0 && <h2 className="text-section-title font-medium text-ink">Other Bills</h2>}
+              <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
+                {otherBills.map((b) => (
+                  <BillRow key={b.id} bill={b} icon="repeat" tone="muted" onEdit={() => setEditingId(b.id)} onTrash={() => setTrashConfirmId(b.id)} />
+                ))}
+              </div>
+            </section>
+          )}
+        </>
       )}
 
       <RecurringBillFormSheet
@@ -164,6 +174,44 @@ export default function RecurringBillsPage() {
           }
         }}
       />
+    </div>
+  );
+}
+
+/** Shared row shape for both the "Credit Cards & Loans" and "Other Bills" sections — everything but the icon/tone and which section it's in is identical. */
+function BillRow({
+  bill,
+  icon,
+  tone,
+  onEdit,
+  onTrash,
+}: {
+  bill: RecurringBill;
+  icon: "creditCard" | "repeat";
+  tone: "yellow" | "muted";
+  onEdit: () => void;
+  onTrash: () => void;
+}) {
+  const days = daysUntil(bill.nextDueDate);
+  return (
+    <div className="flex items-center gap-3 px-4 py-3.5">
+      <button type="button" onClick={onEdit} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+        <IconChip icon={icon} tone={tone} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <p className="truncate text-item-title font-medium text-ink">{bill.name}</p>
+            {bill.ownerUserId !== null && <Badge className="bg-badge-purple-bg text-badge-purple-text">Personal</Badge>}
+          </div>
+          <p className="truncate text-caption text-muted-foreground">
+            {bill.frequency.charAt(0).toUpperCase() + bill.frequency.slice(1)} ·{" "}
+            {days === 0 ? <span className="font-medium text-yellow">Due today</span> : `Due in ${days} days`}
+          </p>
+        </div>
+      </button>
+      <span className="shrink-0 text-body font-semibold text-ink">{formatCurrency(bill.expectedAmount)}</span>
+      <button type="button" onClick={onTrash} aria-label={`Trash ${bill.name}`} className="shrink-0 text-muted-foreground">
+        <Icon name="trash" size={16} />
+      </button>
     </div>
   );
 }

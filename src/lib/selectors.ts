@@ -448,6 +448,33 @@ export function accountTypeIcon(type: AccountType) {
   return ACCOUNT_TYPE_ICON[type];
 }
 
+// "You owe someone else money" account types — as opposed to checking/
+// savings/cash/investment. Mirrored server-side (as a plain string array,
+// for a Postgres `.in()` filter) by DEBT_ACCOUNT_TYPES in
+// send-debt-payments-due-today/route.ts; keep the two in sync by hand if
+// this set ever changes; they can't literally share a constant across the
+// client/server boundary the way most of this file's exports do.
+const DEBT_ACCOUNT_TYPES: ReadonlySet<AccountType> = new Set(["credit_card", "loan", "mortgage"]);
+
+export function isDebtAccountType(type: AccountType): boolean {
+  return DEBT_ACCOUNT_TYPES.has(type);
+}
+
+/**
+ * Upcoming recurring bills that are actually a credit card/loan/mortgage
+ * payment — i.e. linked (via RecurringBill.accountId) to a debt-type
+ * Account. A bill with no accountId at all (most subscriptions/utilities)
+ * can never match; this is additive filtering on top of
+ * upcomingRecurringBills' own active/not-trashed/sorted result, not a
+ * replacement for it — callers that want "everything else" should filter
+ * the same upcomingRecurringBills() list by the negation of this instead
+ * of calling it twice with different assumptions.
+ */
+export function upcomingDebtPaymentBills(bills: RecurringBill[], accounts: Account[]): RecurringBill[] {
+  const debtAccountIds = new Set(accounts.filter((a) => isDebtAccountType(a.type)).map((a) => a.id));
+  return upcomingRecurringBills(bills).filter((b) => b.accountId && debtAccountIds.has(b.accountId));
+}
+
 export const ACCOUNT_TYPE_LABEL: Record<AccountType, string> = {
   checking: "Checking",
   savings: "Savings",
