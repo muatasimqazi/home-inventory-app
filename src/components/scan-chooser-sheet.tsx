@@ -55,8 +55,10 @@ function barcodeScanHref(itemHref: string): string {
  * inventory, or a receipt for Finance), so tapping it opens this chooser
  * instead of guessing which one the user meant.
  *
- * Four explicit, user-picked modes (Household Ledger PRD §17/§32): Scan
- * Item, Scan Receipt, Scan Appliance, and Scan Barcode. This is deliberately a chooser,
+ * Four explicit, user-picked modes (Household Ledger PRD §17/§32), ordered
+ * to group the three inventory-item modes — Scan Item, Scan Barcode, Scan
+ * Appliance — together first, with Scan Receipt (the one Finance-domain
+ * mode, not an inventory item at all) last. This is deliberately a chooser,
  * not a classifier — the user always taps a mode before the camera opens,
  * and each destination shows the AI's best guess with one-tap correction
  * before anything saves (src/app/capture/review/page.tsx's needsReview
@@ -79,9 +81,9 @@ export function ScanChooserSheet({ open, onOpenChange, itemScanHref }: ScanChoos
         </SheetHeader>
         <div className="flex flex-col gap-2 px-4 pb-6">
           <ChooserRow icon="camera" label="Scan Item" description="Add something to your inventory" onClick={() => go(itemScanHref)} />
-          <ChooserRow icon="receipt" label="Scan Receipt" description="Auto-fill a Finance transaction" onClick={() => go("/finance/scan")} />
-          <ChooserRow icon="zap" label="Scan Appliance" description="Read a model/serial label" onClick={() => go(applianceScanHref(itemScanHref))} />
           <ChooserRow icon="scanBarcode" label="Scan Barcode" description="Look up a product by UPC/EAN" onClick={() => go(barcodeScanHref(itemScanHref))} />
+          <ChooserRow icon="zap" label="Scan Appliance" description="Read a model/serial label" onClick={() => go(applianceScanHref(itemScanHref))} />
+          <ChooserRow icon="receipt" label="Scan Receipt" description="Auto-fill a Finance transaction" onClick={() => go("/finance/scan")} />
         </div>
       </SheetContent>
     </Sheet>
