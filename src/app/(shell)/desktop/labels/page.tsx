@@ -33,6 +33,7 @@ export default function LabelPrintingPage() {
   const labelBatchEntries = useInventoryStore((s) => s.labelBatchEntries);
   const createLabelBatch = useInventoryStore((s) => s.createLabelBatch);
   const markLabelBatchPrinted = useInventoryStore((s) => s.markLabelBatchPrinted);
+  const assignDisplayCode = useInventoryStore((s) => s.assignDisplayCode);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [unassignedCount, setUnassignedCount] = useState("0");
@@ -42,6 +43,7 @@ export default function LabelPrintingPage() {
   const [offsetX, setOffsetX] = useState("0");
   const [offsetY, setOffsetY] = useState("0");
   const [printEntries, setPrintEntries] = useState<PreviewEntry[] | null>(null);
+  const [committing, setCommitting] = useState(false);
 
   const containersByLocation = useMemo(() => {
     const active = activeContainers(containers);
@@ -84,10 +86,28 @@ export default function LabelPrintingPage() {
     });
   }
 
-  function commitBatch() {
+  async function commitBatch() {
     if (previewEntries.length === 0) {
       toast.error("Select at least one container or add unassigned labels.");
       return null;
+    }
+    // A container with no Container ID yet gets one assigned now — printing
+    // a label meant to show "QR + Container ID + Name" for a container
+    // that's never had an ID assigned would otherwise print "Unassigned"
+    // forever, since nothing else in the app prompts for one until someone
+    // notices and goes looking for the "Assign Container ID" button on that
+    // container's own page. Reuses assignDisplayCode() (same
+    // uniqueness-checked, race-safe generation the manual flow already
+    // uses) rather than generating codes independently here.
+    const needsCode = Array.from(selectedIds)
+      .map((id) => containers.find((c) => c.id === id))
+      .filter((c): c is NonNullable<typeof c> => !!c && !c.displayCode);
+    for (const c of needsCode) {
+      const result = await assignDisplayCode(c.id);
+      if (!result.ok) {
+        toast.error(`Couldn't assign a Container ID for "${c.name}": ${result.error ?? "unknown error"}`);
+        return null;
+      }
     }
     const { batch, entries } = createLabelBatch({
       paperPreset,
@@ -100,8 +120,12 @@ export default function LabelPrintingPage() {
     });
     // Use the real, freshly-generated tagTokens from the created entries (not the
     // placeholder preview state) — each unassigned label needs a unique QR code.
+    // Container lookups read the live store state (not the possibly-stale
+    // `containers` closure from before the assignDisplayCode() awaits above)
+    // so a just-assigned Container ID is reflected here.
+    const freshContainers = useInventoryStore.getState().containers;
     const resolved: PreviewEntry[] = entries.map((entry) => {
-      const container = entry.containerId ? containers.find((c) => c.id === entry.containerId) : null;
+      const container = entry.containerId ? freshContainers.find((c) => c.id === entry.containerId) : null;
       return {
         tagToken: entry.tagToken,
         displayCode: entry.displayCode,
@@ -113,8 +137,10 @@ export default function LabelPrintingPage() {
     return { batch, entries, resolved };
   }
 
-  function handlePrint() {
-    const committed = commitBatch();
+  async function handlePrint() {
+    setCommitting(true);
+    const committed = await commitBatch();
+    setCommitting(false);
     if (!committed) return;
     markLabelBatchPrinted(committed.batch.id);
     setPrintEntries(committed.resolved);
@@ -122,8 +148,10 @@ export default function LabelPrintingPage() {
     requestAnimationFrame(() => requestAnimationFrame(() => window.print()));
   }
 
-  function handleExportPdf() {
-    const committed = commitBatch();
+  async function handleExportPdf() {
+    setCommitting(true);
+    const committed = await commitBatch();
+    setCommitting(false);
     if (!committed) return;
     const result = buildLabelPdfManifest(committed.batch, committed.entries);
     downloadFile(result.fileName, result.content, result.mimeType);
@@ -230,11 +258,15 @@ export default function LabelPrintingPage() {
           </div>
 
           <div className="flex gap-2">
-            <Button size="lg" variant="outline" className="flex-1" onClick={handleExportPdf}>
+            <Button size="lg" variant="outline" className="flex-1" onClick={handleExportPdf} disabled={committing}>
               <Icon name="download" size={16} /> Export as PDF
             </Button>
-            <Button size="lg" className="flex-1 bg-ink text-white hover:bg-ink/90" onClick={handlePrint}>
-              Print {previewEntries.length} label{previewEntries.length === 1 ? "" : "s"}
+            <Button size="lg" className="flex-1 bg-ink text-white hover:bg-ink/90" onClick={handlePrint} disabled={committing}>
+              {committing ? (
+                <Icon name="spinner" size={16} className="animate-spin" />
+              ) : (
+                `Print ${previewEntries.length} label${previewEntries.length === 1 ? "" : "s"}`
+              )}
             </Button>
           </div>
         </div>
