@@ -85,7 +85,7 @@ export default function SettingsPage() {
 
       <p className="text-caption font-medium tracking-wide text-muted-foreground uppercase">Settings</p>
       <div className="flex flex-col gap-2">
-        <SettingsRow icon="home" label="Household" sublabel={household.name} href="/settings/members" />
+        <SettingsRow icon="home" label="Household" sublabel={household.name} href="/settings/household" />
         <SettingsRow
           icon="grid"
           label="What this household tracks"

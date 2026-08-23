@@ -520,6 +520,8 @@ interface InventoryState {
     householdId: string,
     patch: { financeEnabled?: boolean; inventoryEnabled?: boolean }
   ) => Promise<{ ok: boolean; error?: string }>;
+  /** Owner-only (same RLS as updateHouseholdDomains) rename — the household-setup naming screen has claimed "You can rename this later from Settings" since it shipped; this is what actually makes that true. */
+  renameHousehold: (householdId: string, name: string) => Promise<{ ok: boolean; error?: string }>;
   /** Redeems the caller's own pending invite (matched server-side by their authenticated email, via accept_invite_by_email()) and switches to the joined household. `email` is a client-side confirmation check, not what's sent to the server. */
   acceptInvite: (email: string, displayName: string) => Promise<{ ok: boolean; error?: string; household?: Household }>;
   /** Read-only counterpart to acceptInvite: checks whether the caller's own authenticated email has a pending, unexpired invite waiting, without accepting it (find_pending_invite_by_email(), 0019_pending_invite_check.sql — the same auth.email()-keyed lookup accept_invite_by_email() uses, but no mutation). Null when there's nothing pending. household-setup/page.tsx calls this before auto-creating a household, so a genuine invitee gets a chance to join instead of an unwanted household getting created out from under them. */
@@ -1248,6 +1250,25 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     if (patch.financeEnabled !== undefined) row.finance_enabled = patch.financeEnabled;
     if (patch.inventoryEnabled !== undefined) row.inventory_enabled = patch.inventoryEnabled;
     const { error } = await supabase.from("households").update(row).eq("id", householdId);
+    if (error) {
+      set((s) => ({ households: s.households.map((h) => (h.id === householdId ? previous : h)) }));
+      return { ok: false, error: error.message };
+    }
+    return { ok: true };
+  },
+
+  renameHousehold: async (householdId, name) => {
+    const trimmed = name.trim();
+    if (!trimmed) return { ok: false, error: "Give your household a name." };
+
+    const state = get();
+    const previous = state.households.find((h) => h.id === householdId);
+    if (!previous) return { ok: false, error: "Household not found." };
+
+    set((s) => ({ households: s.households.map((h) => (h.id === householdId ? { ...h, name: trimmed } : h)) }));
+
+    const supabase = getSupabaseBrowserClient();
+    const { error } = await supabase.from("households").update({ name: trimmed }).eq("id", householdId);
     if (error) {
       set((s) => ({ households: s.households.map((h) => (h.id === householdId ? previous : h)) }));
       return { ok: false, error: error.message };
