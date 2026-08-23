@@ -10,6 +10,7 @@ import { MoveSheet } from "@/components/move-sheet";
 import { AddPersonSheet } from "@/components/add-person-sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCaptureSession, type DetectionRow } from "@/lib/capture-session-store";
@@ -140,6 +141,8 @@ export default function CaptureReviewPage() {
       originalDetectedName: row.suggestedName || null,
       category: row.category,
       quantity: row.quantity,
+      description: row.description.trim(),
+      estimatedValue: row.estimatedValue,
       photoEmoji: row.photoEmoji,
       coverPhotoPath,
       locationId: destination?.locationId ?? null,
@@ -492,6 +495,32 @@ function SingleReviewForm({
         />
       </div>
 
+      <div>
+        <label className="mb-1 block text-caption text-muted-foreground">Description</label>
+        <Textarea
+          value={row.description}
+          onChange={(e) => onChange({ description: e.target.value })}
+          placeholder="Material, color, distinguishing details"
+          rows={2}
+        />
+      </div>
+
+      <div>
+        <label className="mb-1 block text-caption text-muted-foreground">Estimated value</label>
+        <div className="relative w-32">
+          <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-body text-muted-foreground">$</span>
+          <Input
+            type="number"
+            min={0}
+            step="1"
+            value={row.estimatedValue ?? ""}
+            onChange={(e) => onChange({ estimatedValue: e.target.value === "" ? null : Math.max(0, Number(e.target.value) || 0) })}
+            placeholder="—"
+            className="h-11 pl-6"
+          />
+        </div>
+      </div>
+
       {row.suggestedTags.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {row.suggestedTags.map((t) => (
@@ -571,6 +600,20 @@ function BulkRow({
               className="h-8 w-16 text-caption"
               aria-label="Quantity"
             />
+            <div className="relative w-20">
+              <span className="pointer-events-none absolute inset-y-0 left-2 flex items-center text-caption text-muted-foreground">$</span>
+              <Input
+                type="number"
+                min={0}
+                step="1"
+                value={row.estimatedValue ?? ""}
+                disabled={row.excluded}
+                onChange={(e) => onChange({ estimatedValue: e.target.value === "" ? null : Math.max(0, Number(e.target.value) || 0) })}
+                placeholder="value"
+                className="h-8 pl-5 text-caption"
+                aria-label="Estimated value"
+              />
+            </div>
           </div>
         </div>
         <button

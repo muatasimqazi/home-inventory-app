@@ -114,6 +114,8 @@ export const useCaptureSession = create<CaptureSessionState>()((set, get) => ({
           rowId: id("det"),
           suggestedName: "",
           category: "Miscellaneous",
+          description: "",
+          estimatedValue: null,
           suggestedTags: [],
           confidence: 1,
           photoEmoji: "📦",

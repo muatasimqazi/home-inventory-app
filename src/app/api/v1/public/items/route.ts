@@ -102,6 +102,8 @@ export async function POST(request: Request) {
     category: resolvedCategory,
     quantity: parsedQuantity,
     notes: typeof notes === "string" ? notes.trim() : "",
+    description: "",
+    estimatedValue: null,
     photoEmoji: categoryEmoji(resolvedCategory),
     coverPhotoPath: null,
     status: "active",

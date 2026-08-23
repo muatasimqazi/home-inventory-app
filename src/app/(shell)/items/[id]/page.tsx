@@ -19,7 +19,7 @@ import { coverPhotoUrl } from "@/lib/cover-photo";
 import { rotateStoredPhoto } from "@/lib/crop-image";
 import { buildBreadcrumb, daysUntil } from "@/lib/selectors";
 import { extraFieldsForCategory } from "@/lib/category";
-import { relativeTime } from "@/lib/format";
+import { relativeTime, formatCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export default function ItemDetailPage() {
@@ -208,7 +208,14 @@ export default function ItemDetailPage() {
           {item.minQuantity !== null && <p className="mt-1 text-micro text-muted-foreground">Minimum {item.minQuantity}</p>}
         </div>
         <Field label="Category" value={item.category} />
+        {item.estimatedValue !== null && <Field label="Estimated value" value={formatCurrency(item.estimatedValue)} />}
         <ItemOwnershipSection itemId={item.id} />
+        {item.description && (
+          <div className="col-span-2">
+            <dt className="text-caption text-muted-foreground">Description</dt>
+            <dd className="mt-1 text-body text-ink">{item.description}</dd>
+          </div>
+        )}
         {item.tagIds.length > 0 && (
           <div className="col-span-2">
             <dt className="text-caption text-muted-foreground">Tags</dt>

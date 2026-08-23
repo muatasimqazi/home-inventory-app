@@ -373,6 +373,8 @@ export interface ItemRow {
   category: string;
   quantity: number;
   notes: string;
+  description: string;
+  estimated_value: number | null;
   photo_emoji: string;
   cover_photo_path: string | null;
   status: string;
@@ -402,6 +404,8 @@ export function rowToItem(row: ItemRow, tagIds: string[]): Item {
     category: row.category,
     quantity: row.quantity,
     notes: row.notes,
+    description: row.description,
+    estimatedValue: row.estimated_value,
     photoEmoji: row.photo_emoji,
     coverPhotoPath: row.cover_photo_path,
     status: row.status as Item["status"],
@@ -432,6 +436,8 @@ export function itemToInsertRow(it: Item): ItemRow {
     category: it.category,
     quantity: it.quantity,
     notes: it.notes,
+    description: it.description,
+    estimated_value: it.estimatedValue,
     photo_emoji: it.photoEmoji,
     cover_photo_path: it.coverPhotoPath,
     status: it.status,

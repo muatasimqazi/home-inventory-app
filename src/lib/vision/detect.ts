@@ -61,6 +61,25 @@ const detectionSchema = z.object({
     z.object({
       suggestedName: z.string().describe("A concise, human-readable name for the item, e.g. 'Cordless Drill'."),
       category: z.enum([...CATEGORIES] as [string, ...string[]]),
+      description: z
+        .string()
+        .describe(
+          "A brief, factual 1-2 sentence description — material, color, size, and any other " +
+            "distinguishing physical details actually visible. A standalone record of what this item " +
+            "is, not just a repeat of the name — useful for insurance or warranty purposes later."
+        ),
+      estimatedValue: z
+        .number()
+        .min(0)
+        .nullable()
+        .describe(
+          "A rough estimated replacement value in USD — your best general-knowledge guess at what " +
+            "buying this item (or a directly equivalent one) new would cost today, rounded to a " +
+            "sensible amount (45, not 44.87). This is for a household inventory's insurance/net-worth " +
+            "records, a reasonable ballpark is fine, not an appraisal. Null only if you genuinely have " +
+            "no basis to guess at all — can't tell what kind of item it even is, let alone its quality " +
+            "tier or brand — not just because you're not fully certain."
+        ),
       suggestedTags: z.array(z.string()).describe("0-3 short lowercase tags, e.g. 'power-tools'."),
       confidence: z.number().min(0).max(1).describe("How confident you are in the identification, 0-1."),
       photoEmoji: z.string().describe("A single emoji that best represents this item."),
@@ -164,6 +183,9 @@ function buildMessages(photos: string[], referenceHint: string | null): ModelMes
     "the category from the allowed list that fits best, suggest a couple of short lowercase " +
     "tags if relevant, and give an honest confidence score — use a lower score for anything " +
     "ambiguous, partially obscured, or generic-looking rather than guessing.\n\n" +
+    "Also give each entry a brief factual description and a rough estimated replacement value " +
+    "in USD — see the description and estimatedValue field descriptions for exactly what makes " +
+    "a good one of each.\n\n" +
     "Also report, per entry, which labeled photo it's in (photoIndex) and a bounding box " +
     "around it within that photo — one photo can contain several different items (e.g. a " +
     "shelf holding a hammer, a drill, and a box of screws), and each needs its own box so its " +

@@ -56,6 +56,8 @@ function EditItemForm({
     category: string;
     quantity: number;
     notes: string;
+    description: string;
+    estimatedValue: number | null;
     extraDetails: Record<string, string>;
     ownerPersonId: string | null;
     isShared: boolean;
@@ -70,6 +72,8 @@ function EditItemForm({
       category: string;
       quantity: number;
       notes: string;
+      description: string;
+      estimatedValue: number | null;
       extraDetails: Record<string, string>;
       ownerPersonId: string | null;
       isShared: boolean;
@@ -83,6 +87,8 @@ function EditItemForm({
   const [category, setCategory] = useState(initial.category);
   const [quantity, setQuantity] = useState(String(initial.quantity));
   const [notes, setNotes] = useState(initial.notes);
+  const [description, setDescription] = useState(initial.description);
+  const [estimatedValue, setEstimatedValue] = useState(initial.estimatedValue === null ? "" : String(initial.estimatedValue));
   const [extraDetails, setExtraDetails] = useState<Record<string, string>>(initial.extraDetails);
   const [ownerPersonId, setOwnerPersonId] = useState(initial.ownerPersonId ?? HOUSEHOLD_OWNER_VALUE);
   const [isShared, setIsShared] = useState(initial.isShared);
@@ -97,11 +103,14 @@ function EditItemForm({
     }
     const ownerPerson = ownerPersonId === HOUSEHOLD_OWNER_VALUE ? null : (people.find((p) => p.id === ownerPersonId) ?? null);
     const trimmedMinQuantity = minQuantity.trim();
+    const trimmedEstimatedValue = estimatedValue.trim();
     onSave(itemId, {
       name: name.trim(),
       category,
       quantity: Math.max(0, Math.min(9999, Number(quantity) || 0)),
       notes: notes.trim(),
+      description: description.trim(),
+      estimatedValue: trimmedEstimatedValue === "" ? null : Math.max(0, Number(trimmedEstimatedValue) || 0),
       extraDetails,
       ownerPersonId: ownerPerson?.id ?? null,
       isShared: ownerPerson ? isShared : false,
@@ -236,6 +245,30 @@ function EditItemForm({
             </div>
           </Field>
         )}
+
+        <Field label="Description">
+          <Textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={2}
+            placeholder="Material, color, distinguishing details"
+          />
+        </Field>
+
+        <Field label="Estimated value">
+          <div className="relative w-32">
+            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-body text-muted-foreground">$</span>
+            <Input
+              type="number"
+              min={0}
+              step="1"
+              value={estimatedValue}
+              onChange={(e) => setEstimatedValue(e.target.value)}
+              placeholder="—"
+              className="h-11 pl-6"
+            />
+          </div>
+        </Field>
 
         <Field label="Notes">
           <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} placeholder="Optional notes" />

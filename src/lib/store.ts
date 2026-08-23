@@ -161,6 +161,10 @@ export interface NewItemInput {
   category: string;
   quantity?: number;
   notes?: string;
+  /** Omitted/empty (default) — usually AI-suggested at capture time (supabase/migrations/0034_item_description_value.sql). */
+  description?: string;
+  /** Omitted/null (default) = not estimated — usually AI-suggested at capture time. */
+  estimatedValue?: number | null;
   photoEmoji: string;
   locationId: string | null;
   containerId: string | null;
@@ -3606,6 +3610,8 @@ function buildItem(householdId: string, userId: string, input: NewItemInput): It
     category: input.category,
     quantity,
     notes: input.notes ?? "",
+    description: input.description ?? "",
+    estimatedValue: input.estimatedValue ?? null,
     photoEmoji: input.photoEmoji,
     coverPhotoPath: input.coverPhotoPath ?? null,
     status: "active",

@@ -179,6 +179,10 @@ export interface Item {
   category: string;
   quantity: number;
   notes: string;
+  /** A factual physical description (material, color, distinguishing features) — usually AI-suggested at capture time, editable afterward. Separate from `notes`, which is open-ended/anything (supabase/migrations/0034_item_description_value.sql). */
+  description: string;
+  /** Rough estimated replacement value in USD — null (default) = not estimated. Usually AI-suggested at capture time, editable afterward. */
+  estimatedValue: number | null;
   photoEmoji: string;
   /** Path within the public "item-photos" Storage bucket (shared across items/locations/containers) — null falls back to photoEmoji. */
   coverPhotoPath: string | null;

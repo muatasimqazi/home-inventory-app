@@ -14,6 +14,10 @@ export interface BoundingBox {
 export interface DetectedItem {
   suggestedName: string;
   category: string;
+  /** A brief, factual physical description — material, color, distinguishing features. Separate from a saved Item's `notes` (open-ended, user's own words). */
+  description: string;
+  /** Rough estimated replacement value in USD. Null when the model has no real basis to guess. */
+  estimatedValue: number | null;
   suggestedTags: string[];
   confidence: number; // 0-1
   photoEmoji: string;
@@ -140,19 +144,19 @@ export const REVIEW_THRESHOLD = 0.75;
 // exercise the whole-photo fallback too. A few also get a quantity above 1
 // to exercise the "one entry, not one per copy" grouping path.
 const CANNED_POOL: Omit<DetectedItem, "needsReview" | "reviewReason" | "photoIndex">[] = [
-  { suggestedName: "Phillips Screwdriver", category: "Tool", suggestedTags: ["hand-tools"], confidence: 0.94, photoEmoji: "🪛", quantity: 1, boundingBox: { x: 0.1, y: 0.2, width: 0.25, height: 0.5 } },
-  { suggestedName: "Flashlight", category: "Tool", suggestedTags: ["power-tools"], confidence: 0.91, photoEmoji: "🔦", quantity: 1, boundingBox: { x: 0.5, y: 0.15, width: 0.3, height: 0.35 } },
-  { suggestedName: "Duct Tape", category: "Hardware", suggestedTags: [], confidence: 0.88, photoEmoji: "🎞️", quantity: 2, boundingBox: { x: 0.3, y: 0.4, width: 0.2, height: 0.2 } },
-  { suggestedName: "Winter Gloves", category: "Clothing", suggestedTags: ["seasonal"], confidence: 0.9, photoEmoji: "🧤", quantity: 1, boundingBox: null },
-  { suggestedName: "Picture Frame", category: "Decor", suggestedTags: [], confidence: 0.85, photoEmoji: "🖼️", quantity: 1, boundingBox: { x: 0.15, y: 0.1, width: 0.4, height: 0.6 } },
-  { suggestedName: "Yoga Mat", category: "Sporting Goods", suggestedTags: [], confidence: 0.93, photoEmoji: "🧘", quantity: 1, boundingBox: null },
-  { suggestedName: "Paint Can", category: "Hardware", suggestedTags: [], confidence: 0.82, photoEmoji: "🎨", quantity: 1, boundingBox: { x: 0.4, y: 0.35, width: 0.22, height: 0.3 } },
-  { suggestedName: "Garden Trowel", category: "Outdoor", suggestedTags: [], confidence: 0.89, photoEmoji: "🌱", quantity: 1, boundingBox: { x: 0.2, y: 0.5, width: 0.5, height: 0.15 } },
-  { suggestedName: "Phone Charger", category: "Electronics", suggestedTags: [], confidence: 0.9, photoEmoji: "🔌", quantity: 1, boundingBox: { x: 0.6, y: 0.6, width: 0.15, height: 0.2 } },
-  { suggestedName: "unidentified small appliance", category: "Electronics", suggestedTags: [], confidence: 0.52, photoEmoji: "📻", quantity: 1, boundingBox: null },
-  { suggestedName: "spiral notebook (color unclear)", category: "Miscellaneous", suggestedTags: [], confidence: 0.61, photoEmoji: "📓", quantity: 1, boundingBox: { x: 0.25, y: 0.25, width: 0.35, height: 0.4 } },
-  { suggestedName: "Candle", category: "Decor", suggestedTags: [], confidence: 0.87, photoEmoji: "🕯️", quantity: 3, boundingBox: { x: 0.45, y: 0.3, width: 0.15, height: 0.35 } },
-  { suggestedName: "Water Bottle", category: "Kitchen", suggestedTags: [], confidence: 0.92, photoEmoji: "🍶", quantity: 1, boundingBox: { x: 0.35, y: 0.1, width: 0.15, height: 0.55 } },
+  { suggestedName: "Phillips Screwdriver", category: "Tool", description: "A red-and-black handled Phillips-head screwdriver, medium size.", estimatedValue: 8, suggestedTags: ["hand-tools"], confidence: 0.94, photoEmoji: "🪛", quantity: 1, boundingBox: { x: 0.1, y: 0.2, width: 0.25, height: 0.5 } },
+  { suggestedName: "Flashlight", category: "Tool", description: "A black aluminum-body LED flashlight, handheld size.", estimatedValue: 15, suggestedTags: ["power-tools"], confidence: 0.91, photoEmoji: "🔦", quantity: 1, boundingBox: { x: 0.5, y: 0.15, width: 0.3, height: 0.35 } },
+  { suggestedName: "Duct Tape", category: "Hardware", description: "Two rolls of standard silver duct tape.", estimatedValue: 12, suggestedTags: [], confidence: 0.88, photoEmoji: "🎞️", quantity: 2, boundingBox: { x: 0.3, y: 0.4, width: 0.2, height: 0.2 } },
+  { suggestedName: "Winter Gloves", category: "Clothing", description: "A pair of black insulated winter gloves.", estimatedValue: 25, suggestedTags: ["seasonal"], confidence: 0.9, photoEmoji: "🧤", quantity: 1, boundingBox: null },
+  { suggestedName: "Picture Frame", category: "Decor", description: "A wooden picture frame with a dark brown finish, roughly 8x10.", estimatedValue: 20, suggestedTags: [], confidence: 0.85, photoEmoji: "🖼️", quantity: 1, boundingBox: { x: 0.15, y: 0.1, width: 0.4, height: 0.6 } },
+  { suggestedName: "Yoga Mat", category: "Sporting Goods", description: "A rolled purple foam yoga mat, standard length.", estimatedValue: 30, suggestedTags: [], confidence: 0.93, photoEmoji: "🧘", quantity: 1, boundingBox: null },
+  { suggestedName: "Paint Can", category: "Hardware", description: "A quart-sized metal paint can, partially full, white label.", estimatedValue: 18, suggestedTags: [], confidence: 0.82, photoEmoji: "🎨", quantity: 1, boundingBox: { x: 0.4, y: 0.35, width: 0.22, height: 0.3 } },
+  { suggestedName: "Garden Trowel", category: "Outdoor", description: "A small hand trowel with a green plastic handle.", estimatedValue: 10, suggestedTags: [], confidence: 0.89, photoEmoji: "🌱", quantity: 1, boundingBox: { x: 0.2, y: 0.5, width: 0.5, height: 0.15 } },
+  { suggestedName: "Phone Charger", category: "Electronics", description: "A white USB-C wall charger with a short cable.", estimatedValue: 20, suggestedTags: [], confidence: 0.9, photoEmoji: "🔌", quantity: 1, boundingBox: { x: 0.6, y: 0.6, width: 0.15, height: 0.2 } },
+  { suggestedName: "unidentified small appliance", category: "Electronics", description: "A small black plastic appliance, unclear function from this angle.", estimatedValue: null, suggestedTags: [], confidence: 0.52, photoEmoji: "📻", quantity: 1, boundingBox: null },
+  { suggestedName: "spiral notebook (color unclear)", category: "Miscellaneous", description: "A spiral-bound notebook, standard size, color not clearly visible.", estimatedValue: 5, suggestedTags: [], confidence: 0.61, photoEmoji: "📓", quantity: 1, boundingBox: { x: 0.25, y: 0.25, width: 0.35, height: 0.4 } },
+  { suggestedName: "Candle", category: "Decor", description: "Three matching glass-jar candles, medium size.", estimatedValue: 24, suggestedTags: [], confidence: 0.87, photoEmoji: "🕯️", quantity: 3, boundingBox: { x: 0.45, y: 0.3, width: 0.15, height: 0.35 } },
+  { suggestedName: "Water Bottle", category: "Kitchen", description: "A stainless steel insulated water bottle, silver finish.", estimatedValue: 22, suggestedTags: [], confidence: 0.92, photoEmoji: "🍶", quantity: 1, boundingBox: { x: 0.35, y: 0.1, width: 0.15, height: 0.55 } },
 ];
 
 /** Shared by MockVisionProvider and the /api/v1/vision/detect route, so both apply the same review threshold. */

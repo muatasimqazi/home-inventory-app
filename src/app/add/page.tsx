@@ -62,6 +62,8 @@ function ManualAddItemInner() {
   const [quantity, setQuantity] = useState("1");
   const [minQuantity, setMinQuantity] = useState("");
   const [notes, setNotes] = useState("");
+  const [description, setDescription] = useState("");
+  const [estimatedValue, setEstimatedValue] = useState("");
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [extraDetails, setExtraDetails] = useState<Record<string, string>>({});
@@ -162,6 +164,8 @@ function ManualAddItemInner() {
       category,
       quantity: Math.max(0, Math.min(9999, Number(quantity) || 0)),
       notes: notes.trim(),
+      description: description.trim(),
+      estimatedValue: estimatedValue.trim() === "" ? null : Math.max(0, Number(estimatedValue.trim()) || 0),
       photoEmoji: CATEGORY_EMOJI[category] ?? "📦",
       coverPhotoPath,
       locationId: destination.locationId,
@@ -435,6 +439,31 @@ function ManualAddItemInner() {
               ))}
             </div>
           )}
+        </Field>
+
+        <Field label="Description">
+          <Textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={2}
+            placeholder="Material, color, distinguishing details"
+            className="bg-white"
+          />
+        </Field>
+
+        <Field label="Estimated value">
+          <div className="relative w-32">
+            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-body text-muted-foreground">$</span>
+            <Input
+              type="number"
+              min={0}
+              step="1"
+              value={estimatedValue}
+              onChange={(e) => setEstimatedValue(e.target.value)}
+              placeholder="—"
+              className="h-11 bg-white pl-6"
+            />
+          </div>
         </Field>
 
         <Field label="Notes">
