@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { sendPushToUser } from "@/lib/push/send";
+import { filterByEnabledDomain } from "@/lib/push/domain-filter";
 
 export const runtime = "nodejs";
 
@@ -69,7 +70,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Couldn't list low-stock items." }, { status: 500 });
   }
 
-  const candidateRows = (rows ?? []) as ItemRow[];
+  const candidateRows = await filterByEnabledDomain(admin, (rows ?? []) as ItemRow[], "inventory");
 
   let notifiedCount = 0;
   let skippedAlreadySent = 0;

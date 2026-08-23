@@ -86,6 +86,12 @@ export default function SettingsPage() {
       <p className="text-caption font-medium tracking-wide text-muted-foreground uppercase">Settings</p>
       <div className="flex flex-col gap-2">
         <SettingsRow icon="home" label="Household" sublabel={household.name} href="/settings/members" />
+        <SettingsRow
+          icon="grid"
+          label="What this household tracks"
+          sublabel={household.financeEnabled && household.inventoryEnabled ? "Inventory & Finance" : household.financeEnabled ? "Finance only" : "Inventory only"}
+          href="/settings/domains"
+        />
         <SettingsRow icon="users" label="My Households" sublabel={`${households.length} household${households.length === 1 ? "" : "s"}`} href="/settings/households" />
         <SettingsRow icon="user" label="People" sublabel={`${people.length} in household`} href="/settings/members" />
         <SettingsRow icon="printer" label="Label printing" sublabel="Container ID labels" href="/desktop/labels" />

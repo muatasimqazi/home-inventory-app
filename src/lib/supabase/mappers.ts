@@ -70,10 +70,19 @@ export interface HouseholdRow {
   name: string;
   created_at: string;
   receipts_token: string;
+  finance_enabled: boolean;
+  inventory_enabled: boolean;
 }
 
 export function rowToHousehold(row: HouseholdRow): Household {
-  return { id: row.id, name: row.name, createdAt: row.created_at, receiptsToken: row.receipts_token };
+  return {
+    id: row.id,
+    name: row.name,
+    createdAt: row.created_at,
+    receiptsToken: row.receipts_token,
+    financeEnabled: row.finance_enabled,
+    inventoryEnabled: row.inventory_enabled,
+  };
 }
 
 export interface MemberRow {

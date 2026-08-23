@@ -7,6 +7,7 @@ import { Icon } from "@/components/icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AddPersonSheet } from "@/components/add-person-sheet";
+import { DomainToggle } from "@/components/domain-toggle";
 import { useInventoryStore } from "@/lib/store";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { Person } from "@/lib/types";
@@ -18,7 +19,7 @@ import type { Person } from "@/lib/types";
 // household" path reached deliberately from Settings, since that isn't an
 // onboarding step at all.
 type Mode = "create" | "join";
-type CreatePhase = "loading" | "invited" | "creating" | "naming" | "ready" | "error";
+type CreatePhase = "loading" | "invited" | "choosing-domains" | "creating" | "naming" | "ready" | "error";
 
 function deriveFirstName(fullName: string, email: string): string {
   const trimmed = fullName.trim();
@@ -64,6 +65,14 @@ function HouseholdSetupInner() {
   const [addedPeople, setAddedPeople] = useState<Person[]>([]);
   const [pendingInvite, setPendingInvite] = useState<{ householdName: string; invitedByDisplayName: string | null } | null>(null);
   const autoCreateStarted = useRef(false);
+  // 0033_household_domains.sql — both default true (create_household()'s
+  // own defaults), so a user who never sees this screen at all (the join
+  // flow inherits whatever the household they're joining already has) or
+  // who backs out via "Try again" without changing anything ends up with
+  // today's behavior either way.
+  const [financeEnabled, setFinanceEnabled] = useState(true);
+  const [inventoryEnabled, setInventoryEnabled] = useState(true);
+  const [domainError, setDomainError] = useState<string | null>(null);
 
   const [joinName, setJoinName] = useState("");
   const [joinEmail, setJoinEmail] = useState("");
@@ -78,7 +87,7 @@ function HouseholdSetupInner() {
       const { displayName: fullName, avatarUrl } = await readAccountMeta();
       const firstName = deriveFirstName(fullName, currentUserEmail);
       const name = `${firstName}'s Home`;
-      await createHousehold({ name, displayName: fullName || firstName, email: currentUserEmail, avatarUrl });
+      await createHousehold({ name, displayName: fullName || firstName, email: currentUserEmail, avatarUrl, financeEnabled, inventoryEnabled });
       setReadyName(name);
       setPhase("ready");
     } catch (e) {
@@ -99,6 +108,11 @@ function HouseholdSetupInner() {
   // add friction to the common case: this is one extra read before the
   // same invisible auto-create, not a screen anyone sees unless they
   // actually have something to join.
+  //
+  // "choosing-domains" (not straight to runAutoCreate) is the one real
+  // screen this otherwise-invisible flow shows — Inventory vs. Finance is
+  // a genuine product choice, not onboarding filler, so it earns the one
+  // exception to this page's own "no wizard" rule (see the file header).
   async function checkInviteThenAutoCreate() {
     const invite = await checkPendingInvite();
     if (invite) {
@@ -106,7 +120,7 @@ function HouseholdSetupInner() {
       setPhase("invited");
       return;
     }
-    await runAutoCreate();
+    setPhase("choosing-domains");
   }
 
   // Zero-household user (the real onboarding case, §13): auto-create
@@ -139,11 +153,15 @@ function HouseholdSetupInner() {
       setErrorMessage("Give your household a name.");
       return;
     }
+    if (!financeEnabled && !inventoryEnabled) {
+      setDomainError("Choose at least one.");
+      return;
+    }
     setPhase("creating");
     try {
       const { displayName: fullName, avatarUrl } = await readAccountMeta();
       const firstName = deriveFirstName(fullName, currentUserEmail);
-      await createHousehold({ name: trimmed, displayName: fullName || firstName, email: currentUserEmail, avatarUrl });
+      await createHousehold({ name: trimmed, displayName: fullName || firstName, email: currentUserEmail, avatarUrl, financeEnabled, inventoryEnabled });
       setReadyName(trimmed);
       setPhase("ready");
       toast.success(`${trimmed} created`);
@@ -151,6 +169,14 @@ function HouseholdSetupInner() {
       setErrorMessage(e instanceof Error ? e.message : "Couldn't create household.");
       setPhase("naming");
     }
+  }
+
+  function handleContinueFromDomains() {
+    if (!financeEnabled && !inventoryEnabled) {
+      setDomainError("Choose at least one.");
+      return;
+    }
+    void runAutoCreate();
   }
 
   async function handleJoin() {
@@ -196,7 +222,15 @@ function HouseholdSetupInner() {
 
   const showBack = mode === "join" || displayPhase === "naming";
   const headerTitle =
-    mode === "join" ? "Join household" : displayPhase === "naming" ? "New household" : displayPhase === "invited" ? "You're invited" : "Your home";
+    mode === "join"
+      ? "Join household"
+      : displayPhase === "naming"
+        ? "New household"
+        : displayPhase === "invited"
+          ? "You're invited"
+          : displayPhase === "choosing-domains"
+            ? "Get started"
+            : "Your home";
 
   return (
     <div className="min-h-dvh bg-background">
@@ -267,6 +301,36 @@ function HouseholdSetupInner() {
             {errorMessage && <p className="text-caption text-muted-foreground">{errorMessage}</p>}
             <Button onClick={runAutoCreate}>Try again</Button>
           </div>
+        ) : displayPhase === "choosing-domains" ? (
+          <>
+            <div>
+              <h2 className="text-screen-title font-semibold text-ink">What do you want to track?</h2>
+              <p className="mt-1 text-body text-muted-foreground">Choose one or both — you can&apos;t turn both off.</p>
+            </div>
+            <DomainToggle
+              icon="box"
+              tone="bg-ink"
+              title="Inventory"
+              description="Catalog what you own — items, locations, containers"
+              checked={inventoryEnabled}
+              onToggle={() => {
+                setDomainError(null);
+                setInventoryEnabled((v) => !v);
+              }}
+            />
+            <DomainToggle
+              icon="trendingUp"
+              tone="bg-yellow"
+              title="Finance"
+              description="Accounts, transactions, budgets & bills"
+              checked={financeEnabled}
+              onToggle={() => {
+                setDomainError(null);
+                setFinanceEnabled((v) => !v);
+              }}
+            />
+            {domainError && <p className="text-caption text-danger">{domainError}</p>}
+          </>
         ) : displayPhase === "naming" ? (
           <>
             <div>
@@ -286,6 +350,34 @@ function HouseholdSetupInner() {
               />
               {errorMessage && <p className="mt-1 text-caption text-danger">{errorMessage}</p>}
             </Field>
+            <div>
+              <p className="mb-1 text-caption text-muted-foreground">What do you want to track?</p>
+              <div className="flex flex-col gap-2">
+                <DomainToggle
+                  icon="box"
+                  tone="bg-ink"
+                  title="Inventory"
+                  description="Catalog what you own"
+                  checked={inventoryEnabled}
+                  onToggle={() => {
+                    setDomainError(null);
+                    setInventoryEnabled((v) => !v);
+                  }}
+                />
+                <DomainToggle
+                  icon="trendingUp"
+                  tone="bg-yellow"
+                  title="Finance"
+                  description="Accounts, transactions, budgets & bills"
+                  checked={financeEnabled}
+                  onToggle={() => {
+                    setDomainError(null);
+                    setFinanceEnabled((v) => !v);
+                  }}
+                />
+              </div>
+              {domainError && <p className="mt-1 text-caption text-danger">{domainError}</p>}
+            </div>
           </>
         ) : displayPhase === "invited" ? (
           <div className="flex flex-1 flex-col items-center gap-4 pt-10 text-center">
@@ -345,6 +437,10 @@ function HouseholdSetupInner() {
             <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={handleJoin} disabled={joining}>
               {joining ? "Redeeming…" : "Redeem invite"}
             </Button>
+          ) : displayPhase === "choosing-domains" ? (
+            <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={handleContinueFromDomains}>
+              Continue
+            </Button>
           ) : displayPhase === "naming" ? (
             <>
               <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={handleCreateNamed}>
@@ -359,7 +455,7 @@ function HouseholdSetupInner() {
               <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={handleJoinFromInvite}>
                 Join {pendingInvite?.householdName}
               </Button>
-              <Button size="lg" variant="outline" onClick={() => void runAutoCreate()}>
+              <Button size="lg" variant="outline" onClick={() => setPhase("choosing-domains")}>
                 No thanks, set up my own
               </Button>
             </>
@@ -400,3 +496,11 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     </div>
   );
 }
+
+/**
+ * One selectable domain row for the "what do you want to track?" step
+ * (0033_household_domains.sql) — same DomainCard visual language as /more
+ * (icon tone, title, description), but a toggle rather than a navigation
+ * link: this screen is choosing whether the domain exists for this
+ * household at all, not going to it.
+ */

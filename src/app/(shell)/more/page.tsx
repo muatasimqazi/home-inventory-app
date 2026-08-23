@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Icon, type IconName } from "@/components/icon";
 import { INVENTORY_LINKS, FINANCE_LINKS, type NavLink } from "@/lib/nav-links";
+import { useCurrentHousehold } from "@/lib/store";
 
 /**
  * The mobile-only domain switcher. Used to be just the two big cards below
@@ -27,6 +28,11 @@ import { INVENTORY_LINKS, FINANCE_LINKS, type NavLink } from "@/lib/nav-links";
  * switcher.
  */
 export default function MorePage() {
+  // Household-setup's domain choice (0033_household_domains.sql) — a
+  // household that opted out of a domain gets no switcher card or
+  // sub-page list for it at all.
+  const household = useCurrentHousehold();
+
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -34,15 +40,19 @@ export default function MorePage() {
         <p className="mt-0.5 text-caption text-muted-foreground">Switch between household domains.</p>
       </div>
 
-      <div className="flex flex-col gap-2">
-        <DomainCard href="/locations" icon="box" tone="bg-ink" title="Locations" description="Storage areas, containers & items" />
-        <LinkList links={INVENTORY_LINKS} />
-      </div>
+      {household.inventoryEnabled && (
+        <div className="flex flex-col gap-2">
+          <DomainCard href="/locations" icon="box" tone="bg-ink" title="Locations" description="Storage areas, containers & items" />
+          <LinkList links={INVENTORY_LINKS} />
+        </div>
+      )}
 
-      <div className="flex flex-col gap-2">
-        <DomainCard href="/finance/dashboard" icon="trendingUp" tone="bg-yellow" title="Finance" description="Accounts, transactions, budgets & bills" />
-        <LinkList links={FINANCE_LINKS} />
-      </div>
+      {household.financeEnabled && (
+        <div className="flex flex-col gap-2">
+          <DomainCard href="/finance/dashboard" icon="trendingUp" tone="bg-yellow" title="Finance" description="Accounts, transactions, budgets & bills" />
+          <LinkList links={FINANCE_LINKS} />
+        </div>
+      )}
     </div>
   );
 }

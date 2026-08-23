@@ -504,9 +504,22 @@ interface InventoryState {
 
   // Household / members
   /** Creates a brand-new household via create_household(), adds the current user as its Owner, switches to it, and starts it with empty inventory. Real, awaited: the household id is server-generated. */
-  createHousehold: (input: { name: string; displayName: string; email: string; avatarUrl?: string }) => Promise<Household>;
+  createHousehold: (input: {
+    name: string;
+    displayName: string;
+    email: string;
+    avatarUrl?: string;
+    /** Both default true (households.finance_enabled/inventory_enabled) — omit only for a call site that genuinely doesn't ask (there shouldn't be one left after household-setup's domain-choice step ships). */
+    financeEnabled?: boolean;
+    inventoryEnabled?: boolean;
+  }) => Promise<Household>;
   /** Swaps the active household's data for another one the current user belongs to (fetched fresh, or from this session's cache). No-op if already current. */
   switchHousehold: (householdId: string) => Promise<void>;
+  /** Owner-only (RLS: "household owner update" on households) change to the domain choice made at household-setup (0033_household_domains.sql). Rejects client-side before the round-trip if it would leave both disabled — the DB's own check constraint would reject it anyway, this just gives a real error message instead of a generic one. */
+  updateHouseholdDomains: (
+    householdId: string,
+    patch: { financeEnabled?: boolean; inventoryEnabled?: boolean }
+  ) => Promise<{ ok: boolean; error?: string }>;
   /** Redeems the caller's own pending invite (matched server-side by their authenticated email, via accept_invite_by_email()) and switches to the joined household. `email` is a client-side confirmation check, not what's sent to the server. */
   acceptInvite: (email: string, displayName: string) => Promise<{ ok: boolean; error?: string; household?: Household }>;
   /** Read-only counterpart to acceptInvite: checks whether the caller's own authenticated email has a pending, unexpired invite waiting, without accepting it (find_pending_invite_by_email(), 0019_pending_invite_check.sql — the same auth.email()-keyed lookup accept_invite_by_email() uses, but no mutation). Null when there's nothing pending. household-setup/page.tsx calls this before auto-creating a household, so a genuine invitee gets a chance to join instead of an unwanted household getting created out from under them. */
@@ -1199,6 +1212,8 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       p_display_name: input.displayName,
       p_email: input.email,
       p_avatar_url: input.avatarUrl ?? null,
+      p_finance_enabled: input.financeEnabled ?? true,
+      p_inventory_enabled: input.inventoryEnabled ?? true,
     });
     if (error) throw new Error(error.message);
     const household = rowToHousehold(data as HouseholdRow);
@@ -1214,6 +1229,30 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     }));
     get().subscribeRealtime(household.id);
     return household;
+  },
+
+  updateHouseholdDomains: async (householdId, patch) => {
+    const state = get();
+    const previous = state.households.find((h) => h.id === householdId);
+    if (!previous) return { ok: false, error: "Household not found." };
+
+    const merged: Household = { ...previous, ...patch };
+    if (!merged.financeEnabled && !merged.inventoryEnabled) {
+      return { ok: false, error: "Choose at least one — a household can't have both turned off." };
+    }
+
+    set((s) => ({ households: s.households.map((h) => (h.id === householdId ? merged : h)) }));
+
+    const supabase = getSupabaseBrowserClient();
+    const row: { finance_enabled?: boolean; inventory_enabled?: boolean } = {};
+    if (patch.financeEnabled !== undefined) row.finance_enabled = patch.financeEnabled;
+    if (patch.inventoryEnabled !== undefined) row.inventory_enabled = patch.inventoryEnabled;
+    const { error } = await supabase.from("households").update(row).eq("id", householdId);
+    if (error) {
+      set((s) => ({ households: s.households.map((h) => (h.id === householdId ? previous : h)) }));
+      return { ok: false, error: error.message };
+    }
+    return { ok: true };
   },
 
   switchHousehold: async (householdId) => {

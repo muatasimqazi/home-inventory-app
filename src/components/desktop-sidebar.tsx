@@ -95,47 +95,54 @@ export function DesktopSidebar() {
           </nav>
         </div>
 
-        <div>
-          {!collapsed && <p className="px-3 pb-1 text-micro font-semibold tracking-wide text-muted-foreground uppercase">Home inventory</p>}
-          <nav className="flex flex-col gap-1" aria-label="Home inventory">
-            <SidebarLink href="/locations" icon="box" label="Locations" pathname={pathname} collapsed={collapsed} />
-            <Link
-              href="/review"
-              title={collapsed ? "Needs Review" : undefined}
-              className={cn(
-                "relative flex items-center gap-3 rounded-lg py-2 text-body",
-                collapsed ? "justify-center px-0" : "px-3",
-                pathname.startsWith("/review") ? "bg-surface-muted text-ink" : "text-ink hover:bg-surface-muted"
-              )}
-            >
-              <Icon name="needsReview" size={18} />
-              {collapsed ? (
-                <ReviewBadge count={summary.needsReviewCount} className="absolute right-1 top-1 h-3.5 min-w-3.5 px-0.5 text-[9px]" />
-              ) : (
-                <>
-                  <span className="flex-1">Needs Review</span>
-                  <ReviewBadge count={summary.needsReviewCount} />
-                </>
-              )}
-            </Link>
-            <SidebarLink href="/tags" icon="tag" label="Tags" pathname={pathname} collapsed={collapsed} />
-            {INVENTORY_LINKS.map((link) => (
-              <SidebarLink key={link.href} {...link} pathname={pathname} collapsed={collapsed} />
-            ))}
-          </nav>
-        </div>
+        {/* Household-setup's domain choice (0033_household_domains.sql) —
+            a household that opted out of a domain gets no sidebar section
+            for it at all, not just a hidden-but-reachable one. */}
+        {household.inventoryEnabled && (
+          <div>
+            {!collapsed && <p className="px-3 pb-1 text-micro font-semibold tracking-wide text-muted-foreground uppercase">Home inventory</p>}
+            <nav className="flex flex-col gap-1" aria-label="Home inventory">
+              <SidebarLink href="/locations" icon="box" label="Locations" pathname={pathname} collapsed={collapsed} />
+              <Link
+                href="/review"
+                title={collapsed ? "Needs Review" : undefined}
+                className={cn(
+                  "relative flex items-center gap-3 rounded-lg py-2 text-body",
+                  collapsed ? "justify-center px-0" : "px-3",
+                  pathname.startsWith("/review") ? "bg-surface-muted text-ink" : "text-ink hover:bg-surface-muted"
+                )}
+              >
+                <Icon name="needsReview" size={18} />
+                {collapsed ? (
+                  <ReviewBadge count={summary.needsReviewCount} className="absolute right-1 top-1 h-3.5 min-w-3.5 px-0.5 text-[9px]" />
+                ) : (
+                  <>
+                    <span className="flex-1">Needs Review</span>
+                    <ReviewBadge count={summary.needsReviewCount} />
+                  </>
+                )}
+              </Link>
+              <SidebarLink href="/tags" icon="tag" label="Tags" pathname={pathname} collapsed={collapsed} />
+              {INVENTORY_LINKS.map((link) => (
+                <SidebarLink key={link.href} {...link} pathname={pathname} collapsed={collapsed} />
+              ))}
+            </nav>
+          </div>
+        )}
 
         {/* Finance domain — 2026-08-18 nav cutover (Household Hub Addendum §6,
             Platform Foundation Addendum's "desktop shows every domain as a
             sidebar section, not a mobile-style switcher" recommendation). */}
-        <div>
-          {!collapsed && <p className="px-3 pb-1 text-micro font-semibold tracking-wide text-muted-foreground uppercase">Finance</p>}
-          <nav className="flex flex-col gap-1" aria-label="Finance">
-            {FINANCE_LINKS.map((link) => (
-              <SidebarLink key={link.href} {...link} pathname={pathname} collapsed={collapsed} />
-            ))}
-          </nav>
-        </div>
+        {household.financeEnabled && (
+          <div>
+            {!collapsed && <p className="px-3 pb-1 text-micro font-semibold tracking-wide text-muted-foreground uppercase">Finance</p>}
+            <nav className="flex flex-col gap-1" aria-label="Finance">
+              {FINANCE_LINKS.map((link) => (
+                <SidebarLink key={link.href} {...link} pathname={pathname} collapsed={collapsed} />
+              ))}
+            </nav>
+          </div>
+        )}
 
         {/* Shared across both domains — one Scan trigger (opens the same
             item-vs-receipt chooser the mobile FAB uses, replacing two

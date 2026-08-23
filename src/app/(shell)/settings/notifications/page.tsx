@@ -10,7 +10,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { rowToNotificationPreference } from "@/lib/supabase/mappers";
 import type { NotificationPreferenceRow } from "@/lib/supabase/mappers";
 
-/** Event types wired to a real send job (Household Hub Addendum §5's generalized push infrastructure) — bill.due (Finance's recurring bills), debt_payment.due_today (the same recurring bills, but only credit card/loan/mortgage ones, and only exactly on the due date — see send-debt-payments-due-today/route.ts for why this needs its own event key rather than reusing bill.due's), capture.nudge (Household Ledger PRD §26 — the finance-triggered inventory capture nudge, src/app/api/v1/push/send-capture-nudges/), and household.activity (real-time, src/app/api/v1/webhooks/activity-log/ — a database trigger on activity_log, not a cron poll like the other two). More rows get added here as future domains plug into the same pipeline. */
+/** Event types wired to a real send job (Household Hub Addendum §5's generalized push infrastructure) — bill.due (Finance's recurring bills), debt_payment.due_today (the same recurring bills, but only credit card/loan/mortgage ones, and only exactly on the due date — see send-debt-payments-due-today/route.ts for why this needs its own event key rather than reusing bill.due's), capture.nudge (Household Ledger PRD §26 — the finance-triggered inventory capture nudge, src/app/api/v1/push/send-capture-nudges/), item.low_stock (0032_low_stock_alerts.sql, src/app/api/v1/push/send-low-stock-alerts/), and household.activity (real-time, src/app/api/v1/webhooks/activity-log/ — a database trigger on activity_log, not a cron poll like the others). More rows get added here as future domains plug into the same pipeline. */
 const EVENT_TYPES: { domainKey: string; eventType: string; label: string; description: string }[] = [
   { domainKey: "finance", eventType: "bill.due", label: "Bill reminders", description: "A recurring bill is due within a few days" },
   {
@@ -24,6 +24,12 @@ const EVENT_TYPES: { domainKey: string; eventType: string; label: string; descri
     eventType: "capture.nudge",
     label: "Capture reminders",
     description: "A big purchase posts and we don't have a photo of it yet",
+  },
+  {
+    domainKey: "inventory",
+    eventType: "item.low_stock",
+    label: "Low-stock alerts",
+    description: "An item with a minimum quantity set drops to or below it",
   },
   {
     domainKey: "activity",

@@ -149,46 +149,57 @@ export default function OverviewPage() {
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
-          <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">Inventory</p>
-          <p className="mt-1 text-item-title font-semibold text-ink">
-            {summary.totalActiveItems} item{summary.totalActiveItems === 1 ? "" : "s"}
-          </p>
-          <p className="mt-0.5 text-caption text-muted-foreground">
-            {activeContainerList.length} container{activeContainerList.length === 1 ? "" : "s"}
-          </p>
-        </div>
-
-        <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
-          <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">Net Worth</p>
-          <p className="mt-1 text-item-title font-semibold text-ink">{formatCurrency(worth)}</p>
-          <p className="mt-0.5 text-caption text-muted-foreground">Trend needs a few weeks</p>
-        </div>
-
-        <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
-          <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">Cash Flow · This Month</p>
-          <div className="mt-1.5 flex items-center gap-4">
-            <div>
-              <p className="text-caption text-muted-foreground">Income</p>
-              <p className="text-body font-semibold text-badge-green-text">{formatCurrency(thisMonth.income, { showPositiveSign: true })}</p>
-            </div>
-            <div>
-              <p className="text-caption text-muted-foreground">Spend</p>
-              <p className="text-body font-semibold text-money-negative-text">{formatCurrency(-thisMonth.spend)}</p>
-            </div>
+        {household.inventoryEnabled && (
+          <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
+            <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">Inventory</p>
+            <p className="mt-1 text-item-title font-semibold text-ink">
+              {summary.totalActiveItems} item{summary.totalActiveItems === 1 ? "" : "s"}
+            </p>
+            <p className="mt-0.5 text-caption text-muted-foreground">
+              {activeContainerList.length} container{activeContainerList.length === 1 ? "" : "s"}
+            </p>
           </div>
-        </div>
+        )}
+
+        {household.financeEnabled && (
+          <>
+            <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
+              <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">Net Worth</p>
+              <p className="mt-1 text-item-title font-semibold text-ink">{formatCurrency(worth)}</p>
+              <p className="mt-0.5 text-caption text-muted-foreground">Trend needs a few weeks</p>
+            </div>
+
+            <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
+              <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">Cash Flow · This Month</p>
+              <div className="mt-1.5 flex items-center gap-4">
+                <div>
+                  <p className="text-caption text-muted-foreground">Income</p>
+                  <p className="text-body font-semibold text-badge-green-text">{formatCurrency(thisMonth.income, { showPositiveSign: true })}</p>
+                </div>
+                <div>
+                  <p className="text-caption text-muted-foreground">Spend</p>
+                  <p className="text-body font-semibold text-money-negative-text">{formatCurrency(-thisMonth.spend)}</p>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
 
         <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
           <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">Needs Attention</p>
           <div className="mt-2 flex flex-wrap gap-2">
-            <ActionChip label="Review" count={summary.needsReviewCount} tone="purple" href="/review" />
-            <ActionChip label="Photos" count={genericPhotos} tone="green" />
-            <ActionChip label="Bills" count={billsDueSoonCount} tone="orange" href="/finance/recurring" />
+            {household.inventoryEnabled && (
+              <>
+                <ActionChip label="Review" count={summary.needsReviewCount} tone="purple" href="/review" />
+                <ActionChip label="Photos" count={genericPhotos} tone="green" />
+              </>
+            )}
+            {household.financeEnabled && <ActionChip label="Bills" count={billsDueSoonCount} tone="orange" href="/finance/recurring" />}
           </div>
         </div>
       </div>
 
+      {household.inventoryEnabled && (
       <section aria-label="Home Inventory" className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <h2 className="domain-section-title text-ink">Home Inventory</h2>
@@ -332,7 +343,9 @@ export default function OverviewPage() {
           </Link>
         ) : null}
       </section>
+      )}
 
+      {household.financeEnabled && (
       <section aria-label="Finance" className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <h2 className="domain-section-title text-ink">Finance</h2>
@@ -432,6 +445,7 @@ export default function OverviewPage() {
           )}
         </div>
       </section>
+      )}
 
       <CreateChooserSheet open={createChooserOpen} onOpenChange={setCreateChooserOpen} />
     </div>

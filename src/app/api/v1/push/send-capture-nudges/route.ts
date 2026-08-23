@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { sendPushToUser } from "@/lib/push/send";
+import { filterByEnabledDomain } from "@/lib/push/domain-filter";
 import { formatCurrency } from "@/lib/format";
 
 export const runtime = "nodejs";
@@ -112,7 +113,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Couldn't list recent transactions." }, { status: 500 });
   }
 
-  const candidateRows = (txns ?? []) as TransactionRow[];
+  // "both": this nudge reads a Finance signal (a transaction) to prompt
+  // an Inventory action (log what you bought) — a household that's opted
+  // out of either half of that shouldn't get it, not just the one domain
+  // this query happens to read from.
+  const candidateRows = await filterByEnabledDomain(admin, (txns ?? []) as TransactionRow[], "both");
 
   // categories is small per household (and this job runs across every
   // household) — one fetch of every category name, looked up by id below,

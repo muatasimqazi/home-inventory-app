@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Icon, type IconName } from "@/components/icon";
+import { useCurrentHousehold } from "@/lib/store";
 
 interface ScanChooserSheetProps {
   open: boolean;
@@ -67,6 +68,10 @@ function barcodeScanHref(itemHref: string): string {
  */
 export function ScanChooserSheet({ open, onOpenChange, itemScanHref }: ScanChooserSheetProps) {
   const router = useRouter();
+  // Household-setup's domain choice (0033_household_domains.sql) — a
+  // household that opted out of a domain shouldn't have this chooser
+  // offer a mode leading straight into it.
+  const household = useCurrentHousehold();
 
   function go(href: string) {
     onOpenChange(false);
@@ -80,10 +85,21 @@ export function ScanChooserSheet({ open, onOpenChange, itemScanHref }: ScanChoos
           <SheetTitle className="text-section-title font-medium text-ink">Scan</SheetTitle>
         </SheetHeader>
         <div className="flex flex-col gap-2 px-4 pb-6">
-          <ChooserRow icon="camera" label="Scan Item" description="Add something to your inventory" onClick={() => go(itemScanHref)} />
-          <ChooserRow icon="scanBarcode" label="Scan Barcode" description="Look up a product by UPC/EAN" onClick={() => go(barcodeScanHref(itemScanHref))} />
-          <ChooserRow icon="zap" label="Scan Appliance" description="Read a model/serial label" onClick={() => go(applianceScanHref(itemScanHref))} />
-          <ChooserRow icon="receipt" label="Scan Receipt" description="Auto-fill a Finance transaction" onClick={() => go("/finance/scan")} />
+          {household.inventoryEnabled && (
+            <>
+              <ChooserRow icon="camera" label="Scan Item" description="Add something to your inventory" onClick={() => go(itemScanHref)} />
+              <ChooserRow
+                icon="scanBarcode"
+                label="Scan Barcode"
+                description="Look up a product by UPC/EAN"
+                onClick={() => go(barcodeScanHref(itemScanHref))}
+              />
+              <ChooserRow icon="zap" label="Scan Appliance" description="Read a model/serial label" onClick={() => go(applianceScanHref(itemScanHref))} />
+            </>
+          )}
+          {household.financeEnabled && (
+            <ChooserRow icon="receipt" label="Scan Receipt" description="Auto-fill a Finance transaction" onClick={() => go("/finance/scan")} />
+          )}
         </div>
       </SheetContent>
     </Sheet>

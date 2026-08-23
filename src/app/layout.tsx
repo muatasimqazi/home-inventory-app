@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { HydrationGate } from "@/components/hydration-gate";
+import { DomainGate } from "@/components/domain-gate";
 
 export const metadata: Metadata = {
   title: "Shohaz",
@@ -49,7 +50,9 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full antialiased">
       <body className="min-h-full flex flex-col">
-        <HydrationGate>{children}</HydrationGate>
+        <HydrationGate>
+          <DomainGate>{children}</DomainGate>
+        </HydrationGate>
         {/* Default 16px top offset lands inside the app's back-button/header
             row (~56-64px tall); push toasts below it instead. Sonner uses a
             *separate* mobileOffset (not offset) below a 600px viewport, so

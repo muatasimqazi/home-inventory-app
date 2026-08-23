@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { sendPushToUser } from "@/lib/push/send";
+import { filterByEnabledDomain } from "@/lib/push/domain-filter";
 import { formatCurrency } from "@/lib/format";
 
 export const runtime = "nodejs";
@@ -75,7 +76,9 @@ export async function POST(request: Request) {
   let notifiedCount = 0;
   let skippedCount = 0;
 
-  for (const bill of (bills ?? []) as RecurringBillRow[]) {
+  const candidateBills = await filterByEnabledDomain(admin, (bills ?? []) as RecurringBillRow[], "finance");
+
+  for (const bill of candidateBills) {
     const occurrenceKey = `${bill.next_due_date}:due_today`;
 
     const { data: alreadySent } = await admin
@@ -132,7 +135,7 @@ export async function POST(request: Request) {
     }
   }
 
-  return NextResponse.json({ dueCount: bills?.length ?? 0, notifiedCount, skippedCount });
+  return NextResponse.json({ dueCount: candidateBills.length, notifiedCount, skippedCount });
 }
 
 // Vercel Cron sends GET by default — same accept-both shape as the other

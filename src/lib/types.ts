@@ -13,6 +13,9 @@ export interface Household {
   createdAt: string;
   /** Opaque local-part for this household's email-receipts forwarding address (token@receipts.<domain>) — never the household's own id, so the address itself doesn't leak it. */
   receiptsToken: string;
+  /** Chosen once at household-setup (both default true — see supabase/migrations/0033_household_domains.sql). UI-level only: hides/shows nav entry points, doesn't restrict data access. At least one of the two is always true, DB-enforced. */
+  financeEnabled: boolean;
+  inventoryEnabled: boolean;
 }
 
 export interface Member {
