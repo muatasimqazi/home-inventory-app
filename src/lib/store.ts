@@ -1534,6 +1534,20 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
 
   createContainer: (input) => {
     const supabase = getSupabaseBrowserClient();
+    // Every new container gets a real Container ID immediately — no
+    // separate "Assign Container ID" step required before it's print-
+    // ready. Computed locally (same nextDisplayCode() the manual/print-
+    // time auto-assign paths already use), not a separate awaited
+    // round-trip: createContainer is synchronous everywhere it's called
+    // (many call sites use the returned Container right away), and this
+    // stays consistent with that rather than becoming the one path that
+    // blocks on a uniqueness check first. The household's own
+    // (household_id, display_code) unique constraint still backstops a
+    // genuine race (two containers created in the same location at the
+    // same instant) — an exceedingly rare case that would surface as a
+    // reverted "Couldn't create container" via persistOrRevert below,
+    // same as any other insert conflict this action could already hit.
+    const locationName = get().locations.find((l) => l.id === input.locationId)?.name ?? "BIN";
     const created: Container = {
       id: newId(),
       householdId: get().currentHouseholdId,
@@ -1542,7 +1556,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       name: input.name,
       description: input.description,
       tagToken: tagToken(),
-      displayCode: null,
+      displayCode: nextDisplayCode(get().containers, locationName),
       coverPhotoEmoji: input.coverPhotoEmoji ?? "📦",
       coverPhotoPath: null,
       createdByUserId: get().currentUserId,

@@ -26,6 +26,7 @@ import { useInventoryStore } from "@/lib/store";
 import { coverPhotoUrl } from "@/lib/cover-photo";
 import { rotateStoredPhoto } from "@/lib/crop-image";
 import { displayCodeBadgeClasses } from "@/lib/badge-color";
+import { nextDisplayCodeForPrefix } from "@/lib/display-code";
 import { cn } from "@/lib/utils";
 import { activeItemCountForContainer, buildBreadcrumb, breadcrumbLabel, collectDescendantIds, directChildContainers } from "@/lib/selectors";
 
@@ -43,6 +44,7 @@ export default function ContainerDetailPage() {
   const moveItem = useInventoryStore((s) => s.moveItem);
   const setContainerCoverPhoto = useInventoryStore((s) => s.setContainerCoverPhoto);
   const removeContainerCoverPhoto = useInventoryStore((s) => s.removeContainerCoverPhoto);
+  const assignDisplayCode = useInventoryStore((s) => s.assignDisplayCode);
 
   const [addSubOpen, setAddSubOpen] = useState(false);
   const [addSubKey, bumpAddSubKey] = useRemountKey();
@@ -386,11 +388,32 @@ export default function ContainerDetailPage() {
         // now (directItems, already computed above for the list below).
         // Only passed at all when there's something to suggest from —
         // EntityFormSheet's own affordance is conditional on this prop
-        // being present, and its handler already shows a generic error
-        // toast on any throw, so this stays a plain pass-through rather
-        // than duplicating that handling here.
+        // being present.
+        //
+        // "For older ones [containers that predate Container IDs being
+        // auto-assigned by default — see createContainer in store.ts],
+        // let AI create the label": when this container has no
+        // Container ID yet, the same AI call also assigns one — a
+        // content-derived prefix (e.g. "TOOLS" for a mix of hand tools)
+        // combined with the next free sequential number for that prefix,
+        // same numbering scheme every other display-code path already
+        // uses (lib/display-code.ts). Never touches an existing Container
+        // ID — a container that already has one (every new container,
+        // and any older one already assigned by hand) only gets the name
+        // suggestion, exactly as before.
         onSuggestName={
-          directItems.length > 0 ? () => containerNamingProvider.suggestContainerName(directItems.map((it) => it.name)) : undefined
+          directItems.length > 0
+            ? async () => {
+                const suggestion = await containerNamingProvider.suggestContainerLabel(directItems.map((it) => it.name));
+                if (!container.displayCode) {
+                  const code = nextDisplayCodeForPrefix(containers, suggestion.codePrefix);
+                  const result = await assignDisplayCode(container.id, code);
+                  if (result.ok) toast.success(`Container ID assigned: ${result.code}`);
+                  else toast.error(result.error ?? "Suggested a name, but couldn't assign a Container ID.");
+                }
+                return suggestion.name;
+              }
+            : undefined
         }
         onSubmit={async ({ name, description, photoFile }) => {
           updateContainer(container.id, { name, description });

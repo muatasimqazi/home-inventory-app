@@ -476,35 +476,54 @@ export class HttpCategorizationProvider implements CategorizationProvider {
 export const categorizationProvider: CategorizationProvider = new HttpCategorizationProvider();
 
 // ---------------------------------------------------------------------------
-// AI container-name suggestion — "AI should suggest a name for a container
-// when editing it." A pure text task (a container's current item names in,
-// a short suggested label out), same sibling-provider pattern as
-// CategorizationProvider above rather than folding it into VisionProvider
-// (no photo involved). Assisted, not automatic, same as every other AI
-// surface in this app: the suggestion fills the Name field for the user to
-// accept or edit, it never saves on its own.
+// AI container-label suggestion — "AI should suggest a name for a container
+// when editing it" + "for older ones [containers created before Container
+// IDs were auto-assigned by default], let AI create the label." A pure
+// text task (a container's current item names in, a short suggested name
+// AND a content-derived Container-ID prefix out — e.g. "TOOLS" for a mix
+// of hand tools, not just the next sequential number for its location),
+// same sibling-provider pattern as CategorizationProvider above rather
+// than folding it into VisionProvider (no photo involved). Assisted, not
+// automatic, same as every other AI surface in this app: the suggestion
+// fills the Name field and (only when the container has no Container ID
+// yet — never overwriting a real one) assigns one, for the user to accept
+// or edit further, never bypassing the normal save/confirm flow.
 // ---------------------------------------------------------------------------
 
-export interface ContainerNamingProvider {
-  /** Suggests a short label for a container based on the names of items currently in it. Throws VisionDetectionError on failure (reused for its shape, same as every other Http*Provider in this file). */
-  suggestContainerName(itemNames: string[]): Promise<string>;
+export interface ContainerLabelSuggestion {
+  name: string;
+  /** Already cleaned (uppercase, letters-only, 2-8 chars) — combine with nextDisplayCodeForPrefix() (lib/display-code.ts) for the actual Container ID. */
+  codePrefix: string;
 }
 
-const MOCK_CONTAINER_NAMES = ["Storage Bin", "Miscellaneous Items", "Household Supplies"];
+export interface ContainerNamingProvider {
+  /** Suggests a short label and a content-derived Container-ID prefix for a container, based on the names of items currently in it. Throws VisionDetectionError on failure (reused for its shape, same as every other Http*Provider in this file). */
+  suggestContainerLabel(itemNames: string[]): Promise<ContainerLabelSuggestion>;
+}
+
+const MOCK_CONTAINER_LABELS: { pattern: RegExp; name: string; codePrefix: string }[] = [
+  { pattern: /tool|drill|wrench|hammer|screwdriver/, name: "Hand Tools", codePrefix: "TOOLS" },
+  { pattern: /shirt|jacket|sweater|coat|glove|sock/, name: "Clothing", codePrefix: "CLOTH" },
+  { pattern: /ornament|light|wreath|garland|tinsel/, name: "Holiday Decorations", codePrefix: "XMAS" },
+  { pattern: /pen|paper|stapler|folder|notebook/, name: "Office Supplies", codePrefix: "OFFICE" },
+];
+const MOCK_CONTAINER_FALLBACK = [
+  { name: "Storage Bin", codePrefix: "BIN" },
+  { name: "Miscellaneous Items", codePrefix: "MISC" },
+  { name: "Household Supplies", codePrefix: "HOME" },
+];
 
 export class MockContainerNamingProvider implements ContainerNamingProvider {
-  async suggestContainerName(itemNames: string[]): Promise<string> {
+  async suggestContainerLabel(itemNames: string[]): Promise<ContainerLabelSuggestion> {
     await new Promise((resolve) => setTimeout(resolve, 700));
     // Light keyword pass so mock mode still feels sensible in a demo, same
     // reasoning as MockCategorizationProvider's own keyword pass — real
     // suggestion happens server-side in lib/inventory/suggest-container-name.ts
     // via a real model call.
     const text = itemNames.join(" ").toLowerCase();
-    if (/tool|drill|wrench|hammer|screwdriver/.test(text)) return "Hand Tools";
-    if (/shirt|jacket|sweater|coat|glove|sock/.test(text)) return "Clothing";
-    if (/ornament|light|wreath|garland|tinsel/.test(text)) return "Holiday Decorations";
-    if (/pen|paper|stapler|folder|notebook/.test(text)) return "Office Supplies";
-    return MOCK_CONTAINER_NAMES[itemNames.length % MOCK_CONTAINER_NAMES.length];
+    const matched = MOCK_CONTAINER_LABELS.find((m) => m.pattern.test(text));
+    if (matched) return { name: matched.name, codePrefix: matched.codePrefix };
+    return MOCK_CONTAINER_FALLBACK[itemNames.length % MOCK_CONTAINER_FALLBACK.length];
   }
 }
 
@@ -515,7 +534,7 @@ export class MockContainerNamingProvider implements ContainerNamingProvider {
  * Vercel AI Gateway same as every other Http*Provider here).
  */
 export class HttpContainerNamingProvider implements ContainerNamingProvider {
-  async suggestContainerName(itemNames: string[]): Promise<string> {
+  async suggestContainerLabel(itemNames: string[]): Promise<ContainerLabelSuggestion> {
     let res: Response;
     try {
       res = await fetch("/api/v1/inventory/suggest-container-name", {
@@ -528,10 +547,9 @@ export class HttpContainerNamingProvider implements ContainerNamingProvider {
     }
     if (!res.ok) {
       const body = await res.json().catch(() => null);
-      throw new VisionDetectionError(body?.error ?? `Container-name suggestion failed (${res.status}).`, body?.retryable ?? true);
+      throw new VisionDetectionError(body?.error ?? `Container-label suggestion failed (${res.status}).`, body?.retryable ?? true);
     }
-    const { suggestedName } = (await res.json()) as { suggestedName: string };
-    return suggestedName;
+    return (await res.json()) as ContainerLabelSuggestion;
   }
 }
 

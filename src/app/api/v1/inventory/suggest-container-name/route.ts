@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { suggestContainerName } from "@/lib/inventory/suggest-container-name";
+import { suggestContainerLabel } from "@/lib/inventory/suggest-container-name";
+import { normalizeCodePrefix } from "@/lib/display-code";
 import { upstreamStatusCode } from "@/lib/upstream-error";
 
 export const runtime = "nodejs";
@@ -8,10 +9,11 @@ export const runtime = "nodejs";
 // kick off an unbounded model call regardless of what a client sends.
 const MAX_ITEMS = 60;
 
-// AI container-name suggestion — a container's own current item names in,
-// a short suggested label out. Pure text task via lib/inventory/
-// suggest-container-name.ts, same Gateway-routed primary+fallback
-// reliability shape as every other AI route in this app.
+// AI container-label suggestion — a container's own current item names in,
+// a short suggested name AND a content-derived Container-ID prefix out.
+// Pure text task via lib/inventory/suggest-container-name.ts, same
+// Gateway-routed primary+fallback reliability shape as every other AI
+// route in this app.
 export async function POST(request: Request) {
   let body: unknown;
   try {
@@ -26,10 +28,17 @@ export async function POST(request: Request) {
   }
 
   try {
-    const suggestedName = await suggestContainerName(itemNames.slice(0, MAX_ITEMS));
-    return NextResponse.json({ suggestedName });
+    const { name, rawCodePrefix } = await suggestContainerLabel(itemNames.slice(0, MAX_ITEMS));
+    // normalizeCodePrefix can legitimately return null (the model's raw
+    // string had fewer than 2 letters in it once cleaned) — "BIN" is the
+    // same generic fallback prefix nextDisplayCode() already uses when a
+    // location name itself yields nothing usable, so an unusable
+    // suggestion degrades to the same safe default rather than failing
+    // the whole request over a cosmetic field.
+    const codePrefix = normalizeCodePrefix(rawCodePrefix) ?? "BIN";
+    return NextResponse.json({ name, codePrefix });
   } catch (error) {
-    console.error("Container-name suggestion failed:", error);
+    console.error("Container-label suggestion failed:", error);
     const status = upstreamStatusCode(error);
     if (status === 503 || status === 429) {
       return NextResponse.json(
@@ -37,6 +46,6 @@ export async function POST(request: Request) {
         { status: 503 }
       );
     }
-    return NextResponse.json({ error: "Couldn't suggest a name. Please try again.", retryable: true }, { status: 502 });
+    return NextResponse.json({ error: "Couldn't suggest a label. Please try again.", retryable: true }, { status: 502 });
   }
 }
