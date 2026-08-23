@@ -7,14 +7,6 @@ export const runtime = "nodejs";
 
 const DOMAIN_KEY = "finance";
 const EVENT_TYPE = "debt_payment.due_today";
-// credit_card/loan/mortgage — the "you owe someone else money" account
-// types, as opposed to checking/savings/cash/investment. Kept as its own
-// list here (not a shared export) because this is the one place in the
-// app that needs it as a Postgres `.in()` filter value rather than a
-// TypeScript type guard — src/lib/selectors.ts's isDebtAccountType is the
-// client-side equivalent this intentionally mirrors, for the Recurring
-// Bills page's own "Credit Cards & Loans" section.
-const DEBT_ACCOUNT_TYPES = ["credit_card", "loan", "mortgage"];
 
 interface RecurringBillRow {
   id: string;
@@ -22,22 +14,30 @@ interface RecurringBillRow {
   name: string;
   expected_amount: number;
   next_due_date: string;
-  account_id: string | null;
   owner_user_id: string | null;
 }
 
 /**
- * "Day of" reminders for credit card/loan/mortgage payments specifically —
- * a narrower, same-day counterpart to send-due-bills' generic 3-day
- * heads-up (which already covers every recurring bill, debt or not, and
- * keeps firing that earlier reminder for these too; this is additive, not
- * a replacement). Distinct domain/event key (debt_payment.due_today) and
- * a distinct occurrence_key suffix (":due_today") so this doesn't collide
- * with send-due-bills' own event_notification_log row for the same
- * bill+due-date — both jobs would otherwise share the exact same
- * (domain_key, entity_type, entity_id, occurrence_key) tuple for a bill
- * due within the 3-day window, and the second one to run would silently
- * no-op against the first's log entry instead of sending its own push.
+ * "Day of" reminders for bills explicitly marked isDebtPayment (a credit
+ * card/loan/mortgage payment) — a narrower, same-day counterpart to
+ * send-due-bills' generic 3-day heads-up (which already covers every
+ * recurring bill, debt or not, and keeps firing that earlier reminder for
+ * these too; this is additive, not a replacement). Distinct domain/event
+ * key (debt_payment.due_today) and a distinct occurrence_key suffix
+ * (":due_today") so this doesn't collide with send-due-bills' own
+ * event_notification_log row for the same bill+due-date — both jobs
+ * would otherwise share the exact same (domain_key, entity_type,
+ * entity_id, occurrence_key) tuple for a bill due within the 3-day
+ * window, and the second one to run would silently no-op against the
+ * first's log entry instead of sending its own push.
+ *
+ * isDebtPayment, not accountId's type: an earlier version of this query
+ * filtered by account_id pointing at a credit_card/loan/mortgage Account,
+ * which is wrong — that field means "charged to/paid from this account,"
+ * and a subscription is routinely charged to a credit card without being
+ * a payment on it. Confirmed live: that version pushed reminders for
+ * subscriptions billed to a card, not the card's own payment. See
+ * 0029_recurring_bill_debt_payment.sql.
  *
  * Missed a day the cron didn't run for whatever reason? No catch-up
  * window — exact-date match only, matching "day of" literally. Same
@@ -60,23 +60,13 @@ export async function POST(request: Request) {
   const admin = getSupabaseAdminClient();
   const todayIso = new Date().toISOString().slice(0, 10);
 
-  const { data: debtAccounts, error: accountsError } = await admin.from("accounts").select("id").in("type", DEBT_ACCOUNT_TYPES);
-  if (accountsError) {
-    console.error("push/send-debt-payments-due-today: couldn't list debt accounts:", accountsError);
-    return NextResponse.json({ error: "Couldn't list debt accounts." }, { status: 500 });
-  }
-  const debtAccountIds = (debtAccounts ?? []).map((a) => a.id as string);
-  if (debtAccountIds.length === 0) {
-    return NextResponse.json({ dueCount: 0, notifiedCount: 0, skippedCount: 0 });
-  }
-
   const { data: bills, error } = await admin
     .from("recurring_bills")
-    .select("id, household_id, name, expected_amount, next_due_date, account_id, owner_user_id")
+    .select("id, household_id, name, expected_amount, next_due_date, owner_user_id")
     .eq("is_active", true)
+    .eq("is_debt_payment", true)
     .is("trashed_at", null)
-    .eq("next_due_date", todayIso)
-    .in("account_id", debtAccountIds);
+    .eq("next_due_date", todayIso);
   if (error) {
     console.error("push/send-debt-payments-due-today: couldn't list bills due today:", error);
     return NextResponse.json({ error: "Couldn't list bills due today." }, { status: 500 });

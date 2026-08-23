@@ -5,6 +5,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
@@ -34,6 +35,7 @@ interface RecurringBillFormSheetProps {
     nextDueDate: string;
     categoryId: string | null;
     accountId: string | null;
+    isDebtPayment: boolean;
     isPersonal: boolean;
     sharedWithUserIds: string[];
   }) => void;
@@ -71,6 +73,7 @@ export function RecurringBillFormSheet({
   const [nextDueDate, setNextDueDate] = useState(initial ? initial.nextDueDate.slice(0, 10) : new Date().toISOString().slice(0, 10));
   const [categoryId, setCategoryId] = useState(initial?.categoryId ?? "");
   const [accountId, setAccountId] = useState(initial?.accountId ?? "");
+  const [isDebtPayment, setIsDebtPayment] = useState(initial?.isDebtPayment ?? false);
   const [isPersonal, setIsPersonal] = useState(initial ? initial.ownerUserId !== null : false);
   const [sharedWithUserIds, setSharedWithUserIds] = useState<string[]>(initialSharedWithUserIds);
   const [error, setError] = useState<string | null>(null);
@@ -102,6 +105,7 @@ export function RecurringBillFormSheet({
       nextDueDate: new Date(`${nextDueDate}T12:00:00`).toISOString(),
       categoryId: categoryId || null,
       accountId: accountId || null,
+      isDebtPayment,
       isPersonal,
       sharedWithUserIds: isPersonal ? sharedWithUserIds : [],
     });
@@ -185,6 +189,16 @@ export function RecurringBillFormSheet({
               </Select>
             </div>
           )}
+
+          <label className="flex items-start gap-2 text-caption text-ink">
+            <Checkbox checked={isDebtPayment} onCheckedChange={(v) => setIsDebtPayment(v === true)} className="mt-0.5" />
+            <span>
+              This bill is a credit card, loan, or mortgage payment
+              <span className="block text-micro text-muted-foreground">
+                Groups it under Credit Cards &amp; Loans and sends a push reminder the day it&apos;s due, on top of the usual few-days-ahead one. Separate from the Account field above, which is just where the charge is paid from.
+              </span>
+            </span>
+          </label>
 
           <div>
             <label className="mb-1 block text-caption text-muted-foreground">Ownership</label>

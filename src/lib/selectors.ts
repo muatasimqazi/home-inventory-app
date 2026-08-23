@@ -448,31 +448,25 @@ export function accountTypeIcon(type: AccountType) {
   return ACCOUNT_TYPE_ICON[type];
 }
 
-// "You owe someone else money" account types — as opposed to checking/
-// savings/cash/investment. Mirrored server-side (as a plain string array,
-// for a Postgres `.in()` filter) by DEBT_ACCOUNT_TYPES in
-// send-debt-payments-due-today/route.ts; keep the two in sync by hand if
-// this set ever changes; they can't literally share a constant across the
-// client/server boundary the way most of this file's exports do.
-const DEBT_ACCOUNT_TYPES: ReadonlySet<AccountType> = new Set(["credit_card", "loan", "mortgage"]);
-
-export function isDebtAccountType(type: AccountType): boolean {
-  return DEBT_ACCOUNT_TYPES.has(type);
-}
-
 /**
- * Upcoming recurring bills that are actually a credit card/loan/mortgage
- * payment — i.e. linked (via RecurringBill.accountId) to a debt-type
- * Account. A bill with no accountId at all (most subscriptions/utilities)
- * can never match; this is additive filtering on top of
+ * Upcoming recurring bills explicitly marked as a credit card/loan/
+ * mortgage payment (RecurringBill.isDebtPayment) — deliberately *not*
+ * derived from which account a bill happens to be linked to.
+ * account_id means "charged to/paid from this account," which for a
+ * subscription is routinely a credit card without that subscription
+ * being a payment on it at all — an earlier version of this selector
+ * inferred "debt payment" from accountId pointing at a credit_card/loan/
+ * mortgage Account and got it wrong in exactly that way (confirmed live:
+ * subscription bills billed to a real household's credit card showed up
+ * here as if they were the card's own payment). isDebtPayment is a
+ * separate, explicit flag for exactly this reason. Additive on top of
  * upcomingRecurringBills' own active/not-trashed/sorted result, not a
  * replacement for it — callers that want "everything else" should filter
  * the same upcomingRecurringBills() list by the negation of this instead
  * of calling it twice with different assumptions.
  */
-export function upcomingDebtPaymentBills(bills: RecurringBill[], accounts: Account[]): RecurringBill[] {
-  const debtAccountIds = new Set(accounts.filter((a) => isDebtAccountType(a.type)).map((a) => a.id));
-  return upcomingRecurringBills(bills).filter((b) => b.accountId && debtAccountIds.has(b.accountId));
+export function upcomingDebtPaymentBills(bills: RecurringBill[]): RecurringBill[] {
+  return upcomingRecurringBills(bills).filter((b) => b.isDebtPayment);
 }
 
 export const ACCOUNT_TYPE_LABEL: Record<AccountType, string> = {

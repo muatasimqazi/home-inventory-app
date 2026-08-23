@@ -41,7 +41,7 @@ export default function RecurringBillsPage() {
   const [trashConfirmId, setTrashConfirmId] = useState<string | null>(null);
 
   const bills = upcomingRecurringBills(recurringBills);
-  const debtBills = upcomingDebtPaymentBills(recurringBills, accounts);
+  const debtBills = upcomingDebtPaymentBills(recurringBills);
   const debtBillIds = new Set(debtBills.map((b) => b.id));
   const otherBills = bills.filter((b) => !debtBillIds.has(b.id));
   const otherMembers = members.filter((m) => m.userId !== currentUserId);
@@ -96,7 +96,7 @@ export default function RecurringBillsPage() {
               <div>
                 <h2 className="text-section-title font-medium text-ink">Credit Cards &amp; Loans</h2>
                 <p className="text-caption text-muted-foreground">
-                  Linked to a credit card, loan, or mortgage account — you&apos;ll get a push reminder the day each of these is due.
+                  Marked as a credit card, loan, or mortgage payment — you&apos;ll get a push reminder the day each of these is due.
                 </p>
               </div>
               <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
@@ -151,6 +151,7 @@ export default function RecurringBillsPage() {
               nextDueDate: values.nextDueDate,
               categoryId: values.categoryId,
               accountId: values.accountId,
+              isDebtPayment: values.isDebtPayment,
               ownerUserId: values.isPersonal ? (editingBill.ownerUserId ?? currentUserId) : null,
             });
             applySharing(editingBill.id, values.isPersonal, values.sharedWithUserIds, editingShares);

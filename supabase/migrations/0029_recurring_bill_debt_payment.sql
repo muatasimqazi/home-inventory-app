@@ -1,0 +1,22 @@
+-- Fixes a real bug in the just-shipped "Credit Cards & Loans" section
+-- (0028 landed API keys, not this — see the commit this migration ships
+-- with): it derived "is this a debt payment" from
+-- recurring_bills.account_id pointing at a credit_card/loan/mortgage
+-- account. That field means "which account this charge posts against/is
+-- paid from" — for a subscription, that's routinely a credit card (how
+-- you'd pick which card a Netflix charge bills to), which is the *source*
+-- of the charge, not a payment *toward* that card's balance. Confirmed
+-- live: a household's real "Amazon Prime Video" and "Wellhub" subscription
+-- bills (charged to a Chase card, tracked here purely for receipt/charge
+-- matching) showed up in Credit Cards & Loans, while the household's nine
+-- real credit cards and four real loans had no actual payment bill
+-- wrongly-or-rightly flagged, because none exists yet — this household
+-- tracks those balances via Plaid sync directly, not a manual recurring
+-- bill.
+--
+-- account_id's own meaning doesn't change. This adds the actually-missing
+-- signal: an explicit, independent flag for "this bill IS a payment
+-- toward a debt account's balance," set deliberately per bill (checkbox
+-- in the bill form) rather than inferred from which account happens to be
+-- linked.
+alter table recurring_bills add column is_debt_payment boolean not null default false;

@@ -485,6 +485,8 @@ export interface RecurringBill {
   accountId: string | null;
   /** Same nullable joint-vs-personal shape as Account.ownerUserId. */
   ownerUserId: string | null;
+  /** Explicit "this bill IS a payment toward accountId's balance" — independent of accountId itself, which just means "charged to/paid from this account" (a subscription's accountId is routinely a credit card too, without being a payment on it). Drives the Recurring Bills page's "Credit Cards & Loans" section and the same-day debt-payment push reminder (send-debt-payments-due-today/route.ts). */
+  isDebtPayment: boolean;
   /** Paused/resumed — distinct from the trash lifecycle below. */
   isActive: boolean;
   trashedAt: string | null;
