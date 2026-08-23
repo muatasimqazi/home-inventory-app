@@ -20,6 +20,7 @@ import { DisplayCodeSheet } from "@/components/display-code-sheet";
 import { LoadMoreButton } from "@/components/load-more-button";
 import { Button } from "@/components/ui/button";
 import { useRemountKey } from "@/hooks/use-remount-key";
+import { containerNamingProvider } from "@/lib/ai";
 import { usePaginated } from "@/hooks/use-paginated";
 import { useInventoryStore } from "@/lib/store";
 import { coverPhotoUrl } from "@/lib/cover-photo";
@@ -381,6 +382,16 @@ export default function ContainerDetailPage() {
         initialDescription={container.description ?? ""}
         initialCoverPhotoPath={container.coverPhotoPath}
         initialCoverPhotoEmoji={container.coverPhotoEmoji ?? "📦"}
+        // Suggests a name from what's actually inside this container right
+        // now (directItems, already computed above for the list below).
+        // Only passed at all when there's something to suggest from —
+        // EntityFormSheet's own affordance is conditional on this prop
+        // being present, and its handler already shows a generic error
+        // toast on any throw, so this stays a plain pass-through rather
+        // than duplicating that handling here.
+        onSuggestName={
+          directItems.length > 0 ? () => containerNamingProvider.suggestContainerName(directItems.map((it) => it.name)) : undefined
+        }
         onSubmit={async ({ name, description, photoFile }) => {
           updateContainer(container.id, { name, description });
           if (photoFile) {

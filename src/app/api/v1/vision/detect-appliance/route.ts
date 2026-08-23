@@ -1,18 +1,6 @@
 import { NextResponse } from "next/server";
-import { APICallError, RetryError } from "ai";
 import { detectApplianceLabel } from "@/lib/vision/detect";
-
-/** Unwraps a (possibly retry-wrapped) AI SDK error down to a real HTTP status code from the provider, if there is one. Duplicated from /api/v1/vision/detect/route.ts rather than shared — small enough, and keeps this route independently deletable/movable if appliance detection ever needs different handling. */
-function upstreamStatusCode(error: unknown): number | undefined {
-  if (APICallError.isInstance(error)) return error.statusCode;
-  if (RetryError.isInstance(error)) {
-    for (const inner of error.errors) {
-      const code = upstreamStatusCode(inner);
-      if (code !== undefined) return code;
-    }
-  }
-  return undefined;
-}
+import { upstreamStatusCode } from "@/lib/upstream-error";
 
 export const runtime = "nodejs";
 

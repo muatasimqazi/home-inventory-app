@@ -474,3 +474,68 @@ export class HttpCategorizationProvider implements CategorizationProvider {
 // lib/finance/categorize.ts). Every call site depends only on the
 // CategorizationProvider interface.
 export const categorizationProvider: CategorizationProvider = new HttpCategorizationProvider();
+
+// ---------------------------------------------------------------------------
+// AI container-name suggestion — "AI should suggest a name for a container
+// when editing it." A pure text task (a container's current item names in,
+// a short suggested label out), same sibling-provider pattern as
+// CategorizationProvider above rather than folding it into VisionProvider
+// (no photo involved). Assisted, not automatic, same as every other AI
+// surface in this app: the suggestion fills the Name field for the user to
+// accept or edit, it never saves on its own.
+// ---------------------------------------------------------------------------
+
+export interface ContainerNamingProvider {
+  /** Suggests a short label for a container based on the names of items currently in it. Throws VisionDetectionError on failure (reused for its shape, same as every other Http*Provider in this file). */
+  suggestContainerName(itemNames: string[]): Promise<string>;
+}
+
+const MOCK_CONTAINER_NAMES = ["Storage Bin", "Miscellaneous Items", "Household Supplies"];
+
+export class MockContainerNamingProvider implements ContainerNamingProvider {
+  async suggestContainerName(itemNames: string[]): Promise<string> {
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    // Light keyword pass so mock mode still feels sensible in a demo, same
+    // reasoning as MockCategorizationProvider's own keyword pass — real
+    // suggestion happens server-side in lib/inventory/suggest-container-name.ts
+    // via a real model call.
+    const text = itemNames.join(" ").toLowerCase();
+    if (/tool|drill|wrench|hammer|screwdriver/.test(text)) return "Hand Tools";
+    if (/shirt|jacket|sweater|coat|glove|sock/.test(text)) return "Clothing";
+    if (/ornament|light|wreath|garland|tinsel/.test(text)) return "Holiday Decorations";
+    if (/pen|paper|stapler|folder|notebook/.test(text)) return "Office Supplies";
+    return MOCK_CONTAINER_NAMES[itemNames.length % MOCK_CONTAINER_NAMES.length];
+  }
+}
+
+/**
+ * Real, active provider — calls /api/v1/inventory/suggest-container-name
+ * over fetch, never touches a model provider directly (that lives
+ * server-side in lib/inventory/suggest-container-name.ts, routed through
+ * Vercel AI Gateway same as every other Http*Provider here).
+ */
+export class HttpContainerNamingProvider implements ContainerNamingProvider {
+  async suggestContainerName(itemNames: string[]): Promise<string> {
+    let res: Response;
+    try {
+      res = await fetch("/api/v1/inventory/suggest-container-name", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemNames }),
+      });
+    } catch {
+      throw new VisionDetectionError("Couldn't reach the server. Check your connection and try again.", true);
+    }
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new VisionDetectionError(body?.error ?? `Container-name suggestion failed (${res.status}).`, body?.retryable ?? true);
+    }
+    const { suggestedName } = (await res.json()) as { suggestedName: string };
+    return suggestedName;
+  }
+}
+
+// Real suggestion is live, routed through Vercel AI Gateway (see
+// lib/inventory/suggest-container-name.ts). Every call site depends only on
+// the ContainerNamingProvider interface.
+export const containerNamingProvider: ContainerNamingProvider = new HttpContainerNamingProvider();

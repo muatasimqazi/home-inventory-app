@@ -1,11 +1,13 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { toast } from "sonner";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { PhotoThumb } from "@/components/photo-thumb";
+import { Icon } from "@/components/icon";
 
 interface EntityFormSheetProps {
   open: boolean;
@@ -21,6 +23,16 @@ interface EntityFormSheetProps {
   onSubmit: (values: { name: string; description: string; photoFile?: File | null }) => void;
   /** Optional tap-to-fill name suggestions (e.g. Location's UP reference list) shown as pill chips under the Name field. Omit to show none — Container creation and every "edit" use of this sheet don't pass it. */
   nameSuggestions?: string[];
+  /**
+   * When provided, shows a small "AI suggest" affordance next to the Name
+   * label — tapping it calls this, and fills the Name field with whatever
+   * it resolves to (never auto-saves; the user still has to tap Save, same
+   * as picking a nameSuggestions chip). Return null when there's nothing
+   * to suggest from (e.g. an empty container) rather than calling this at
+   * all — the caller decides whether the affordance should even show, via
+   * whether it passes this prop.
+   */
+  onSuggestName?: () => Promise<string | null>;
 }
 
 /** Shared Create/Edit sheet for Location and Container — name + optional description + optional cover photo. */
@@ -35,6 +47,7 @@ export function EntityFormSheet({
   initialCoverPhotoEmoji = "📦",
   onSubmit,
   nameSuggestions,
+  onSuggestName,
 }: EntityFormSheetProps) {
   // Lazy-seeded from initial* props, not reseeded via an effect — this only
   // stays correct because every caller mounts this component behind a
@@ -49,6 +62,25 @@ export function EntityFormSheet({
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const [suggesting, setSuggesting] = useState(false);
+
+  async function handleSuggestName() {
+    if (!onSuggestName || suggesting) return;
+    setSuggesting(true);
+    try {
+      const suggestion = await onSuggestName();
+      if (suggestion) {
+        setName(suggestion);
+        if (error) setError(null);
+      } else {
+        toast("Nothing to suggest a name from yet.");
+      }
+    } catch {
+      toast.error("Couldn't suggest a name. Please try again.");
+    } finally {
+      setSuggesting(false);
+    }
+  }
 
   function handlePhotoChosen(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -103,7 +135,20 @@ export function EntityFormSheet({
             )}
           </div>
           <div>
-            <label className="mb-1 block text-caption text-muted-foreground">Name</label>
+            <div className="mb-1 flex items-center justify-between">
+              <label className="text-caption text-muted-foreground">Name</label>
+              {onSuggestName && (
+                <button
+                  type="button"
+                  onClick={handleSuggestName}
+                  disabled={suggesting}
+                  className="flex items-center gap-1 text-caption font-medium text-yellow-text disabled:opacity-60"
+                >
+                  {suggesting ? <Icon name="spinner" size={12} className="animate-spin" /> : <Icon name="ai" size={12} />}
+                  {suggesting ? "Thinking…" : "AI suggest"}
+                </button>
+              )}
+            </div>
             <Input
               value={name}
               onChange={(e) => {

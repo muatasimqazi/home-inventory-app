@@ -1,19 +1,7 @@
 import { NextResponse } from "next/server";
-import { APICallError, RetryError } from "ai";
 import { extractReceipts } from "@/lib/vision/extract-receipts";
 import type { ReceiptExtraction } from "@/lib/ai";
-
-/** Unwraps a (possibly retry-wrapped) AI SDK error down to a real HTTP status code from the provider, if there is one. Duplicated from /api/v1/vision/detect/route.ts rather than shared — two call sites, small function, not worth an indirection yet. */
-function upstreamStatusCode(error: unknown): number | undefined {
-  if (APICallError.isInstance(error)) return error.statusCode;
-  if (RetryError.isInstance(error)) {
-    for (const inner of error.errors) {
-      const code = upstreamStatusCode(inner);
-      if (code !== undefined) return code;
-    }
-  }
-  return undefined;
-}
+import { upstreamStatusCode } from "@/lib/upstream-error";
 
 export const runtime = "nodejs";
 
