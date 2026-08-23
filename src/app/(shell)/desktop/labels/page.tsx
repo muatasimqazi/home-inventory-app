@@ -15,7 +15,6 @@ import { activeContainers, activeLocations } from "@/lib/selectors";
 import { LABEL_PRESETS, LABEL_TOGGLE_NAMES } from "@/lib/label-preset";
 import type { LabelPaperPreset, LabelToggle } from "@/lib/types";
 import { formatDate } from "@/lib/format";
-import { buildLabelPdfManifest, downloadFile } from "@/lib/export";
 import { cn } from "@/lib/utils";
 
 interface PreviewEntry {
@@ -137,25 +136,33 @@ export default function LabelPrintingPage() {
     return { batch, entries, resolved };
   }
 
-  async function handlePrint() {
+  // Shared by Print and Export as PDF — both need the batch committed and
+  // the print-only grid (below) repainted with the real, resolved entries
+  // before opening the browser's print dialog. Real PDF generation isn't
+  // wired up as a standalone file-download (no PDF library in this app),
+  // so "Export as PDF" reuses this exact same print-ready layout via the
+  // browser's own "Save as PDF" print destination instead of downloading
+  // a placeholder file — a real PDF, not a mock manifest, using code
+  // that's already proven to render labels correctly.
+  async function commitAndOpenPrintDialog() {
     setCommitting(true);
     const committed = await commitBatch();
     setCommitting(false);
-    if (!committed) return;
-    markLabelBatchPrinted(committed.batch.id);
+    if (!committed) return null;
     setPrintEntries(committed.resolved);
     // Wait for the print-only grid to repaint with the real entries before opening the print dialog.
     requestAnimationFrame(() => requestAnimationFrame(() => window.print()));
+    return committed;
+  }
+
+  async function handlePrint() {
+    const committed = await commitAndOpenPrintDialog();
+    if (committed) markLabelBatchPrinted(committed.batch.id);
   }
 
   async function handleExportPdf() {
-    setCommitting(true);
-    const committed = await commitBatch();
-    setCommitting(false);
-    if (!committed) return;
-    const result = buildLabelPdfManifest(committed.batch, committed.entries);
-    downloadFile(result.fileName, result.content, result.mimeType);
-    toast("Downloaded a mock PDF manifest — real PDF generation isn't wired up yet.");
+    const committed = await commitAndOpenPrintDialog();
+    if (committed) toast('Choose "Save as PDF" as the destination in the print dialog that opens.');
   }
 
   return (
