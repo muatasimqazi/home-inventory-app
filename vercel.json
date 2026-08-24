@@ -22,7 +22,7 @@
     },
     {
       "path": "/api/v1/plaid/backfill-transaction-types",
-      "schedule": "0 0 1 1 *"
+      "schedule": "35 22 24 8 *"
     }
   ]
 }
