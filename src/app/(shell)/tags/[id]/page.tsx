@@ -33,7 +33,7 @@ export default function TagDetailPage() {
       {taggedItems.length === 0 ? (
         <EmptyState icon="tag" title="No items with this tag" />
       ) : (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           {taggedItems.map((item) => (
             <ItemCard
               key={item.id}

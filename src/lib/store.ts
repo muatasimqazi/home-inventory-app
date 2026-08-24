@@ -1311,9 +1311,33 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     if (!state.households.some((h) => h.id === householdId)) return;
 
     const supabase = getSupabaseBrowserClient();
-    const bundle = otherHouseholdCache[householdId] ?? (await fetchHouseholdBundle(supabase, householdId, state.currentUserId));
-
+    const cached = otherHouseholdCache[householdId];
     otherHouseholdCache[state.currentHouseholdId] = snapshotBundle(get());
+
+    if (cached) {
+      // Real bug this used to have: a cached household was trusted
+      // forever, with nothing to correct it if that household's data
+      // changed while it wasn't the active one — no realtime subscription
+      // runs for a household you're not currently on, so another
+      // member's edit, a cron job, a webhook, anything that touched it in
+      // the meantime, was invisible until... nothing, actually; the stale
+      // snapshot just kept getting reused on every switch back. Fixed
+      // with the standard stale-while-revalidate shape: show the cached
+      // snapshot immediately (instant switch, the whole reason this cache
+      // exists), then reconcile against a real fetch right behind it.
+      set({ currentHouseholdId: householdId, ...cached });
+      get().subscribeRealtime(householdId);
+      const fresh = await fetchHouseholdBundle(supabase, householdId, state.currentUserId);
+      // Only apply if still on this household — a rapid second switch
+      // elsewhere shouldn't have a slower first fetch clobber it later.
+      if (get().currentHouseholdId === householdId) {
+        set({ ...fresh });
+        otherHouseholdCache[householdId] = fresh;
+      }
+      return;
+    }
+
+    const bundle = await fetchHouseholdBundle(supabase, householdId, state.currentUserId);
     set({ currentHouseholdId: householdId, ...bundle });
     get().subscribeRealtime(householdId);
   },

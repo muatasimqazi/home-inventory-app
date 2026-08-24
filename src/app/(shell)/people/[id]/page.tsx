@@ -82,7 +82,7 @@ export default function PersonProfilePage() {
           description={isMe ? "Items you own show up here once you set \"Belongs to\" on them." : `${person.displayName} hasn't shared any items with the household.`}
         />
       ) : (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           {personItems.map((item) => (
             <ItemCard
               key={item.id}

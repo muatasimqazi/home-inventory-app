@@ -8,18 +8,22 @@ import { useInventoryStore } from "@/lib/store";
 import { buildBreadcrumb, breadcrumbLabel } from "@/lib/selectors";
 
 /**
- * Items with no Container — either sitting directly in a Location (the
- * Dashboard "Loose" count) or, previously, with no Location either (a
- * dead end nothing linked to, since capture/manual-add both fell back
- * silently to nowhere). This is the one place both are actually visible
- * and actionable — tap through to move any of them.
+ * Items with neither a Location nor a Container — genuinely unfiled,
+ * nowhere in the house at all (a dead end nothing linked to, since
+ * capture/manual-add both fell back silently to nowhere before this
+ * page existed to catch them). Used to also include anything sitting
+ * directly in a Location with no specific Container — dropped: an
+ * appliance (nothing sensible to put a fridge "inside") or any bulky
+ * item someone deliberately just assigns a room to was permanently
+ * unfixable under that definition, since there was nothing to move it
+ * into. Having a Location is enough to be findable.
  */
 export default function UnassignedItemsPage() {
   const items = useInventoryStore((s) => s.items);
   const locations = useInventoryStore((s) => s.locations);
   const containers = useInventoryStore((s) => s.containers);
 
-  const looseItems = items.filter((it) => it.status === "active" && it.containerId === null);
+  const looseItems = items.filter((it) => it.status === "active" && it.locationId === null && it.containerId === null);
 
   return (
     <div className="flex flex-col gap-4">
@@ -29,12 +33,12 @@ export default function UnassignedItemsPage() {
         </Link>
         <div>
           <h1 className="text-screen-title font-medium text-ink">Unassigned items</h1>
-          <p className="text-caption text-muted-foreground">Not yet placed in a Container.</p>
+          <p className="text-caption text-muted-foreground">Not yet placed anywhere in the house.</p>
         </div>
       </div>
 
       {looseItems.length === 0 ? (
-        <EmptyState icon="box" title="Nothing unassigned" description="Every active item is filed into a Container." />
+        <EmptyState icon="box" title="Nothing unassigned" description="Every active item has at least a Location." />
       ) : (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           {looseItems.map((item) => (

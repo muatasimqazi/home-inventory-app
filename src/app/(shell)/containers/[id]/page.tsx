@@ -312,7 +312,7 @@ export default function ContainerDetailPage() {
                 </Button>
               </div>
               {view === "grid" ? (
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                   {paginatedDirectItems.map((item) => (
                     <ItemCard
                       key={item.id}

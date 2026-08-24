@@ -211,9 +211,21 @@ export function computeHouseholdSummary(items: Item[], locations: Location[]): H
   };
 }
 
-/** Active items with no Container — sitting directly in a Location, or (should be rare, but nothing used to catch it) with no Location either. The Dashboard "Action queue" Loose count; links to /unassigned, which lists the same set. */
+/**
+ * Active items with neither a Location nor a Container — genuinely
+ * unfiled, nowhere in the house at all. Used to require only "no
+ * Container," which meant anything filed directly under a Location with
+ * no specific bin (an appliance — nothing sensible to put a fridge
+ * "inside" — or any bulky item someone deliberately just assigns a room
+ * to) counted as needing attention forever, with no fix available: there
+ * was nothing to move it into. Having a Location is enough to be
+ * findable; requiring a Container on top of that isn't a real gap, it's
+ * a stricter organizational choice some items don't need. The Dashboard
+ * Needs Attention "Loose" count; links to /unassigned, which lists the
+ * same set.
+ */
 export function looseItemCount(items: Item[]): number {
-  return items.filter((it) => it.status === "active" && it.containerId === null).length;
+  return items.filter((it) => it.status === "active" && it.locationId === null && it.containerId === null).length;
 }
 
 /** Active items still on the generic placeholder photo emoji — the Dashboard "Action queue" Photos count. */
