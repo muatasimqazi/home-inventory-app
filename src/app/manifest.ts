@@ -6,10 +6,10 @@ import type { MetadataRoute } from "next";
 // extra wiring needed.
 //
 // Icons are the real bundle (public/icons/, plus src/app/icon.svg and
-// apple-icon.png as Next's auto-detected file-convention icons — see
-// app-icons.md) — a house-with-magnifying-glass mark on teal (#0f6b68),
-// not the placeholder box-icon-on-taupe one this file shipped with
-// originally. Deliberately NOT adopting the bundle's own manifest.webmanifest
+// apple-icon.png as Next's auto-detected file-convention icons) — a
+// house-with-roofline-and-inventory-grid mark on teal (#316A68), not the
+// placeholder box-icon-on-taupe one this file shipped with originally.
+// Deliberately NOT adopting the bundle's own manifest.webmanifest
 // wholesale, though — it was exported for a generically-named "Home
 // Inventory" placeholder (different name/description, teal
 // background_color/theme_color) rather than this app's actual identity, so
@@ -33,9 +33,10 @@ export default function manifest(): MetadataRoute.Manifest {
     background_color: "#ffffff",
     theme_color: "#1a1d29",
     icons: [
-      { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
-      { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
-      { src: "/icons/icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+      { src: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: "/icons/icon-512x512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+      { src: "/icons/maskable-icon-192x192.png", sizes: "192x192", type: "image/png", purpose: "maskable" },
+      { src: "/icons/maskable-icon-512x512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
   };
 }
