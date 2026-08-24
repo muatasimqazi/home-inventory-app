@@ -158,3 +158,11 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ apply, totalCandidates, totalChanged, items: perItem });
 }
+
+// Not a real recurring cron (see the file-level comment) — this alias only
+// exists so `vercel crons run` can trigger it on demand, the one
+// mechanism that reaches CRON_SECRET (a Sensitive env var, unreadable
+// outside Vercel's own runtime — see the file-level comment) without
+// ever needing to know its value. GET, not POST, since that's what
+// `vercel crons run` / Vercel's own scheduler sends, same as sync-all.
+export const GET = POST;
