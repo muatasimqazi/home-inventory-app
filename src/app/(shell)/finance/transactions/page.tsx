@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation";
 import { Icon } from "@/components/icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchBar } from "@/components/search-bar";
 import { EmptyState } from "@/components/empty-state";
 import { TransactionFormSheet } from "@/components/transaction-form-sheet";
@@ -28,7 +29,7 @@ import { createAndLinkRefundTransaction } from "@/lib/receipt-refunds";
 import { decideCategoryRuleLearnAction } from "@/lib/receipt-resolution";
 import { useInventoryStore } from "@/lib/store";
 import { displayCodeBadgeClasses } from "@/lib/badge-color";
-import { categoriesForTransaction } from "@/lib/selectors";
+import { categoriesForTransaction, sortByLabel } from "@/lib/selectors";
 import { formatCurrency, parseCalendarDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useRemountKey } from "@/hooks/use-remount-key";
@@ -115,6 +116,9 @@ export default function TransactionsListPage() {
   const [customFrom, setCustomFrom] = useState(() => searchParams.get("from") ?? "");
   const [customTo, setCustomTo] = useState(() => searchParams.get("to") ?? "");
   const [uncategorizedOnly, setUncategorizedOnly] = useState(() => searchParams.get("uncategorized") === "1");
+  // "all" (not "" — Radix Select's SelectItem can't take an empty-string
+  // value) means no category filter.
+  const [categoryFilterId, setCategoryFilterId] = useState(() => searchParams.get("category") ?? "all");
   // Deep-link from Account Detail's "Add transaction" (?open=new&accountId=...)
   // — starts the create sheet already open, pre-filled with that account,
   // rather than landing on a list and requiring a second click to find
@@ -348,6 +352,18 @@ export default function TransactionsListPage() {
   }
 
   const active = transactions.filter((t) => !t.trashedAt);
+  // Active only, alphabetical — same shape every other category dropdown
+  // in this app uses (e.g. AccountFormSheet, RecurringBillFormSheet), so
+  // an archived category can't be picked as a filter (nothing on screen
+  // would ever match it if it were active-only-hidden anyway, since
+  // finance-categories.tsx's "archive" flow only stops it from being
+  // newly assigned, not from staying on already-categorized transactions
+  // — but filtering by a category you can no longer see in that other
+  // dropdown either would be a confusing exception to carve out here).
+  const activeFinanceCategories = sortByLabel(
+    financeCategories.filter((c) => c.status === "active"),
+    (c) => c.name
+  );
   const now = new Date();
   const fromTime = dateScope === "custom" && customFrom ? new Date(`${customFrom}T00:00:00`).getTime() : null;
   const toTime = dateScope === "custom" && customTo ? new Date(`${customTo}T23:59:59`).getTime() : null;
@@ -368,6 +384,17 @@ export default function TransactionsListPage() {
 
     if (uncategorizedOnly && (t.categoryId || (t.type !== "expense" && t.type !== "income" && t.type !== "refund"))) return false;
 
+    // categoriesForTransaction, not a bare t.categoryId === categoryFilterId
+    // check — same reasoning as uncategorizedForSuggestion below: a
+    // transaction's tag-style categories (transactionCategoryLinks) are
+    // what the row's own badges actually display, and can exist without a
+    // primary categoryId set at all.
+    if (
+      categoryFilterId !== "all" &&
+      !categoriesForTransaction(t, categoryIdsByTransaction[t.id] ?? [], financeCategories).some((c) => c.id === categoryFilterId)
+    )
+      return false;
+
     if (trimmedQuery) {
       const merchantMatch = t.merchant?.toLowerCase().includes(trimmedQuery) || t.description?.toLowerCase().includes(trimmedQuery);
       const itemMatch = (lineItemsByTransaction[t.id] ?? []).some(
@@ -385,13 +412,13 @@ export default function TransactionsListPage() {
   const sorted = [...filtered].sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
   // "Load more" over the fully-loaded, already-filtered+sorted list — the
   // reset key covers every filter dimension above (date scope/custom
-  // range/search/uncategorized-only) so changing any of them jumps back to
-  // the first page, but stays stable across a Realtime-driven update to
-  // `transactions` itself, so a scrolled-down user's progress survives a
-  // live edit elsewhere.
+  // range/search/uncategorized-only/category) so changing any of them jumps
+  // back to the first page, but stays stable across a Realtime-driven
+  // update to `transactions` itself, so a scrolled-down user's progress
+  // survives a live edit elsewhere.
   const { visible: paginatedTransactions, hasMore, remaining, pageSize, loadMore } = usePaginated(
     sorted,
-    `${dateScope}:${customFrom}:${customTo}:${trimmedQuery}:${uncategorizedOnly}`
+    `${dateScope}:${customFrom}:${customTo}:${trimmedQuery}:${uncategorizedOnly}:${categoryFilterId}`
   );
   const groups = groupByDay(paginatedTransactions);
   const detailTxn = transactions.find((t) => t.id === detailId) ?? null;
@@ -580,6 +607,32 @@ export default function TransactionsListPage() {
             <FilterChip key={value} label={label} active={dateScope === value} onClick={() => setDateScope(value)} />
           ))}
           <FilterChip label="Uncategorized" active={uncategorizedOnly} onClick={() => setUncategorizedOnly((v) => !v)} />
+          {activeFinanceCategories.length > 0 && (
+            <Select value={categoryFilterId} onValueChange={setCategoryFilterId}>
+              <SelectTrigger
+                className={cn(
+                  "h-auto shrink-0 gap-1 rounded-full border px-3 py-1.5 text-caption font-medium",
+                  categoryFilterId !== "all" ? "border-ink bg-ink text-white [&_svg]:text-white" : "border-border bg-white text-ink"
+                )}
+              >
+                {/* Children override, not the `placeholder` prop — "all" is
+                    a real matching SelectItem (Radix Select can't take an
+                    empty-string item value), so the placeholder would never
+                    show; this keeps the at-rest label as short as the
+                    other chips ("All", "This month") instead of falling
+                    back to the full "All categories" item text. */}
+                <SelectValue>{categoryFilterId === "all" ? "Category" : activeFinanceCategories.find((c) => c.id === categoryFilterId)?.name}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All categories</SelectItem>
+                {activeFinanceCategories.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
         {/* Select-all convention mirrors Trash's InventoryTrashPanel — scoped to
             the currently filtered+sorted list, not the whole account. Also
@@ -674,7 +727,11 @@ export default function TransactionsListPage() {
         <EmptyState
           icon="receipt"
           title="No transactions"
-          description={trimmedQuery || dateScope !== "all" || uncategorizedOnly ? "Nothing matches these filters yet." : "Nothing here yet."}
+          description={
+            trimmedQuery || dateScope !== "all" || uncategorizedOnly || categoryFilterId !== "all"
+              ? "Nothing matches these filters yet."
+              : "Nothing here yet."
+          }
         />
       ) : (
         <div className="flex flex-col gap-4">
