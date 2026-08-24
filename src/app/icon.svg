@@ -1,8 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
   <title id="title">Shohaz app icon</title>
   <desc id="desc">A teal rounded-square home mark with a yellow roofline and one highlighted yellow inventory box.</desc>
-  <rect width="1024" height="1024" fill="#FFFFFF"/>
-  <rect x="74" y="28" width="876" height="940" rx="210" fill="#316A68"/>
+  <!-- Full-bleed to the canvas edge, not inset on a white backdrop like the
+       original draft — most "any"-purpose consumers (installed PWA/home-
+       screen icon on Android, desktop, some browsers) show this PNG as-is
+       with no cropping of their own, so a white margin around a smaller
+       shape here doesn't get cropped away — it just shows through as a
+       visible white border around the icon. rx keeps the same baked-in
+       rounding for platforms that don't mask it themselves, sized to the
+       full 1024 canvas instead of the old 876-wide inset rect. -->
+  <rect width="1024" height="1024" rx="224" fill="#316A68"/>
   <path
     d="M246 476 L512 244 L778 476"
     fill="none"
