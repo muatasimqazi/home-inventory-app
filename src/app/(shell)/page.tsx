@@ -27,7 +27,6 @@ import {
   groupAccountsByType,
   looseItemCount,
   netWorth,
-  recentTransactions,
   unreadActivityCount,
   upcomingRecurringBills,
 } from "@/lib/selectors";
@@ -42,6 +41,12 @@ const BILLS_DUE_SOON_DAYS = 7;
 // would only grow and eventually push the rest of the page below the
 // fold. "View all" (next to the heading) is the actual full list.
 const TAGS_PREVIEW_LIMIT = 8;
+// Same "at a glance, not the whole list" reasoning — this grid was
+// previously unbounded (every active location, however many), unlike
+// every other preview list on this page (recentContainers above, tags
+// below) which already caps itself. A household with a couple dozen
+// locations turned this into the single longest thing on the page.
+const LOCATIONS_PREVIEW_LIMIT = 6;
 
 /**
  * The former Home page was an inventory-only dashboard living at "/" —
@@ -96,9 +101,22 @@ export default function OverviewPage() {
   const worth = netWorth(scopedAccounts);
   const thisMonth = cashFlowForMonth(scopedTransactions, new Date());
   const accountGroups = groupAccountsByType(scopedAccounts);
-  const recentTxns = recentTransactions(scopedTransactions, 4);
   const upcomingBills = upcomingRecurringBills(scopedBills, 3);
   const billsDueSoonCount = upcomingRecurringBills(scopedBills).filter((b) => daysUntil(b.nextDueDate) <= BILLS_DUE_SOON_DAYS).length;
+
+  // The one "what needs doing" list on the page (see the banner below) —
+  // only chips with something to actually act on, so a clean household
+  // sees one calm line instead of a row of chips all reading "0".
+  const needsAttentionChips: { label: string; count: number; tone: "purple" | "green" | "orange"; href?: string }[] = [
+    ...(household.inventoryEnabled
+      ? [
+          { label: "Review", count: summary.needsReviewCount, tone: "purple" as const, href: "/review" },
+          { label: "Photos", count: genericPhotos, tone: "green" as const },
+          { label: "Loose", count: loose, tone: "orange" as const, href: "/unassigned" },
+        ]
+      : []),
+    ...(household.financeEnabled ? [{ label: "Bills", count: billsDueSoonCount, tone: "orange" as const, href: "/finance/recurring" }] : []),
+  ].filter((chip) => chip.count > 0);
 
   return (
     <div className="flex flex-col gap-6">
@@ -125,30 +143,12 @@ export default function OverviewPage() {
 
       <SearchBar value="" onChange={() => {}} onFocus={() => router.push("/search")} className="md:hidden" />
 
-      <div className="flex gap-0.5 rounded-lg bg-surface-muted p-0.75 md:w-80">
-        <button
-          type="button"
-          onClick={() => setView("mine")}
-          className={cn(
-            "flex-1 rounded-md py-2 text-caption font-semibold transition-colors",
-            view === "mine" ? "bg-white text-yellow shadow-sm" : "text-muted-foreground"
-          )}
-        >
-          My Dashboard
-        </button>
-        <button
-          type="button"
-          onClick={() => setView("household")}
-          className={cn(
-            "flex-1 rounded-md py-2 text-caption font-semibold transition-colors",
-            view === "household" ? "bg-white text-yellow shadow-sm" : "text-muted-foreground"
-          )}
-        >
-          Household
-        </button>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      {/* Read-only numbers only — "what needs doing" lives in its own
+          banner below, not mixed into this row. Every card here is the
+          same shape (a label + one headline value) on purpose: a stat row
+          where one cell wraps a list of chips and the rest don't reads as
+          broken rhythm, not variety. */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         {household.inventoryEnabled && (
           <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
             <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">Inventory</p>
@@ -184,20 +184,32 @@ export default function OverviewPage() {
             </div>
           </>
         )}
+      </div>
 
-        <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
-          <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">Needs Attention</p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {household.inventoryEnabled && (
-              <>
-                <ActionChip label="Review" count={summary.needsReviewCount} tone="purple" href="/review" />
-                <ActionChip label="Photos" count={genericPhotos} tone="green" />
-              </>
-            )}
-            {household.financeEnabled && <ActionChip label="Bills" count={billsDueSoonCount} tone="orange" href="/finance/recurring" />}
+      {/* The one, consolidated "what needs doing" surface — used to be
+          shown twice (a "Needs Attention" stat tile up here, and an
+          almost-identical "Action queue" card repeated a few hundred
+          pixels later in Home Inventory) with no two of the three chips
+          ever quite matching between them. Zero-state collapses to a
+          single calm line instead of three chips all reading "0" — that's
+          not information worth making someone parse. */}
+      {needsAttentionChips.length > 0 ? (
+        <div className="flex items-center justify-between gap-3 rounded-2xl border border-badge-orange-border bg-badge-orange-bg/40 p-4 shadow-sm">
+          <div className="min-w-0">
+            <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">Needs attention</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {needsAttentionChips.map((chip) => (
+                <ActionChip key={chip.label} {...chip} />
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="flex items-center gap-2 rounded-2xl border border-border bg-white px-4 py-3 shadow-sm">
+          <Icon name="check" size={16} className="shrink-0 text-badge-green-text" />
+          <p className="text-caption text-muted-foreground">All caught up — nothing needs attention right now.</p>
+        </div>
+      )}
 
       {household.inventoryEnabled && (
       <section aria-label="Home Inventory" className="flex flex-col gap-3">
@@ -206,27 +218,6 @@ export default function OverviewPage() {
           <Link href="/desktop" className="text-caption font-semibold text-ink">
             Open full dashboard
           </Link>
-        </div>
-
-        <div className="flex flex-col gap-3 rounded-2xl border border-border bg-white p-4 shadow-sm">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">Next up</p>
-              <p className="mt-1 text-item-title font-semibold text-ink">Action queue</p>
-              <p className="mt-1 text-caption text-muted-foreground">Quick checks that keep the inventory accurate.</p>
-            </div>
-            <Link
-              href="/review"
-              className="tap-target flex h-11 shrink-0 items-center justify-center rounded-md bg-yellow px-5 text-caption font-semibold text-white"
-            >
-              Open
-            </Link>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <ActionChip label="Review" count={summary.needsReviewCount} tone="purple" />
-            <ActionChip label="Photos" count={genericPhotos} tone="green" />
-            <ActionChip label="Loose" count={loose} tone="orange" href="/unassigned" />
-          </div>
         </div>
 
         {locations.length > 0 && (
@@ -238,7 +229,7 @@ export default function OverviewPage() {
               </Link>
             </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {locations.map((loc) => {
+              {locations.slice(0, LOCATIONS_PREVIEW_LIMIT).map((loc) => {
                 const count = summary.itemCountByLocation[loc.id] ?? 0;
                 return (
                   <Link
@@ -354,6 +345,34 @@ export default function OverviewPage() {
           </Link>
         </div>
 
+        {/* Lives here now, not up top — it only ever affected the numbers
+            in this section (Inventory has no per-record privacy model to
+            toggle), so showing it above content it doesn't touch was the
+            actual bug: someone could switch it expecting the Inventory
+            stat to move too, and nothing would happen. */}
+        <div className="flex gap-0.5 self-start rounded-lg bg-surface-muted p-0.75">
+          <button
+            type="button"
+            onClick={() => setView("mine")}
+            className={cn(
+              "rounded-md px-4 py-1.5 text-caption font-semibold transition-colors",
+              view === "mine" ? "bg-white text-yellow shadow-sm" : "text-muted-foreground"
+            )}
+          >
+            My Dashboard
+          </button>
+          <button
+            type="button"
+            onClick={() => setView("household")}
+            className={cn(
+              "rounded-md px-4 py-1.5 text-caption font-semibold transition-colors",
+              view === "household" ? "bg-white text-yellow shadow-sm" : "text-muted-foreground"
+            )}
+          >
+            Household
+          </button>
+        </div>
+
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_320px]">
           <div>
             <div className="mb-2 flex items-center justify-between">
@@ -417,32 +436,6 @@ export default function OverviewPage() {
               </div>
             )}
           </div>
-        </div>
-
-        <div>
-          <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-item-title font-semibold text-ink">Recent transactions</h3>
-            <Link href="/finance/transactions" className="text-caption font-medium text-yellow-text">
-              View all
-            </Link>
-          </div>
-          {recentTxns.length === 0 ? (
-            <p className="rounded-2xl border border-dashed border-border bg-white p-4 text-center text-caption text-muted-foreground">No transactions yet.</p>
-          ) : (
-            <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
-              {recentTxns.map((t) => (
-                <Link key={t.id} href={`/finance/transactions?transactionId=${t.id}`} className="flex items-center gap-3 px-4 py-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-body font-medium text-ink">{t.merchant ?? t.description ?? "Transaction"}</p>
-                    <p className="truncate text-caption text-muted-foreground">{formatShortDate(t.occurredAt)}</p>
-                  </div>
-                  <span className={cn("shrink-0 text-body font-semibold", t.amount < 0 ? "text-money-negative-text" : "text-badge-green-text")}>
-                    {formatCurrency(t.amount, { showPositiveSign: true })}
-                  </span>
-                </Link>
-              ))}
-            </div>
-          )}
         </div>
       </section>
       )}
