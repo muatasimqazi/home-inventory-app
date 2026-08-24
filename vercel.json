@@ -19,10 +19,6 @@
     {
       "path": "/api/v1/push/send-low-stock-alerts",
       "schedule": "0 14 * * *"
-    },
-    {
-      "path": "/api/v1/plaid/backfill-transaction-types",
-      "schedule": "35 22 24 8 *"
     }
   ]
 }

@@ -30,11 +30,17 @@ import { NextResponse, type NextRequest } from "next/server";
 // /api/v1/push/send-low-stock-alerts is the same shape again — added
 // here up front alongside vercel.json's own cron entry this time, not
 // discovered after the fact.
+// /api/v1/plaid/backfill-transaction-types is the same shape yet again —
+// this one *was* live-discovered the hard way (a real, hour-plus chase
+// through Vercel deployment-protection settings and cron-firing timing
+// before finding the actual cause was this same missing-from-PUBLIC_PATHS
+// bug, not anything Vercel-side).
 const PUBLIC_PATHS = [
   "/sign-in",
   "/auth/callback",
   "/api/v1/webhooks",
   "/api/v1/plaid/sync-all",
+  "/api/v1/plaid/backfill-transaction-types",
   "/api/v1/push/send-due-bills",
   "/api/v1/push/send-capture-nudges",
   "/api/v1/push/send-debt-payments-due-today",
