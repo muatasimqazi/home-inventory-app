@@ -155,8 +155,13 @@ export async function POST(request: Request) {
 
   const totalChanged = perItem.reduce((sum, r) => sum + r.changed, 0);
   const totalCandidates = perItem.reduce((sum, r) => sum + r.candidates, 0);
+  const result = { apply, totalCandidates, totalChanged, items: perItem };
+  // vercel crons run doesn't surface a triggered function's HTTP response
+  // back to the CLI — logging it explicitly is what makes the result
+  // readable afterward via runtime logs.
+  console.log("backfill-transaction-types result:", JSON.stringify(result));
 
-  return NextResponse.json({ apply, totalCandidates, totalChanged, items: perItem });
+  return NextResponse.json(result);
 }
 
 // Not a real recurring cron (see the file-level comment) — this alias only
