@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCaptureSession, type DetectionRow } from "@/lib/capture-session-store";
+import { useKeyboardInset } from "@/hooks/use-keyboard-inset";
 import { useInventoryStore, uploadCoverPhotoFile, type NewItemInput } from "@/lib/store";
 import { stopCameraStream } from "@/lib/camera-stream";
 import { cropToItem, dataUrlToFile } from "@/lib/crop-image";
@@ -37,6 +38,10 @@ function needsCorrection(row: DetectionRow): boolean {
 
 export default function CaptureReviewPage() {
   const router = useRouter();
+  // iOS Safari doesn't shrink the layout viewport when the keyboard opens
+  // (see the hook's own comment) — without this, focusing a field above
+  // pushes this fixed Save bar behind the keyboard. No-op on Chromium.
+  const keyboardInset = useKeyboardInset();
   const photos = useCaptureSession((s) => s.photos);
   const destination = useCaptureSession((s) => s.destination);
   const detections = useCaptureSession((s) => s.detections);
@@ -356,7 +361,7 @@ export default function CaptureReviewPage() {
         )}
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-border bg-white px-4 py-3">
+      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-border bg-white px-4 py-3" style={{ bottom: keyboardInset }}>
         <div className="mx-auto flex max-w-xl flex-col gap-2">
           {missingDestination && (
             <p className="text-center text-caption text-danger">Choose a location above before saving — otherwise these items can&apos;t be found later.</p>

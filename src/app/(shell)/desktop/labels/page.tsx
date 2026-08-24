@@ -278,29 +278,41 @@ export default function LabelPrintingPage() {
           </div>
         </div>
 
-        <div className="flex flex-col gap-4">
-          <div className="rounded-xl bg-white p-4 shadow-sm">
+        <div className="flex min-w-0 flex-col gap-4">
+          <div className="min-w-0 rounded-xl bg-white p-4 shadow-sm">
             <p className="mb-3 text-caption font-medium text-ink">Live preview</p>
             {previewEntries.length === 0 ? (
               <p className="text-caption text-muted-foreground">Select containers or add unassigned labels to preview the sheet.</p>
             ) : (
-              <div
-                className="grid gap-2"
-                style={{ gridTemplateColumns: `repeat(${preset.columns}, ${preset.widthMm}mm)` }}
-              >
-                {previewEntries.map((entry, i) => (
-                  <LabelCard
-                    key={i}
-                    resolveUrl={containerResolveUrl(entry.tagToken)}
-                    displayCode={entry.displayCode}
-                    name={entry.name}
-                    locationName={entry.locationName}
-                    toggle={toggle}
-                    includeLocation={includeLocation}
-                    widthMm={preset.widthMm}
-                    heightMm={preset.heightMm}
-                  />
-                ))}
+              // Labels are sized in real physical mm (large-1up alone is
+              // 190mm ≈ 720px, several presets' full row is wider still) —
+              // deliberately not shrunk to fit, since the whole point of
+              // this preview is showing the actual print size. On a phone
+              // viewport that's routinely wider than the screen, so this
+              // scrolls horizontally within its own card instead of
+              // stretching the grid track (and with it the whole page)
+              // past the viewport — min-w-0 above is what actually lets a
+              // CSS grid item shrink enough for this overflow to apply
+              // locally rather than blowing out the row.
+              <div className="overflow-x-auto">
+                <div
+                  className="grid w-max gap-2"
+                  style={{ gridTemplateColumns: `repeat(${preset.columns}, ${preset.widthMm}mm)` }}
+                >
+                  {previewEntries.map((entry, i) => (
+                    <LabelCard
+                      key={i}
+                      resolveUrl={containerResolveUrl(entry.tagToken)}
+                      displayCode={entry.displayCode}
+                      name={entry.name}
+                      locationName={entry.locationName}
+                      toggle={toggle}
+                      includeLocation={includeLocation}
+                      widthMm={preset.widthMm}
+                      heightMm={preset.heightMm}
+                    />
+                  ))}
+                </div>
               </div>
             )}
           </div>

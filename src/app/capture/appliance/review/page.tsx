@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useApplianceCapture } from "@/lib/appliance-capture-store";
+import { useKeyboardInset } from "@/hooks/use-keyboard-inset";
 import { useInventoryStore, uploadCoverPhotoFile } from "@/lib/store";
 import { stopCameraStream } from "@/lib/camera-stream";
 import { dataUrlToFile } from "@/lib/crop-image";
@@ -37,6 +38,11 @@ import { cn } from "@/lib/utils";
 
 export default function ApplianceReviewPage() {
   const router = useRouter();
+  // iOS Safari doesn't shrink the layout viewport when the keyboard opens
+  // (see the hook's own comment) — without this, focusing one of the
+  // fields above pushes this fixed Save bar behind the keyboard. No-op on
+  // Chromium, which already handles this natively.
+  const keyboardInset = useKeyboardInset();
   const photo = useApplianceCapture((s) => s.photo);
   const detection = useApplianceCapture((s) => s.detection);
   const detecting = useApplianceCapture((s) => s.detecting);
@@ -220,7 +226,7 @@ export default function ApplianceReviewPage() {
         </div>
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-border bg-white px-4 py-3">
+      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-border bg-white px-4 py-3" style={{ bottom: keyboardInset }}>
         <div className="mx-auto flex max-w-xl flex-col gap-2">
           {missingDestination && (
             <p className="text-center text-caption text-danger">Choose a location above before saving — otherwise this can&apos;t be found later.</p>

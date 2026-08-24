@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { AddPersonSheet } from "@/components/add-person-sheet";
 import { DomainToggle } from "@/components/domain-toggle";
 import { useInventoryStore } from "@/lib/store";
+import { useKeyboardInset } from "@/hooks/use-keyboard-inset";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { Person } from "@/lib/types";
 
@@ -49,6 +50,10 @@ function HouseholdSetupInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [mode, setMode] = useState<Mode>(searchParams.get("mode") === "join" ? "join" : "create");
+  // iOS Safari doesn't shrink the layout viewport when the keyboard opens
+  // (see the hook's own comment) — without this, focusing the name/email
+  // field pushes this sticky footer behind the keyboard. No-op on Chromium.
+  const keyboardInset = useKeyboardInset();
 
   const isHydrated = useInventoryStore((s) => s.isHydrated);
   const currentUserEmail = useInventoryStore((s) => s.currentUserEmail);
@@ -431,7 +436,7 @@ function HouseholdSetupInner() {
         )}
       </div>
 
-      <div className="sticky bottom-0 border-t border-border bg-white px-4 py-3">
+      <div className="sticky bottom-0 border-t border-border bg-white px-4 py-3" style={{ bottom: keyboardInset }}>
         <div className="mx-auto flex max-w-lg flex-col gap-2">
           {mode === "join" ? (
             <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={handleJoin} disabled={joining}>

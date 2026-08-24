@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useInventoryStore, uploadCoverPhotoFile } from "@/lib/store";
+import { useKeyboardInset } from "@/hooks/use-keyboard-inset";
 import { buildBreadcrumb, sortByLabel, suggestBetterContainer } from "@/lib/selectors";
 import { SORTED_CATEGORIES } from "@/lib/types";
 import { extraFieldsForCategory, CATEGORY_EMOJI } from "@/lib/category";
@@ -34,6 +35,11 @@ export default function ManualAddItemPage() {
 function ManualAddItemInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  // iOS Safari doesn't shrink the layout viewport when the keyboard opens
+  // (see the hook's own comment) — without this, focusing the Name/Notes
+  // field pushes this sticky Save bar behind the keyboard. No-op on
+  // Chromium.
+  const keyboardInset = useKeyboardInset();
   const locations = useInventoryStore((s) => s.locations);
   const containers = useInventoryStore((s) => s.containers);
   const items = useInventoryStore((s) => s.items);
@@ -471,7 +477,7 @@ function ManualAddItemInner() {
         </Field>
       </div>
 
-      <div className="sticky bottom-0 border-t border-border bg-white px-4 py-3">
+      <div className="sticky bottom-0 border-t border-border bg-white px-4 py-3" style={{ bottom: keyboardInset }}>
         <div className="mx-auto flex max-w-lg gap-2">
           <Button variant="outline" size="lg" className="flex-1" onClick={() => router.back()}>
             Cancel

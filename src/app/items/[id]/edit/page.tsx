@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useInventoryStore } from "@/lib/store";
+import { useKeyboardInset } from "@/hooks/use-keyboard-inset";
 import { sortByLabel } from "@/lib/selectors";
 import { SORTED_CATEGORIES, type Person } from "@/lib/types";
 import { extraFieldsForCategory } from "@/lib/category";
@@ -83,6 +84,10 @@ function EditItemForm({
   onDone: () => void;
 }) {
   const router = useRouter();
+  // iOS Safari doesn't shrink the layout viewport when the keyboard opens
+  // (see the hook's own comment) — without this, focusing any field above
+  // pushes this sticky Save bar behind the keyboard. No-op on Chromium.
+  const keyboardInset = useKeyboardInset();
   const [name, setName] = useState(initial.name);
   const [category, setCategory] = useState(initial.category);
   const [quantity, setQuantity] = useState(String(initial.quantity));
@@ -275,7 +280,7 @@ function EditItemForm({
         </Field>
       </div>
 
-      <div className="sticky bottom-0 border-t border-border bg-white px-4 py-3">
+      <div className="sticky bottom-0 border-t border-border bg-white px-4 py-3" style={{ bottom: keyboardInset }}>
         <div className="mx-auto flex max-w-lg gap-2">
           <Button variant="outline" size="lg" className="flex-1" onClick={() => router.back()}>
             Cancel

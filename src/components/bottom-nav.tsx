@@ -7,6 +7,7 @@ import { Icon, type IconName } from "@/components/icon";
 import { ScanChooserSheet } from "@/components/scan-chooser-sheet";
 import { useInventoryStore } from "@/lib/store";
 import { contextualCaptureHref } from "@/lib/selectors";
+import { useKeyboardInset } from "@/hooks/use-keyboard-inset";
 import { cn } from "@/lib/utils";
 
 // Household Hub Addendum §6's originally-decided shape (Home, Search,
@@ -41,6 +42,11 @@ export function BottomNav() {
   const containers = useInventoryStore((s) => s.containers);
   const scanHref = contextualCaptureHref(pathname, containers);
   const [chooserOpen, setChooserOpen] = useState(false);
+  // iOS Safari doesn't shrink the layout viewport when the keyboard opens
+  // (see the hook's own comment) — without this, e.g. focusing /search's
+  // own input pushes this fixed tab bar behind the keyboard. No-op on
+  // Chromium, which already handles this natively.
+  const keyboardInset = useKeyboardInset();
 
   function renderTab(tab: (typeof LEFT_TABS)[number]) {
     const active = tab.href === "/" ? pathname === "/" : pathname.startsWith(tab.href);
@@ -83,6 +89,7 @@ export function BottomNav() {
         // on each side (2 left, 1 right) — a flat row would put it at the
         // 3rd-of-4 position, off-center.
         className="fixed inset-x-0 bottom-0 z-40 flex min-h-17.5 items-center border-t border-border bg-white px-2 pb-[env(safe-area-inset-bottom)] md:hidden print:hidden"
+        style={{ bottom: keyboardInset }}
       >
         <div className="flex flex-1 items-center justify-around">{LEFT_TABS.map(renderTab)}</div>
 

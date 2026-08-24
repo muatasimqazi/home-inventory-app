@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useInventoryStore } from "@/lib/store";
 import { useReceiptScanSession, type DraftRow } from "@/lib/receipt-scan-session-store";
+import { useKeyboardInset } from "@/hooks/use-keyboard-inset";
 import { formatCurrency, formatShortDate, getLocalTodayIso } from "@/lib/format";
 import { sortByLabel } from "@/lib/selectors";
 import { cn } from "@/lib/utils";
@@ -30,6 +31,10 @@ import { cn } from "@/lib/utils";
 export default function BulkStatementReviewPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  // iOS Safari doesn't shrink the layout viewport when the keyboard opens
+  // (see the hook's own comment) — without this, focusing a field above
+  // pushes this fixed Save bar behind the keyboard. No-op on Chromium.
+  const keyboardInset = useKeyboardInset();
   const batchIdParam = searchParams.get("batchId");
   const batch = useReceiptScanSession((s) => s.batch);
   const drafts = useReceiptScanSession((s) => s.drafts);
@@ -261,7 +266,10 @@ export default function BulkStatementReviewPage() {
         ))}
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 border-t border-border bg-white px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <div
+        className="fixed inset-x-0 bottom-0 border-t border-border bg-white px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+        style={{ bottom: keyboardInset }}
+      >
         <Button size="lg" className="w-full bg-ink text-white hover:bg-ink/90" onClick={handleConfirmAll} disabled={confirmingAll || readyCount === 0}>
           {confirmingAll ? <Icon name="spinner" size={16} className="animate-spin" /> : `Confirm all ready (${readyCount})`}
         </Button>
