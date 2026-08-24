@@ -30,17 +30,19 @@ import { NextResponse, type NextRequest } from "next/server";
 // /api/v1/push/send-low-stock-alerts is the same shape again — added
 // here up front alongside vercel.json's own cron entry this time, not
 // discovered after the fact.
-// /api/v1/plaid/backfill-transaction-types is the same shape yet again —
-// this one *was* live-discovered the hard way (a real, hour-plus chase
-// through Vercel deployment-protection settings and cron-firing timing
-// before finding the actual cause was this same missing-from-PUBLIC_PATHS
-// bug, not anything Vercel-side).
+//
+// This list has bitten a new CRON_SECRET-bearer route often enough
+// (three separate times before this comment existed) that it's worth
+// naming as its own lesson: adding a route like that means adding it
+// here too, or it silently 307s to /sign-in before its own auth check
+// (or any of its logic) ever runs — CRON_SECRET, Vercel's own SSO/
+// deployment protection, and everything else about the route can be
+// completely correct and it'll still never fire.
 const PUBLIC_PATHS = [
   "/sign-in",
   "/auth/callback",
   "/api/v1/webhooks",
   "/api/v1/plaid/sync-all",
-  "/api/v1/plaid/backfill-transaction-types",
   "/api/v1/push/send-due-bills",
   "/api/v1/push/send-capture-nudges",
   "/api/v1/push/send-debt-payments-due-today",

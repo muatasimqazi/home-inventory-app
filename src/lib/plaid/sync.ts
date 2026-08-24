@@ -43,7 +43,7 @@ function purgeAfter(from: Date): string {
 }
 
 /** Plaid: positive = money leaving the account, negative = money entering — the opposite of Shohaz's own signed-amount convention (negative = money out). */
-export function toShohazAmount(plaidAmount: number): number {
+function toShohazAmount(plaidAmount: number): number {
   return -plaidAmount;
 }
 
@@ -76,7 +76,7 @@ export function toShohazAmount(plaidAmount: number): number {
  * every selector that excludes one from cash flow/categorization
  * excludes both identically today.
  */
-export function plaidTransactionType(pt: PlaidTransaction, signedAmount: number): Transaction["type"] {
+function plaidTransactionType(pt: PlaidTransaction, signedAmount: number): Transaction["type"] {
   switch (pt.personal_finance_category?.primary) {
     case "LOAN_PAYMENTS":
       return "payment";
