@@ -1,20 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Icon } from "@/components/icon";
 import { IconChip } from "@/components/icon-chip";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CashFlowChart } from "@/components/charts/cash-flow-chart";
 import { useInventoryStore } from "@/lib/store";
 import {
   accountTypeIcon,
   cashFlowForMonth,
   cashFlowTrend,
+  categoriesForTransaction,
   categoryBreakdownForMonth,
   groupAccountsByType,
   netWorth,
   recentTransactions,
+  sortByLabel,
   upcomingRecurringBills,
 } from "@/lib/selectors";
 import { formatCurrency, formatShortDate } from "@/lib/format";
@@ -39,7 +42,27 @@ export default function FinanceDashboardPage() {
   const transactions = useInventoryStore((s) => s.transactions);
   const recurringBills = useInventoryStore((s) => s.recurringBills);
   const financeCategories = useInventoryStore((s) => s.financeCategories);
+  // Tag-style multi-category links — same reasoning as Transactions'
+  // list page: a transaction can be categorized only via these, with no
+  // primary categoryId set, so the Cash Flow category filter below needs
+  // this to match everything the category picker/badges elsewhere in the
+  // app already treat as "categorized under X".
+  const transactionCategoryLinks = useInventoryStore((s) => s.transactionCategories);
   const [view, setView] = useState<"mine" | "household">("mine");
+  // First-of-month, not "now" itself — the stepper only ever moves whole
+  // months, and pinning to the 1st keeps equality checks (isCurrentMonth
+  // below) simple regardless of which day this page happens to load on.
+  const [statsMonth, setStatsMonth] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
+  // "all" (not "" — Radix Select's SelectItem can't take an empty-string
+  // value), same convention as Transactions' own category filter. Only
+  // narrows the Cash Flow tile, not the category breakdown below it —
+  // that chart's entire point is comparing every category at once, so
+  // filtering it down to the one category you're already looking at
+  // would just collapse it to a single, redundant bar.
+  const [cashFlowCategoryId, setCashFlowCategoryId] = useState("all");
 
   const scopedAccounts = view === "household" ? accounts.filter((a) => a.ownerUserId === null) : accounts;
   const scopedTransactions =
@@ -47,13 +70,38 @@ export default function FinanceDashboardPage() {
       ? transactions.filter((t) => scopedAccounts.some((a) => a.id === t.accountId))
       : transactions;
 
+  const categoryIdsByTransaction = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    for (const tc of transactionCategoryLinks) {
+      (map[tc.transactionId] ??= []).push(tc.categoryId);
+    }
+    return map;
+  }, [transactionCategoryLinks]);
+  const activeFinanceCategories = sortByLabel(
+    financeCategories.filter((c) => c.status === "active"),
+    (c) => c.name
+  );
+  const cashFlowSourceTransactions =
+    cashFlowCategoryId === "all"
+      ? scopedTransactions
+      : scopedTransactions.filter((t) =>
+          categoriesForTransaction(t, categoryIdsByTransaction[t.id] ?? [], financeCategories).some((c) => c.id === cashFlowCategoryId)
+        );
+
+  const now = new Date();
+  const isCurrentStatsMonth = statsMonth.getFullYear() === now.getFullYear() && statsMonth.getMonth() === now.getMonth();
+  const statsMonthLabel = statsMonth.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  function stepStatsMonth(delta: number) {
+    setStatsMonth((m) => new Date(m.getFullYear(), m.getMonth() + delta, 1));
+  }
+
   const worth = netWorth(scopedAccounts);
-  const thisMonth = cashFlowForMonth(scopedTransactions, new Date());
+  const monthFlow = cashFlowForMonth(cashFlowSourceTransactions, statsMonth);
   const groups = groupAccountsByType(scopedAccounts);
   const recent = recentTransactions(scopedTransactions, 3);
   const bills = upcomingRecurringBills(recurringBills, 1);
   const flowTrend = cashFlowTrend(scopedTransactions, 6);
-  const categorySpend = categoryBreakdownForMonth(scopedTransactions, financeCategories, new Date());
+  const categorySpend = categoryBreakdownForMonth(scopedTransactions, financeCategories, statsMonth);
   const maxCategorySpend = Math.max(1, ...categorySpend.map((c) => c.amount));
 
   return (
@@ -94,25 +142,81 @@ export default function FinanceDashboardPage() {
       </div>
 
       <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
-        <p className="text-caption font-medium tracking-wide text-muted-foreground uppercase">Cash Flow · This Month</p>
-        <div className="mt-2 flex items-center gap-6">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-caption font-medium tracking-wide text-muted-foreground uppercase">Cash Flow</p>
+          {/* Shared with the category breakdown card below — its own
+              header just reflects statsMonthLabel rather than repeating
+              this control, since one month applies to both. */}
+          <div className="flex shrink-0 items-center gap-0.5">
+            <button
+              type="button"
+              onClick={() => stepStatsMonth(-1)}
+              aria-label="Previous month"
+              className="tap-target flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-surface-muted"
+            >
+              <Icon name="chevronLeft" size={16} />
+            </button>
+            <span className="w-28 text-center text-caption font-medium text-ink">{statsMonthLabel}</span>
+            <button
+              type="button"
+              onClick={() => stepStatsMonth(1)}
+              disabled={isCurrentStatsMonth}
+              aria-label="Next month"
+              className="tap-target flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-surface-muted disabled:opacity-30"
+            >
+              <Icon name="chevronRight" size={16} />
+            </button>
+          </div>
+        </div>
+
+        {activeFinanceCategories.length > 0 && (
+          <div className="mt-2">
+            <Select value={cashFlowCategoryId} onValueChange={setCashFlowCategoryId}>
+              <SelectTrigger
+                className={cn(
+                  // Same data-[size=default]:h-auto fix as Transactions'
+                  // own category filter chip — see that page's comment for
+                  // why a plain h-auto alone doesn't override the base
+                  // SelectTrigger's fixed height.
+                  "data-[size=default]:h-auto gap-1 rounded-full border px-3 py-1.5 text-caption font-medium",
+                  cashFlowCategoryId !== "all" ? "border-ink bg-ink text-white [&_svg]:text-white" : "border-border bg-white text-ink"
+                )}
+              >
+                <SelectValue>{cashFlowCategoryId === "all" ? "All categories" : activeFinanceCategories.find((c) => c.id === cashFlowCategoryId)?.name}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All categories</SelectItem>
+                {activeFinanceCategories.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        <div className="mt-3 flex items-center gap-6">
           <div>
             <p className="text-caption text-muted-foreground">Income</p>
-            <p className="text-item-title font-semibold text-badge-green-text">{formatCurrency(thisMonth.income, { showPositiveSign: true })}</p>
+            <p className="text-item-title font-semibold text-badge-green-text">{formatCurrency(monthFlow.income, { showPositiveSign: true })}</p>
           </div>
           <div>
             <p className="text-caption text-muted-foreground">Spend</p>
-            <p className="text-item-title font-semibold text-money-negative-text">{formatCurrency(-thisMonth.spend)}</p>
+            <p className="text-item-title font-semibold text-money-negative-text">{formatCurrency(-monthFlow.spend)}</p>
           </div>
           <div>
             <p className="text-caption text-muted-foreground">Net</p>
-            <p className={cn("text-item-title font-semibold", thisMonth.net >= 0 ? "text-badge-green-text" : "text-money-negative-text")}>
-              {formatCurrency(thisMonth.net, { showPositiveSign: true })}
+            <p className={cn("text-item-title font-semibold", monthFlow.net >= 0 ? "text-badge-green-text" : "text-money-negative-text")}>
+              {formatCurrency(monthFlow.net, { showPositiveSign: true })}
             </p>
           </div>
         </div>
         {/* PRD §35 "Cash flow — income vs. expense, per month" — the tile
-            above is a single-period snapshot; this is the actual trend. */}
+            above is a single-period snapshot; this is the actual trend.
+            Deliberately still anchored to the real current month
+            regardless of statsMonth above — it's "the last 6 months
+            leading up to now," not itself something you browse. */}
         <div className="mt-4 border-t border-border pt-4">
           <CashFlowChart months={flowTrend} />
         </div>
@@ -120,7 +224,7 @@ export default function FinanceDashboardPage() {
 
       {categorySpend.length > 0 && (
         <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
-          <p className="mb-3 text-caption font-medium tracking-wide text-muted-foreground uppercase">Spending by Category · This Month</p>
+          <p className="mb-3 text-caption font-medium tracking-wide text-muted-foreground uppercase">Spending by Category · {statsMonthLabel}</p>
           <div className="flex flex-col gap-2.5">
             {categorySpend.map((c) => (
               <div key={c.categoryId ?? "uncategorized"} className="flex items-center gap-3">

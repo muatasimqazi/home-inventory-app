@@ -598,7 +598,7 @@ export default function TransactionsListPage() {
       </div>
 
       <div className="flex items-center justify-between gap-2">
-        <div className="flex gap-2 overflow-x-auto pb-1">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1">
           {([
             ["all", "All"],
             ["month", "This month"],
@@ -611,7 +611,16 @@ export default function TransactionsListPage() {
             <Select value={categoryFilterId} onValueChange={setCategoryFilterId}>
               <SelectTrigger
                 className={cn(
-                  "h-auto shrink-0 gap-1 rounded-full border px-3 py-1.5 text-caption font-medium",
+                  // data-[size=default]:h-auto, not just h-auto — the base
+                  // SelectTrigger sets height via that same data-scoped key
+                  // (data-[size=default]:h-8), a different utility "name"
+                  // from tailwind-merge's point of view than a plain h-*
+                  // class, so a plain h-auto here doesn't actually conflict
+                  // with/override it; both survived and the fixed 32px one
+                  // won, which is why this chip rendered taller/boxier than
+                  // the plain-button FilterChips next to it (no fixed
+                  // height at all, sized purely by their own padding).
+                  "data-[size=default]:h-auto shrink-0 gap-1 rounded-full border px-3 py-1.5 text-caption font-medium",
                   categoryFilterId !== "all" ? "border-ink bg-ink text-white [&_svg]:text-white" : "border-border bg-white text-ink"
                 )}
               >
