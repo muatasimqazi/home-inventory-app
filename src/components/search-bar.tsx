@@ -44,7 +44,16 @@ export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(function S
         autoFocus={autoFocus}
         placeholder={placeholder}
         aria-label="Search"
-        className="tap-target h-full w-full rounded-2xl bg-transparent pr-4 pl-11 text-body text-ink outline-none placeholder:text-muted-foreground"
+        // text-base (16px), not text-body (14px), below md — iOS Safari
+        // auto-zooms the whole page on focus for any input under 16px, and
+        // its zoom-out-on-blur is unreliable enough (especially racing our
+        // own focus/scroll handling in useAutoFocusVisible) that this read
+        // as "the UI stays magnified after losing focus". 16px keeps iOS
+        // from ever triggering the zoom in the first place; md:text-body
+        // still shrinks it back to the intended size on desktop, where
+        // this browser behavior doesn't apply anyway (same pattern as
+        // ui/input.tsx's own text-base md:text-sm).
+        className="tap-target h-full w-full rounded-2xl bg-transparent pr-4 pl-11 text-base text-ink outline-none placeholder:text-muted-foreground md:text-body"
       />
       {/* Keyboard shortcut hint — desktop only, per design (never shown on mobile). */}
       <span className="pointer-events-none absolute right-3 hidden items-center justify-center rounded-md bg-surface-muted px-1.5 py-0.5 text-micro text-muted-foreground md:flex">
