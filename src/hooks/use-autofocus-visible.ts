@@ -21,7 +21,21 @@ import { useEffect, type DependencyList, type RefObject } from "react";
  *    A short delay before scrolling (rather than reacting to
  *    visualViewport's resize, which doesn't fire reliably at focus time
  *    either) gives the keyboard's own open animation time to actually
- *    finish first — scrolling mid-animation just races it.
+ *    finish first — scrolling mid-animation just races it. Deliberately
+ *    a no-op on Chromium and `block: "nearest"` (not "center") for the
+ *    same reason useKeyboardInset is a Chromium no-op (see that file):
+ *    `interactive-widget=resizes-content` already shrinks the layout
+ *    viewport and natively scrolls the focused field into view there —
+ *    running this hook's own scrollIntoView *on top of* that native one
+ *    was the actual bug behind "keyboard opens, pushes the rest of the
+ *    UI up and out of view, then looks wrong once focus is lost": two
+ *    competing scrolls (one native+minimal, one JS-driven+recentering)
+ *    fighting mid-animation, and the JS one's extra offset outliving the
+ *    keyboard closing since nothing reverses it. Safari/WebKit still
+ *    needs the manual assist (no native viewport resize there at all),
+ *    but even there `"nearest"` — scroll only the minimum distance
+ *    needed, not recenter the whole page — is what a well-behaved native
+ *    scroll-into-view would have done anyway.
  *
  * `deps` defaults to mount-only (`[]`) — the common case, an input
  * that's there from the moment its owning component renders. Pass e.g.
@@ -41,8 +55,12 @@ export function useAutoFocusVisible<T extends HTMLElement>(ref: RefObject<T | nu
     let timeout: ReturnType<typeof setTimeout> | undefined;
     const raf = requestAnimationFrame(() => {
       ref.current?.focus();
+      // Chromium already resizes the layout viewport natively and scrolls
+      // the focused field into view itself — nothing for this hook to add,
+      // and adding it anyway is the bug (see file-level comment above).
+      if ("chrome" in window) return;
       timeout = setTimeout(() => {
-        ref.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+        ref.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
       }, 350);
     });
     return () => {
