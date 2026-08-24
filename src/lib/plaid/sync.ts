@@ -43,8 +43,49 @@ function purgeAfter(from: Date): string {
 }
 
 /** Plaid: positive = money leaving the account, negative = money entering — the opposite of Shohaz's own signed-amount convention (negative = money out). */
-function toShohazAmount(plaidAmount: number): number {
+export function toShohazAmount(plaidAmount: number): number {
   return -plaidAmount;
+}
+
+/**
+ * Real bug, found investigating "net worth and cash flow both read too
+ * high": every Plaid-synced transaction was typed by sign alone
+ * (amount < 0 ? "expense" : "income"), same as a plain manual entry. But
+ * sign alone can't tell a real deposit apart from a credit-card/loan
+ * payment landing as a positive "credit" on that account — Plaid reports
+ * both the same way. So every synced card/loan payment was quietly
+ * counted as *income*, on top of the matching *expense* Plaid already
+ * reports on the paying account — cashFlowForMonth (selectors.ts)
+ * deliberately excludes "transfer"/"payment" from income/spend for
+ * exactly this reason (moving money between your own accounts isn't
+ * real income or spend), but nothing here was ever giving it that type
+ * to exclude. Net worth stayed numerically correct despite this — see
+ * the balance-reconciliation loop below, which forces each account's
+ * current_balance to match Plaid's own reported balance every sync,
+ * independent of any one transaction's type — but cash flow has no
+ * equivalent self-correction; it sums the raw monthly rows directly.
+ *
+ * personal_finance_category is Plaid's own confidence-scored
+ * classification of intent — the right signal for this, rather than
+ * guessing from merchant text the way findDuplicateTransaction does for
+ * a different problem. LOAN_PAYMENTS is specifically credit-card/loan/
+ * mortgage payments; TRANSFER_IN/TRANSFER_OUT is general account-to-
+ * account movement (e.g. checking <-> savings) — mapped to "payment" and
+ * "transfer" respectively to match how a manually-entered linked pair
+ * (createLinkedTransactionPair) already distinguishes the two, though
+ * every selector that excludes one from cash flow/categorization
+ * excludes both identically today.
+ */
+export function plaidTransactionType(pt: PlaidTransaction, signedAmount: number): Transaction["type"] {
+  switch (pt.personal_finance_category?.primary) {
+    case "LOAN_PAYMENTS":
+      return "payment";
+    case "TRANSFER_IN":
+    case "TRANSFER_OUT":
+      return "transfer";
+    default:
+      return signedAmount < 0 ? "expense" : "income";
+  }
 }
 
 function merchantAndDescription(pt: PlaidTransaction): { merchant: string | null; description: string | null } {
@@ -86,6 +127,7 @@ async function handleAdded(
       if (!pendingMatch.userEdited) {
         patch.merchant = merchant;
         patch.description = description;
+        patch.type = plaidTransactionType(pt, amount);
       }
       await admin.from("transactions").update(patch).eq("id", pendingMatch.id);
       return null; // reconciled onto an existing row, not a new one
@@ -120,7 +162,7 @@ async function handleAdded(
     occurredAt,
     postedAt: pt.pending ? null : occurredAt,
     amount,
-    type: amount < 0 ? "expense" : "income",
+    type: plaidTransactionType(pt, amount),
     categoryId: category.categoryId,
     merchant,
     description,
@@ -164,6 +206,7 @@ async function handleModified(admin: SupabaseClient, accountId: string, pt: Plai
     const { merchant, description } = merchantAndDescription(pt);
     patch.merchant = merchant;
     patch.description = description;
+    patch.type = plaidTransactionType(pt, amount);
   }
   await admin.from("transactions").update(patch).eq("id", existing.id);
 }
