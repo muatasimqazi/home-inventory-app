@@ -10,6 +10,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useInventoryStore } from "@/lib/store";
 import { PERSON_RELATIONSHIPS, PERSON_RELATIONSHIP_LABEL, type Person, type PersonRelationship } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { useAutoFocusVisible } from "@/hooks/use-autofocus-visible";
 
 type Step = "details" | "linkChoice" | "inviteEmail";
 
@@ -68,6 +69,10 @@ export function AddPersonSheet({ open, onOpenChange, onCreated, canInvite = true
   const [email, setEmail] = useState("");
   const [nameError, setNameError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  useAutoFocusVisible(nameInputRef, [visible, step]);
+  const emailInputRef = useRef<HTMLInputElement>(null);
+  useAutoFocusVisible(emailInputRef, [visible, step]);
 
   // Fresh state every time the caller signals a new open — adjusted during
   // render (React's documented pattern for "reset state when a prop
@@ -183,7 +188,7 @@ export function AddPersonSheet({ open, onOpenChange, onCreated, canInvite = true
                 }}
                 placeholder="e.g. Emma"
                 className="h-11"
-                autoFocus
+                ref={nameInputRef}
               />
               {nameError && <p className="mt-1 text-caption text-danger">{nameError}</p>}
             </div>
@@ -234,7 +239,7 @@ export function AddPersonSheet({ open, onOpenChange, onCreated, canInvite = true
           <div className="flex flex-col gap-3 px-4 pb-6">
             <div>
               <label className="mb-1 block text-caption text-muted-foreground">Email address</label>
-              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@example.com" className="h-11" autoFocus />
+              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@example.com" className="h-11" ref={emailInputRef} />
             </div>
             <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={handleSendInvite} disabled={!email.trim()}>
               Send invite

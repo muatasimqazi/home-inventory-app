@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { sortByLabel } from "@/lib/selectors";
 import { resolveCategory } from "@/lib/receipt-resolution";
 import { useRemountKey } from "@/hooks/use-remount-key";
+import { useAutoFocusVisible } from "@/hooks/use-autofocus-visible";
 import type { Account, CategoryRule, FinanceCategory, Transaction, TransactionType } from "@/lib/types";
 
 const TYPES: { value: TransactionType; label: string }[] = [
@@ -108,6 +109,8 @@ export function TransactionFormSheet({
   const [toAccountId, setToAccountId] = useState(accounts.find((a) => a.id !== accountId)?.id ?? "");
   const [occurredAt, setOccurredAt] = useState(initial ? toDateInputValue(initial.occurredAt) : toDateInputValue(new Date().toISOString()));
   const [amount, setAmount] = useState(initial ? String(Math.abs(initial.amount)) : "");
+  const amountInputRef = useRef<HTMLInputElement>(null);
+  useAutoFocusVisible(amountInputRef, [open]);
   // Seeded from transaction_categories when editing (falling back to the
   // legacy single categoryId only if — unexpectedly — no tag rows exist
   // for this transaction yet, e.g. a row from before the backfill ran).
@@ -280,7 +283,7 @@ export function TransactionFormSheet({
               placeholder="$0.00"
               className="h-11"
               inputMode="decimal"
-              autoFocus
+              ref={amountInputRef}
             />
           </div>
 

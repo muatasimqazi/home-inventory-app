@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useAutoFocusVisible } from "@/hooks/use-autofocus-visible";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Icon, type IconName } from "@/components/icon";
@@ -31,6 +32,8 @@ export default function SettingsPage() {
   const me = members.find((m) => m.userId === currentUserId);
 
   const [editOpen, setEditOpen] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  useAutoFocusVisible(nameInputRef, [editOpen]);
   const [nameInput, setNameInput] = useState(me?.displayName ?? "");
   const [timezoneInput, setTimezoneInput] = useState(me?.timezone ?? AUTO_TIMEZONE_VALUE);
   const [nameError, setNameError] = useState<string | null>(null);
@@ -142,7 +145,7 @@ export default function SettingsPage() {
                   if (nameError) setNameError(null);
                 }}
                 className="h-11 bg-white"
-                autoFocus
+                ref={nameInputRef}
               />
               {nameError && <p className="mt-1 text-caption text-danger">{nameError}</p>}
             </div>

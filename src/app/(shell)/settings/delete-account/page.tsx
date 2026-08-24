@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useInventoryStore } from "@/lib/store";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useAutoFocusVisible } from "@/hooks/use-autofocus-visible";
 
 const CONFIRMATION_PHRASE = "DELETE";
 
@@ -41,6 +42,8 @@ export default function DeleteAccountPage() {
 
   const [preview, setPreview] = useState<Preview | "loading" | "error">("loading");
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const phraseInputRef = useRef<HTMLInputElement>(null);
+  useAutoFocusVisible(phraseInputRef, [confirmOpen]);
   const [phraseInput, setPhraseInput] = useState("");
   const [deleting, setDeleting] = useState(false);
 
@@ -221,7 +224,7 @@ export default function DeleteAccountPage() {
             onChange={(e) => setPhraseInput(e.target.value)}
             placeholder={CONFIRMATION_PHRASE}
             className="h-11 font-mono"
-            autoFocus
+            ref={phraseInputRef}
             disabled={deleting}
           />
           <DialogFooter className="gap-2 sm:gap-2">

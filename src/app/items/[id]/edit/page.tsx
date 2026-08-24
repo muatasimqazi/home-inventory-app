@@ -1,7 +1,8 @@
 "use client";
 
 import { notFound, useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useAutoFocusVisible } from "@/hooks/use-autofocus-visible";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
 import { AddPersonSheet } from "@/components/add-person-sheet";
@@ -89,6 +90,8 @@ function EditItemForm({
   // pushes this sticky Save bar behind the keyboard. No-op on Chromium.
   const keyboardInset = useKeyboardInset();
   const [name, setName] = useState(initial.name);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  useAutoFocusVisible(nameInputRef);
   const [category, setCategory] = useState(initial.category);
   const [quantity, setQuantity] = useState(String(initial.quantity));
   const [notes, setNotes] = useState(initial.notes);
@@ -151,7 +154,7 @@ function EditItemForm({
               if (error) setError(null);
             }}
             className="h-11"
-            autoFocus
+            ref={nameInputRef}
           />
           {error && <p className="mt-1 text-caption text-danger">{error}</p>}
         </Field>

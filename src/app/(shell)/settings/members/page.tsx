@@ -15,6 +15,7 @@ import { useInventoryStore } from "@/lib/store";
 import { coverPhotoUrl } from "@/lib/cover-photo";
 import { PERSON_RELATIONSHIPS, PERSON_RELATIONSHIP_LABEL, type Member, type Person, type PersonRelationship } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { useAutoFocusVisible } from "@/hooks/use-autofocus-visible";
 
 const RELATIONSHIP_OPTIONS = PERSON_RELATIONSHIPS.map((value) => ({ value, label: PERSON_RELATIONSHIP_LABEL[value] }));
 
@@ -408,6 +409,8 @@ function InvitePersonSheet({
   onSend: (email: string) => void;
 }) {
   const [email, setEmail] = useState("");
+  const emailInputRef = useRef<HTMLInputElement>(null);
+  useAutoFocusVisible(emailInputRef, [open]);
 
   const [prevPersonId, setPrevPersonId] = useState<string | null>(person?.id ?? null);
   if (person && person.id !== prevPersonId) {
@@ -427,7 +430,7 @@ function InvitePersonSheet({
           </p>
           <div>
             <label className="mb-1 block text-caption text-muted-foreground">Email address</label>
-            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@example.com" className="h-11" autoFocus />
+            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@example.com" className="h-11" ref={emailInputRef} />
           </div>
           <Button
             size="lg"

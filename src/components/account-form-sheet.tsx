@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
+import { useAutoFocusVisible } from "@/hooks/use-autofocus-visible";
 import type { Account, AccountType, Member } from "@/lib/types";
 import { ACCOUNT_TYPE_LABEL, LIABILITY_ACCOUNT_TYPES, normalizeAccountBalance, displayAccountBalanceMagnitude } from "@/lib/selectors";
 
@@ -59,6 +60,8 @@ export function AccountFormSheet({
   onSubmit,
 }: AccountFormSheetProps) {
   const [name, setName] = useState(initial?.name ?? "");
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  useAutoFocusVisible(nameInputRef, [open]);
   const [type, setType] = useState<AccountType>(initial?.type ?? "checking");
   const [institutionName, setInstitutionName] = useState(initial?.institutionName ?? "");
   const [cardLastFour, setCardLastFour] = useState(initial?.cardLastFour ?? "");
@@ -117,7 +120,7 @@ export function AccountFormSheet({
               }}
               placeholder="e.g. Household Checking"
               className="h-11"
-              autoFocus
+              ref={nameInputRef}
             />
           </div>
 

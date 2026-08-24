@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Icon } from "@/components/icon";
 import { PinnedLocationPhoto } from "@/components/pinned-location-photo";
 import { PINNED_LOCATION_CATEGORIES, PINNED_LOCATION_CATEGORY_LABELS } from "@/lib/pinned-locations";
+import { useAutoFocusVisible } from "@/hooks/use-autofocus-visible";
 import type { PinnedLocationCategory } from "@/lib/types";
 
 interface PinnedLocationFormSheetProps {
@@ -53,6 +54,8 @@ export function PinnedLocationFormSheet({
   const [category, setCategory] = useState<PinnedLocationCategory>(initialCategory);
   const [locationNote, setLocationNote] = useState(initialLocationNote);
   const [error, setError] = useState<string | null>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  useAutoFocusVisible(nameInputRef, [open]);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
   const [photoRemoved, setPhotoRemoved] = useState(false);
@@ -143,7 +146,7 @@ export function PinnedLocationFormSheet({
               }}
               placeholder="e.g. Main Water Shutoff"
               className="h-11"
-              autoFocus
+              ref={nameInputRef}
             />
             {error && <p className="mt-1 text-caption text-danger">{error}</p>}
           </div>

@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useAutoFocusVisible } from "@/hooks/use-autofocus-visible";
 
 interface CategoryFormDialogProps {
   open: boolean;
@@ -16,6 +17,8 @@ interface CategoryFormDialogProps {
 export function CategoryFormDialog({ open, onOpenChange, initialName = "", onSubmit }: CategoryFormDialogProps) {
   const [name, setName] = useState(initialName);
   const [error, setError] = useState<string | null>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  useAutoFocusVisible(nameInputRef, [open]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -33,7 +36,7 @@ export function CategoryFormDialog({ open, onOpenChange, initialName = "", onSub
             }}
             placeholder="e.g. Groceries"
             className="h-11"
-            autoFocus
+            ref={nameInputRef}
           />
           {error && <p className="mt-1 text-caption text-danger">{error}</p>}
         </div>

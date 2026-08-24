@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { sortByLabel } from "@/lib/selectors";
+import { useAutoFocusVisible } from "@/hooks/use-autofocus-visible";
 import type { FinanceCategory } from "@/lib/types";
 
 interface RuleFormDialogProps {
@@ -25,6 +26,8 @@ export function RuleFormDialog({ open, onOpenChange, categories, onSubmit }: Rul
   );
   const [categoryId, setCategoryId] = useState(activeCategories[0]?.id ?? "");
   const [error, setError] = useState<string | null>(null);
+  const matchValueInputRef = useRef<HTMLInputElement>(null);
+  useAutoFocusVisible(matchValueInputRef, [open]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -55,7 +58,7 @@ export function RuleFormDialog({ open, onOpenChange, categories, onSubmit }: Rul
             }}
             placeholder="e.g. Whole Foods"
             className="h-11"
-            autoFocus
+            ref={matchValueInputRef}
           />
           <div>
             <label className="mb-1 block text-caption text-muted-foreground">Set category to</label>

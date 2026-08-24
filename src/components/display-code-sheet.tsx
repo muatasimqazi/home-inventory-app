@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Icon } from "@/components/icon";
 import { useInventoryStore } from "@/lib/store";
 import { nextDisplayCode } from "@/lib/display-code";
+import { useAutoFocusVisible } from "@/hooks/use-autofocus-visible";
 import type { Container } from "@/lib/types";
 
 interface DisplayCodeSheetProps {
@@ -34,6 +35,8 @@ export function DisplayCodeSheet({ open, onOpenChange, container }: DisplayCodeS
     () => container.displayCode ?? nextDisplayCode(containers, locations.find((l) => l.id === container.locationId)?.name ?? "BIN")
   );
   const [error, setError] = useState<string | null>(null);
+  const codeInputRef = useRef<HTMLInputElement>(null);
+  useAutoFocusVisible(codeInputRef, [open]);
 
   async function handleSave() {
     const result = await assignDisplayCode(container.id, value);
@@ -87,7 +90,7 @@ export function DisplayCodeSheet({ open, onOpenChange, container }: DisplayCodeS
               }}
               placeholder="e.g. GAR-234"
               className="h-11 font-semibold uppercase"
-              autoFocus
+              ref={codeInputRef}
             />
             {container.displayCode && (
               <Button type="button" variant="outline" size="icon-lg" onClick={handleCopy} aria-label="Copy Container ID">

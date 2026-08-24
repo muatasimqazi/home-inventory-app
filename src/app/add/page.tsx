@@ -15,6 +15,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useInventoryStore, uploadCoverPhotoFile } from "@/lib/store";
 import { useKeyboardInset } from "@/hooks/use-keyboard-inset";
+import { useAutoFocusVisible } from "@/hooks/use-autofocus-visible";
 import { buildBreadcrumb, sortByLabel, suggestBetterContainer } from "@/lib/selectors";
 import { SORTED_CATEGORIES } from "@/lib/types";
 import { extraFieldsForCategory, CATEGORY_EMOJI } from "@/lib/category";
@@ -61,6 +62,8 @@ function ManualAddItemInner() {
   // hand-edited URL param naming a category that no longer exists would
   // otherwise silently set the Select to an unrenderable value.
   const [name, setName] = useState(() => searchParams.get("name") ?? "");
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  useAutoFocusVisible(nameInputRef);
   const [category, setCategory] = useState<string>(() => {
     const param = searchParams.get("category");
     return param && (SORTED_CATEGORIES as readonly string[]).includes(param) ? param : SORTED_CATEGORIES[0];
@@ -261,7 +264,7 @@ function ManualAddItemInner() {
               }}
               placeholder="e.g. Cordless Drill"
               className="h-11 bg-white"
-              autoFocus
+              ref={nameInputRef}
             />
             {nameSuggestionsOpen && nameSuggestions.length > 0 && (
               <div className="absolute z-10 mt-1 w-full overflow-hidden rounded-lg border border-border bg-white shadow-lg">

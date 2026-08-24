@@ -10,6 +10,7 @@ import { AddPersonSheet } from "@/components/add-person-sheet";
 import { DomainToggle } from "@/components/domain-toggle";
 import { useInventoryStore } from "@/lib/store";
 import { useKeyboardInset } from "@/hooks/use-keyboard-inset";
+import { useAutoFocusVisible } from "@/hooks/use-autofocus-visible";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { Person } from "@/lib/types";
 
@@ -152,6 +153,11 @@ function HouseholdSetupInner() {
   const displayPhase: CreatePhase =
     phase === "loading" && mode === "create" && isHydrated && households.length > 0 ? "naming" : phase;
 
+  const joinNameInputRef = useRef<HTMLInputElement>(null);
+  useAutoFocusVisible(joinNameInputRef, [mode === "join"]);
+  const householdNameInputRef = useRef<HTMLInputElement>(null);
+  useAutoFocusVisible(householdNameInputRef, [displayPhase === "naming"]);
+
   async function handleCreateNamed() {
     const trimmed = manualName.trim();
     if (!trimmed) {
@@ -271,7 +277,7 @@ function HouseholdSetupInner() {
                 }}
                 placeholder="e.g. Alex"
                 className="h-11 bg-white"
-                autoFocus
+                ref={joinNameInputRef}
               />
               <p className="mt-1 text-caption text-muted-foreground">Shown to other members instead of a generic &ldquo;You&rdquo;.</p>
               {joinNameError && <p className="mt-1 text-caption text-danger">{joinNameError}</p>}
@@ -351,7 +357,7 @@ function HouseholdSetupInner() {
                 }}
                 placeholder="e.g. Lake House"
                 className="h-11 bg-white"
-                autoFocus
+                ref={householdNameInputRef}
               />
               {errorMessage && <p className="mt-1 text-caption text-danger">{errorMessage}</p>}
             </Field>

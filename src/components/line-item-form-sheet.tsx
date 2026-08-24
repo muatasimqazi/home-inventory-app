@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Icon } from "@/components/icon";
 import { formatCurrency, formatShortDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { useAutoFocusVisible } from "@/hooks/use-autofocus-visible";
 import type { ScannedReceiptLineItem, Transaction } from "@/lib/types";
 
 interface LineItemFormValues {
@@ -107,6 +108,8 @@ function LineItemFormSheetInner({
 }: Omit<LineItemFormSheetProps, "createForTransactionId">) {
   const isCreate = !lineItem;
   const [standardName, setStandardName] = useState(lineItem ? (lineItem.standardName ?? lineItem.rawItem) : "");
+  const standardNameInputRef = useRef<HTMLInputElement>(null);
+  useAutoFocusVisible(standardNameInputRef);
   const [brand, setBrand] = useState(lineItem?.brand ?? "");
   const [quantity, setQuantity] = useState(lineItem ? String(lineItem.quantity) : "1");
   const [unitPrice, setUnitPrice] = useState(lineItem ? centsToInput(lineItem.unitPriceCents) : "");
@@ -186,7 +189,7 @@ function LineItemFormSheetInner({
                 if (error) setError(null);
               }}
               className="h-11"
-              autoFocus
+              ref={standardNameInputRef}
             />
           </div>
 

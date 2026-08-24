@@ -1,12 +1,13 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Icon } from "@/components/icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { appOrigin } from "@/lib/urls";
+import { useAutoFocusVisible } from "@/hooks/use-autofocus-visible";
 
 type Mode = "default" | "email" | "authenticating" | "checkEmail";
 type AuthAction = "signin" | "signup";
@@ -23,6 +24,8 @@ function SignInInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [mode, setMode] = useState<Mode>("default");
+  const emailInputRef = useRef<HTMLInputElement>(null);
+  useAutoFocusVisible(emailInputRef, [mode]);
   const [authAction, setAuthAction] = useState<AuthAction>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -117,7 +120,7 @@ function SignInInner() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="h-11"
-              autoFocus
+              ref={emailInputRef}
             />
             <Input
               type="password"

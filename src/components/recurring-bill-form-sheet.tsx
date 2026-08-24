@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
+import { useAutoFocusVisible } from "@/hooks/use-autofocus-visible";
 import { sortByLabel, looksLikeDebtPaymentCategory } from "@/lib/selectors";
 import type { Account, FinanceCategory, Member, RecurringBill, RecurringBillFrequency } from "@/lib/types";
 
@@ -68,6 +69,8 @@ export function RecurringBillFormSheet({
   onSubmit,
 }: RecurringBillFormSheetProps) {
   const [name, setName] = useState(initial?.name ?? "");
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  useAutoFocusVisible(nameInputRef, [open]);
   const [expectedAmount, setExpectedAmount] = useState(initial ? String(initial.expectedAmount) : "");
   const [frequency, setFrequency] = useState<RecurringBillFrequency>(initial?.frequency ?? "monthly");
   const [nextDueDate, setNextDueDate] = useState(initial ? initial.nextDueDate.slice(0, 10) : new Date().toISOString().slice(0, 10));
@@ -133,7 +136,7 @@ export function RecurringBillFormSheet({
               }}
               placeholder="e.g. Mortgage payment"
               className="h-11"
-              autoFocus
+              ref={nameInputRef}
             />
           </div>
 

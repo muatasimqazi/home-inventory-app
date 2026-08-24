@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { PhotoThumb } from "@/components/photo-thumb";
 import { Icon } from "@/components/icon";
+import { useAutoFocusVisible } from "@/hooks/use-autofocus-visible";
 
 interface EntityFormSheetProps {
   open: boolean;
@@ -63,6 +64,8 @@ export function EntityFormSheet({
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [suggesting, setSuggesting] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  useAutoFocusVisible(nameInputRef, [open]);
 
   async function handleSuggestName() {
     if (!onSuggestName || suggesting) return;
@@ -157,7 +160,7 @@ export function EntityFormSheet({
               }}
               placeholder={namePlaceholder}
               className="h-11"
-              autoFocus
+              ref={nameInputRef}
             />
             {error && <p className="mt-1 text-caption text-danger">{error}</p>}
             {nameSuggestions && nameSuggestions.length > 0 && (

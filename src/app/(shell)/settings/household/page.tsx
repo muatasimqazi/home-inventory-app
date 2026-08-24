@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useInventoryStore, useCurrentHousehold } from "@/lib/store";
+import { useAutoFocusVisible } from "@/hooks/use-autofocus-visible";
 
 /**
  * The household entity itself — currently just its name — as its own
@@ -33,6 +34,8 @@ export default function HouseholdDetailsPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [nameInput, setNameInput] = useState(household.name);
   const [nameError, setNameError] = useState<string | null>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  useAutoFocusVisible(nameInputRef, [editOpen]);
   const [saving, setSaving] = useState(false);
 
   async function handleSave() {
@@ -110,7 +113,7 @@ export default function HouseholdDetailsPage() {
                   if (nameError) setNameError(null);
                 }}
                 className="h-11 bg-white"
-                autoFocus
+                ref={nameInputRef}
               />
               {nameError && <p className="mt-1 text-caption text-danger">{nameError}</p>}
             </div>

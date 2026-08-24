@@ -12,6 +12,7 @@ import { AskConversationEntry } from "@/components/ask-conversation-entry";
 import { LoadMoreButton } from "@/components/load-more-button";
 import { useAskConversation } from "@/hooks/use-ask-conversation";
 import { usePaginated } from "@/hooks/use-paginated";
+import { useAutoFocusVisible } from "@/hooks/use-autofocus-visible";
 import { categoryAccentClass } from "@/lib/category";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { rowToScannedReceiptLineItem, type ScannedReceiptLineItemRow } from "@/lib/supabase/mappers";
@@ -92,21 +93,16 @@ function SearchPageInner() {
     };
   }, [transactions]);
 
+  // useAutoFocusVisible's own raf-deferred focus() is the fix for this
+  // page's original bug (arriving here is always a client-side route
+  // change — from the bottom nav's Search tab, or the dashboard's decoy
+  // search bar — and a focus() fired at the exact instant of mount, before
+  // the route transition's paint has settled, quietly loses iOS's
+  // "recently interacted" window: cursor/caret shows, keyboard doesn't).
+  // It also now scrolls the bar into view once the keyboard's actually
+  // open, which plain `autoFocus` never did on its own either.
   const inputRef = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    // `autoFocus` below already fires immediately on mount and is enough on
-    // desktop, but arriving here is always a client-side route change (from
-    // the bottom nav's Search tab, or the dashboard's decoy search bar) —
-    // iOS Safari only opens the on-screen keyboard for a focus() call that
-    // lands within its "recently interacted" window, and a focus fired at
-    // the exact instant of mount, before the route transition's paint has
-    // settled, quietly loses that window (cursor/caret shows, keyboard
-    // doesn't). Firing a second focus() one frame later — after the browser
-    // has actually painted the new page — is the fix that's held up in
-    // practice for this exact "focus survives, keyboard doesn't" case.
-    const raf = requestAnimationFrame(() => inputRef.current?.focus());
-    return () => cancelAnimationFrame(raf);
-  }, []);
+  useAutoFocusVisible(inputRef);
 
   // Reference-catalog ("Common items") lazy load. Unlike the Add Item
   // form's typeahead — which defers loadReferenceItems() to first focus on
@@ -207,7 +203,7 @@ function SearchPageInner() {
         <Link href="/" className="tap-target flex size-9 shrink-0 items-center justify-center rounded-full bg-white shadow-sm">
           <Icon name="arrowLeft" size={18} />
         </Link>
-        <SearchBar ref={inputRef} value={query} onChange={setQuery} autoFocus className="flex-1" />
+        <SearchBar ref={inputRef} value={query} onChange={setQuery} className="flex-1" />
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-1">
