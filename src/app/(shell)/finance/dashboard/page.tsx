@@ -100,7 +100,15 @@ export default function FinanceDashboardPage() {
   const groups = groupAccountsByType(scopedAccounts);
   const recent = recentTransactions(scopedTransactions, 3);
   const bills = upcomingRecurringBills(recurringBills, 1);
-  const flowTrend = cashFlowTrend(scopedTransactions, 6);
+  // cashFlowSourceTransactions, not scopedTransactions — the trend chart
+  // needs to actually reflect the category filter too, or picking a
+  // category changes the Income/Spend/Net numbers above it while the
+  // chart right below keeps showing the whole household's trend, reading
+  // as "the filter doesn't do anything." The 6-month *window* itself
+  // stays anchored to the real current month regardless of statsMonth
+  // (see cashFlowTrend's own default `now` param) — that's "the last 6
+  // months up to now," not itself something to browse via the stepper.
+  const flowTrend = cashFlowTrend(cashFlowSourceTransactions, 6);
   const categorySpend = categoryBreakdownForMonth(scopedTransactions, financeCategories, statsMonth);
   const maxCategorySpend = Math.max(1, ...categorySpend.map((c) => c.amount));
 
@@ -218,7 +226,7 @@ export default function FinanceDashboardPage() {
             regardless of statsMonth above — it's "the last 6 months
             leading up to now," not itself something you browse. */}
         <div className="mt-4 border-t border-border pt-4">
-          <CashFlowChart months={flowTrend} />
+          <CashFlowChart months={flowTrend} highlightMonth={statsMonth} />
         </div>
       </div>
 
