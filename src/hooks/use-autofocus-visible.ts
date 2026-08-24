@@ -2,9 +2,22 @@
 
 import { useEffect, type DependencyList, type RefObject } from "react";
 
+/** Nearest ancestor that actually scrolls its own content (not just one that's tall), walking up from `el`. Used to know what to restore on blur — see the file-level comment below. */
+function findScrollParent(el: HTMLElement): HTMLElement | null {
+  let node = el.parentElement;
+  while (node) {
+    const style = getComputedStyle(node);
+    if ((style.overflowY === "auto" || style.overflowY === "scroll") && node.scrollHeight > node.clientHeight) {
+      return node;
+    }
+    node = node.parentElement;
+  }
+  return null;
+}
+
 /**
  * Replaces the plain `autoFocus` prop wherever a field needs to grab the
- * keyboard the instant a page/sheet appears. Two distinct iOS Safari bugs
+ * keyboard the instant a page/sheet appears. Three distinct iOS Safari bugs
  * `autoFocus` alone doesn't cover:
  *
  * 1. A focus() fired at the exact instant of mount, before the browser
@@ -36,6 +49,16 @@ import { useEffect, type DependencyList, type RefObject } from "react";
  *    but even there `"nearest"` — scroll only the minimum distance
  *    needed, not recenter the whole page — is what a well-behaved native
  *    scroll-into-view would have done anyway.
+ * 3. Whatever scrolled to reveal the field — this hook's own
+ *    scrollIntoView on WebKit, or the browser's native scroll on Chromium
+ *    — never scrolls back when the keyboard closes; the page (or the
+ *    sheet's own scrollable body) is left sitting wherever it ended up,
+ *    looking wrong even once the keyboard-caused layout shift itself
+ *    (SheetContent's height/position, capped in ui/sheet.tsx) has
+ *    reverted. Fixed by recording the nearest scrolling ancestor's
+ *    scrollTop and the page's own scrollY right as focus lands, then
+ *    restoring both on blur — same open-side delay, so the restore
+ *    doesn't race the keyboard's own close animation either.
  *
  * `deps` defaults to mount-only (`[]`) — the common case, an input
  * that's there from the moment its owning component renders. Pass e.g.
@@ -52,20 +75,54 @@ import { useEffect, type DependencyList, type RefObject } from "react";
  */
 export function useAutoFocusVisible<T extends HTMLElement>(ref: RefObject<T | null>, deps: DependencyList = []) {
   useEffect(() => {
-    let timeout: ReturnType<typeof setTimeout> | undefined;
+    let openTimeout: ReturnType<typeof setTimeout> | undefined;
+    let blurTimeout: ReturnType<typeof setTimeout> | undefined;
+    let el: T | null = null;
+    // Recorded once, right as focus lands (see the raf callback below),
+    // then held here for the life of this field's focus so handleBlur can
+    // snap back to exactly where things were before this field was ever
+    // touched — not to 0, which would be wrong for e.g. a page the user
+    // had already scrolled down before tapping the field.
+    let originalScrollTop = 0;
+    let originalWindowScrollY = 0;
+
+    function handleBlur() {
+      const scrollParent = el ? findScrollParent(el) : null;
+      // Delayed the same way the open-side scroll is — gives the
+      // keyboard's own close animation time to finish first, so this
+      // doesn't race it.
+      blurTimeout = setTimeout(() => {
+        scrollParent?.scrollTo({ top: originalScrollTop, behavior: "smooth" });
+        window.scrollTo({ top: originalWindowScrollY, behavior: "smooth" });
+      }, 350);
+    }
+
     const raf = requestAnimationFrame(() => {
-      ref.current?.focus();
+      el = ref.current;
+      if (!el) return;
+      el.focus();
+
+      const scrollParent = findScrollParent(el);
+      originalScrollTop = scrollParent?.scrollTop ?? 0;
+      originalWindowScrollY = window.scrollY;
+      el.addEventListener("blur", handleBlur);
+
       // Chromium already resizes the layout viewport natively and scrolls
       // the focused field into view itself — nothing for this hook to add,
       // and adding it anyway is the bug (see file-level comment above).
+      // The blur-restore above still applies either way, since Chromium's
+      // native scroll needs undoing on blur just as much as ours does.
       if ("chrome" in window) return;
-      timeout = setTimeout(() => {
+      openTimeout = setTimeout(() => {
         ref.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
       }, 350);
     });
+
     return () => {
       cancelAnimationFrame(raf);
-      if (timeout !== undefined) clearTimeout(timeout);
+      if (openTimeout !== undefined) clearTimeout(openTimeout);
+      if (blurTimeout !== undefined) clearTimeout(blurTimeout);
+      el?.removeEventListener("blur", handleBlur);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
