@@ -10,6 +10,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { CategoryFormDialog } from "@/components/category-form-dialog";
 import { RuleFormDialog } from "@/components/rule-form-dialog";
 import { useInventoryStore } from "@/lib/store";
+import { sortByLabel } from "@/lib/selectors";
 import { categoryBadgeClasses } from "@/lib/badge-color";
 import { cn } from "@/lib/utils";
 import { useRemountKey } from "@/hooks/use-remount-key";
@@ -35,7 +36,10 @@ export default function CategoriesAndRulesPage() {
   const [ruleDialogKey, bumpRuleDialogKey] = useRemountKey();
   const [trashConfirmId, setTrashConfirmId] = useState<string | null>(null);
 
-  const activeCategories = financeCategories.filter((c) => c.status === "active");
+  const activeCategories = sortByLabel(
+    financeCategories.filter((c) => c.status === "active"),
+    (c) => c.name
+  );
 
   function handleTrashCategory(id: string) {
     // The DB blocks this outright (prevent_trash_referenced_category(),
