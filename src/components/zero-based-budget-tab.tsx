@@ -6,10 +6,28 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/empty-state";
 import { DonutChart } from "@/components/charts/donut-chart";
-import { badgeColorVar } from "@/lib/badge-color";
 import { formatCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { ZeroBasedAllocation } from "@/lib/selectors";
+
+// Rank-based teal-shade ramp (largest allocation darkest, smallest
+// lightest) — matches the WealthWise mockup's monochrome gradient look
+// more closely than the hashed multi-hue badge palette used elsewhere in
+// the app (categories here are already sorted by allocation size, so
+// "rank" and "visual weight" line up meaningfully, unlike a hash). Built
+// from --color-yellow via color-mix() rather than five new global tokens
+// — one accent color, five real shades, nothing to keep in sync if the
+// brand color ever changes.
+const TEAL_SHADE_RAMP = [
+  "var(--color-yellow)",
+  "color-mix(in srgb, var(--color-yellow) 80%, white)",
+  "color-mix(in srgb, var(--color-yellow) 60%, white)",
+  "color-mix(in srgb, var(--color-yellow) 40%, white)",
+  "color-mix(in srgb, var(--color-yellow) 25%, white)",
+];
+function shadeForRank(rank: number): string {
+  return TEAL_SHADE_RAMP[rank % TEAL_SHADE_RAMP.length];
+}
 
 /**
  * Budgeting v2 — Zero-Based Budget Builder: "every dollar of planned
@@ -89,7 +107,7 @@ export function ZeroBasedBudgetTab({
         </div>
         <div className="mt-3 flex items-center justify-center">
           <DonutChart
-            slices={allocation.slices.map((s) => ({ key: s.categoryId, value: s.amount, colorVar: badgeColorVar(s.categoryId) }))}
+            slices={allocation.slices.map((s, i) => ({ key: s.categoryId, value: s.amount, color: shadeForRank(i) }))}
             total={allocation.targetIncome}
             centerLabel={formatCurrency(Math.abs(allocation.unallocated))}
             centerSubLabel={over ? "over-allocated" : "unallocated"}
@@ -104,9 +122,9 @@ export function ZeroBasedBudgetTab({
 
       {allocation.slices.length > 0 && (
         <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
-          {allocation.slices.map((s) => (
+          {allocation.slices.map((s, i) => (
             <div key={s.categoryId} className="flex items-center gap-3 px-4 py-3">
-              <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: `var(${badgeColorVar(s.categoryId)})` }} />
+              <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: shadeForRank(i) }} />
               <span className="min-w-0 flex-1 truncate text-body text-ink">{s.name}</span>
               <span className="shrink-0 text-caption text-muted-foreground">{s.percent}%</span>
               <span className="w-20 shrink-0 text-right text-body font-medium text-ink">{formatCurrency(s.amount)}</span>

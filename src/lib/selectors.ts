@@ -1,5 +1,6 @@
 import type { Account, AccountType, ActivityLogEntry, CategoryBudget, Container, FinanceCategory, Item, Location, RecurringBill, Tag, Transaction, TransactionCategory } from "./types";
 import { formatCurrency, parseCalendarDate } from "./format";
+import { normalizeMerchant } from "./recurring-detection";
 
 /**
  * The full tag-style category set for one transaction (Categories
@@ -687,6 +688,140 @@ export function spendingInsights(
       currentAmount: Math.round(currentAmount * 100) / 100,
       trailingAvg: Math.round(trailingAvg * 100) / 100,
       message: `${name} is ${direction} ${rounded}% this month (${formatCurrency(currentAmount)} vs your ${formatCurrency(trailingAvg)} average).`,
+    });
+  }
+
+  return insights.sort((a, b) => Math.abs(b.currentAmount - b.trailingAvg) - Math.abs(a.currentAmount - a.trailingAvg)).slice(0, 3);
+}
+
+export interface WeekendSpendingInsight {
+  direction: "up" | "down";
+  /** Absolute percent change, weekend per-day average vs. weekday per-day average — always positive, direction carries the sign. */
+  percentChange: number;
+  weekendPerDay: number;
+  weekdayPerDay: number;
+  message: string;
+}
+
+/**
+ * Budgeting v3 — household-wide (not per-category) weekend-vs-weekday
+ * spending comparison for the given month, per-day averages rather than
+ * raw totals (a month typically has ~2x as many weekdays as weekend
+ * days, so comparing totals would always read "weekdays are higher"
+ * regardless of the real pattern). `elapsedDays` — not the full calendar
+ * month — for both buckets: for the current, still-in-progress month,
+ * counting unelapsed future days as zero-spend days would drag the
+ * per-day average down and understate the real pattern; a past, complete
+ * month uses its own full day count. At most one insight (there's only
+ * one weekend-vs-weekday relationship to report), null when there's
+ * nothing noteworthy or not enough of either day type to compare.
+ */
+export function weekendSpendingInsight(transactions: Transaction[], month: Date, now: Date = new Date()): WeekendSpendingInsight | null {
+  const y = month.getFullYear();
+  const m = month.getMonth();
+  const isCurrentMonth = y === now.getFullYear() && m === now.getMonth();
+  const lastDayOfMonth = new Date(y, m + 1, 0).getDate();
+  const elapsedDays = isCurrentMonth ? Math.min(now.getDate(), lastDayOfMonth) : lastDayOfMonth;
+
+  let weekendDays = 0;
+  let weekdayDays = 0;
+  for (let day = 1; day <= elapsedDays; day++) {
+    const dow = new Date(y, m, day).getDay();
+    if (dow === 0 || dow === 6) weekendDays++;
+    else weekdayDays++;
+  }
+  if (weekendDays === 0 || weekdayDays === 0) return null;
+
+  let weekendTotal = 0;
+  let weekdayTotal = 0;
+  for (const t of transactions) {
+    if (t.trashedAt || t.excludedFromReports || t.type !== "expense") continue;
+    const d = parseCalendarDate(t.occurredAt);
+    if (d.getFullYear() !== y || d.getMonth() !== m || d.getDate() > elapsedDays) continue;
+    const dow = d.getDay();
+    if (dow === 0 || dow === 6) weekendTotal += Math.abs(t.amount);
+    else weekdayTotal += Math.abs(t.amount);
+  }
+
+  const weekendPerDay = weekendTotal / weekendDays;
+  const weekdayPerDay = weekdayTotal / weekdayDays;
+  if (weekdayPerDay < 5) return null; // noise floor — too little weekday spend for a % comparison to mean anything
+  const percentChange = ((weekendPerDay - weekdayPerDay) / weekdayPerDay) * 100;
+  if (Math.abs(percentChange) < 25) return null;
+  const direction: "up" | "down" = percentChange >= 0 ? "up" : "down";
+  const rounded = Math.round(Math.abs(percentChange));
+  return {
+    direction,
+    percentChange: rounded,
+    weekendPerDay: Math.round(weekendPerDay * 100) / 100,
+    weekdayPerDay: Math.round(weekdayPerDay * 100) / 100,
+    message: `You spend ${rounded}% ${direction === "up" ? "more" : "less"} on weekends than weekdays this month.`,
+  };
+}
+
+export interface MerchantSpendingInsight {
+  merchantKey: string;
+  merchantName: string;
+  direction: "up" | "down";
+  percentChange: number;
+  currentAmount: number;
+  trailingAvg: number;
+  message: string;
+}
+
+/** Shared by merchantSpendingInsights below — groups by normalizeMerchant()'s key (the same shared "same merchant" definition recurring-bill detection uses), but keeps the original, non-normalized string for display. */
+function spendByMerchantForMonth(transactions: Transaction[], month: Date): Map<string, { total: number; displayName: string }> {
+  const y = month.getFullYear();
+  const m = month.getMonth();
+  const totals = new Map<string, { total: number; displayName: string }>();
+  for (const t of transactions) {
+    if (t.trashedAt || t.excludedFromReports || t.type !== "expense") continue;
+    if (!t.merchant) continue;
+    const key = normalizeMerchant(t.merchant);
+    if (!key) continue; // guards a merchant string that's all digits/punctuation, same as detectRecurringFromTransactions
+    const d = parseCalendarDate(t.occurredAt);
+    if (d.getFullYear() !== y || d.getMonth() !== m) continue;
+    const existing = totals.get(key);
+    totals.set(key, { total: (existing?.total ?? 0) + Math.abs(t.amount), displayName: t.merchant.trim() });
+  }
+  return totals;
+}
+
+/**
+ * Budgeting v3 — same month-over-trailing-average comparison as
+ * spendingInsights above, but grouped by merchant instead of category
+ * ("your Starbucks spending is up 40% this month" vs. "Dining Out is up
+ * 40%"). A lower trailing-avg floor ($15, vs. spendingInsights' $20) —
+ * a single merchant is naturally smaller than a whole category, so the
+ * same $20 floor would silently exclude almost every real merchant.
+ */
+export function merchantSpendingInsights(transactions: Transaction[], month: Date, monthsBack = 3): MerchantSpendingInsight[] {
+  const current = spendByMerchantForMonth(transactions, month);
+
+  const trailingTotals = new Map<string, number>();
+  for (let i = 1; i <= monthsBack; i++) {
+    const priorMonth = new Date(month.getFullYear(), month.getMonth() - i, 1);
+    for (const [key, { total }] of spendByMerchantForMonth(transactions, priorMonth)) {
+      trailingTotals.set(key, (trailingTotals.get(key) ?? 0) + total);
+    }
+  }
+
+  const insights: MerchantSpendingInsight[] = [];
+  for (const [key, { total: currentAmount, displayName }] of current) {
+    const trailingAvg = (trailingTotals.get(key) ?? 0) / monthsBack;
+    if (trailingAvg < 15) continue;
+    const percentChange = ((currentAmount - trailingAvg) / trailingAvg) * 100;
+    if (Math.abs(percentChange) < 25) continue;
+    const direction: "up" | "down" = percentChange >= 0 ? "up" : "down";
+    const rounded = Math.round(Math.abs(percentChange));
+    insights.push({
+      merchantKey: key,
+      merchantName: displayName,
+      direction,
+      percentChange: rounded,
+      currentAmount: Math.round(currentAmount * 100) / 100,
+      trailingAvg: Math.round(trailingAvg * 100) / 100,
+      message: `${displayName} spending is ${direction} ${rounded}% this month (${formatCurrency(currentAmount)} vs your ${formatCurrency(trailingAvg)} average).`,
     });
   }
 

@@ -10,8 +10,19 @@ import { CategoryBudgetFormDialog } from "@/components/category-budget-form-dial
 import { BudgetRecommendationsCard } from "@/components/budget-recommendations-card";
 import { ZeroBasedBudgetTab } from "@/components/zero-based-budget-tab";
 import { BudgetVsActualChart } from "@/components/charts/budget-vs-actual-chart";
+import { Sparkline } from "@/components/charts/sparkline";
 import { useInventoryStore } from "@/lib/store";
-import { budgetVsActualForMonth, cashFlowForMonth, cashFlowTrend, sortByLabel, trailingCategorySpend, spendingInsights, zeroBasedAllocation } from "@/lib/selectors";
+import {
+  budgetVsActualForMonth,
+  cashFlowForMonth,
+  cashFlowTrend,
+  sortByLabel,
+  trailingCategorySpend,
+  spendingInsights,
+  weekendSpendingInsight,
+  merchantSpendingInsights,
+  zeroBasedAllocation,
+} from "@/lib/selectors";
 import { formatCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useRemountKey } from "@/hooks/use-remount-key";
@@ -75,18 +86,43 @@ export default function BudgetPage() {
   // simply falls outside this chart's window, same known limitation the
   // Dashboard's trend chart already has.
   const spendTrend = useMemo(() => cashFlowTrend(transactions, 6), [transactions]);
+  const targetIncome = financeSettings?.targetMonthlyIncome ?? null;
+  // Same rate this month's Savings Rate card shows, projected across the
+  // trend window against the *current* target income — same honesty
+  // caveat as the Budget vs Actual chart's flat Budget line: there's no
+  // historical target-income record, so the current value is the only
+  // real figure to compare each past month's actual spend against.
+  const savingsRateTrend = useMemo(
+    () => (targetIncome && targetIncome > 0 ? spendTrend.map((m) => ((targetIncome - m.spend) / targetIncome) * 100) : []),
+    [spendTrend, targetIncome]
+  );
+  const savingsRate = targetIncome && targetIncome > 0 ? ((targetIncome - totalActual) / targetIncome) * 100 : null;
 
   const recommendationCandidates = useMemo(
     () => trailingCategorySpend(transactions, transactionCategoryLinks, financeCategories, categoryBudgets),
     [transactions, transactionCategoryLinks, financeCategories, categoryBudgets]
   );
-  const insights = useMemo(
+  const categoryInsights = useMemo(
     () => spendingInsights(transactions, transactionCategoryLinks, financeCategories, month),
     [transactions, transactionCategoryLinks, financeCategories, month]
   );
+  const weekendInsight = useMemo(() => weekendSpendingInsight(transactions, month), [transactions, month]);
+  const merchantInsights = useMemo(() => merchantSpendingInsights(transactions, month), [transactions, month]);
+  // Combined, capped to 3 total (matching the mockup's 3-card insight
+  // panel) — weekend first when it clears threshold (a single household-
+  // wide signal, more narratively interesting than any one category or
+  // merchant), then merchant + category insights merged by $ magnitude.
+  const insights = useMemo(() => {
+    const rest = [
+      ...merchantInsights.map((m) => ({ key: `merchant-${m.merchantKey}`, direction: m.direction, message: m.message, magnitude: Math.abs(m.currentAmount - m.trailingAvg) })),
+      ...categoryInsights.map((c) => ({ key: `category-${c.categoryId}`, direction: c.direction, message: c.message, magnitude: Math.abs(c.currentAmount - c.trailingAvg) })),
+    ].sort((a, b) => b.magnitude - a.magnitude);
+    const weekend = weekendInsight ? [{ key: "weekend", direction: weekendInsight.direction, message: weekendInsight.message, magnitude: Infinity }] : [];
+    return [...weekend, ...rest].slice(0, 3);
+  }, [weekendInsight, merchantInsights, categoryInsights]);
   const allocation = useMemo(
-    () => zeroBasedAllocation(categoryBudgets, financeCategories, financeSettings?.targetMonthlyIncome ?? null),
-    [categoryBudgets, financeCategories, financeSettings]
+    () => zeroBasedAllocation(categoryBudgets, financeCategories, targetIncome),
+    [categoryBudgets, financeCategories, targetIncome]
   );
 
   const editingBudget = editingCategoryId ? categoryBudgets.find((b) => b.categoryId === editingCategoryId) : null;
@@ -141,7 +177,7 @@ export default function BudgetPage() {
           <div className="flex flex-col gap-2">
             {insights.map((insight) => (
               <div
-                key={insight.categoryId}
+                key={insight.key}
                 className={cn(
                   "flex items-start gap-2.5 rounded-2xl border p-3",
                   insight.direction === "up" ? "border-money-negative-border bg-money-negative-bg" : "border-badge-green-border bg-badge-green-bg"
@@ -158,14 +194,19 @@ export default function BudgetPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-3 gap-2">
+        <div className={cn("grid gap-2", savingsRate !== null ? "grid-cols-2" : "grid-cols-3")}>
           <div className="rounded-2xl border border-border bg-white p-3 shadow-sm">
             <p className="text-caption text-muted-foreground">Budget</p>
             <p className="mt-0.5 text-body font-semibold text-ink">{formatCurrency(totalBudgeted)}</p>
+            {/* No sparkline here, unlike Spent/Savings Rate below — a
+                standing target has no real per-period history to show
+                (same reason the trend chart's own Budget line is flat),
+                so this card stays number-only rather than faking one. */}
           </div>
           <div className="rounded-2xl border border-border bg-white p-3 shadow-sm">
             <p className="text-caption text-muted-foreground">Spent</p>
             <p className="mt-0.5 text-body font-semibold text-ink">{formatCurrency(totalActual)}</p>
+            <Sparkline values={spendTrend.map((m) => m.spend)} colorVar="--color-money-negative-text" />
           </div>
           <div className="rounded-2xl border border-border bg-white p-3 shadow-sm">
             <p className="text-caption text-muted-foreground">{totalRemaining < 0 ? "Over by" : "Remaining"}</p>
@@ -173,6 +214,15 @@ export default function BudgetPage() {
               {formatCurrency(Math.abs(totalRemaining))}
             </p>
           </div>
+          {savingsRate !== null && (
+            <div className="rounded-2xl border border-border bg-white p-3 shadow-sm">
+              <p className="text-caption text-muted-foreground">Savings Rate</p>
+              <p className={cn("mt-0.5 text-body font-semibold", savingsRate >= 0 ? "text-badge-green-text" : "text-money-negative-text")}>
+                {Math.round(savingsRate)}%
+              </p>
+              <Sparkline values={savingsRateTrend} colorVar={savingsRate >= 0 ? "--color-badge-green-text" : "--color-money-negative-text"} />
+            </div>
+          )}
         </div>
 
         {totalBudgeted > 0 && (

@@ -3,7 +3,8 @@
 export interface DonutSlice {
   key: string;
   value: number;
-  colorVar: string;
+  /** A ready-to-use CSS color value — `var(--color-x)`, `color-mix(...)`, a hex code, whatever the caller wants. Not wrapped in `var()` here, unlike trend-line-chart.tsx's `colorVar` convention, so a caller building a shade ramp (color-mix) isn't forced through an extra CSS custom property just to get a color into this component. */
+  color: string;
 }
 
 const SIZE = 160;
@@ -16,8 +17,8 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
  * as trend-line-chart.tsx (see that file's own doc comment). Built for
  * the Zero-Based Budget Builder's income-allocation view: one arc per
  * budgeted category (`stroke-dasharray`/`stroke-dashoffset` segments
- * around a circle, per-slice colored via a CSS var so callers can reuse
- * badgeColorVar() for a category-consistent hue), plus an implicit
+ * around a circle, per-slice colored via whatever CSS color the caller
+ * passes — e.g. a rank-based color-mix() shade ramp), plus an implicit
  * "unallocated" remainder rendered in a muted color when `slices` don't
  * add up to `total`. `total` is a separate prop rather than the sum of
  * `slices` — Zero-Based needs to show unallocated *income*, which can be
@@ -64,7 +65,7 @@ export function DonutChart({
             cy={SIZE / 2}
             r={RADIUS}
             fill="none"
-            stroke={`var(${s.colorVar})`}
+            stroke={s.color}
             strokeWidth={STROKE_WIDTH}
             strokeDasharray={`${s.dash} ${CIRCUMFERENCE - s.dash}`}
             strokeDashoffset={-s.offset}
