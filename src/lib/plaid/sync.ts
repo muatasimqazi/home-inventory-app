@@ -6,6 +6,7 @@ import { newId } from "@/lib/id";
 import { findDuplicateTransaction } from "@/lib/csv-import-resolution";
 import { resolveCategory } from "@/lib/receipt-resolution";
 import { transactionToInsertRow, rowToAccount, rowToTransaction, rowToCategoryRule, rowToFinanceCategory } from "@/lib/supabase/mappers";
+import { buildCreditCardLiabilityRows } from "./liabilities";
 import type { AccountRow, TransactionRow, CategoryRuleRow, FinanceCategoryRow } from "@/lib/supabase/mappers";
 import { TRASH_RETENTION_DAYS } from "@/lib/types";
 import type { Transaction } from "@/lib/types";
@@ -359,6 +360,26 @@ export async function syncPlaidItem(admin: SupabaseClient, item: PlaidItemForSyn
       const txnSum = ((sumRows ?? []) as { amount: number }[]).reduce((total, r) => total + r.amount, 0);
       const normalizedBalance = normalizeAccountBalance(account.type, plaidBalance);
       await admin.from("accounts").update({ starting_balance: normalizedBalance - txnSum }).eq("id", accountId);
+    }
+
+    // Credit card APR/statement details (Liabilities product) — its own
+    // try/catch, separate from the outer one this whole function already
+    // has: a Liabilities fetch failure (e.g. this Item never consented
+    // to it, an unsupported institution) must not mark the *whole* sync
+    // as failed or flip plaid_items.status to reauth_required/error —
+    // Transactions succeeding is what matters; this is a bonus on top.
+    try {
+      const creditCardAccounts = plaidLinkedAccounts.filter((a) => a.type === "credit_card");
+      if (creditCardAccounts.length > 0) {
+        const accountIdByPlaidAccountId = new Map(creditCardAccounts.map((a) => [a.plaidAccountId as string, a.id]));
+        const liabilitiesResponse = await plaidClient.liabilitiesGet({ access_token: item.access_token });
+        const rows = buildCreditCardLiabilityRows(liabilitiesResponse.data.liabilities.credit ?? [], accountIdByPlaidAccountId);
+        if (rows.length > 0) {
+          await admin.from("credit_card_liabilities").upsert(rows, { onConflict: "account_id" });
+        }
+      }
+    } catch (liabilitiesError) {
+      console.error(`syncPlaidItem: liabilities fetch failed for item ${item.id} (non-fatal):`, liabilitiesError);
     }
 
     await admin

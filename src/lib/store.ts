@@ -61,6 +61,7 @@ import {
   recurringCandidateDismissalToInsertRow,
   rowToAccountBalanceSnapshot,
   accountBalanceSnapshotToInsertRow,
+  rowToCreditCardLiability,
   rowToTransactionAttachment,
   transactionAttachmentToInsertRow,
   rowToTransactionCategory,
@@ -98,12 +99,14 @@ import {
   type RecurringBillRow,
   type FinanceBillShareRow,
   type AccountBalanceSnapshotRow,
+  type CreditCardLiabilityRow,
   type RecurringCandidateDismissalRow,
 } from "./supabase/mappers";
 import type {
   Account,
   AccountBalanceSnapshot,
   AccountType,
+  CreditCardLiability,
   ActivityAction,
   ActivityEntityType,
   ActivityLogEntry,
@@ -322,6 +325,8 @@ interface InventoryState {
   recurringCandidateDismissals: RecurringCandidateDismissal[];
   /** No Realtime subscription (rarely changes, not needed for live sync) — fetched once at hydration like everything else. */
   accountBalanceSnapshots: AccountBalanceSnapshot[];
+  /** Plaid Liabilities product data (APR, statement balance, minimum payment, due date) for credit_card accounts only — one row per account, Plaid-sourced, no manual-entry path. No household_id column (visibility inherited via account_id, same as account_balance_snapshots/transactions) — unlike that table, this one IS Realtime-bound (see subscribeRealtime), since the "Connect for interest rate info" reconnect flow needs a freshly-synced row to appear live. */
+  creditCardLiabilities: CreditCardLiability[];
   /** Permanently-retained receipt images (docs/Receipt Scanning Addendum.md §6) — unlike receipt_scan_batches/scanned_transaction_drafts/scanned_receipt_line_items (review-stage only, fetched on-demand by receipt-scan-session-store.ts, not part of this bundle), attachments are real permanent records shown on Transaction Detail, so they hydrate here like everything else. */
   transactionAttachments: TransactionAttachment[];
   /** Tag-style multi-category links (Categories Foundation workstream, supabase/migrations/0024_transaction_categories.sql) — a transaction can carry several of these, each still representing its full amount (not split-transaction accounting). transactions.categoryId is kept in sync alongside this table (whichever category is selected first/primary), so every existing single-category call site (dashboards, budget math, category_rules, the Ask tool) keeps working unchanged. RLS is privacy-aware like transactions' own policy, so — like itemPurchases — this array is already the complete set the caller should see. */
@@ -660,6 +665,7 @@ interface HouseholdBundle {
   financeBillShares: FinanceBillShare[];
   recurringCandidateDismissals: RecurringCandidateDismissal[];
   accountBalanceSnapshots: AccountBalanceSnapshot[];
+  creditCardLiabilities: CreditCardLiability[];
   transactionAttachments: TransactionAttachment[];
   transactionCategories: TransactionCategory[];
   categoryBudgets: CategoryBudget[];
@@ -695,6 +701,7 @@ function snapshotBundle(state: InventoryState): HouseholdBundle {
     financeBillShares: state.financeBillShares,
     recurringCandidateDismissals: state.recurringCandidateDismissals,
     accountBalanceSnapshots: state.accountBalanceSnapshots,
+    creditCardLiabilities: state.creditCardLiabilities,
     transactionAttachments: state.transactionAttachments,
     transactionCategories: state.transactionCategories,
     categoryBudgets: state.categoryBudgets,
@@ -814,6 +821,13 @@ async function fetchHouseholdBundle(
     : { data: [], error: null };
   if (snapshotsRes.error) throw new Error(snapshotsRes.error.message);
 
+  // credit_card_liabilities — same no-household_id-column reasoning as
+  // account_balance_snapshots just above, same accountIds reused.
+  const creditCardLiabilitiesRes = accountIds.length > 0
+    ? await supabase.from("credit_card_liabilities").select("*").in("account_id", accountIds)
+    : { data: [], error: null };
+  if (creditCardLiabilitiesRes.error) throw new Error(creditCardLiabilitiesRes.error.message);
+
   type ItemRowWithTags = ItemRow & { item_tags: { tag_id: string }[] | null };
 
   return {
@@ -842,6 +856,7 @@ async function fetchHouseholdBundle(
     financeBillShares: ((financeBillSharesRes.data ?? []) as FinanceBillShareRow[]).map(rowToFinanceBillShare),
     recurringCandidateDismissals: ((recurringCandidateDismissalsRes.data ?? []) as RecurringCandidateDismissalRow[]).map(rowToRecurringCandidateDismissal),
     accountBalanceSnapshots: ((snapshotsRes.data ?? []) as AccountBalanceSnapshotRow[]).map(rowToAccountBalanceSnapshot),
+    creditCardLiabilities: ((creditCardLiabilitiesRes.data ?? []) as CreditCardLiabilityRow[]).map(rowToCreditCardLiability),
     transactionAttachments: ((transactionAttachmentsRes.data ?? []) as TransactionAttachmentRow[]).map(rowToTransactionAttachment),
     transactionCategories: ((transactionCategoriesRes.data ?? []) as TransactionCategoryRow[]).map(rowToTransactionCategory),
     categoryBudgets: ((categoryBudgetsRes.data ?? []) as CategoryBudgetRow[]).map(rowToCategoryBudget),
@@ -1032,6 +1047,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
   financeBillShares: [],
   recurringCandidateDismissals: [],
   accountBalanceSnapshots: [],
+  creditCardLiabilities: [],
   transactionAttachments: [],
   transactionCategories: [],
   itemPurchases: [],
@@ -1215,6 +1231,29 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     // private account's transaction only reaches subscribers who can see
     // that account.
     bind<ItemPurchaseRow, ItemPurchase>("item_purchases", householdFilter, rowToItemPurchase, (p) => p.id, (r) => r.id as string, "itemPurchases");
+
+    // credit_card_liabilities: bespoke, same reason favorites/item_tags
+    // below are — no household_id column on this table at all (visibility
+    // inherited via account_id), so there's no `filter` this subscription
+    // can use the way bind()'s stateKey union assumes every table can.
+    // Subscribed unfiltered, guarded client-side by checking the account
+    // is one of the currently-loaded household's own accounts.
+    channel.on("postgres_changes", { event: "*", schema: "public", table: "credit_card_liabilities" }, (payload) => {
+      const change = payload as unknown as RealtimeRowChange;
+      if (change.eventType === "DELETE") {
+        const accountId = change.old.account_id as string;
+        set((s) => ({ creditCardLiabilities: s.creditCardLiabilities.filter((l) => l.accountId !== accountId) }));
+        return;
+      }
+      const row = change.new as unknown as CreditCardLiabilityRow;
+      if (!get().accounts.some((a) => a.id === row.account_id)) return;
+      const mapped = rowToCreditCardLiability(row);
+      set((s) => ({
+        creditCardLiabilities: s.creditCardLiabilities.some((l) => l.accountId === mapped.accountId)
+          ? s.creditCardLiabilities.map((l) => (l.accountId === mapped.accountId ? mapped : l))
+          : [...s.creditCardLiabilities, mapped],
+      }));
+    });
 
     // items: bespoke, since tagIds is derived from item_tags, not a column
     // on this row — a bare replace-by-id would wipe it back to [] on every

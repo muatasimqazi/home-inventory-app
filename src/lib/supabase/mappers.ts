@@ -36,6 +36,8 @@ import type {
   FinanceLifecycleStatus,
   FinanceAccountShare,
   AccountBalanceSnapshot,
+  CreditCardLiability,
+  CreditCardApr,
   Transaction,
   TransactionType,
   TransactionStatus,
@@ -1214,6 +1216,71 @@ export function accountBalanceSnapshotToInsertRow(s: AccountBalanceSnapshot): Ac
     as_of_date: s.asOfDate,
     source: s.source,
     created_at: s.createdAt,
+  };
+}
+
+/** The jsonb shape stored in credit_card_liabilities.aprs — snake_case, matching Plaid's own field names directly (not this app's usual camelCase convention) since it's a passthrough of Plaid's response, not a hand-designed column set. */
+export interface CreditCardAprRow {
+  apr_percentage: number;
+  apr_type: string;
+  balance_subject_to_apr: number | null;
+  interest_charge_amount: number | null;
+}
+
+export interface CreditCardLiabilityRow {
+  account_id: string;
+  aprs: CreditCardAprRow[];
+  is_overdue: boolean | null;
+  last_payment_amount: number | null;
+  last_payment_date: string | null;
+  last_statement_issue_date: string | null;
+  last_statement_balance: number | null;
+  minimum_payment_amount: number | null;
+  next_payment_due_date: string | null;
+  last_synced_at: string;
+}
+
+export function rowToCreditCardLiability(row: CreditCardLiabilityRow): CreditCardLiability {
+  return {
+    accountId: row.account_id,
+    aprs: (row.aprs ?? []).map(
+      (a): CreditCardApr => ({
+        aprPercentage: a.apr_percentage,
+        aprType: a.apr_type,
+        balanceSubjectToApr: a.balance_subject_to_apr,
+        interestChargeAmount: a.interest_charge_amount,
+      })
+    ),
+    isOverdue: row.is_overdue,
+    lastPaymentAmount: row.last_payment_amount,
+    lastPaymentDate: row.last_payment_date,
+    lastStatementIssueDate: row.last_statement_issue_date,
+    lastStatementBalance: row.last_statement_balance,
+    minimumPaymentAmount: row.minimum_payment_amount,
+    nextPaymentDueDate: row.next_payment_due_date,
+    lastSyncedAt: row.last_synced_at,
+  };
+}
+
+export function creditCardLiabilityToInsertRow(l: CreditCardLiability): CreditCardLiabilityRow {
+  return {
+    account_id: l.accountId,
+    aprs: l.aprs.map(
+      (a): CreditCardAprRow => ({
+        apr_percentage: a.aprPercentage,
+        apr_type: a.aprType,
+        balance_subject_to_apr: a.balanceSubjectToApr,
+        interest_charge_amount: a.interestChargeAmount,
+      })
+    ),
+    is_overdue: l.isOverdue,
+    last_payment_amount: l.lastPaymentAmount,
+    last_payment_date: l.lastPaymentDate,
+    last_statement_issue_date: l.lastStatementIssueDate,
+    last_statement_balance: l.lastStatementBalance,
+    minimum_payment_amount: l.minimumPaymentAmount,
+    next_payment_due_date: l.nextPaymentDueDate,
+    last_synced_at: l.lastSyncedAt,
   };
 }
 

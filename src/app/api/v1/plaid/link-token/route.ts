@@ -47,8 +47,19 @@ export async function POST(request: Request) {
       country_codes: [CountryCode.Us],
       user: { client_user_id: householdId },
       webhook: `${appOrigin()}/api/v1/webhooks/plaid`,
-      // Reconnect (update mode) omits `products` per Plaid's own
-      // requirement — the Item already has Transactions initialized.
+      // additional_consented_products (not a hard `products` requirement)
+      // for Liabilities in BOTH modes — credit card APR/statement data.
+      // Soft consent: not billed until actually called, and (unlike a
+      // hard product) an institution that doesn't support it still shows
+      // in Link rather than being excluded with "Connectivity not
+      // supported." Reconnect (update mode) otherwise still omits
+      // `products` itself per Plaid's own requirement — the Item already
+      // has Transactions initialized — but adding Liabilities consent
+      // here means any future reauth, for any reason, on any item, picks
+      // it up as a side effect (docs/Bank Sync Addendum.md §8's existing
+      // reconnect flow becomes the "Connect for interest rate info"
+      // mechanism for an already-linked card, not a new flow).
+      additional_consented_products: [Products.Liabilities],
       ...(accessToken ? { access_token: accessToken } : { products: [Products.Transactions] }),
     });
     return NextResponse.json({ linkToken: response.data.link_token });

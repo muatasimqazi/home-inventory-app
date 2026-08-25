@@ -63,6 +63,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, routed: true, ignored: payload.webhook_code });
   }
 
+  if (payload.webhook_type === "LIABILITIES") {
+    // Plaid-initiated liability change (a rate change, a new statement) —
+    // syncPlaidItem already includes the credit-card Liabilities fetch
+    // (see its own comment) alongside Transactions, so routing here to
+    // the exact same call keeps this a fresh full sync rather than a
+    // second, separate code path for one narrower fetch.
+    const result = await syncPlaidItem(admin, {
+      id: itemRow.id,
+      household_id: itemRow.household_id,
+      plaid_item_id: itemRow.plaid_item_id,
+      access_token: itemRow.access_token,
+      cursor: itemRow.cursor,
+      created_by_user_id: itemRow.created_by_user_id,
+    });
+    return NextResponse.json({ ok: true, routed: true, synced: result });
+  }
+
   if (payload.webhook_type === "ITEM" && payload.webhook_code === "ERROR") {
     const errorCode = payload.error?.error_code ?? "unknown_error";
     const status = errorCode === "ITEM_LOGIN_REQUIRED" ? "reauth_required" : "error";

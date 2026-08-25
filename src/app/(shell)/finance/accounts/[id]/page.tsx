@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { AccountFormSheet } from "@/components/account-form-sheet";
+import { CreditCardLiabilityCard } from "@/components/credit-card-liability-card";
 import { useInventoryStore } from "@/lib/store";
 import { transactionsForAccount, ACCOUNT_TYPE_LABEL } from "@/lib/selectors";
 import { formatCurrency, formatShortDate } from "@/lib/format";
@@ -18,6 +19,7 @@ export default function AccountDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const accounts = useInventoryStore((s) => s.accounts);
+  const creditCardLiabilities = useInventoryStore((s) => s.creditCardLiabilities);
   const transactions = useInventoryStore((s) => s.transactions);
   const members = useInventoryStore((s) => s.members);
   const financeAccountShares = useInventoryStore((s) => s.financeAccountShares);
@@ -107,6 +109,10 @@ export default function AccountDetailPage() {
           </button>
         )}
       </div>
+
+      {account.type === "credit_card" && (
+        <CreditCardLiabilityCard account={account} liability={creditCardLiabilities.find((l) => l.accountId === account.id) ?? null} />
+      )}
 
       <div>
         <div className="mb-2 flex items-center justify-between">

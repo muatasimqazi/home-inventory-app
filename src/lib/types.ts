@@ -409,6 +409,28 @@ export interface Account {
   createdByUserId: string | null;
 }
 
+/** One entry in CreditCardLiability.aprs — Plaid returns several per card (purchase/cash advance/balance transfer/a promotional rate), never just one. */
+export interface CreditCardApr {
+  aprPercentage: number;
+  aprType: string;
+  balanceSubjectToApr: number | null;
+  interestChargeAmount: number | null;
+}
+
+/** Plaid Liabilities product data for one credit_card account (user question: "can I get my credit card's interest rate from Plaid" — this is that answer). One row per account, Plaid-sourced only — no manual-entry path, and no row at all for a non-Plaid card or a Plaid card whose Item hasn't consented to Liabilities yet. */
+export interface CreditCardLiability {
+  accountId: string;
+  aprs: CreditCardApr[];
+  isOverdue: boolean | null;
+  lastPaymentAmount: number | null;
+  lastPaymentDate: string | null;
+  lastStatementIssueDate: string | null;
+  lastStatementBalance: number | null;
+  minimumPaymentAmount: number | null;
+  nextPaymentDueDate: string | null;
+  lastSyncedAt: string;
+}
+
 /** Explicit per-member opt-in grant onto a personal account. No row = not shared with that member. */
 export interface FinanceAccountShare {
   id: string;

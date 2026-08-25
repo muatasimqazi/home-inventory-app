@@ -19,7 +19,7 @@ import type { PlaidItem } from "@/lib/types";
  * already opened" ref. Calling `open()` from onClick has no such
  * ambiguity — a click only ever happens once per click.
  */
-function PlaidLinkLauncher({ token, onSuccess, onExit }: { token: string; onSuccess: PlaidLinkOnSuccess; onExit: () => void }) {
+export function PlaidLinkLauncher({ token, onSuccess, onExit }: { token: string; onSuccess: PlaidLinkOnSuccess; onExit: () => void }) {
   const { open, ready } = usePlaidLink({ token, onSuccess, onExit });
 
   return (
@@ -35,7 +35,7 @@ const STATUS_LABEL: Record<PlaidItem["status"], string> = {
   error: "Error",
 };
 
-function formatLastSynced(iso: string | null): string {
+export function formatLastSynced(iso: string | null): string {
   if (!iso) return "Never synced";
   const diffMs = Date.now() - new Date(iso).getTime();
   const minutes = Math.round(diffMs / 60000);
