@@ -644,7 +644,13 @@ export default function TransactionsListPage() {
                   // won, which is why this chip rendered taller/boxier than
                   // the plain-button FilterChips next to it (no fixed
                   // height at all, sized purely by their own padding).
-                  "data-[size=default]:h-auto shrink-0 gap-1 rounded-full border px-3 py-1.5 text-caption font-medium",
+                  //
+                  // tap-target (min-height/width 44px, same as FilterChip)
+                  // — without it this chip's height comes only from its own
+                  // padding+content, which sits *below* 44px, so it read as
+                  // the smallest chip in the row instead of matching its
+                  // siblings.
+                  "tap-target data-[size=default]:h-auto shrink-0 gap-1 rounded-full border px-3 py-1.5 text-caption font-medium",
                   categoryFilterId !== "all" ? "border-ink bg-ink text-white [&_svg]:text-white" : "border-border bg-white text-ink"
                 )}
               >
