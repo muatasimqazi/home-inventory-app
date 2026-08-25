@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Icon } from "@/components/icon";
 import { EmptyState } from "@/components/empty-state";
+import { PhotoThumb } from "@/components/photo-thumb";
 import { cn } from "@/lib/utils";
 import { displayCodeBadgeClasses } from "@/lib/badge-color";
 import { activeItemCountForLocation, directChildContainers, itemsIn } from "@/lib/selectors";
@@ -98,16 +99,21 @@ export function LocationAccordionRow({
 
   return (
     <div className="overflow-hidden rounded-xl bg-white shadow-sm">
-      <button type="button" onClick={onToggle} className="tap-target flex w-full items-center gap-3 px-4 py-3 text-left">
-        <Icon name={isOpen ? "chevronDown" : "chevronRight"} size={16} className="shrink-0 text-muted-foreground" />
-        <span className="text-xl" aria-hidden>
-          {location.coverPhotoEmoji ?? "📦"}
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-body font-medium text-ink">{location.name}</p>
-          <p className="text-caption text-muted-foreground">
-            {rootContainers.length} container{rootContainers.length === 1 ? "" : "s"} · {totalItemCount} item{totalItemCount === 1 ? "" : "s"}
-          </p>
+      <button type="button" onClick={onToggle} className="tap-target flex w-full items-stretch gap-3 text-left">
+        {/* Real cover photo, not just the emoji fallback — this row used to
+            render location.coverPhotoEmoji unconditionally and never
+            checked coverPhotoPath at all, so an uploaded or AI-generated
+            location photo never showed up in Browse. Edge-to-edge like the
+            List tab's row, above; the rest of the row keeps its own py-3. */}
+        <PhotoThumb emoji={location.coverPhotoEmoji ?? "📦"} coverPhotoPath={location.coverPhotoPath} className="w-14 shrink-0" emojiClassName="text-xl" fit="cover" />
+        <div className="flex min-w-0 flex-1 items-center gap-3 py-3 pr-4">
+          <Icon name={isOpen ? "chevronDown" : "chevronRight"} size={16} className="shrink-0 text-muted-foreground" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-body font-medium text-ink">{location.name}</p>
+            <p className="text-caption text-muted-foreground">
+              {rootContainers.length} container{rootContainers.length === 1 ? "" : "s"} · {totalItemCount} item{totalItemCount === 1 ? "" : "s"}
+            </p>
+          </div>
         </div>
       </button>
 

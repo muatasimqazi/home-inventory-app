@@ -90,21 +90,21 @@ export default function LocationsListPage() {
                   <Link
                     key={loc.id}
                     href={`/locations/${loc.id}`}
-                    className="flex items-center gap-3 rounded-2xl border border-border bg-white px-4 py-3.5 shadow-sm"
+                    className="flex items-stretch gap-3 overflow-hidden rounded-2xl border border-border bg-white shadow-sm"
                   >
-                    <PhotoThumb
-                      emoji={loc.coverPhotoEmoji ?? "📍"}
-                      coverPhotoPath={loc.coverPhotoPath}
-                      className="size-10 shrink-0 rounded-[10px]"
-                      emojiClassName="text-lg"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-item-title font-medium text-ink">{loc.name}</p>
-                      <p className="truncate text-caption text-muted-foreground">
-                        {itemCount} item{itemCount === 1 ? "" : "s"}
-                      </p>
+                    {/* Edge-to-edge top-to-bottom (and flush left) — the
+                        photo has no padding of its own; the text side keeps
+                        its own py-3.5 pr-4. */}
+                    <PhotoThumb emoji={loc.coverPhotoEmoji ?? "📍"} coverPhotoPath={loc.coverPhotoPath} className="w-16 shrink-0" emojiClassName="text-2xl" fit="cover" />
+                    <div className="flex min-w-0 flex-1 items-center gap-3 py-3.5 pr-4">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-item-title font-medium text-ink">{loc.name}</p>
+                        <p className="truncate text-caption text-muted-foreground">
+                          {itemCount} item{itemCount === 1 ? "" : "s"}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-caption font-semibold text-ink">Open</span>
                     </div>
-                    <span className="shrink-0 text-caption font-semibold text-ink">Open</span>
                   </Link>
                 );
               })}

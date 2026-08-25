@@ -160,8 +160,13 @@ export default function LocationDetailPage() {
         </div>
       </div>
 
-      <div className="relative">
-        <PhotoThumb emoji={location.coverPhotoEmoji ?? "📦"} coverPhotoPath={location.coverPhotoPath} className="h-48 w-full" emojiClassName="text-8xl" fit="cover" />
+      <div className="relative md:max-w-md">
+        {/* Was a fixed h-48 (192px) — too small/cropped-looking to read as
+            an actual photo. aspect-square matches the same ecommerce-style
+            hero treatment ItemPhotoGallery uses for items; md:max-w-md
+            caps it on wide desktop viewports for the same reason that cap
+            was added there (the shell's <main> has no global max-width). */}
+        <PhotoThumb emoji={location.coverPhotoEmoji ?? "📦"} coverPhotoPath={location.coverPhotoPath} className="aspect-square w-full" emojiClassName="text-8xl" fit="cover" />
         <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChosen} />
         <div className="absolute bottom-2 right-2 flex gap-2">
           {location.coverPhotoPath && (
