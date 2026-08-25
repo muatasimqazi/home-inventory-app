@@ -104,8 +104,21 @@ export function LocationAccordionRow({
             render location.coverPhotoEmoji unconditionally and never
             checked coverPhotoPath at all, so an uploaded or AI-generated
             location photo never showed up in Browse. Edge-to-edge like the
-            List tab's row, above; the rest of the row keeps its own py-3. */}
-        <PhotoThumb emoji={location.coverPhotoEmoji ?? "📦"} coverPhotoPath={location.coverPhotoPath} className="w-14 shrink-0" emojiClassName="text-xl" fit="cover" />
+            List tab's row, above; the rest of the row keeps its own py-3.
+            relative+w-14 wrapper, PhotoThumb absolutely positioned to fill
+            it — same fix as that row's own, for the same reason: a plain
+            width-only className left height unconstrained, so a tall
+            source photo rendered as a tall row instead of a consistent
+            fixed-size thumbnail. */}
+        <div className="relative w-14 shrink-0">
+          <PhotoThumb
+            emoji={location.coverPhotoEmoji ?? "📦"}
+            coverPhotoPath={location.coverPhotoPath}
+            className="absolute inset-0 size-full"
+            emojiClassName="text-xl"
+            fit="cover"
+          />
+        </div>
         <div className="flex min-w-0 flex-1 items-center gap-3 py-3 pr-4">
           <Icon name={isOpen ? "chevronDown" : "chevronRight"} size={16} className="shrink-0 text-muted-foreground" />
           <div className="min-w-0 flex-1">

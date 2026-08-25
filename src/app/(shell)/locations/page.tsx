@@ -98,8 +98,25 @@ export default function LocationsListPage() {
                   >
                     {/* Edge-to-edge top-to-bottom (and flush left) — the
                         photo has no padding of its own; the text side keeps
-                        its own py-3.5 pr-4. */}
-                    <PhotoThumb emoji={loc.coverPhotoEmoji ?? "📍"} coverPhotoPath={loc.coverPhotoPath} className="w-16 shrink-0" emojiClassName="text-2xl" fit="cover" />
+                        its own py-3.5 pr-4.
+                        relative+w-16 wrapper, PhotoThumb absolutely
+                        positioned to fill it — a plain width-only
+                        className left height unconstrained, so img's
+                        size-full (height:100% of an auto-height parent)
+                        fell back to the source photo's own aspect ratio:
+                        a tall original photo rendered as a tall row, a
+                        wide one as a short row, no two rows the same
+                        height. Same fix entity-card.tsx already uses for
+                        its own aspect-ratio boxes. */}
+                    <div className="relative w-16 shrink-0">
+                      <PhotoThumb
+                        emoji={loc.coverPhotoEmoji ?? "📍"}
+                        coverPhotoPath={loc.coverPhotoPath}
+                        className="absolute inset-0 size-full"
+                        emojiClassName="text-2xl"
+                        fit="cover"
+                      />
+                    </div>
                     <div className="flex min-w-0 flex-1 items-center gap-3 py-3.5 pr-4">
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-item-title font-medium text-ink">{loc.name}</p>

@@ -221,8 +221,28 @@ export default function OverviewPage() {
                   >
                     {/* Edge-to-edge top-to-bottom (and flush left) — no
                         padding around the photo itself, unlike the rest of
-                        the row, which keeps its own py-2.5 pr-3. */}
-                    <PhotoThumb emoji={loc.coverPhotoEmoji ?? "📍"} coverPhotoPath={loc.coverPhotoPath} className="w-14 shrink-0" emojiClassName="text-xl" fit="cover" />
+                        the row, which keeps its own py-2.5 pr-3.
+                        relative+w-14 wrapper, PhotoThumb absolutely
+                        positioned to fill it — a plain width-only
+                        className here left height unconstrained, so
+                        img's size-full (height:100% of an auto-height
+                        parent) fell back to the *source photo's own*
+                        aspect ratio: a tall original photo rendered as a
+                        tall row, a wide one as a short row, no two rows
+                        the same height. Same fix entity-card.tsx already
+                        uses for its own aspect-ratio boxes — absolute
+                        positioning breaks the image out of normal flow
+                        entirely, so it can't feed back into the size of
+                        the box it's filling. */}
+                    <div className="relative w-14 shrink-0">
+                      <PhotoThumb
+                        emoji={loc.coverPhotoEmoji ?? "📍"}
+                        coverPhotoPath={loc.coverPhotoPath}
+                        className="absolute inset-0 size-full"
+                        emojiClassName="text-xl"
+                        fit="cover"
+                      />
+                    </div>
                     <span className="min-w-0 flex-1 truncate self-center text-caption font-medium text-ink">{loc.name}</span>
                     {count > 0 && (
                       <span className="my-auto mr-3 shrink-0 rounded-full bg-badge-green-bg px-2 py-0.5 text-micro font-semibold text-badge-green-text">
