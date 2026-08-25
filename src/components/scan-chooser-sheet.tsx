@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Icon, type IconName } from "@/components/icon";
 import { useCurrentHousehold } from "@/lib/store";
+import { cn } from "@/lib/utils";
 
 interface ScanChooserSheetProps {
   open: boolean;
@@ -12,10 +13,23 @@ interface ScanChooserSheetProps {
   itemScanHref: string;
 }
 
-function ChooserRow({ icon, label, description, onClick }: { icon: IconName; label: string; description: string; onClick: () => void }) {
+function ChooserRow({
+  icon,
+  label,
+  description,
+  iconClassName,
+  onClick,
+}: {
+  icon: IconName;
+  label: string;
+  description: string;
+  /** One hue from the badge color wheel (badge-color.ts) — see this file's own comment on why these 5 rows each get a fixed, distinct one. */
+  iconClassName: string;
+  onClick: () => void;
+}) {
   return (
     <button type="button" onClick={onClick} className="tap-target flex items-center gap-3 rounded-2xl border border-border bg-white p-4 text-left">
-      <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-yellow text-white">
+      <span className={cn("flex size-12 shrink-0 items-center justify-center rounded-full text-white", iconClassName)}>
         <Icon name={icon} size={22} />
       </span>
       <div className="min-w-0 flex-1">
@@ -92,27 +106,55 @@ export function ScanChooserSheet({ open, onOpenChange, itemScanHref }: ScanChoos
         <SheetHeader>
           <SheetTitle className="text-section-title font-medium text-ink">Scan</SheetTitle>
         </SheetHeader>
+        {/* Each row a fixed, distinct hue from the same 5-hue badge color
+            wheel container-ID badges already use (badge-color.ts) — was
+            bg-yellow (the brand/primary fill) on every row, indistinct
+            from itself and from every other primary-colored button in the
+            app. Hand-picked per action rather than hashed
+            (displayCodeBadgeClasses's approach) since these are 5 fixed,
+            named actions, not arbitrary keys — "Item"/"Receipt" reuse the
+            same hue as their CreateChooserSheet counterpart. */}
         <div className="flex flex-col gap-2 px-4 pb-6">
           {household.inventoryEnabled && (
             <>
-              <ChooserRow icon="camera" label="Scan Item" description="Add something to your inventory" onClick={() => go(itemScanHref)} />
+              <ChooserRow
+                icon="camera"
+                label="Scan Item"
+                description="Add something to your inventory"
+                iconClassName="bg-badge-green-text"
+                onClick={() => go(itemScanHref)}
+              />
               <ChooserRow
                 icon="scanBarcode"
                 label="Scan Barcode"
                 description="Look up a product by UPC/EAN"
+                iconClassName="bg-badge-blue-text"
                 onClick={() => go(barcodeScanHref(itemScanHref))}
               />
-              <ChooserRow icon="zap" label="Scan Appliance" description="Read a model/serial label" onClick={() => go(applianceScanHref(itemScanHref))} />
+              <ChooserRow
+                icon="zap"
+                label="Scan Appliance"
+                description="Read a model/serial label"
+                iconClassName="bg-badge-orange-text"
+                onClick={() => go(applianceScanHref(itemScanHref))}
+              />
               <ChooserRow
                 icon="ai"
                 label="Scan Wardrobe"
                 description="Catalog a clothing item + generate studio photos"
+                iconClassName="bg-badge-purple-text"
                 onClick={() => go(wardrobeScanHref(itemScanHref))}
               />
             </>
           )}
           {household.financeEnabled && (
-            <ChooserRow icon="receipt" label="Scan Receipt" description="Auto-fill a Finance transaction" onClick={() => go("/finance/scan")} />
+            <ChooserRow
+              icon="receipt"
+              label="Scan Receipt"
+              description="Auto-fill a Finance transaction"
+              iconClassName="bg-badge-red-text"
+              onClick={() => go("/finance/scan")}
+            />
           )}
         </div>
       </SheetContent>

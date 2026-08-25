@@ -5,16 +5,30 @@ import { useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Icon, type IconName } from "@/components/icon";
 import { ContainerWizardSheet } from "@/components/container-wizard-sheet";
+import { cn } from "@/lib/utils";
 
 interface CreateChooserSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-function ChooserRow({ icon, label, description, onClick }: { icon: IconName; label: string; description: string; onClick: () => void }) {
+function ChooserRow({
+  icon,
+  label,
+  description,
+  iconClassName,
+  onClick,
+}: {
+  icon: IconName;
+  label: string;
+  description: string;
+  /** One hue from the badge color wheel (badge-color.ts) — see this file's own comment on why these 5 rows each get a fixed, distinct one. */
+  iconClassName: string;
+  onClick: () => void;
+}) {
   return (
     <button type="button" onClick={onClick} className="tap-target flex items-center gap-3 rounded-2xl border border-border bg-white p-4 text-left">
-      <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-yellow text-white">
+      <span className={cn("flex size-12 shrink-0 items-center justify-center rounded-full text-white", iconClassName)}>
         <Icon name={icon} size={22} />
       </span>
       <div className="min-w-0 flex-1">
@@ -61,13 +75,25 @@ export function CreateChooserSheet({ open, onOpenChange }: CreateChooserSheetPro
           <SheetHeader>
             <SheetTitle className="text-section-title font-medium text-ink">Add</SheetTitle>
           </SheetHeader>
+          {/* Same 5-hue badge color wheel as ScanChooserSheet, and the
+              same hue for the concepts the two sheets share — Item stays
+              green, Transaction stays red (Scan Receipt's hue) — since a
+              Scan Receipt and a manually-added Transaction are the same
+              underlying thing. */}
           <div className="flex flex-col gap-2 px-4 pb-6">
-            <ChooserRow icon="box" label="Item" description="Add something to your inventory" onClick={() => go("/add")} />
-            <ChooserRow icon="pin" label="Location" description="A room or area you store things in" onClick={() => go("/locations?open=new")} />
+            <ChooserRow icon="box" label="Item" description="Add something to your inventory" iconClassName="bg-badge-green-text" onClick={() => go("/add")} />
+            <ChooserRow
+              icon="pin"
+              label="Location"
+              description="A room or area you store things in"
+              iconClassName="bg-badge-blue-text"
+              onClick={() => go("/locations?open=new")}
+            />
             <ChooserRow
               icon="archive"
               label="Container"
               description="A bin, box, or shelf inside a Location"
+              iconClassName="bg-badge-orange-text"
               onClick={() => {
                 onOpenChange(false);
                 setWizardOpen(true);
@@ -77,9 +103,16 @@ export function CreateChooserSheet({ open, onOpenChange }: CreateChooserSheetPro
               icon="receipt"
               label="Transaction"
               description="A purchase, payment, or transfer"
+              iconClassName="bg-badge-red-text"
               onClick={() => go("/finance/transactions?open=new")}
             />
-            <ChooserRow icon="wallet" label="Account" description="A bank, card, or investment account" onClick={() => go("/finance/accounts?open=new")} />
+            <ChooserRow
+              icon="wallet"
+              label="Account"
+              description="A bank, card, or investment account"
+              iconClassName="bg-badge-purple-text"
+              onClick={() => go("/finance/accounts?open=new")}
+            />
           </div>
         </SheetContent>
       </Sheet>
