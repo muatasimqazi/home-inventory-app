@@ -15,6 +15,7 @@ import { EmptyState } from "@/components/empty-state";
 import { EntityFormSheet } from "@/components/entity-form-sheet";
 import { MoveSheet } from "@/components/move-sheet";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { GenerateLocationPhotoDialog } from "@/components/generate-location-photo-dialog";
 import { LoadMoreButton } from "@/components/load-more-button";
 import { Button } from "@/components/ui/button";
 import { usePaginated } from "@/hooks/use-paginated";
@@ -35,6 +36,7 @@ export default function LocationDetailPage() {
   const updateLocation = useInventoryStore((s) => s.updateLocation);
   const trashLocation = useInventoryStore((s) => s.trashLocation);
   const setLocationCoverPhoto = useInventoryStore((s) => s.setLocationCoverPhoto);
+  const generateLocationCoverPhoto = useInventoryStore((s) => s.generateLocationCoverPhoto);
   const removeLocationCoverPhoto = useInventoryStore((s) => s.removeLocationCoverPhoto);
   const trashItem = useInventoryStore((s) => s.trashItem);
   const moveItem = useInventoryStore((s) => s.moveItem);
@@ -46,6 +48,9 @@ export default function LocationDetailPage() {
   const [view, setView] = useState<ViewMode>("grid");
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [rotatingPhoto, setRotatingPhoto] = useState(false);
+  const [generatingPhoto, setGeneratingPhoto] = useState(false);
+  const [generatePhotoOpen, setGeneratePhotoOpen] = useState(false);
+  const [generatePhotoKey, bumpGeneratePhotoKey] = useRemountKey();
   const photoInputRef = useRef<HTMLInputElement>(null);
   // Bulk select for "Items directly here" — same itemSelectMode +
   // Set<id> + Move/Trash bulk-action-bar convention as the Container
@@ -127,6 +132,18 @@ export default function LocationDetailPage() {
     }
   }
 
+  async function handleGeneratePhoto(input: { roomType: string; detail: string }) {
+    if (!location) return;
+    setGeneratingPhoto(true);
+    const result = await generateLocationCoverPhoto(location.id, input);
+    setGeneratingPhoto(false);
+    if (!result.ok) {
+      toast.error(result.error ?? "Couldn't generate a photo.");
+      return;
+    }
+    toast.success("Photo generated");
+  }
+
   return (
     <div className="flex flex-col gap-5 pb-6">
       <div className="flex items-center justify-between">
@@ -176,6 +193,15 @@ export default function LocationDetailPage() {
             className="tap-target flex size-9 items-center justify-center rounded-full bg-white/90 shadow-sm disabled:opacity-60"
           >
             {uploadingPhoto ? <Icon name="spinner" size={16} className="animate-spin" /> : <Icon name="camera" size={16} />}
+          </button>
+          <button
+            type="button"
+            onClick={() => { bumpGeneratePhotoKey(); setGeneratePhotoOpen(true); }}
+            disabled={generatingPhoto}
+            aria-label="Generate photo with AI"
+            className="tap-target flex size-9 items-center justify-center rounded-full bg-white/90 shadow-sm disabled:opacity-60"
+          >
+            {generatingPhoto ? <Icon name="spinner" size={16} className="animate-spin" /> : <Icon name="ai" size={16} className="text-yellow" />}
           </button>
         </div>
       </div>
@@ -362,6 +388,14 @@ export default function LocationDetailPage() {
           toast("Moved to Trash", { description: "Recoverable for 30 days." });
           router.push("/locations");
         }}
+      />
+
+      <GenerateLocationPhotoDialog
+        key={generatePhotoKey}
+        open={generatePhotoOpen}
+        onOpenChange={setGeneratePhotoOpen}
+        initialRoomType={location.name}
+        onSubmit={handleGeneratePhoto}
       />
 
       <MoveSheet

@@ -364,6 +364,8 @@ interface InventoryState {
   restoreLocation: (locationId: string) => void;
   permanentlyDeleteLocation: (locationId: string) => void;
   setLocationCoverPhoto: (locationId: string, file: File) => Promise<{ ok: boolean; error?: string }>;
+  /** Generates a cover photo via AI (POST /api/v1/vision/generate-location-photo) from a room type ("Kitchen", "Pantry", "Wardrobe", ...) plus optional freeform detail, then points the location at it — same shape/guarantees as setLocationCoverPhoto, just a generated image in place of a chosen file. */
+  generateLocationCoverPhoto: (locationId: string, input: { roomType: string; detail?: string }) => Promise<{ ok: boolean; error?: string }>;
   removeLocationCoverPhoto: (locationId: string) => void;
 
   // Containers
@@ -911,6 +913,37 @@ export async function uploadCoverPhotoFile(file: File, householdId: string): Pro
   const { error: uploadError } = await supabase.storage.from("item-photos").upload(path, normalized, { contentType: normalized.type });
   if (uploadError) return { ok: false, error: uploadError.message };
   return { ok: true, path };
+}
+
+/**
+ * AI-generation counterpart to uploadCoverPhotoFile above — same output
+ * shape (a path already sitting in the "item-photos" bucket), just
+ * produced by POST /api/v1/vision/generate-location-photo (the actual
+ * generateImage() call is server-only, per lib/vision/generate-location-
+ * photo.ts) instead of a local file. Kept separate from that route's own
+ * validation/auth rather than inlined into generateLocationCoverPhoto
+ * below so the fetch-and-parse boilerplate isn't duplicated if a second
+ * caller (e.g. Container cover photos) wants the same AI-generate flow
+ * later.
+ */
+async function generateCoverPhotoViaAI(
+  locationId: string,
+  householdId: string,
+  roomType: string,
+  detail: string
+): Promise<{ ok: true; path: string } | { ok: false; error: string }> {
+  try {
+    const res = await fetch("/api/v1/vision/generate-location-photo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ householdId, locationId, roomType, detail: detail || undefined }),
+    });
+    const data = await res.json();
+    if (!res.ok) return { ok: false, error: data.error ?? "Couldn't generate a photo." };
+    return { ok: true, path: data.path };
+  } catch {
+    return { ok: false, error: "Couldn't reach the server. Check your connection." };
+  }
 }
 
 function removeCoverPhotoObject(path: string, context: string) {
@@ -1807,6 +1840,31 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     if (updateError) {
       set((s) => ({ locations: s.locations.map((l) => (l.id === locationId ? { ...l, coverPhotoPath: previousPath } : l)) }));
       removeCoverPhotoObject(path, "location cover photo upload");
+      return { ok: false, error: updateError.message };
+    }
+    if (previousPath) removeCoverPhotoObject(previousPath, "replaced location cover photo");
+    return { ok: true };
+  },
+
+  generateLocationCoverPhoto: async (locationId, input) => {
+    const location = get().locations.find((l) => l.id === locationId);
+    if (!location) return { ok: false, error: "Location not found." };
+    const previousPath = location.coverPhotoPath;
+
+    const generated = await generateCoverPhotoViaAI(locationId, location.householdId, input.roomType, input.detail ?? "");
+    if (!generated.ok) return generated;
+    const { path } = generated;
+
+    // Same optimistic-set/write-DB/revert-on-failure/old-photo-cleanup
+    // order as setLocationCoverPhoto above — the generated image is
+    // already sitting in Storage at this point (the API route uploaded
+    // it), this just points the location row at it.
+    const supabase = getSupabaseBrowserClient();
+    set((s) => ({ locations: s.locations.map((l) => (l.id === locationId ? { ...l, coverPhotoPath: path } : l)) }));
+    const { error: updateError } = await supabase.from("locations").update({ cover_photo_path: path }).eq("id", locationId);
+    if (updateError) {
+      set((s) => ({ locations: s.locations.map((l) => (l.id === locationId ? { ...l, coverPhotoPath: previousPath } : l)) }));
+      removeCoverPhotoObject(path, "generated location cover photo");
       return { ok: false, error: updateError.message };
     }
     if (previousPath) removeCoverPhotoObject(previousPath, "replaced location cover photo");
