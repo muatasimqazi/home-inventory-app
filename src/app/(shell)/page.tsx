@@ -53,11 +53,14 @@ const LOCATIONS_PREVIEW_LIMIT = 6;
  * fine while Shohaz had one domain, but a household-hub home needs to
  * represent every domain, not lead with one. This is that: a cross-domain
  * Overview (Household Hub Addendum §6's "what needs attention" view) with
- * a stat row pulling one headline number from each domain, a Home
- * Inventory section (the old Home page's content, now scoped under its
- * own heading), and a Finance section alongside it. Desktop sidebar gained
- * a matching standalone "Overview" nav entry above the per-domain
- * sections; mobile's bottom-nav "Home" tab still points here unchanged.
+ * a Home Inventory section (the old Home page's content, now scoped under
+ * its own heading) and a Finance section alongside it — every finance
+ * number (including Net Worth/Cash Flow, which used to sit in an
+ * ungrouped top stat row) now lives inside the Finance section, next to
+ * the My Dashboard/Household toggle that actually affects those numbers,
+ * rather than separated from it. Desktop sidebar gained a matching
+ * standalone "Overview" nav entry above the per-domain sections; mobile's
+ * bottom-nav "Home" tab still points here unchanged.
  */
 export default function OverviewPage() {
   const router = useRouter();
@@ -143,48 +146,24 @@ export default function OverviewPage() {
 
       <SearchBar value="" onChange={() => {}} onFocus={() => router.push("/search")} className="md:hidden" />
 
-      {/* Read-only numbers only — "what needs doing" lives in its own
-          banner below, not mixed into this row. Every card here is the
-          same shape (a label + one headline value) on purpose: a stat row
-          where one cell wraps a list of chips and the rest don't reads as
-          broken rhythm, not variety. */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-        {household.inventoryEnabled && (
-          <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
-            <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">Inventory</p>
-            <p className="mt-1 text-item-title font-semibold text-ink">
-              {summary.totalActiveItems} item{summary.totalActiveItems === 1 ? "" : "s"}
-            </p>
-            <p className="mt-0.5 text-caption text-muted-foreground">
-              {activeContainerList.length} container{activeContainerList.length === 1 ? "" : "s"}
-            </p>
-          </div>
-        )}
-
-        {household.financeEnabled && (
-          <>
-            <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
-              <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">Net Worth</p>
-              <p className="mt-1 text-item-title font-semibold text-ink">{formatCurrency(worth)}</p>
-              <p className="mt-0.5 text-caption text-muted-foreground">Trend needs a few weeks</p>
-            </div>
-
-            <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
-              <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">Cash Flow · This Month</p>
-              <div className="mt-1.5 flex items-center gap-4">
-                <div>
-                  <p className="text-caption text-muted-foreground">Income</p>
-                  <p className="text-body font-semibold text-badge-green-text">{formatCurrency(thisMonth.income, { showPositiveSign: true })}</p>
-                </div>
-                <div>
-                  <p className="text-caption text-muted-foreground">Spend</p>
-                  <p className="text-body font-semibold text-money-negative-text">{formatCurrency(-thisMonth.spend)}</p>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-      </div>
+      {/* Read-only number only — "what needs doing" lives in its own
+          banner below, not mixed into this row. Finance's own headline
+          numbers (Net Worth, Cash Flow) used to sit here too, ungrouped
+          from every other Finance card below; they've moved into the
+          Finance section itself, next to the My Dashboard/Household
+          toggle that actually affects them. A plain card, not a grid, now
+          that it's never more than this one tile. */}
+      {household.inventoryEnabled && (
+        <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
+          <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">Inventory</p>
+          <p className="mt-1 text-item-title font-semibold text-ink">
+            {summary.totalActiveItems} item{summary.totalActiveItems === 1 ? "" : "s"}
+          </p>
+          <p className="mt-0.5 text-caption text-muted-foreground">
+            {activeContainerList.length} container{activeContainerList.length === 1 ? "" : "s"}
+          </p>
+        </div>
+      )}
 
       {/* The one, consolidated "what needs doing" surface — used to be
           shown twice (a "Needs Attention" stat tile up here, and an
@@ -371,6 +350,32 @@ export default function OverviewPage() {
           >
             Household
           </button>
+        </div>
+
+        {/* Finance's own headline numbers, moved down from the page's
+            top-level stat row (see that row's own comment) — right next
+            to the toggle above, since these are exactly the two numbers
+            that toggle affects (My Dashboard vs. Household scoping). */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
+            <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">Net Worth</p>
+            <p className="mt-1 text-item-title font-semibold text-ink">{formatCurrency(worth)}</p>
+            <p className="mt-0.5 text-caption text-muted-foreground">Trend needs a few weeks</p>
+          </div>
+
+          <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
+            <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">Cash Flow · This Month</p>
+            <div className="mt-1.5 flex items-center gap-4">
+              <div>
+                <p className="text-caption text-muted-foreground">Income</p>
+                <p className="text-body font-semibold text-badge-green-text">{formatCurrency(thisMonth.income, { showPositiveSign: true })}</p>
+              </div>
+              <div>
+                <p className="text-caption text-muted-foreground">Spend</p>
+                <p className="text-body font-semibold text-money-negative-text">{formatCurrency(-thisMonth.spend)}</p>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_320px]">
