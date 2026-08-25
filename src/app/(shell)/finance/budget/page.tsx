@@ -9,8 +9,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CategoryBudgetFormDialog } from "@/components/category-budget-form-dialog";
 import { BudgetRecommendationsCard } from "@/components/budget-recommendations-card";
 import { ZeroBasedBudgetTab } from "@/components/zero-based-budget-tab";
+import { BudgetVsActualChart } from "@/components/charts/budget-vs-actual-chart";
 import { useInventoryStore } from "@/lib/store";
-import { budgetVsActualForMonth, cashFlowForMonth, sortByLabel, trailingCategorySpend, spendingInsights, zeroBasedAllocation } from "@/lib/selectors";
+import { budgetVsActualForMonth, cashFlowForMonth, cashFlowTrend, sortByLabel, trailingCategorySpend, spendingInsights, zeroBasedAllocation } from "@/lib/selectors";
 import { formatCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useRemountKey } from "@/hooks/use-remount-key";
@@ -67,6 +68,13 @@ export default function BudgetPage() {
   // invisible from the top-line Actual Spending figure.
   const totalActual = cashFlowForMonth(transactions, month).spend;
   const totalRemaining = totalBudgeted - totalActual;
+  // 6-month window anchored to real "now", not the stepper's `month" —
+  // same reasoning as the Dashboard's own cash-flow trend chart: it's
+  // "the last 6 months up to now," not itself something to browse. If
+  // the stepper is walked back further than that, the highlighted column
+  // simply falls outside this chart's window, same known limitation the
+  // Dashboard's trend chart already has.
+  const spendTrend = useMemo(() => cashFlowTrend(transactions, 6), [transactions]);
 
   const recommendationCandidates = useMemo(
     () => trailingCategorySpend(transactions, transactionCategoryLinks, financeCategories, categoryBudgets),
@@ -166,6 +174,13 @@ export default function BudgetPage() {
             </p>
           </div>
         </div>
+
+        {totalBudgeted > 0 && (
+          <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
+            <p className="mb-3 text-caption font-medium tracking-wide text-muted-foreground uppercase">Budget vs Actual</p>
+            <BudgetVsActualChart months={spendTrend} budgetedAmount={totalBudgeted} highlightMonth={month} />
+          </div>
+        )}
 
         {recommendationCandidates.length > 0 && <BudgetRecommendationsCard candidates={recommendationCandidates} onApply={setCategoryBudget} />}
 
