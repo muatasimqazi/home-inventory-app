@@ -12,17 +12,24 @@ import { useInventoryStore } from "@/lib/store";
 import { displayCodeBadgeClasses } from "@/lib/badge-color";
 import { cn } from "@/lib/utils";
 import { useRemountKey } from "@/hooks/use-remount-key";
+import type { FinanceCategory } from "@/lib/types";
 
 export default function CategoriesAndRulesPage() {
   const financeCategories = useInventoryStore((s) => s.financeCategories);
   const categoryRules = useInventoryStore((s) => s.categoryRules);
   const createFinanceCategory = useInventoryStore((s) => s.createFinanceCategory);
+  const updateFinanceCategory = useInventoryStore((s) => s.updateFinanceCategory);
   const trashFinanceCategory = useInventoryStore((s) => s.trashFinanceCategory);
   const createCategoryRule = useInventoryStore((s) => s.createCategoryRule);
   const deleteCategoryRule = useInventoryStore((s) => s.deleteCategoryRule);
 
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [categoryDialogKey, bumpCategoryDialogKey] = useRemountKey();
+  // Same dialog as "Add" (category-form-dialog.tsx already supports an
+  // initialName + "Edit Category" title for exactly this) — set instead of
+  // opening the add dialog when the tap is on an existing category's own
+  // edit button, so submit renames it instead of creating a new one.
+  const [editingCategory, setEditingCategory] = useState<FinanceCategory | null>(null);
   const [ruleDialogOpen, setRuleDialogOpen] = useState(false);
   const [ruleDialogKey, bumpRuleDialogKey] = useRemountKey();
   const [trashConfirmId, setTrashConfirmId] = useState<string | null>(null);
@@ -63,14 +70,24 @@ export default function CategoriesAndRulesPage() {
               >
                 {c.name}
                 {c.householdId !== null && (
-                  <button
-                    type="button"
-                    onClick={() => setTrashConfirmId(c.id)}
-                    aria-label={`Trash ${c.name}`}
-                    className="flex size-5 items-center justify-center rounded-full bg-white/50"
-                  >
-                    <Icon name="trash" size={11} />
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setEditingCategory(c)}
+                      aria-label={`Rename ${c.name}`}
+                      className="flex size-5 items-center justify-center rounded-full bg-white/50"
+                    >
+                      <Icon name="edit" size={11} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTrashConfirmId(c.id)}
+                      aria-label={`Trash ${c.name}`}
+                      className="flex size-5 items-center justify-center rounded-full bg-white/50"
+                    >
+                      <Icon name="trash" size={11} />
+                    </button>
+                  </>
                 )}
               </div>
             ))}
@@ -114,6 +131,18 @@ export default function CategoriesAndRulesPage() {
         onSubmit={(name) => {
           createFinanceCategory({ name });
           toast.success(`Added ${name}`);
+        }}
+      />
+
+      <CategoryFormDialog
+        key={editingCategory?.id}
+        open={editingCategory !== null}
+        onOpenChange={(open) => !open && setEditingCategory(null)}
+        initialName={editingCategory?.name}
+        onSubmit={(name) => {
+          if (!editingCategory) return;
+          updateFinanceCategory(editingCategory.id, { name });
+          toast.success(`Renamed to ${name}`);
         }}
       />
 
