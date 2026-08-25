@@ -2492,6 +2492,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       // plaid_account_id directly via the admin client.
       plaidItemId: null,
       plaidAccountId: null,
+      createdByUserId: get().currentUserId,
     };
     set((s) => ({ accounts: [...s.accounts, created] }));
     persistOrRevert(
@@ -2531,6 +2532,9 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     const updateRow: Partial<ReturnType<typeof accountToInsertRow>> = accountToInsertRow(merged);
     delete updateRow.plaid_item_id;
     delete updateRow.plaid_account_id;
+    // Same reasoning — who created the account is set once and never
+    // meant to change via a later edit.
+    delete updateRow.created_by_user_id;
     persistOrRevert(
       supabase.from("accounts").update(updateRow).eq("id", accountId),
       () => set((s) => ({ accounts: s.accounts.map((a) => (a.id === accountId ? previous : a)) })),

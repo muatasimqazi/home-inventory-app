@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Icon } from "@/components/icon";
 import { IconChip } from "@/components/icon-chip";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
 import { AccountFormSheet } from "@/components/account-form-sheet";
@@ -67,24 +68,43 @@ export default function AccountsListPage() {
             <div key={group.label}>
               <p className="mb-2 text-caption font-medium tracking-wide text-muted-foreground uppercase">{group.label}</p>
               <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
-                {group.accounts.map((a) => (
-                  <Link key={a.id} href={`/finance/accounts/${a.id}`} className="flex items-center gap-3 px-4 py-3.5">
-                    <IconChip icon={accountTypeIcon(a.type)} tone="muted" />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-item-title font-medium text-ink">{a.name}</p>
-                      <p className="truncate text-caption text-muted-foreground">
-                        {a.institutionName}
-                        {a.cardLastFour ? ` · ...${a.cardLastFour}` : ""}
-                      </p>
-                      {a.ownerUserId !== null && (
-                        <Badge className="mt-1 bg-badge-purple-bg text-badge-purple-text">Personal</Badge>
-                      )}
-                    </div>
-                    <span className={cn("shrink-0 text-body font-semibold", a.currentBalance < 0 ? "text-money-negative-text" : "text-ink")}>
-                      {formatCurrency(a.currentBalance)}
-                    </span>
-                  </Link>
-                ))}
+                {group.accounts.map((a) => {
+                  // Only meaningful on a joint account — a personal
+                  // account already shows the "Personal" badge in this
+                  // same slot, and it's implicitly yours (or shared with
+                  // you) either way, so who created it isn't the
+                  // interesting fact there the way it is on an account
+                  // the whole household shares.
+                  const creator = a.ownerUserId === null ? members.find((m) => m.userId === a.createdByUserId) : undefined;
+                  return (
+                    <Link key={a.id} href={`/finance/accounts/${a.id}`} className="flex items-center gap-3 px-4 py-3.5">
+                      <IconChip icon={accountTypeIcon(a.type)} tone="muted" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-item-title font-medium text-ink">{a.name}</p>
+                        <p className="truncate text-caption text-muted-foreground">
+                          {a.institutionName}
+                          {a.cardLastFour ? ` · ...${a.cardLastFour}` : ""}
+                        </p>
+                        {a.ownerUserId !== null ? (
+                          <Badge className="mt-1 bg-badge-purple-bg text-badge-purple-text">Personal</Badge>
+                        ) : (
+                          creator && (
+                            <span className="mt-1 flex items-center gap-1">
+                              <Avatar size="sm" className="size-4">
+                                <AvatarImage src={creator.avatarUrl} alt="" />
+                                <AvatarFallback className="text-[9px]">{creator.displayName.charAt(0)}</AvatarFallback>
+                              </Avatar>
+                              <span className="truncate text-caption text-muted-foreground">Added by {creator.displayName}</span>
+                            </span>
+                          )
+                        )}
+                      </div>
+                      <span className={cn("shrink-0 text-body font-semibold", a.currentBalance < 0 ? "text-money-negative-text" : "text-ink")}>
+                        {formatCurrency(a.currentBalance)}
+                      </span>
+                    </Link>
+                  );
+                })}
               </div>
             </div>
           ))}

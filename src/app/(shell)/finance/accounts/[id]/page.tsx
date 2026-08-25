@@ -6,6 +6,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { AccountFormSheet } from "@/components/account-form-sheet";
 import { useInventoryStore } from "@/lib/store";
@@ -47,6 +48,7 @@ export default function AccountDetailPage() {
 
   const isOwner = account.ownerUserId === currentUserId;
   const isJoint = account.ownerUserId === null;
+  const creator = isJoint ? members.find((m) => m.userId === account.createdByUserId) : undefined;
   const accountTransactions = transactionsForAccount(transactions, account.id);
 
   return (
@@ -90,6 +92,15 @@ export default function AccountDetailPage() {
             </p>
           )}
         </div>
+        {isJoint && creator && (
+          <div className="mt-2 flex items-center gap-1.5">
+            <Avatar size="sm">
+              <AvatarImage src={creator.avatarUrl} alt="" />
+              <AvatarFallback className="text-[10px]">{creator.displayName.charAt(0)}</AvatarFallback>
+            </Avatar>
+            <p className="text-caption text-muted-foreground">Added by {creator.displayName}</p>
+          </div>
+        )}
         {isOwner && !isJoint && (
           <button type="button" onClick={() => setEditOpen(true)} className="mt-2 rounded-full bg-badge-purple-bg px-3 py-1 text-caption font-semibold text-badge-purple-text">
             Manage sharing

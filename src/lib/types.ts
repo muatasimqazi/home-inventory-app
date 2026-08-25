@@ -405,6 +405,8 @@ export interface Account {
   /** Bank Sync Addendum §3/§8 — null for every non-Plaid account. Set together: an account is either fully Plaid-linked (both set) or not (both null), never one without the other. */
   plaidItemId: string | null;
   plaidAccountId: string | null;
+  /** Who added this account — set once at creation (manual create, or whoever linked the bank for a Plaid account), never touched by a later edit. Null for accounts created before this was tracked and never backfillable (no matching activity_log/plaid_items row). */
+  createdByUserId: string | null;
 }
 
 /** Explicit per-member opt-in grant onto a personal account. No row = not shared with that member. */

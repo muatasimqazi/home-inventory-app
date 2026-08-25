@@ -110,6 +110,9 @@ export async function POST(request: Request) {
       permanentlyDeleteAfter: null,
       plaidItemId: itemRow.id,
       plaidAccountId: pa.account_id,
+      // Whoever linked the bank — same value plaid_items.created_by_user_id
+      // already got a few lines up, from the same auth.userId.
+      createdByUserId: auth.userId,
     };
     const { error: accountInsertError } = await admin.from("accounts").insert(accountToInsertRow(created));
     if (accountInsertError) console.error(`plaid/exchange-public-token: couldn't insert account for Plaid account ${pa.account_id}:`, accountInsertError);

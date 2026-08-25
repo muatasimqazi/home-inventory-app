@@ -744,6 +744,7 @@ export interface AccountRow {
   permanently_delete_after: string | null;
   plaid_item_id: string | null;
   plaid_account_id: string | null;
+  created_by_user_id: string | null;
 }
 
 export function rowToAccount(row: AccountRow): Account {
@@ -764,6 +765,7 @@ export function rowToAccount(row: AccountRow): Account {
     permanentlyDeleteAfter: row.permanently_delete_after,
     plaidItemId: row.plaid_item_id,
     plaidAccountId: row.plaid_account_id,
+    createdByUserId: row.created_by_user_id,
   };
 }
 
@@ -785,6 +787,7 @@ export function accountToInsertRow(a: Account): Omit<AccountRow, "current_balanc
     permanently_delete_after: a.permanentlyDeleteAfter,
     plaid_item_id: a.plaidItemId,
     plaid_account_id: a.plaidAccountId,
+    created_by_user_id: a.createdByUserId,
   };
 }
 
