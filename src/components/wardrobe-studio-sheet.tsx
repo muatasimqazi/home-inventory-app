@@ -11,14 +11,16 @@ import { WARDROBE_STYLES, WARDROBE_STYLE_LABEL } from "@/lib/wardrobe-styles";
 import { cn } from "@/lib/utils";
 import type { Item, ItemStudioPhoto, ItemStudioPhotoAspectRatio, ItemStudioPhotoStyle } from "@/lib/types";
 
-// Ghost Mannequin only by default (user request) — the most requested/
-// ecommerce-relevant style for an actual garment, and the one that
-// actually renders it *worn*, not just photographed flat. Generating
-// white_background/studio_shadow too by default meant every capture
-// produced 3 variants whether or not anyone wanted them; now it's a
-// single, deliberate choice unless the user explicitly picks more (up
-// to MAX_STYLES) themselves.
-const DEFAULT_STYLES: ItemStudioPhotoStyle[] = ["ghost_mannequin"];
+// Ghost Mannequin front + profile by default (user request) — the most
+// ecommerce-relevant treatment for an actual garment, as two genuinely
+// different angles rather than one. Was Ghost Mannequin alone; adding
+// white_background/studio_shadow as a 2nd photo just produced another
+// front-on view with a different background, not a second angle, so it
+// read as a near-duplicate of the first. ghost_mannequin_profile is
+// built specifically to pair with the front shot — a real rotation, not
+// another straight-on style — so defaulting to both now gives two
+// actually-different photos instead of two similar-looking ones.
+const DEFAULT_STYLES: ItemStudioPhotoStyle[] = ["ghost_mannequin", "ghost_mannequin_profile"];
 const MAX_STYLES = 3;
 
 /**

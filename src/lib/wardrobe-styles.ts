@@ -7,6 +7,7 @@ import type { ItemStudioPhotoStyle } from "@/lib/types";
 // needs adding in one place instead of staying in sync across four.
 export const WARDROBE_STYLES: ItemStudioPhotoStyle[] = [
   "ghost_mannequin",
+  "ghost_mannequin_profile",
   "white_background",
   "transparent_background",
   "studio_shadow",
@@ -16,6 +17,7 @@ export const WARDROBE_STYLES: ItemStudioPhotoStyle[] = [
 
 export const WARDROBE_STYLE_LABEL: Record<ItemStudioPhotoStyle, string> = {
   ghost_mannequin: "Ghost Mannequin",
+  ghost_mannequin_profile: "Ghost Mannequin — Profile",
   white_background: "White Background",
   transparent_background: "Transparent",
   studio_shadow: "Studio Shadow",
