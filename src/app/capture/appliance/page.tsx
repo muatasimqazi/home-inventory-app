@@ -332,27 +332,6 @@ function ApplianceCaptureInner() {
             <div className="pointer-events-none absolute inset-x-6 top-6 rounded-xl bg-black/40 px-3 py-2 text-center text-caption text-white/90">
               Frame the manufacturer&apos;s label — usually a sticker or metal plate on the back, side, or inside edge.
             </div>
-            <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-4 bg-linear-to-t from-black/60 to-transparent px-6 pb-8 pt-10">
-              <div className="flex w-full items-center justify-center gap-10">
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  aria-label="Choose from library"
-                  className="tap-target flex size-11 items-center justify-center rounded-full bg-white/10 text-white"
-                >
-                  <Icon name="gallery" size={20} />
-                </button>
-                <button
-                  type="button"
-                  onClick={handleShutter}
-                  aria-label="Capture photo"
-                  className="flex size-18 items-center justify-center rounded-full border-4 border-white bg-white/20"
-                >
-                  <span className="size-14 rounded-full bg-white" />
-                </button>
-                <div className="size-11" />
-              </div>
-            </div>
           </>
         )}
 
@@ -397,6 +376,34 @@ function ApplianceCaptureInner() {
           </div>
         )}
       </div>
+
+      {/* A sibling panel below the video, not an overlay on top of it — see
+          capture/page.tsx's identical fix and its own longer comment on why
+          (real camera UI overlapping the live view obscured exactly the
+          part of the frame users needed to see while composing a shot). */}
+      {mode === "live" && (
+        <div className="flex flex-col items-center gap-4 bg-ink px-6 pb-[max(2rem,env(safe-area-inset-bottom))] pt-6">
+          <div className="flex w-full items-center justify-center gap-10">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              aria-label="Choose from library"
+              className="tap-target flex size-11 items-center justify-center rounded-full bg-white/10 text-white"
+            >
+              <Icon name="gallery" size={20} />
+            </button>
+            <button
+              type="button"
+              onClick={handleShutter}
+              aria-label="Capture photo"
+              className="flex size-18 items-center justify-center rounded-full border-4 border-white bg-white/20"
+            >
+              <span className="size-14 rounded-full bg-white" />
+            </button>
+            <div className="size-11" />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

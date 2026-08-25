@@ -346,41 +346,7 @@ function CameraCaptureInner() {
           </div>
         )}
 
-        {mode === "live" && (
-          <>
-            <video ref={videoRef} autoPlay playsInline muted className="size-full object-cover" />
-            <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-4 bg-linear-to-t from-black/60 to-transparent px-6 pb-8 pt-10">
-              {photos.length > 0 && (
-                <button
-                  type="button"
-                  onClick={handleReviewAndSave}
-                  className="tap-target h-11 w-full max-w-xs rounded-full bg-yellow text-body font-medium text-white"
-                >
-                  Review & Save ({photos.length})
-                </button>
-              )}
-              <div className="flex w-full items-center justify-center gap-10">
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  aria-label="Choose from library"
-                  className="tap-target flex size-11 items-center justify-center rounded-full bg-white/10 text-white"
-                >
-                  <Icon name="gallery" size={20} />
-                </button>
-                <button
-                  type="button"
-                  onClick={handleShutter}
-                  aria-label="Capture photo"
-                  className="flex size-18 items-center justify-center rounded-full border-4 border-white bg-white/20"
-                >
-                  <span className="size-14 rounded-full bg-white" />
-                </button>
-                <div className="size-11" />
-              </div>
-            </div>
-          </>
-        )}
+        {mode === "live" && <video ref={videoRef} autoPlay playsInline muted className="size-full object-cover" />}
 
         {mode === "preview" && previewUrl && (
           <div className="flex h-full flex-col">
@@ -436,6 +402,46 @@ function CameraCaptureInner() {
           </div>
         )}
       </div>
+
+      {/* A sibling panel below the video, not an overlay on top of it (was
+          `absolute inset-x-0 bottom-0` over the live feed) — real camera UI
+          overlapping the live view meant users couldn't actually see the
+          bottom of whatever they were framing while composing a shot, and
+          would find it cut off after capture. finance/scan/page.tsx's own
+          live-mode controls already use this same non-overlapping sibling
+          pattern; this just brings capture/page.tsx in line with it. */}
+      {mode === "live" && (
+        <div className="flex flex-col items-center gap-4 bg-ink px-6 pb-[max(2rem,env(safe-area-inset-bottom))] pt-6">
+          {photos.length > 0 && (
+            <button
+              type="button"
+              onClick={handleReviewAndSave}
+              className="tap-target h-11 w-full max-w-xs rounded-full bg-yellow text-body font-medium text-white"
+            >
+              Review & Save ({photos.length})
+            </button>
+          )}
+          <div className="flex w-full items-center justify-center gap-10">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              aria-label="Choose from library"
+              className="tap-target flex size-11 items-center justify-center rounded-full bg-white/10 text-white"
+            >
+              <Icon name="gallery" size={20} />
+            </button>
+            <button
+              type="button"
+              onClick={handleShutter}
+              aria-label="Capture photo"
+              className="flex size-18 items-center justify-center rounded-full border-4 border-white bg-white/20"
+            >
+              <span className="size-14 rounded-full bg-white" />
+            </button>
+            <div className="size-11" />
+          </div>
+        </div>
+      )}
 
       {mode === "live" && photos.length > 0 && (
         <div className="flex gap-2 overflow-x-auto bg-ink px-4 pb-4">
