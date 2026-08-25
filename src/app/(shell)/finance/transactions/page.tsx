@@ -631,7 +631,6 @@ export default function TransactionsListPage() {
           ] as [DateScope, string][]).map(([value, label]) => (
             <FilterChip key={value} label={label} active={dateScope === value} onClick={() => setDateScope(value)} />
           ))}
-          <FilterChip label="Uncategorized" active={uncategorizedOnly} onClick={() => setUncategorizedOnly((v) => !v)} />
           {activeFinanceCategories.length > 0 && (
             <Select value={categoryFilterId} onValueChange={setCategoryFilterId}>
               <SelectTrigger
@@ -667,6 +666,7 @@ export default function TransactionsListPage() {
               </SelectContent>
             </Select>
           )}
+          <FilterChip label="Uncategorized" active={uncategorizedOnly} onClick={() => setUncategorizedOnly((v) => !v)} />
         </div>
         {/* Select-all convention mirrors Trash's InventoryTrashPanel — scoped to
             the currently filtered+sorted list, not the whole account. Also
