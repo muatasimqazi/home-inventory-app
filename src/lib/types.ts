@@ -488,6 +488,8 @@ export interface Transaction {
   plaidTransactionId: string | null;
   /** Bank Sync Addendum §7 — once a household member edits category/merchant/description/notes on a Plaid-sourced (or Plaid-adopted) transaction, a later `modified` sync refreshes amount/date/status only and leaves these fields alone. */
   userEdited: boolean;
+  /** A real 100×100 merchant logo PNG, straight from Plaid's own transaction data — null for every non-Plaid transaction (manual/csv_import/receipt_scan), and for a Plaid transaction Plaid itself has no logo for. Forward-only: only ever set at sync time, never backfilled for transactions synced before this was captured. */
+  merchantLogoUrl: string | null;
 }
 
 /**

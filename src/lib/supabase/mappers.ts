@@ -920,6 +920,7 @@ export interface TransactionRow {
   permanently_delete_after: string | null;
   plaid_transaction_id: string | null;
   user_edited: boolean;
+  merchant_logo_url: string | null;
 }
 
 export function rowToTransaction(row: TransactionRow): Transaction {
@@ -947,6 +948,7 @@ export function rowToTransaction(row: TransactionRow): Transaction {
     permanentlyDeleteAfter: row.permanently_delete_after,
     plaidTransactionId: row.plaid_transaction_id,
     userEdited: row.user_edited,
+    merchantLogoUrl: row.merchant_logo_url,
   };
 }
 
@@ -975,6 +977,7 @@ export function transactionToInsertRow(t: Transaction): TransactionRow {
     permanently_delete_after: t.permanentlyDeleteAfter,
     plaid_transaction_id: t.plaidTransactionId,
     user_edited: t.userEdited,
+    merchant_logo_url: t.merchantLogoUrl,
   };
 }
 

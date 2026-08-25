@@ -2652,6 +2652,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       // directly via the admin client, not through this store method.
       plaidTransactionId: null,
       userEdited: false,
+      merchantLogoUrl: null,
     };
     // Tag-style multi-category set (Categories Foundation workstream) —
     // deduped, and only actually written once the transaction row itself
@@ -2729,6 +2730,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       permanentlyDeleteAfter: null,
       plaidTransactionId: null,
       userEdited: false,
+      merchantLogoUrl: null,
     };
     const toTxn: Transaction = {
       ...fromTxn,

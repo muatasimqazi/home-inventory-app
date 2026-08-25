@@ -56,6 +56,7 @@ export async function createAndLinkRefundTransaction(
     permanentlyDeleteAfter: null,
     plaidTransactionId: null,
     userEdited: false,
+    merchantLogoUrl: null,
   };
 
   const { error: insertError } = await getSupabaseBrowserClient().from("transactions").insert(transactionToInsertRow(transaction));

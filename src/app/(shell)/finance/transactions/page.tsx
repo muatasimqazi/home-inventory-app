@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchBar } from "@/components/search-bar";
+import { MerchantIcon } from "@/components/merchant-icon";
 import { EmptyState } from "@/components/empty-state";
 import { TransactionFormSheet } from "@/components/transaction-form-sheet";
 import { TransactionDetailSheet } from "@/components/transaction-detail-sheet";
@@ -826,6 +827,7 @@ export default function TransactionsListPage() {
                           onClick={() => (selectMode && isCategorizable ? toggleSelected(t.id) : setDetailId(t.id))}
                           className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left"
                         >
+                          <MerchantIcon logoUrl={t.merchantLogoUrl} merchantName={t.merchant ?? t.description} className="size-9" />
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-body font-medium text-ink">{t.merchant ?? t.description ?? "Transaction"}</p>
                             <div className="mt-0.5 flex flex-wrap items-center gap-1.5">

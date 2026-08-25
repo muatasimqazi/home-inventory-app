@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CashFlowChart } from "@/components/charts/cash-flow-chart";
 import { FinanceAiCard } from "@/components/finance-ai-card";
+import { MerchantIcon } from "@/components/merchant-icon";
 import { useInventoryStore } from "@/lib/store";
 import {
   accountTypeIcon,
@@ -304,6 +305,7 @@ export default function FinanceDashboardPage() {
           <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
             {recent.map((t) => (
               <Link key={t.id} href={`/finance/transactions?transactionId=${t.id}`} className="flex items-center gap-3 px-4 py-3">
+                <MerchantIcon logoUrl={t.merchantLogoUrl} merchantName={t.merchant ?? t.description} className="size-9" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-body font-medium text-ink">{t.merchant ?? t.description ?? "Transaction"}</p>
                   <p className="truncate text-caption text-muted-foreground">{formatShortDate(t.occurredAt)}</p>

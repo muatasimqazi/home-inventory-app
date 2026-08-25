@@ -122,6 +122,11 @@ async function handleAdded(
         occurred_at: occurredAt,
         posted_at: pt.pending ? null : occurredAt,
         status: pt.pending ? "pending" : "posted",
+        // Always refreshed, not gated behind !pendingMatch.userEdited below
+        // — unlike merchant/description/type, there's no UI for a
+        // household to hand-edit this, so it's purely Plaid-derived and
+        // safe to keep in sync the same way amount/occurred_at/status are.
+        merchant_logo_url: pt.logo_url ?? null,
         updated_at: new Date().toISOString(),
       };
       if (!pendingMatch.userEdited) {
@@ -157,7 +162,7 @@ async function handleAdded(
   // creating a second row for the same real-world charge.
   const duplicate = findDuplicateTransaction({ accountId, amount, occurredAt, description: merchant ?? "" }, existingTxns);
   if (duplicate) {
-    await admin.from("transactions").update({ plaid_transaction_id: pt.transaction_id }).eq("id", duplicate.id);
+    await admin.from("transactions").update({ plaid_transaction_id: pt.transaction_id, merchant_logo_url: pt.logo_url ?? null }).eq("id", duplicate.id);
     return null;
   }
 
@@ -196,6 +201,7 @@ async function handleAdded(
     permanentlyDeleteAfter: null,
     plaidTransactionId: pt.transaction_id,
     userEdited: false,
+    merchantLogoUrl: pt.logo_url ?? null,
   };
   const { error: insertError } = await admin.from("transactions").insert(transactionToInsertRow(created));
   if (insertError) {
@@ -232,6 +238,7 @@ async function handleModified(admin: SupabaseClient, accountId: string, pt: Plai
     occurred_at: occurredAt,
     posted_at: pt.pending ? null : occurredAt,
     status: pt.pending ? "pending" : "posted",
+    merchant_logo_url: pt.logo_url ?? null,
     updated_at: new Date().toISOString(),
   };
   // Addendum §7 — once a human has edited category/merchant/description/

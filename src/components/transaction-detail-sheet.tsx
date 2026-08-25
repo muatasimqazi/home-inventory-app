@@ -6,6 +6,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/icon";
 import { LineItemFormSheet } from "@/components/line-item-form-sheet";
+import { MerchantIcon } from "@/components/merchant-icon";
 import { LinkPurchaseSheet } from "@/components/link-purchase-sheet";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -248,7 +249,10 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-md">
         <SheetHeader>
-          <SheetTitle className="text-section-title font-medium text-ink">{transaction.merchant ?? transaction.description ?? "Transaction"}</SheetTitle>
+          <div className="flex items-center gap-2.5">
+            <MerchantIcon logoUrl={transaction.merchantLogoUrl} merchantName={transaction.merchant ?? transaction.description} className="size-10 text-body" />
+            <SheetTitle className="min-w-0 truncate text-section-title font-medium text-ink">{transaction.merchant ?? transaction.description ?? "Transaction"}</SheetTitle>
+          </div>
         </SheetHeader>
         {/* SheetContent for side="right"/"left" is a fixed h-full flex
             column (see components/ui/sheet.tsx) — unlike bottom sheets,
