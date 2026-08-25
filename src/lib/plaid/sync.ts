@@ -134,6 +134,23 @@ async function handleAdded(
     }
   }
 
+  // Real bug, found live in production: an *exact* plaid_transaction_id
+  // match was never checked before falling through to the fuzzy
+  // findDuplicateTransaction heuristic below — if Plaid re-serves a
+  // transaction_id we've already stored (a cursor edge case, two sync
+  // runs overlapping) and its merchant/date has drifted enough to miss
+  // the fuzzy amount/date-window/description-similarity match, this fell
+  // straight through to a plain insert(), which the DB's own unique
+  // constraint on plaid_transaction_id then correctly rejected — but as
+  // a raw, unhandled Postgres error, not the graceful "already have
+  // this one" no-op every other duplicate path here gets. Checking the
+  // exact id first is both cheaper (skip the fuzzy scan entirely when we
+  // already have the real key) and strictly more correct — an identical
+  // external id is never ambiguous the way a fuzzy match can be.
+  if (existingTxns.some((t) => t.plaidTransactionId === pt.transaction_id)) {
+    return null;
+  }
+
   // Same duplicate-detection heuristic CSV import uses (Addendum §2) —
   // one story across every import path. A match gets *adopted*
   // (plaid_transaction_id set, original source preserved) instead of
@@ -180,7 +197,25 @@ async function handleAdded(
     plaidTransactionId: pt.transaction_id,
     userEdited: false,
   };
-  await admin.from("transactions").insert(transactionToInsertRow(created));
+  const { error: insertError } = await admin.from("transactions").insert(transactionToInsertRow(created));
+  if (insertError) {
+    // 23505 = unique_violation. The exact-id and fuzzy checks above cover
+    // every duplicate this function can see in its own in-memory
+    // existingTxns snapshot, but two genuinely concurrent sync runs for
+    // the same item (a manual "sync now" landing mid-cron, say) each read
+    // that snapshot before the other's insert commits — a real race
+    // neither in-memory check can catch. Treating a unique-violation
+    // specifically as "someone else already inserted this one" rather
+    // than a hard failure keeps that scenario a benign no-op instead of
+    // an unhandled raw Postgres error (confirmed live: this used to
+    // surface exactly that way). Any other error is a genuine failure —
+    // logged and skipped, not thrown, so one bad row in a page doesn't
+    // abort the rest of the sync.
+    if (insertError.code !== "23505") {
+      console.error(`syncPlaidItem: couldn't insert transaction ${pt.transaction_id}:`, insertError);
+    }
+    return null;
+  }
   return created;
 }
 
