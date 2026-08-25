@@ -109,10 +109,15 @@ export default function LocationsListPage() {
                         height. Same fix entity-card.tsx already uses for
                         its own aspect-ratio boxes. */}
                     <div className="relative w-16 shrink-0">
+                      {/* rounded-r-none — PhotoThumb's own rounded-2xl
+                          rounds all 4 corners by default, right for a
+                          card's own edges but wrong here: this photo only
+                          sits at the card's left edge, its right edge
+                          butts up against the text, not a corner. */}
                       <PhotoThumb
                         emoji={loc.coverPhotoEmoji ?? "📍"}
                         coverPhotoPath={loc.coverPhotoPath}
-                        className="absolute inset-0 size-full"
+                        className="absolute inset-0 size-full rounded-r-none"
                         emojiClassName="text-2xl"
                         fit="cover"
                       />

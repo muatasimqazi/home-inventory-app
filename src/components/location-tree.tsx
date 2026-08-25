@@ -111,10 +111,14 @@ export function LocationAccordionRow({
             source photo rendered as a tall row instead of a consistent
             fixed-size thumbnail. */}
         <div className="relative w-14 shrink-0">
+          {/* rounded-r-none — PhotoThumb's own rounded-2xl rounds all 4
+              corners by default, right for a card's own edges but wrong
+              here: this photo only sits at the row's left edge, its right
+              edge butts up against the text, not a corner. */}
           <PhotoThumb
             emoji={location.coverPhotoEmoji ?? "📦"}
             coverPhotoPath={location.coverPhotoPath}
-            className="absolute inset-0 size-full"
+            className="absolute inset-0 size-full rounded-r-none"
             emojiClassName="text-xl"
             fit="cover"
           />

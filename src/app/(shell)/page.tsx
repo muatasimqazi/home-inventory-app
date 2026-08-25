@@ -235,10 +235,16 @@ export default function OverviewPage() {
                         entirely, so it can't feed back into the size of
                         the box it's filling. */}
                     <div className="relative w-14 shrink-0">
+                      {/* rounded-r-none — PhotoThumb's own rounded-2xl
+                          rounds all 4 corners by default, right for a
+                          card's own edges but wrong here: this photo only
+                          sits at the card's left edge (top-left/bottom-left
+                          are real corners), its right edge butts up against
+                          the text, not a corner. */}
                       <PhotoThumb
                         emoji={loc.coverPhotoEmoji ?? "📍"}
                         coverPhotoPath={loc.coverPhotoPath}
-                        className="absolute inset-0 size-full"
+                        className="absolute inset-0 size-full rounded-r-none"
                         emojiClassName="text-xl"
                         fit="cover"
                       />
