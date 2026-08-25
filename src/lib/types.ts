@@ -224,7 +224,7 @@ export interface Attachment {
 }
 
 /** AI-generated ecommerce-style product photo for an item (docs/Wardrobe Inventory.md) — background removed/replaced, garment preserved as-is. One row per style per generation attempt, never overwritten (a regeneration is a new row) — the full set for an item is its own generation history. */
-export type ItemStudioPhotoStyle = "white_background" | "transparent_background" | "studio_shadow" | "boutique_flat_lay" | "neutral_lifestyle";
+export type ItemStudioPhotoStyle = "white_background" | "transparent_background" | "studio_shadow" | "boutique_flat_lay" | "neutral_lifestyle" | "ghost_mannequin";
 export type ItemStudioPhotoAspectRatio = "1:1" | "4:5";
 export type ItemStudioPhotoStatus = "queued" | "processing" | "complete" | "failed";
 

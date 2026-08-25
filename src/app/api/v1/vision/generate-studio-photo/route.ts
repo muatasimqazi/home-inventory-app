@@ -4,11 +4,11 @@ import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { generateStudioPhoto } from "@/lib/vision/generate-studio-photo";
 import { itemStudioPhotoToInsertRow } from "@/lib/supabase/mappers";
 import { newId } from "@/lib/id";
+import { WARDROBE_STYLES } from "@/lib/wardrobe-styles";
 import type { ItemStudioPhoto, ItemStudioPhotoAspectRatio, ItemStudioPhotoStyle } from "@/lib/types";
 
 export const runtime = "nodejs";
 
-const VALID_STYLES: ItemStudioPhotoStyle[] = ["white_background", "transparent_background", "studio_shadow", "boutique_flat_lay", "neutral_lifestyle"];
 const VALID_ASPECT_RATIOS: ItemStudioPhotoAspectRatio[] = ["1:1", "4:5"];
 // A real cap on one batch — the client's own style picker already caps
 // selection at 3 (docs/Wardrobe Inventory.md's "generate at least 3
@@ -51,8 +51,8 @@ export async function POST(request: Request) {
   if (typeof householdId !== "string" || !householdId) return NextResponse.json({ error: "`householdId` is required." }, { status: 400 });
   if (typeof itemId !== "string" || !itemId) return NextResponse.json({ error: "`itemId` is required." }, { status: 400 });
   if (typeof originalPhotoPath !== "string" || !originalPhotoPath) return NextResponse.json({ error: "`originalPhotoPath` is required." }, { status: 400 });
-  if (!Array.isArray(styles) || styles.length === 0 || styles.length > MAX_STYLES || !styles.every((s) => VALID_STYLES.includes(s as ItemStudioPhotoStyle))) {
-    return NextResponse.json({ error: `\`styles\` must be 1-${MAX_STYLES} of: ${VALID_STYLES.join(", ")}.` }, { status: 400 });
+  if (!Array.isArray(styles) || styles.length === 0 || styles.length > MAX_STYLES || !styles.every((s) => WARDROBE_STYLES.includes(s as ItemStudioPhotoStyle))) {
+    return NextResponse.json({ error: `\`styles\` must be 1-${MAX_STYLES} of: ${WARDROBE_STYLES.join(", ")}.` }, { status: 400 });
   }
   if (typeof aspectRatio !== "string" || !VALID_ASPECT_RATIOS.includes(aspectRatio as ItemStudioPhotoAspectRatio)) {
     return NextResponse.json({ error: "`aspectRatio` must be one of: 1:1, 4:5." }, { status: 400 });

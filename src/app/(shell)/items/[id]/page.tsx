@@ -2,22 +2,20 @@
 
 import Link from "next/link";
 import { notFound, useParams, useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
-import { PhotoThumb } from "@/components/photo-thumb";
 import { BreadcrumbTrail } from "@/components/breadcrumb-trail";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { MoveSheet } from "@/components/move-sheet";
 import { ActivityRow } from "@/components/activity-row";
 import { ItemAttachments } from "@/components/item-attachments";
+import { ItemPhotoGallery } from "@/components/item-photo-gallery";
 import { ItemStudioPhotosSection } from "@/components/item-studio-photos-section";
 import { ItemOwnershipSection } from "@/components/item-ownership-section";
 import { ItemPurchaseSection } from "@/components/item-purchase-section";
 import { Button } from "@/components/ui/button";
 import { useInventoryStore } from "@/lib/store";
-import { coverPhotoUrl } from "@/lib/cover-photo";
-import { rotateStoredPhoto } from "@/lib/crop-image";
 import { buildBreadcrumb, daysUntil } from "@/lib/selectors";
 import { extraFieldsForCategory } from "@/lib/category";
 import { relativeTime, formatCurrency } from "@/lib/format";
@@ -27,6 +25,7 @@ export default function ItemDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const items = useInventoryStore((s) => s.items);
+  const itemStudioPhotos = useInventoryStore((s) => s.itemStudioPhotos);
   const locations = useInventoryStore((s) => s.locations);
   const containers = useInventoryStore((s) => s.containers);
   const activity = useInventoryStore((s) => s.activity);
@@ -46,15 +45,10 @@ export default function ItemDetailPage() {
   const permanentlyDeleteItem = useInventoryStore((s) => s.permanentlyDeleteItem);
   const moveItem = useInventoryStore((s) => s.moveItem);
   const updateItem = useInventoryStore((s) => s.updateItem);
-  const setItemCoverPhoto = useInventoryStore((s) => s.setItemCoverPhoto);
-  const removeItemCoverPhoto = useInventoryStore((s) => s.removeItemCoverPhoto);
 
   const [moveOpen, setMoveOpen] = useState(false);
   const [trashConfirmOpen, setTrashConfirmOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [rotatingPhoto, setRotatingPhoto] = useState(false);
-  const photoInputRef = useRef<HTMLInputElement>(null);
 
   // permanentlyDeleteItem() removes the item from `items` optimistically,
   // before router.push away from this page has finished — without this,
@@ -72,39 +66,6 @@ export default function ItemDetailPage() {
   if (!item) {
     if (!everHadItem) return notFound();
     return null;
-  }
-
-  async function handlePhotoChosen(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file || !item) return;
-    setUploadingPhoto(true);
-    const result = await setItemCoverPhoto(item.id, file);
-    setUploadingPhoto(false);
-    if (!result.ok) {
-      toast.error(result.error ?? "Couldn't set photo.");
-      return;
-    }
-    toast.success("Photo updated");
-  }
-
-  // A bulk multi-item capture crops each item's cover automatically (see
-  // cropToItem) — it never goes through the interactive crop step's own
-  // rotate control, so a photo that came out sideways/upside-down there had
-  // no way to be fixed short of deleting and recapturing. Works on any
-  // saved photo, not just those.
-  async function handleRotatePhoto() {
-    if (!item || !item.coverPhotoPath) return;
-    setRotatingPhoto(true);
-    try {
-      const rotated = await rotateStoredPhoto(coverPhotoUrl(item.coverPhotoPath), 90);
-      const result = await setItemCoverPhoto(item.id, rotated);
-      if (!result.ok) toast.error(result.error ?? "Couldn't rotate photo.");
-    } catch {
-      toast.error("Couldn't rotate photo.");
-    } finally {
-      setRotatingPhoto(false);
-    }
   }
 
   const breadcrumb = buildBreadcrumb(item.locationId, item.containerId, locations, containers);
@@ -126,42 +87,7 @@ export default function ItemDetailPage() {
         </div>
       )}
 
-      <div className="relative">
-        <PhotoThumb emoji={item.photoEmoji} coverPhotoPath={item.coverPhotoPath} className="h-48 w-full" emojiClassName="text-8xl" fit="cover" />
-        <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChosen} />
-        <div className="absolute bottom-2 right-2 flex gap-2">
-          {item.coverPhotoPath && (
-            <button
-              type="button"
-              onClick={handleRotatePhoto}
-              disabled={rotatingPhoto}
-              aria-label="Rotate photo"
-              className="tap-target flex size-9 items-center justify-center rounded-full bg-white/90 shadow-sm disabled:opacity-60"
-            >
-              {rotatingPhoto ? <Icon name="spinner" size={16} className="animate-spin" /> : <Icon name="rotate" size={16} />}
-            </button>
-          )}
-          {item.coverPhotoPath && (
-            <button
-              type="button"
-              onClick={() => removeItemCoverPhoto(item.id)}
-              aria-label="Remove photo"
-              className="tap-target flex size-9 items-center justify-center rounded-full bg-white/90 shadow-sm"
-            >
-              <Icon name="close" size={16} />
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => photoInputRef.current?.click()}
-            disabled={uploadingPhoto}
-            aria-label={item.coverPhotoPath ? "Change photo" : "Add photo"}
-            className="tap-target flex size-9 items-center justify-center rounded-full bg-white/90 shadow-sm disabled:opacity-60"
-          >
-            {uploadingPhoto ? <Icon name="spinner" size={16} className="animate-spin" /> : <Icon name="camera" size={16} />}
-          </button>
-        </div>
-      </div>
+      <ItemPhotoGallery item={item} studioPhotos={itemStudioPhotos.filter((p) => p.itemId === item.id)} />
 
       <div className="flex flex-col gap-1">
         <div className="flex items-start justify-between gap-2">

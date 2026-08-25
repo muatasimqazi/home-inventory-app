@@ -6,36 +6,29 @@ import { Icon } from "@/components/icon";
 import { Button } from "@/components/ui/button";
 import { WardrobeStudioSheet } from "@/components/wardrobe-studio-sheet";
 import { useInventoryStore } from "@/lib/store";
-import { coverPhotoUrl } from "@/lib/cover-photo";
-import { relativeTime } from "@/lib/format";
+import { WARDROBE_STYLE_LABEL } from "@/lib/wardrobe-styles";
 import type { Item, ItemStudioPhotoStyle } from "@/lib/types";
 
-const STYLE_LABEL: Record<ItemStudioPhotoStyle, string> = {
-  white_background: "White Background",
-  transparent_background: "Transparent",
-  studio_shadow: "Studio Shadow",
-  boutique_flat_lay: "Boutique Flat Lay",
-  neutral_lifestyle: "Neutral Lifestyle",
-};
-
 /**
- * Wardrobe Photo Studio's generation history for one item (docs/Wardrobe
- * Inventory.md, Phase 2's "generation history") — also the second entry
- * point into WardrobeStudioSheet ("Create Studio Photo," works for any
- * item, not just ones cataloged via the wardrobe capture flow). Omits
- * itself entirely when the item has no cover photo yet — there's nothing
- * to generate from, same "omit, don't show an empty dash" posture
- * LinkedBanksCard already established elsewhere in this app.
+ * Wardrobe Photo Studio's generate/retry controls for one item (docs/
+ * Wardrobe Inventory.md). Every *completed* photo already shows up in
+ * ItemPhotoGallery above (the item page's hero + thumbnail strip) — this
+ * section stays focused on what that gallery can't show: the "Create
+ * Studio Photo" trigger itself, and any failed attempt still needing a
+ * retry (nothing to put in a photo gallery for a generation that has no
+ * image). Omits itself entirely when the item has no cover photo yet —
+ * there's nothing to generate from, same "omit, don't show an empty
+ * dash" posture LinkedBanksCard already established elsewhere.
  */
 export function ItemStudioPhotosSection({ item }: { item: Item }) {
   const itemStudioPhotos = useInventoryStore((s) => s.itemStudioPhotos);
   const currentHouseholdId = useInventoryStore((s) => s.currentHouseholdId);
-  const updateItem = useInventoryStore((s) => s.updateItem);
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [retryingId, setRetryingId] = useState<string | null>(null);
 
-  const photos = itemStudioPhotos.filter((p) => p.itemId === item.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const photos = itemStudioPhotos.filter((p) => p.itemId === item.id);
+  const failed = photos.filter((p) => p.status === "failed").sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
   if (!item.coverPhotoPath) return null;
   const sourcePhotoPath = item.coverPhotoPath;
@@ -51,7 +44,7 @@ export function ItemStudioPhotosSection({ item }: { item: Item }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Retry failed.");
       const [retried] = data.results as { status: string; errorMessage: string | null }[];
-      if (retried.status === "complete") toast.success(`${STYLE_LABEL[style]} ready`);
+      if (retried.status === "complete") toast.success(`${WARDROBE_STYLE_LABEL[style]} ready`);
       else toast.error(retried.errorMessage ?? "Retry failed.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Retry failed.");
@@ -69,36 +62,22 @@ export function ItemStudioPhotosSection({ item }: { item: Item }) {
         </Button>
       </div>
 
-      {photos.length === 0 ? (
-        <p className="text-caption text-muted-foreground">No studio photos yet — generate clean, ecommerce-style photos of this item for reselling or listing.</p>
-      ) : (
-        <div className="grid grid-cols-3 gap-2">
-          {photos.map((p) => (
-            <div key={p.id} className="flex flex-col gap-1">
-              <div className="flex aspect-square items-center justify-center overflow-hidden rounded-lg bg-surface-muted">
-                {p.status === "complete" && p.generatedPhotoPath ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={coverPhotoUrl(p.generatedPhotoPath)} alt={STYLE_LABEL[p.style]} className="size-full object-cover" />
-                ) : (
-                  <div className="flex flex-col items-center gap-1 p-2 text-center">
-                    <Icon name="danger" size={14} className="text-danger" />
-                    {retryingId === p.id ? (
-                      <Icon name="spinner" size={12} className="animate-spin text-muted-foreground" />
-                    ) : (
-                      <button type="button" onClick={() => handleRetry(p.id, p.style)} className="text-micro font-medium text-yellow-text">
-                        Retry
-                      </button>
-                    )}
-                  </div>
-                )}
+      {photos.length === 0 && (
+        <p className="text-caption text-muted-foreground">Generate clean, ecommerce-style photos of this item for reselling or listing.</p>
+      )}
+
+      {failed.length > 0 && (
+        <div className="flex flex-col divide-y divide-border">
+          {failed.map((p) => (
+            <div key={p.id} className="flex items-center gap-3 py-2 first:pt-0 last:pb-0">
+              <Icon name="danger" size={16} className="shrink-0 text-danger" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-caption font-medium text-ink">{WARDROBE_STYLE_LABEL[p.style]}</p>
+                <p className="truncate text-micro text-muted-foreground">{p.errorMessage ?? "Generation failed"}</p>
               </div>
-              <p className="truncate text-micro font-medium text-ink">{STYLE_LABEL[p.style]}</p>
-              {p.status === "complete" && p.generatedPhotoPath && (
-                <button type="button" onClick={() => updateItem(item.id, { coverPhotoPath: p.generatedPhotoPath! })} className="text-left text-micro text-yellow-text">
-                  Set as cover
-                </button>
-              )}
-              <p className="text-micro text-muted-foreground">{relativeTime(p.createdAt)}</p>
+              <Button size="sm" variant="outline" onClick={() => handleRetry(p.id, p.style)} disabled={retryingId === p.id}>
+                {retryingId === p.id ? <Icon name="spinner" size={14} className="animate-spin" /> : "Retry"}
+              </Button>
             </div>
           ))}
         </div>

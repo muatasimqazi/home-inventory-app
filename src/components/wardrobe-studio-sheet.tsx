@@ -7,18 +7,13 @@ import { Icon } from "@/components/icon";
 import { Button } from "@/components/ui/button";
 import { useInventoryStore } from "@/lib/store";
 import { coverPhotoUrl } from "@/lib/cover-photo";
+import { WARDROBE_STYLES, WARDROBE_STYLE_LABEL } from "@/lib/wardrobe-styles";
 import { cn } from "@/lib/utils";
 import type { Item, ItemStudioPhoto, ItemStudioPhotoAspectRatio, ItemStudioPhotoStyle } from "@/lib/types";
 
-const STYLE_LABEL: Record<ItemStudioPhotoStyle, string> = {
-  white_background: "White Background",
-  transparent_background: "Transparent",
-  studio_shadow: "Studio Shadow",
-  boutique_flat_lay: "Boutique Flat Lay",
-  neutral_lifestyle: "Neutral Lifestyle",
-};
-
-const DEFAULT_STYLES: ItemStudioPhotoStyle[] = ["white_background", "studio_shadow", "boutique_flat_lay"];
+// Ghost Mannequin leads the defaults — the most requested/ecommerce-
+// relevant style for an actual garment — alongside the original two.
+const DEFAULT_STYLES: ItemStudioPhotoStyle[] = ["ghost_mannequin", "white_background", "studio_shadow"];
 const MAX_STYLES = 3;
 
 /**
@@ -99,7 +94,7 @@ export function WardrobeStudioSheet({
     try {
       const [retried] = await requestGeneration([style]);
       setResults((prev) => [...prev.filter((r) => r.style !== style), retried]);
-      if (retried.status === "complete") toast.success(`${STYLE_LABEL[style]} ready`);
+      if (retried.status === "complete") toast.success(`${WARDROBE_STYLE_LABEL[style]} ready`);
       else toast.error(retried.errorMessage ?? "Retry failed.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Retry failed.");
@@ -128,7 +123,7 @@ export function WardrobeStudioSheet({
           <div>
             <p className="mb-2 text-caption text-muted-foreground">Styles (up to {MAX_STYLES})</p>
             <div className="flex flex-wrap gap-2">
-              {(Object.keys(STYLE_LABEL) as ItemStudioPhotoStyle[]).map((style) => {
+              {WARDROBE_STYLES.map((style) => {
                 const checked = selectedStyles.has(style);
                 const disabled = !checked && selectedStyles.size >= MAX_STYLES;
                 return (
@@ -143,7 +138,7 @@ export function WardrobeStudioSheet({
                       disabled && "opacity-40"
                     )}
                   >
-                    {STYLE_LABEL[style]}
+                    {WARDROBE_STYLE_LABEL[style]}
                   </button>
                 );
               })}
@@ -188,7 +183,7 @@ export function WardrobeStudioSheet({
                   <div className="flex aspect-square items-center justify-center overflow-hidden rounded-lg bg-surface-muted">
                     {r.status === "complete" && r.generatedPhotoPath ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={coverPhotoUrl(r.generatedPhotoPath)} alt={STYLE_LABEL[r.style]} className="size-full object-cover" />
+                      <img src={coverPhotoUrl(r.generatedPhotoPath)} alt={WARDROBE_STYLE_LABEL[r.style]} className="size-full object-cover" />
                     ) : (
                       <div className="flex flex-col items-center gap-1 p-3 text-center">
                         <Icon name="danger" size={18} className="text-danger" />
@@ -196,7 +191,7 @@ export function WardrobeStudioSheet({
                       </div>
                     )}
                   </div>
-                  <p className="text-center text-caption font-medium text-ink">{STYLE_LABEL[r.style]}</p>
+                  <p className="text-center text-caption font-medium text-ink">{WARDROBE_STYLE_LABEL[r.style]}</p>
                   {r.status === "complete" && r.generatedPhotoPath ? (
                     <div className="flex flex-col gap-1.5">
                       <Button className="h-11 w-full bg-ink text-white hover:bg-ink/90" onClick={() => handleSaveAsCover(r.generatedPhotoPath!)}>
