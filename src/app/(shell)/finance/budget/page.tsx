@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
@@ -26,6 +27,10 @@ import {
 import { formatCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useRemountKey } from "@/hooks/use-remount-key";
+
+function toIsoDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 /**
  * Budgeting v1 (per-category budget vs. actual) + v2 (docs note: v1
@@ -261,21 +266,34 @@ export default function BudgetPage() {
                 const near = !over && pct >= 80;
                 const barColor = over ? "bg-money-negative-text" : near ? "bg-badge-orange-text" : "bg-badge-green-text";
                 const remainingColor = over ? "text-money-negative-text" : "text-muted-foreground";
+                const monthStart = new Date(month.getFullYear(), month.getMonth(), 1);
+                const monthEnd = new Date(month.getFullYear(), month.getMonth() + 1, 0);
+                const transactionsHref = `/finance/transactions?category=${p.categoryId}&dateScope=custom&from=${toIsoDate(monthStart)}&to=${toIsoDate(monthEnd)}`;
                 return (
-                  <button key={p.categoryId} type="button" onClick={() => openEdit(p.categoryId)} className="flex flex-col gap-1.5 px-4 py-3 text-left">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="truncate text-body font-medium text-ink">{p.name}</span>
-                      <span className="shrink-0 text-caption text-muted-foreground">
-                        {formatCurrency(p.actual)} of {formatCurrency(p.budgeted)}
+                  <div key={p.categoryId} className="flex items-center gap-1 px-4 py-3">
+                    <Link href={transactionsHref} className="flex min-w-0 flex-1 flex-col gap-1.5 text-left">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="truncate text-body font-medium text-ink">{p.name}</span>
+                        <span className="shrink-0 text-caption text-muted-foreground">
+                          {formatCurrency(p.actual)} of {formatCurrency(p.budgeted)}
+                        </span>
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full bg-surface-muted">
+                        <div className={cn("h-full rounded-full", barColor)} style={{ width: `${Math.min(100, Math.max(p.actual > 0 ? 4 : 0, pct))}%` }} />
+                      </div>
+                      <span className={cn("text-caption", remainingColor)}>
+                        {over ? `Over by ${formatCurrency(Math.abs(p.remaining))}` : `${formatCurrency(p.remaining)} left`}
                       </span>
-                    </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-surface-muted">
-                      <div className={cn("h-full rounded-full", barColor)} style={{ width: `${Math.min(100, Math.max(p.actual > 0 ? 4 : 0, pct))}%` }} />
-                    </div>
-                    <span className={cn("text-caption", remainingColor)}>
-                      {over ? `Over by ${formatCurrency(Math.abs(p.remaining))}` : `${formatCurrency(p.remaining)} left`}
-                    </span>
-                  </button>
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => openEdit(p.categoryId)}
+                      aria-label={`Edit ${p.name} budget`}
+                      className="tap-target flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-surface-muted"
+                    >
+                      <Icon name="edit" size={15} />
+                    </button>
+                  </div>
                 );
               })}
             </div>
