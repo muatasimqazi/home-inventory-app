@@ -43,6 +43,7 @@ const PUBLIC_PATHS = [
   "/auth/callback",
   "/api/v1/webhooks",
   "/api/v1/plaid/sync-all",
+  "/api/v1/plaid/diagnose-duplicates", // temporary, read-only — see that route's own comment
   "/api/v1/push/send-due-bills",
   "/api/v1/push/send-capture-nudges",
   "/api/v1/push/send-debt-payments-due-today",
