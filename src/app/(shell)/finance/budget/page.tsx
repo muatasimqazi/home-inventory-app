@@ -24,13 +24,9 @@ import {
   merchantSpendingInsights,
   zeroBasedAllocation,
 } from "@/lib/selectors";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, toIsoDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useRemountKey } from "@/hooks/use-remount-key";
-
-function toIsoDate(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
 
 /**
  * Budgeting v1 (per-category budget vs. actual) + v2 (docs note: v1

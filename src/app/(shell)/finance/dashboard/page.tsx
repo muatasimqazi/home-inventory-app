@@ -22,7 +22,7 @@ import {
   sortByLabel,
   upcomingRecurringBills,
 } from "@/lib/selectors";
-import { formatCurrency, formatShortDate } from "@/lib/format";
+import { formatCurrency, formatShortDate, toIsoDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /**
@@ -94,6 +94,10 @@ export default function FinanceDashboardPage() {
   const now = new Date();
   const isCurrentStatsMonth = statsMonth.getFullYear() === now.getFullYear() && statsMonth.getMonth() === now.getMonth();
   const statsMonthLabel = statsMonth.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  // For "Spending by Category" rows linking into Transactions' own custom
+  // date-range filter, below.
+  const statsMonthStart = new Date(statsMonth.getFullYear(), statsMonth.getMonth(), 1);
+  const statsMonthEnd = new Date(statsMonth.getFullYear(), statsMonth.getMonth() + 1, 0);
   function stepStatsMonth(delta: number) {
     setStatsMonth((m) => new Date(m.getFullYear(), m.getMonth() + delta, 1));
   }
@@ -237,15 +241,24 @@ export default function FinanceDashboardPage() {
         <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
           <p className="mb-3 text-caption font-medium tracking-wide text-muted-foreground uppercase">Spending by Category · {statsMonthLabel}</p>
           <div className="flex flex-col gap-2.5">
-            {categorySpend.map((c) => (
-              <div key={c.categoryId ?? "uncategorized"} className="flex items-center gap-3">
-                <span className="w-28 shrink-0 truncate text-caption text-ink">{c.name}</span>
-                <div className="h-2 flex-1 overflow-hidden rounded-full bg-surface-muted">
-                  <div className="h-full rounded-full bg-yellow" style={{ width: `${Math.max(4, (c.amount / maxCategorySpend) * 100)}%` }} />
-                </div>
-                <span className="w-20 shrink-0 text-right text-caption font-medium text-ink">{formatCurrency(c.amount)}</span>
-              </div>
-            ))}
+            {categorySpend.map((c) => {
+              // c.categoryId null = the "Uncategorized" bucket
+              // (categoryBreakdownForMonth) — Transactions has its own
+              // dedicated uncategorized filter (not a real category id),
+              // so route there instead of a category= that would match
+              // nothing.
+              const categoryHrefParams = c.categoryId ? `category=${c.categoryId}` : "uncategorized=1";
+              const transactionsHref = `/finance/transactions?${categoryHrefParams}&dateScope=custom&from=${toIsoDate(statsMonthStart)}&to=${toIsoDate(statsMonthEnd)}&back=${encodeURIComponent("/finance/dashboard")}&backLabel=${encodeURIComponent("Dashboard")}`;
+              return (
+                <Link key={c.categoryId ?? "uncategorized"} href={transactionsHref} className="flex items-center gap-3">
+                  <span className="w-28 shrink-0 truncate text-caption text-ink">{c.name}</span>
+                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-surface-muted">
+                    <div className="h-full rounded-full bg-yellow" style={{ width: `${Math.max(4, (c.amount / maxCategorySpend) * 100)}%` }} />
+                  </div>
+                  <span className="w-20 shrink-0 text-right text-caption font-medium text-ink">{formatCurrency(c.amount)}</span>
+                </Link>
+              );
+            })}
           </div>
         </div>
       )}

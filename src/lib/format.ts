@@ -45,6 +45,11 @@ export function formatDate(iso: string): string {
   return parseCalendarDate(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
+/** parseCalendarDate's inverse: a local Date -> "YYYY-MM-DD". `.toISOString()` isn't this — it converts to UTC first, which shifts the calendar day for anyone west of UTC. Originally private to the Budget page (building a month's from/to for a "view these transactions" link); moved here once Dashboard's own "Spending by Category" needed the exact same thing. */
+export function toIsoDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 /**
  * "Today" as a plain YYYY-MM-DD, in a specific IANA zone (Member.timezone,
  * Settings > your profile) if given, else whatever zone this device/
