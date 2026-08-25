@@ -314,7 +314,10 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
             </div>
           )}
           {transaction.excludedFromReports && (
-            <p className="text-caption text-muted-foreground">Excluded from reports.</p>
+            <p className="flex items-center gap-1.5 text-caption text-muted-foreground">
+              <Icon name="eyeOff" size={14} className="shrink-0" aria-hidden />
+              Excluded from reports.
+            </p>
           )}
           {transaction.linkedTransactionId && (
             <p className="text-caption text-muted-foreground">Linked to another leg of a transfer/payment.</p>

@@ -840,6 +840,15 @@ export default function TransactionsListPage() {
                               )}
                             </div>
                           </div>
+                          {t.excludedFromReports && (
+                            <Icon
+                              name="eyeOff"
+                              size={14}
+                              className="shrink-0 text-muted-foreground"
+                              role="img"
+                              aria-label="Excluded from reports"
+                            />
+                          )}
                           <span className={cn("shrink-0 text-body font-semibold", t.amount < 0 ? "text-money-negative-text" : "text-badge-green-text")}>
                             {formatCurrency(t.amount, { showPositiveSign: true })}
                           </span>
