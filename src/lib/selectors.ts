@@ -1,4 +1,4 @@
-import type { Account, AccountType, ActivityLogEntry, Container, FinanceCategory, Item, Location, RecurringBill, Tag, Transaction } from "./types";
+import type { Account, AccountType, ActivityLogEntry, CategoryBudget, Container, FinanceCategory, Item, Location, RecurringBill, Tag, Transaction, TransactionCategory } from "./types";
 import { parseCalendarDate } from "./format";
 
 /**
@@ -442,6 +442,68 @@ export function categoryBreakdownForMonth(transactions: Transaction[], categorie
     .filter((c) => c.amount > 0) // a $0 total (e.g. a receipt whose amount never got parsed) isn't meaningful as a spend-ranked bar
     .sort((a, b) => b.amount - a.amount)
     .slice(0, limit);
+}
+
+export interface BudgetProgress {
+  categoryId: string;
+  name: string;
+  budgeted: number;
+  actual: number;
+  /** budgeted - actual. Negative means over budget. */
+  remaining: number;
+}
+
+/**
+ * Budgeting v1 — real spend against a standing per-category monthly $
+ * target, for the given month. Unlike categoryBreakdownForMonth above
+ * (primary categoryId only), this uses categoriesForTransaction()'s
+ * thorough definition — a transaction_categories tag-link wins over the
+ * primary category — the same one the Transactions page's own category
+ * filter and the Ask AI's getSpendByCategory tool already settled on;
+ * "how much have I spent on Dining Out" should count everything tagged
+ * that way, full stop. Only categories with a budget set are returned —
+ * nothing to compare an unbudgeted category's spend against.
+ */
+export function budgetVsActualForMonth(
+  transactions: Transaction[],
+  categoryBudgets: CategoryBudget[],
+  transactionCategoryLinks: TransactionCategory[],
+  categories: FinanceCategory[],
+  month: Date
+): BudgetProgress[] {
+  if (categoryBudgets.length === 0) return [];
+  const y = month.getFullYear();
+  const m = month.getMonth();
+  const nameById = new Map(categories.map((c) => [c.id, c.name]));
+
+  const tagsByTransactionId = new Map<string, string[]>();
+  for (const tc of transactionCategoryLinks) {
+    (tagsByTransactionId.get(tc.transactionId) ?? tagsByTransactionId.set(tc.transactionId, []).get(tc.transactionId)!).push(tc.categoryId);
+  }
+
+  const actualByCategoryId = new Map<string, number>();
+  for (const t of transactions) {
+    if (t.trashedAt || t.excludedFromReports || t.type !== "expense") continue;
+    // Same bare-date fix as cashFlowForMonth/categoryBreakdownForMonth.
+    const d = parseCalendarDate(t.occurredAt);
+    if (d.getFullYear() !== y || d.getMonth() !== m) continue;
+    for (const c of categoriesForTransaction(t, tagsByTransactionId.get(t.id) ?? [], categories)) {
+      actualByCategoryId.set(c.id, (actualByCategoryId.get(c.id) ?? 0) + Math.abs(t.amount));
+    }
+  }
+
+  return categoryBudgets
+    .map((b) => {
+      const actual = Math.round((actualByCategoryId.get(b.categoryId) ?? 0) * 100) / 100;
+      return {
+        categoryId: b.categoryId,
+        name: nameById.get(b.categoryId) ?? "Uncategorized",
+        budgeted: b.monthlyAmount,
+        actual,
+        remaining: Math.round((b.monthlyAmount - actual) * 100) / 100,
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /** Active, non-trashed transactions for one account, most recent first. */

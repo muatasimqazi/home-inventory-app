@@ -455,6 +455,16 @@ export interface CategoryRule {
   createdAt: string;
 }
 
+/** Budgeting v1 — a standing monthly $ target per category, not a per-month record (one row per category, updated in place as the target changes). Household-wide, no owner/privacy split, same as CategoryRule above. */
+export interface CategoryBudget {
+  id: string;
+  householdId: string;
+  categoryId: string;
+  monthlyAmount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type TransactionType = "expense" | "income" | "transfer" | "payment" | "refund";
 export type TransactionStatus = "pending" | "posted";
 export type TransactionSource = "manual" | "csv_import" | "receipt_scan" | "plaid";

@@ -29,6 +29,7 @@ export const FINANCE_LINKS: NavLink[] = [
   { href: "/finance/dashboard", icon: "trendingUp", label: "Dashboard" },
   { href: "/finance/accounts", icon: "wallet", label: "Accounts" },
   { href: "/finance/transactions", icon: "receipt", label: "Transactions" },
+  { href: "/finance/budget", icon: "target", label: "Budget" },
   { href: "/finance/categories", icon: "pieChart", label: "Categories & Rules" },
   { href: "/finance/recurring", icon: "repeat", label: "Recurring Bills" },
   { href: "/finance/net-worth", icon: "trendingUp", label: "Net Worth" },

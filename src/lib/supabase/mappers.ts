@@ -43,6 +43,7 @@ import type {
   FinanceCategory,
   FinanceCategoryStatus,
   CategoryRule,
+  CategoryBudget,
   RecurringBill,
   RecurringBillFrequency,
   FinanceBillShare,
@@ -893,6 +894,37 @@ export function categoryRuleToInsertRow(r: CategoryRule): CategoryRuleRow {
     category_id: r.categoryId,
     applies_from: r.appliesFrom,
     created_at: r.createdAt,
+  };
+}
+
+export interface CategoryBudgetRow {
+  id: string;
+  household_id: string;
+  category_id: string;
+  monthly_amount: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export function rowToCategoryBudget(row: CategoryBudgetRow): CategoryBudget {
+  return {
+    id: row.id,
+    householdId: row.household_id,
+    categoryId: row.category_id,
+    monthlyAmount: row.monthly_amount,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function categoryBudgetToInsertRow(b: CategoryBudget): CategoryBudgetRow {
+  return {
+    id: b.id,
+    household_id: b.householdId,
+    category_id: b.categoryId,
+    monthly_amount: b.monthlyAmount,
+    created_at: b.createdAt,
+    updated_at: b.updatedAt,
   };
 }
 

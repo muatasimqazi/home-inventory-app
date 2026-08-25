@@ -62,6 +62,7 @@ import {
   Smartphone,
   Sparkles,
   Tag,
+  Target,
   Trash2,
   TrendingUp,
   Upload,
@@ -143,6 +144,7 @@ const ICONS = {
   repeat: Repeat,
   lock: Lock,
   cash: Banknote,
+  target: Target,
   // Home Map (PRD §29) — one icon per pinned_locations category.
   droplet: Droplet,
   zap: Zap,

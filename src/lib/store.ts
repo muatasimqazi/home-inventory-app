@@ -47,6 +47,8 @@ import {
   financeCategoryToInsertRow,
   rowToCategoryRule,
   categoryRuleToInsertRow,
+  rowToCategoryBudget,
+  categoryBudgetToInsertRow,
   rowToTransaction,
   transactionToInsertRow,
   rowToRecurringBill,
@@ -88,6 +90,7 @@ import {
   type FinanceAccountShareRow,
   type FinanceCategoryRow,
   type CategoryRuleRow,
+  type CategoryBudgetRow,
   type TransactionRow,
   type RecurringBillRow,
   type FinanceBillShareRow,
@@ -105,6 +108,7 @@ import type {
   ItemDocumentLink,
   AttachmentKind,
   CategoryRule,
+  CategoryBudget,
   Container,
   Favorite,
   FinanceAccountShare,
@@ -304,6 +308,8 @@ interface InventoryState {
   transactions: Transaction[];
   financeCategories: FinanceCategory[];
   categoryRules: CategoryRule[];
+  /** Budgeting v1 — a standing monthly $ target per category, household-wide like categoryRules above. */
+  categoryBudgets: CategoryBudget[];
   recurringBills: RecurringBill[];
   financeBillShares: FinanceBillShare[];
   /** AI recurring-bill detection dismissals (Workstream 4, supabase/migrations/0026_recurring_candidate_dismissals.sql) — which detected-but-not-yet-tracked merchant+account patterns a household member has already said "not recurring" to, so /finance/recurring/detected doesn't keep re-surfacing them every run. Privacy-scoped like transactions (RLS via the account's own can_view_account()). */
@@ -482,6 +488,12 @@ interface InventoryState {
   createCategoryRule: (input: { matchField: "merchant" | "description"; matchType?: "contains" | "exact"; matchValue: string; categoryId: string }) => CategoryRule;
   deleteCategoryRule: (ruleId: string) => void;
 
+  // Finance — Budgeting v1: one standing monthly $ target per category.
+  /** Create-or-update in one call (a real .upsert() on the household_id+category_id unique constraint) — the caller never needs to know ahead of time whether this category already has a budget. */
+  setCategoryBudget: (categoryId: string, monthlyAmount: number) => void;
+  /** Removes budgeting for a category entirely — a plain delete, not trash/retention (a budget amount is a current target, not a record worth keeping history of). */
+  deleteCategoryBudget: (categoryId: string) => void;
+
   // Finance — Recurring bills
   createRecurringBill: (input: NewRecurringBillInput) => RecurringBill;
   updateRecurringBill: (billId: string, patch: Partial<RecurringBill>) => void;
@@ -640,6 +652,7 @@ interface HouseholdBundle {
   accountBalanceSnapshots: AccountBalanceSnapshot[];
   transactionAttachments: TransactionAttachment[];
   transactionCategories: TransactionCategory[];
+  categoryBudgets: CategoryBudget[];
   itemPurchases: ItemPurchase[];
   lastUsedDestination: { locationId: string | null; containerId: string | null } | null;
 }
@@ -673,6 +686,7 @@ function snapshotBundle(state: InventoryState): HouseholdBundle {
     accountBalanceSnapshots: state.accountBalanceSnapshots,
     transactionAttachments: state.transactionAttachments,
     transactionCategories: state.transactionCategories,
+    categoryBudgets: state.categoryBudgets,
     itemPurchases: state.itemPurchases,
     lastUsedDestination: state.lastUsedDestination,
   };
@@ -711,6 +725,7 @@ async function fetchHouseholdBundle(
     recurringCandidateDismissalsRes,
     transactionAttachmentsRes,
     transactionCategoriesRes,
+    categoryBudgetsRes,
     itemPurchasesRes,
   ] = await Promise.all([
     supabase.from("members").select("*").eq("household_id", householdId),
@@ -757,6 +772,7 @@ async function fetchHouseholdBundle(
     supabase.from("recurring_candidate_dismissals").select("*").eq("household_id", householdId),
     supabase.from("transaction_attachments").select("*").eq("household_id", householdId),
     supabase.from("transaction_categories").select("*").eq("household_id", householdId),
+    supabase.from("category_budgets").select("*").eq("household_id", householdId),
     supabase.from("item_purchases").select("*").eq("household_id", householdId),
   ]);
 
@@ -765,7 +781,7 @@ async function fetchHouseholdBundle(
     attachmentsRes.error ?? itemDocumentLinksRes.error ?? pinnedLocationsRes.error ?? labelBatchesRes.error ?? labelBatchEntriesRes.error ?? normalizationRulesRes.error ??
     accountsRes.error ?? financeAccountSharesRes.error ?? transactionsRes.error ?? financeCategoriesRes.error ?? categoryRulesRes.error ?? recurringBillsRes.error ?? financeBillSharesRes.error ??
     recurringCandidateDismissalsRes.error ??
-    transactionAttachmentsRes.error ?? transactionCategoriesRes.error ?? itemPurchasesRes.error;
+    transactionAttachmentsRes.error ?? transactionCategoriesRes.error ?? categoryBudgetsRes.error ?? itemPurchasesRes.error;
   if (firstError) throw new Error(firstError.message);
 
   // account_balance_snapshots has no household_id column of its own
@@ -810,6 +826,7 @@ async function fetchHouseholdBundle(
     accountBalanceSnapshots: ((snapshotsRes.data ?? []) as AccountBalanceSnapshotRow[]).map(rowToAccountBalanceSnapshot),
     transactionAttachments: ((transactionAttachmentsRes.data ?? []) as TransactionAttachmentRow[]).map(rowToTransactionAttachment),
     transactionCategories: ((transactionCategoriesRes.data ?? []) as TransactionCategoryRow[]).map(rowToTransactionCategory),
+    categoryBudgets: ((categoryBudgetsRes.data ?? []) as CategoryBudgetRow[]).map(rowToCategoryBudget),
     itemPurchases: ((itemPurchasesRes.data ?? []) as ItemPurchaseRow[]).map(rowToItemPurchase),
     lastUsedDestination: null,
   };
@@ -990,6 +1007,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
   transactions: [],
   financeCategories: [],
   categoryRules: [],
+  categoryBudgets: [],
   recurringBills: [],
   financeBillShares: [],
   recurringCandidateDismissals: [],
@@ -1087,7 +1105,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       stateKey:
         | "members" | "invites" | "people" | "locations" | "containers" | "tags" | "activity" | "attachments" | "itemDocumentLinks" | "pinnedLocations"
         | "labelBatches" | "labelBatchEntries" | "normalizationRules"
-        | "accounts" | "financeAccountShares" | "transactions" | "financeCategories" | "categoryRules"
+        | "accounts" | "financeAccountShares" | "transactions" | "financeCategories" | "categoryRules" | "categoryBudgets"
         | "recurringBills" | "financeBillShares" | "recurringCandidateDismissals" | "transactionAttachments" | "transactionCategories" | "itemPurchases"
     ) {
       const handler = arrayMergeHandler<TRow, TDomain>(mapper, keyOf, rowKeyOf, (updater) =>
@@ -1130,6 +1148,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     bind<FinanceAccountShareRow, FinanceAccountShare>("finance_account_shares", householdFilter, rowToFinanceAccountShare, (s) => s.id, (r) => r.id as string, "financeAccountShares");
     bind<TransactionRow, Transaction>("transactions", householdFilter, rowToTransaction, (t) => t.id, (r) => r.id as string, "transactions");
     bind<CategoryRuleRow, CategoryRule>("category_rules", householdFilter, rowToCategoryRule, (r) => r.id, (r) => r.id as string, "categoryRules");
+    bind<CategoryBudgetRow, CategoryBudget>("category_budgets", householdFilter, rowToCategoryBudget, (b) => b.id, (r) => r.id as string, "categoryBudgets");
     bind<RecurringBillRow, RecurringBill>("recurring_bills", householdFilter, rowToRecurringBill, (b) => b.id, (r) => r.id as string, "recurringBills");
     bind<FinanceBillShareRow, FinanceBillShare>("finance_bill_shares", householdFilter, rowToFinanceBillShare, (s) => s.id, (r) => r.id as string, "financeBillShares");
     bind<RecurringCandidateDismissalRow, RecurringCandidateDismissal>(
@@ -3042,6 +3061,41 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       supabase.from("category_rules").delete().eq("id", ruleId),
       () => set({ categoryRules: previous }),
       "Couldn't delete rule"
+    );
+  },
+
+  setCategoryBudget: (categoryId, monthlyAmount) => {
+    const supabase = getSupabaseBrowserClient();
+    const previous = get().categoryBudgets;
+    // Reuses the existing row's own id when one already exists (rather
+    // than always generating a fresh one) — the upsert below matches on
+    // the household_id+category_id unique constraint, not id, but
+    // sending a *different* id than what's already stored would still
+    // try to overwrite the primary key on conflict, which is needless
+    // risk when the correct id is already sitting right here locally.
+    const existing = previous.find((b) => b.categoryId === categoryId);
+    const timestamp = nowIso();
+    const merged: CategoryBudget = existing
+      ? { ...existing, monthlyAmount, updatedAt: timestamp }
+      : { id: newId(), householdId: get().currentHouseholdId, categoryId, monthlyAmount, createdAt: timestamp, updatedAt: timestamp };
+    set((s) => ({
+      categoryBudgets: existing ? s.categoryBudgets.map((b) => (b.categoryId === categoryId ? merged : b)) : [...s.categoryBudgets, merged],
+    }));
+    persistOrRevert(
+      supabase.from("category_budgets").upsert(categoryBudgetToInsertRow(merged), { onConflict: "household_id,category_id" }),
+      () => set({ categoryBudgets: previous }),
+      "Couldn't save budget"
+    );
+  },
+
+  deleteCategoryBudget: (categoryId) => {
+    const supabase = getSupabaseBrowserClient();
+    const previous = get().categoryBudgets;
+    set((s) => ({ categoryBudgets: s.categoryBudgets.filter((b) => b.categoryId !== categoryId) }));
+    persistOrRevert(
+      supabase.from("category_budgets").delete().eq("category_id", categoryId).eq("household_id", get().currentHouseholdId),
+      () => set({ categoryBudgets: previous }),
+      "Couldn't remove budget"
     );
   },
 
