@@ -47,14 +47,32 @@ function systemPrompt(): string {
     "matching location or no reference data. " +
     "Transaction amounts are signed: negative means money spent, positive means money received (income or " +
     "a refund) — describe spending as a positive dollar figure in your answer, don't say 'spent -$40'. " +
-    "When summarizing total spend, use searchTransactions' own totalAmount/count fields, which reflect every " +
-    "match — never add up only the transactions listed, since the list can be capped short of the true total. " +
+    "When summarizing total spend, use searchTransactions'/getSpendByCategory's own totalAmount/totalSpend/" +
+    "count fields, which reflect every match — never add up only the transactions/categories listed, since " +
+    "the list can be capped or ranked short of the true total. " +
+    "For 'how much have I spent on [category]' or 'what's my biggest spending category' questions, use " +
+    "getSpendByCategory, not searchTransactions — it looks up real spending categories, where " +
+    "searchTransactions only matches merchant/item text. Always compute dateFrom/dateTo yourself before " +
+    "calling it: 'this month' = the 1st of the current month through today, 'this week' = the last 7 days " +
+    "including today — never leave both blank unless the question genuinely means all-time. " +
     "Keep answers short and direct: state the number, date, or location first, then at most one sentence of " +
     "relevant context. No preamble, no restating the question — the specific item/transaction you found is shown " +
     "separately below your answer, so don't re-describe it in exhaustive detail either. " +
     "Respond in plain prose only — this renders in a plain-text chat bubble, not a markdown viewer, so never use " +
     "**bold**, *italics*, `code`, bullet/numbered lists, or headings; write it the way you'd say it out loud."
   );
+}
+
+/** Shared by both searchTransactions' `transactions` and getSpendByCategory's `topTransactions` — same result-card shape either way. */
+function transactionRefs(transactions: { id: string; merchant: string | null; description: string | null; date: string; matchedItem?: string }[]): AskReference[] {
+  return transactions.map((t) => ({
+    kind: "transaction",
+    id: t.id,
+    title: t.matchedItem ?? t.merchant ?? t.description ?? "Transaction",
+    subtitle: t.matchedItem ? (t.merchant ?? null) : null,
+    imageUrl: null,
+    href: `/finance/transactions?transactionId=${t.id}`,
+  }));
 }
 
 /** Pulls result cards out of what the tools actually returned this turn — not something the model is asked to narrate separately, so it can't drift from what was really found. Capped and deduped; the model may call the same tool more than once while narrowing a search. */
@@ -76,16 +94,10 @@ function extractReferences(toolResults: { toolName: string; output: unknown }[])
       }
     } else if (tr.toolName === "searchTransactions") {
       const output = tr.output as { transactions?: { id: string; merchant: string | null; description: string | null; date: string; matchedItem?: string }[] };
-      for (const t of output.transactions ?? []) {
-        refs.push({
-          kind: "transaction",
-          id: t.id,
-          title: t.matchedItem ?? t.merchant ?? t.description ?? "Transaction",
-          subtitle: t.matchedItem ? (t.merchant ?? null) : null,
-          imageUrl: null,
-          href: `/finance/transactions?transactionId=${t.id}`,
-        });
-      }
+      refs.push(...transactionRefs(output.transactions ?? []));
+    } else if (tr.toolName === "getSpendByCategory") {
+      const output = tr.output as { topTransactions?: { id: string; merchant: string | null; description: string | null; date: string }[] };
+      refs.push(...transactionRefs(output.topTransactions ?? []));
     }
   }
 

@@ -597,6 +597,15 @@ export default function TransactionsListPage() {
         )}
       </div>
 
+      {/* Links to the dedicated AI card on the Dashboard (#ask-ai) rather
+          than duplicating that UI here — one Finance AI surface, not two
+          to keep in sync. */}
+      <Link href="/finance/dashboard#ask-ai" className="flex items-center gap-1.5 text-caption font-medium text-yellow-text">
+        <Icon name="ai" size={14} />
+        Ask AI about your spending
+        <Icon name="chevronRight" size={12} />
+      </Link>
+
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 overflow-x-auto pb-1">
           {([

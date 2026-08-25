@@ -120,6 +120,133 @@ export function createAskTools(supabase: SupabaseClient, householdId: string) {
       },
     }),
 
+    // Category matching mirrors categoriesForTransaction() in
+    // selectors.ts: a transaction_categories tag-link, when one exists,
+    // wins over the primary category_id — not categoryBreakdownForMonth's
+    // simpler primary-only grouping — since "how much did I spend on
+    // dining out" means every transaction tagged that way, full stop, the
+    // same definition the Transactions page's own category filter uses.
+    getSpendByCategory: tool({
+      description:
+        "Get real spend totals by category — for 'how much have I spent on X' questions (X being a spending " +
+        "category like 'dining out', 'groceries', 'subscriptions') and for 'what's my biggest spending " +
+        "category' or 'how much have I spent [overall]' questions. Always compute dateFrom/dateTo yourself " +
+        "from what was asked, relative to today's date, before calling this — 'this month' means the 1st of " +
+        "the current month through today, 'this week' means the last 7 days including today; never leave " +
+        "both blank unless the question really means all-time. Pass `category` for a specific category; omit " +
+        "it to get the full ranked breakdown across every category for the range instead — use that for " +
+        "'biggest category' or an overall spend total (the response's totalSpend is already the real summed " +
+        "total; never add up the category list yourself). If the result has `categoryNotFound` set, the name " +
+        "didn't match any real category the household uses — say so plainly and offer the `availableCategories` " +
+        "list rather than guessing a number.",
+      inputSchema: z.object({
+        category: z
+          .string()
+          .optional()
+          .describe("A spending category as the user described it, e.g. 'dining out'. Freeform — matched against the household's real categories here, no need to canonicalize it yourself. Omit for the full ranked breakdown."),
+        dateFrom: z.string().optional().describe("Inclusive lower bound, YYYY-MM-DD — compute this yourself from the question; don't leave it blank unless the question means all-time."),
+        dateTo: z.string().optional().describe("Inclusive upper bound, YYYY-MM-DD — usually today."),
+      }),
+      execute: async ({ category, dateFrom, dateTo }) => {
+        const { data: categoryRows, error: categoriesError } = await supabase
+          .from("categories")
+          .select("id, name")
+          .or(`household_id.eq.${householdId},household_id.is.null`)
+          .neq("status", "trashed");
+        if (categoriesError) return { error: categoriesError.message };
+        const allCategories = (categoryRows ?? []) as { id: string; name: string }[];
+        const nameById = new Map(allCategories.map((c) => [c.id, c.name]));
+
+        let matchedCategoryIds: Set<string> | null = null;
+        if (category) {
+          const needle = category.trim().toLowerCase();
+          const exact = allCategories.filter((c) => c.name.toLowerCase() === needle);
+          const matched = exact.length > 0 ? exact : allCategories.filter((c) => c.name.toLowerCase().includes(needle));
+          if (matched.length === 0) {
+            return {
+              categoryNotFound: true,
+              availableCategories: allCategories.map((c) => c.name).slice(0, 30),
+              message: `No category matching "${category}" found in this household.`,
+            };
+          }
+          matchedCategoryIds = new Set(matched.map((c) => c.id));
+        }
+
+        // Same "spend" definition cashFlowForMonth/categoryBreakdownForMonth
+        // use (selectors.ts): expense-typed, not trashed, not excluded from
+        // reports. household_id filter is explicit even under RLS, same
+        // defense-in-depth style searchTransactions above already uses.
+        let query = supabase
+          .from("transactions")
+          .select("id, merchant, description, amount, occurred_at, category_id")
+          .eq("household_id", householdId)
+          .eq("type", "expense")
+          .eq("excluded_from_reports", false)
+          .is("trashed_at", null);
+        if (dateFrom) query = query.gte("occurred_at", dateFrom);
+        if (dateTo) query = query.lte("occurred_at", dateTo);
+        const { data: txnRows, error: txnError } = await query;
+        if (txnError) return { error: txnError.message };
+        const transactions = (txnRows ?? []) as { id: string; merchant: string | null; description: string | null; amount: number; occurred_at: string; category_id: string | null }[];
+
+        // Tag-style links for exactly these transactions — a second,
+        // separate query rather than an embedded relation select, same
+        // two-step style searchTransactions' own item-name matching above
+        // already uses.
+        const txnIds = transactions.map((t) => t.id);
+        const { data: tagRows, error: tagError } =
+          txnIds.length > 0
+            ? await supabase.from("transaction_categories").select("transaction_id, category_id").in("transaction_id", txnIds)
+            : { data: [] as { transaction_id: string; category_id: string }[], error: null };
+        if (tagError) return { error: tagError.message };
+        const tagsByTxnId = new Map<string, string[]>();
+        for (const row of tagRows ?? []) {
+          const list = tagsByTxnId.get(row.transaction_id as string) ?? [];
+          list.push(row.category_id as string);
+          tagsByTxnId.set(row.transaction_id as string, list);
+        }
+        /** Tag-links win when present, else the primary category_id, else uncategorized — categoriesForTransaction()'s exact rule. */
+        function effectiveCategoryIds(t: (typeof transactions)[number]): string[] {
+          const tags = tagsByTxnId.get(t.id);
+          if (tags && tags.length > 0) return tags;
+          return t.category_id ? [t.category_id] : [];
+        }
+
+        if (matchedCategoryIds) {
+          const inCategory = transactions.filter((t) => effectiveCategoryIds(t).some((id) => matchedCategoryIds!.has(id)));
+          const totalAmount = Math.round(inCategory.reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0) * 100) / 100;
+          const top = [...inCategory].sort((a, b) => Math.abs(Number(b.amount)) - Math.abs(Number(a.amount))).slice(0, 3);
+          return {
+            category: [...matchedCategoryIds].map((id) => nameById.get(id)).filter(Boolean).join(", "),
+            totalAmount,
+            count: inCategory.length,
+            topTransactions: top.map((t) => ({
+              id: t.id,
+              merchant: t.merchant,
+              description: t.description,
+              amount: Number(t.amount),
+              date: t.occurred_at,
+            })),
+          };
+        }
+
+        // No category given — full ranked breakdown, same grouping
+        // categoryBreakdownForMonth uses, just over a flexible range
+        // instead of a fixed month.
+        const totals = new Map<string, number>();
+        for (const t of transactions) {
+          const ids = effectiveCategoryIds(t);
+          const key = ids[0] ?? "uncategorized";
+          totals.set(key, (totals.get(key) ?? 0) + Math.abs(Number(t.amount)));
+        }
+        const categories = Array.from(totals.entries())
+          .map(([id, amount]) => ({ name: id === "uncategorized" ? "Uncategorized" : (nameById.get(id) ?? "Uncategorized"), amount: Math.round(amount * 100) / 100 }))
+          .sort((a, b) => b.amount - a.amount);
+        const totalSpend = Math.round(categories.reduce((sum, c) => sum + c.amount, 0) * 100) / 100;
+        return { categories, totalSpend };
+      },
+    }),
+
     findInventoryItems: tool({
       description:
         "Search the household's physical inventory by item name — use for questions like 'where is my X', " +

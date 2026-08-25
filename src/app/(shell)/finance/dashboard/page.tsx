@@ -7,6 +7,7 @@ import { IconChip } from "@/components/icon-chip";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CashFlowChart } from "@/components/charts/cash-flow-chart";
+import { FinanceAiCard } from "@/components/finance-ai-card";
 import { useInventoryStore } from "@/lib/store";
 import {
   accountTypeIcon,
@@ -38,6 +39,7 @@ import { cn } from "@/lib/utils";
  * of that question.
  */
 export default function FinanceDashboardPage() {
+  const householdId = useInventoryStore((s) => s.currentHouseholdId);
   const accounts = useInventoryStore((s) => s.accounts);
   const transactions = useInventoryStore((s) => s.transactions);
   const recurringBills = useInventoryStore((s) => s.recurringBills);
@@ -246,6 +248,8 @@ export default function FinanceDashboardPage() {
           </div>
         </div>
       )}
+
+      <FinanceAiCard householdId={householdId} categorySpend={categorySpend} />
 
       <div>
         <div className="mb-2 flex items-center justify-between">
