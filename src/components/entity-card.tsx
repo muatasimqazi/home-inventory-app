@@ -23,7 +23,14 @@ export function EntityCard({ href, emoji, coverPhotoPath, title, subtitle, badge
     <Link
       href={href}
       className={cn(
-        "flex flex-col overflow-hidden rounded-xl bg-white p-3 shadow-sm transition-shadow hover:shadow-lg",
+        // rounded-2xl + border-border, not rounded-xl alone — the
+        // radius/border/shadow combo every other card in the app uses
+        // (ContainerCard, the Accounts/Recent-transactions/Recurring-bills
+        // row lists, ...); this one card type had drifted to a smaller
+        // radius with no border, most visible on Location/Container
+        // detail's child-entity grid ("Browse") sitting right next to
+        // rows that do use the standard combo.
+        "flex flex-col overflow-hidden rounded-2xl border border-border bg-white p-3 shadow-sm transition-shadow hover:shadow-lg",
         className
       )}
     >
