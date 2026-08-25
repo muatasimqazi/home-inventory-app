@@ -93,7 +93,7 @@ export function ItemPhotoGallery({ item, studioPhotos }: { item: Item; studioPho
 
   if (!active) {
     return (
-      <div className="relative">
+      <div className="relative md:max-w-md">
         <PhotoThumb emoji={item.photoEmoji} coverPhotoPath={null} className="aspect-square w-full" emojiClassName="text-8xl" fit="cover" />
         <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChosen} />
         <button
@@ -110,7 +110,7 @@ export function ItemPhotoGallery({ item, studioPhotos }: { item: Item; studioPho
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2 md:max-w-md">
       <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-surface-muted">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={coverPhotoUrl(active.path)} alt={active.label ?? item.name} className="size-full object-cover" />
