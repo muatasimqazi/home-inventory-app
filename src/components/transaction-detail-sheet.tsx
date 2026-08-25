@@ -23,7 +23,7 @@ import { createAndLinkRefundTransaction } from "@/lib/receipt-refunds";
 import { useInventoryStore } from "@/lib/store";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { displayCodeBadgeClasses } from "@/lib/badge-color";
+import { categoryBadgeClasses } from "@/lib/badge-color";
 import { categoriesForTransaction } from "@/lib/selectors";
 import type { Account, ScannedReceiptLineItem, Transaction, TransactionAttachment } from "@/lib/types";
 
@@ -305,7 +305,7 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
               ) : (
                 <div className="mt-0.5 flex flex-wrap gap-1">
                   {displayedCategories.map((c) => (
-                    <span key={c.id} className={cn("rounded-full border px-1.5 py-0.5 text-micro font-medium", displayCodeBadgeClasses(c.id))}>
+                    <span key={c.id} className={cn("rounded-full px-1.5 py-0.5 text-micro font-medium", categoryBadgeClasses(c.id))}>
                       {c.name}
                     </span>
                   ))}

@@ -10,7 +10,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { CategoryFormDialog } from "@/components/category-form-dialog";
 import { RuleFormDialog } from "@/components/rule-form-dialog";
 import { useInventoryStore } from "@/lib/store";
-import { displayCodeBadgeClasses } from "@/lib/badge-color";
+import { categoryBadgeClasses } from "@/lib/badge-color";
 import { cn } from "@/lib/utils";
 import { useRemountKey } from "@/hooks/use-remount-key";
 import type { FinanceCategory } from "@/lib/types";
@@ -66,32 +66,45 @@ export default function CategoriesAndRulesPage() {
         {activeCategories.length === 0 ? (
           <EmptyState icon="pieChart" title="No categories yet" description="Default categories will appear here, or add your own." />
         ) : (
-          <div className="flex flex-wrap gap-2">
+          // A real row list, not wrapped pills — pills read fine as a
+          // handful of inline tags (a transaction's 1-2 categories) but a
+          // household's full category set is dozens of them: cramped into
+          // wrapped pills, the trash/edit hit-targets shrink to be barely
+          // tappable and a name can't ever truncate, it just pushes the
+          // pill wider. One name per row, own line, actual tap targets —
+          // same divide-y row-list convention as Rules right below.
+          <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
             {activeCategories.map((c) => (
-              <div
-                key={c.id}
-                className={cn("flex items-center gap-1.5 rounded-full border py-1.5 pr-1.5 pl-3 text-caption font-medium", displayCodeBadgeClasses(c.id))}
-              >
-                {c.name}
+              <div key={c.id} className="flex items-center gap-3 px-4 py-3">
+                <span
+                  className={cn(
+                    "flex size-9 shrink-0 items-center justify-center rounded-full text-body font-semibold",
+                    categoryBadgeClasses(c.id)
+                  )}
+                  aria-hidden
+                >
+                  {c.name.charAt(0).toUpperCase()}
+                </span>
+                <p className="min-w-0 flex-1 truncate text-body font-medium text-ink">{c.name}</p>
                 {c.householdId !== null && (
-                  <>
+                  <div className="flex shrink-0 items-center gap-1">
                     <button
                       type="button"
                       onClick={() => setEditingCategory(c)}
                       aria-label={`Rename ${c.name}`}
-                      className="flex size-5 items-center justify-center rounded-full bg-white/50"
+                      className="tap-target flex size-8 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-muted"
                     >
-                      <Icon name="edit" size={11} />
+                      <Icon name="edit" size={15} />
                     </button>
                     <button
                       type="button"
                       onClick={() => setTrashConfirmId(c.id)}
                       aria-label={`Trash ${c.name}`}
-                      className="flex size-5 items-center justify-center rounded-full bg-white/50"
+                      className="tap-target flex size-8 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-muted"
                     >
-                      <Icon name="trash" size={11} />
+                      <Icon name="trash" size={15} />
                     </button>
-                  </>
+                  </div>
                 )}
               </div>
             ))}

@@ -30,7 +30,7 @@ import {
 import { createAndLinkRefundTransaction } from "@/lib/receipt-refunds";
 import { decideCategoryRuleLearnAction } from "@/lib/receipt-resolution";
 import { useInventoryStore } from "@/lib/store";
-import { displayCodeBadgeClasses } from "@/lib/badge-color";
+import { categoryBadgeClasses } from "@/lib/badge-color";
 import { categoriesForTransaction, sortByLabel } from "@/lib/selectors";
 import { formatCurrency, parseCalendarDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -860,7 +860,7 @@ export default function TransactionsListPage() {
                             <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
                               {displayedCategories.length > 0 ? (
                                 displayedCategories.map((c) => (
-                                  <span key={c.id} className={cn("rounded-full border px-1.5 py-0.5 text-micro font-medium", displayCodeBadgeClasses(c.id))}>
+                                  <span key={c.id} className={cn("rounded-full px-1.5 py-0.5 text-micro font-medium", categoryBadgeClasses(c.id))}>
                                     {c.name}
                                   </span>
                                 ))
