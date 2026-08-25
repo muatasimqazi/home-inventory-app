@@ -29,7 +29,7 @@ export async function POST(request: Request) {
   const [{ data: rows, error: queryError }, { data: categoryRows }] = await Promise.all([
     admin
       .from("transactions")
-      .select("id, household_id, account_id, occurred_at, merchant, description, amount, plaid_transaction_id, category_id, type")
+      .select("id, household_id, account_id, occurred_at, merchant, description, amount, plaid_transaction_id, category_id, type, created_at")
       .eq("source", "plaid")
       .is("trashed_at", null),
     admin.from("categories").select("id, name"),
@@ -105,7 +105,7 @@ export async function POST(request: Request) {
   const merchantCandidates: {
     accountId: string;
     merchant: string;
-    rows: { id: string; occurredAt: string; amount: number; description: string | null; plaidTransactionId: string | null; category: string | null; type: string }[];
+    rows: { id: string; occurredAt: string; amount: number; description: string | null; plaidTransactionId: string | null; category: string | null; type: string; createdAt: string }[];
   }[] = [];
   for (const group of merchantGroups.values()) {
     if (group.length < 2) continue;
@@ -133,6 +133,7 @@ export async function POST(request: Request) {
             plaidTransactionId: c.plaid_transaction_id,
             category: c.category_id ? (categoryNameById.get(c.category_id) ?? null) : null,
             type: c.type,
+            createdAt: c.created_at,
           })),
         });
       }
