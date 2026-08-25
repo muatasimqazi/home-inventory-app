@@ -1,5 +1,9 @@
+"use client";
+
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { coverPhotoUrl } from "@/lib/cover-photo";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface PhotoThumbProps {
   emoji: string;
@@ -18,11 +22,45 @@ interface PhotoThumbProps {
  * placeholder box.
  */
 export function PhotoThumb({ emoji, coverPhotoPath, label, className, emojiClassName, fit = "contain" }: PhotoThumbProps) {
+  // Real photos load from Supabase Storage — not instant, and this
+  // component is used everywhere (item/container/location cards and
+  // detail pages) with nothing shown in the meantime before this: a blank
+  // box that abruptly popped a photo into once the network resolved.
+  // Reset during render on coverPhotoPath change (React's documented
+  // "adjust state when a prop changes" pattern — see e.g.
+  // add-person-sheet.tsx's prevOpen for the same idiom elsewhere in this
+  // app), not a setState-in-effect, which fires a wasted extra render
+  // after the DOM's already painted with the stale `loaded` value — the
+  // same DOM node can go from one item's photo to another's without
+  // remounting (e.g. a Realtime-driven update swapping which cover photo
+  // a row shows).
+  const [loaded, setLoaded] = useState(false);
+  const [prevPath, setPrevPath] = useState(coverPhotoPath);
+  if (coverPhotoPath !== prevPath) {
+    setPrevPath(coverPhotoPath);
+    setLoaded(false);
+  }
+
   if (coverPhotoPath) {
     return (
-      <div className={cn("overflow-hidden rounded-2xl bg-brand-100", className)}>
+      <div className={cn("relative overflow-hidden rounded-2xl bg-brand-100", className)}>
+        {!loaded && <Skeleton className="absolute inset-0 rounded-none bg-brand-100/60" />}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={coverPhotoUrl(coverPhotoPath)} alt="" className={cn("size-full", fit === "cover" ? "object-cover" : "object-contain")} />
+        <img
+          src={coverPhotoUrl(coverPhotoPath)}
+          alt=""
+          onLoad={() => setLoaded(true)}
+          // A failed load (404, network error) should still clear the
+          // skeleton rather than pulse forever — the img itself just
+          // renders blank/broken at that point, same as before this
+          // change, but at least not stuck "loading" indefinitely.
+          onError={() => setLoaded(true)}
+          className={cn(
+            "size-full transition-opacity duration-200",
+            fit === "cover" ? "object-cover" : "object-contain",
+            loaded ? "opacity-100" : "opacity-0"
+          )}
+        />
       </div>
     );
   }

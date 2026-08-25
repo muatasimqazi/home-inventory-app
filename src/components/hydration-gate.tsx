@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useInventoryStore } from "@/lib/store";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // Guaranteed-unauthenticated routes per src/proxy.ts's own PUBLIC_PATHS —
 // hydrate() would just hit the "not signed in" branch here, so skip it
@@ -47,16 +48,40 @@ export function HydrationGate({ children }: { children: ReactNode }) {
   if (isPublic || isHouseholdSetup) return <>{children}</>;
 
   if (!isHydrated) {
-    // The brand mark, not just plain text — this is the first thing anyone
-    // sees on every cold load, and doubly so launched from a home-screen
-    // icon (no Safari chrome to lend the page any context in the meantime).
-    // Same mark as the sign-in screen, so there's no visual hand-off
-    // between "app is booting" and "app is asking you to sign in."
+    // A skeleton shaped like the real app shell (app-shell.tsx/bottom-
+    // nav.tsx), not a bare spinner — this is the first thing anyone sees
+    // on every cold load, doubly so launched from a home-screen icon (no
+    // Safari chrome to lend the page any context in the meantime), and it
+    // used to be a static icon + "Loading your household…" with nothing
+    // to look at. Static markup, not the real BottomNav/AppShell
+    // components — those need live store/router data (pathname, contextual
+    // scan href, etc.) that doesn't exist yet at this point.
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-background">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/icon.svg" alt="" width={56} height={56} className="size-14 rounded-2xl" />
-        <p className="text-body text-muted-foreground">Loading your household…</p>
+      <div className="flex min-h-dvh w-full flex-col bg-background">
+        <main className="w-full flex-1 px-5 pb-28 pt-[max(1.5rem,env(safe-area-inset-top))] md:px-8 md:pb-10 md:pt-6">
+          <div className="flex flex-col gap-5">
+            <div className="flex items-center justify-between">
+              <Skeleton className="h-7 w-32" />
+              <Skeleton className="size-9 rounded-full" />
+            </div>
+            {[0, 1, 2].map((i) => (
+              <Skeleton key={i} className="h-24 w-full rounded-2xl" />
+            ))}
+          </div>
+        </main>
+        {/* Same min-h-17.5/border-t/px-2 shape as the real bottom nav, so
+            there's no visible size jump once the real one mounts. */}
+        <nav aria-hidden className="fixed inset-x-0 bottom-0 z-40 flex min-h-17.5 items-center border-t border-border bg-white px-2 pb-[env(safe-area-inset-bottom)] md:hidden">
+          <div className="flex flex-1 items-center justify-around">
+            <Skeleton className="size-8 rounded-full" />
+            <Skeleton className="size-8 rounded-full" />
+          </div>
+          <Skeleton className="-mt-8 size-16 shrink-0 rounded-full" />
+          <div className="flex flex-1 items-center justify-around">
+            <Skeleton className="size-8 rounded-full" />
+            <Skeleton className="size-8 rounded-full" />
+          </div>
+        </nav>
       </div>
     );
   }
