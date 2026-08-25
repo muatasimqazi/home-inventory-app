@@ -9,6 +9,7 @@ import { CreateChooserSheet } from "@/components/create-chooser-sheet";
 import { Icon } from "@/components/icon";
 import { IconChip } from "@/components/icon-chip";
 import { PhotoThumb } from "@/components/photo-thumb";
+import { MerchantIcon } from "@/components/merchant-icon";
 import { Badge } from "@/components/ui/badge";
 import { ReviewBadge } from "@/components/review-badge";
 import { EmptyState } from "@/components/empty-state";
@@ -27,6 +28,7 @@ import {
   groupAccountsByType,
   looseItemCount,
   netWorth,
+  recentTransactions,
   unreadActivityCount,
   upcomingRecurringBills,
 } from "@/lib/selectors";
@@ -104,6 +106,7 @@ export default function OverviewPage() {
   const worth = netWorth(scopedAccounts);
   const thisMonth = cashFlowForMonth(scopedTransactions, new Date());
   const accountGroups = groupAccountsByType(scopedAccounts);
+  const recentTransactionsList = recentTransactions(scopedTransactions, 5);
   const upcomingBills = upcomingRecurringBills(scopedBills, 3);
   const billsDueSoonCount = upcomingRecurringBills(scopedBills).filter((b) => daysUntil(b.nextDueDate) <= BILLS_DUE_SOON_DAYS).length;
 
@@ -441,6 +444,36 @@ export default function OverviewPage() {
               </div>
             )}
           </div>
+        </div>
+
+        <div>
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-item-title font-semibold text-ink">Recent transactions</h3>
+            <Link href="/finance/transactions" className="text-caption font-medium text-yellow-text">
+              View all
+            </Link>
+          </div>
+          {recentTransactionsList.length === 0 ? (
+            <p className="rounded-2xl border border-dashed border-border bg-white p-4 text-center text-caption text-muted-foreground">No transactions yet.</p>
+          ) : (
+            <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
+              {recentTransactionsList.map((t) => (
+                <Link key={t.id} href={`/finance/transactions?transactionId=${t.id}`} className="flex items-center gap-3 px-4 py-3">
+                  <MerchantIcon logoUrl={t.merchantLogoUrl} merchantName={t.merchant ?? t.description} className="size-9" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-body font-medium text-ink">{t.merchant ?? t.description ?? "Transaction"}</p>
+                    <p className="truncate text-caption text-muted-foreground">{formatShortDate(t.occurredAt)}</p>
+                  </div>
+                  {t.excludedFromReports && (
+                    <Icon name="eyeOff" size={14} className="shrink-0 text-muted-foreground" role="img" aria-label="Excluded from reports" />
+                  )}
+                  <span className={cn("shrink-0 text-body font-semibold", t.amount < 0 ? "text-money-negative-text" : "text-badge-green-text")}>
+                    {formatCurrency(t.amount, { showPositiveSign: true })}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       </section>
       )}
