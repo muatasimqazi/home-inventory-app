@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Icon, type IconName } from "@/components/icon";
+import { BackButton } from "@/components/back-button";
 
 /**
  * Bare `/finance` — a menu of every Finance section. Stand-in for the real
@@ -26,9 +27,12 @@ const SECTIONS: { href: string; icon: IconName; label: string; description: stri
 export default function FinanceIndexPage() {
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h1 className="text-screen-title font-semibold text-ink">Finance</h1>
-        <p className="mt-0.5 text-caption text-muted-foreground">Household finances, all in one place.</p>
+      <div className="flex items-center gap-2">
+        <BackButton />
+        <div>
+          <h1 className="text-screen-title font-semibold text-ink">Finance</h1>
+          <p className="mt-0.5 text-caption text-muted-foreground">Household finances, all in one place.</p>
+        </div>
       </div>
       <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
         {SECTIONS.map((s) => (

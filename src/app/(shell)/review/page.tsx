@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
+import { BackButton } from "@/components/back-button";
 import { PhotoThumb } from "@/components/photo-thumb";
 import { EmptyState } from "@/components/empty-state";
 import { Input } from "@/components/ui/input";
@@ -57,9 +58,12 @@ export default function NeedsReviewPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h1 className="text-screen-title font-medium text-ink">Needs Review</h1>
-        <p className="text-caption text-muted-foreground">{queue.length} item{queue.length === 1 ? "" : "s"} flagged by AI capture</p>
+      <div className="flex items-center gap-2">
+        <BackButton hideOnDesktop />
+        <div>
+          <h1 className="text-screen-title font-medium text-ink">Needs Review</h1>
+          <p className="text-caption text-muted-foreground">{queue.length} item{queue.length === 1 ? "" : "s"} flagged by AI capture</p>
+        </div>
       </div>
 
       {queue.length === 0 ? (

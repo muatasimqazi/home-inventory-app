@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
+import { BackButton } from "@/components/back-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -52,9 +53,12 @@ export default function HouseholdDetailsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h1 className="text-screen-title font-semibold text-ink">Household</h1>
-        <p className="mt-0.5 text-caption text-muted-foreground">{isOwner ? "Only you, as owner, can rename it." : "Only the household owner can rename it."}</p>
+      <div className="flex items-center gap-2">
+        <BackButton />
+        <div>
+          <h1 className="text-screen-title font-semibold text-ink">Household</h1>
+          <p className="mt-0.5 text-caption text-muted-foreground">{isOwner ? "Only you, as owner, can rename it." : "Only the household owner can rename it."}</p>
+        </div>
       </div>
 
       {isOwner ? (

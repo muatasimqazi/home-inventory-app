@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
+import { BackButton } from "@/components/back-button";
 import { IconChip } from "@/components/icon-chip";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -186,9 +187,12 @@ export default function PendingReceiptsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h1 className="text-screen-title font-semibold text-ink">Pending Receipts</h1>
-        <p className="mt-0.5 text-caption text-muted-foreground">Confirm or dismiss receipts scanned or emailed in, before they become real transactions.</p>
+      <div className="flex items-center gap-2">
+        <BackButton />
+        <div>
+          <h1 className="text-screen-title font-semibold text-ink">Pending Receipts</h1>
+          <p className="mt-0.5 text-caption text-muted-foreground">Confirm or dismiss receipts scanned or emailed in, before they become real transactions.</p>
+        </div>
       </div>
 
       {groups === null ? (

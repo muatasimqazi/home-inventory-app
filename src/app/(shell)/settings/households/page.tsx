@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
+import { BackButton } from "@/components/back-button";
 import { Button } from "@/components/ui/button";
 import { useInventoryStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
@@ -23,9 +24,12 @@ export default function MyHouseholdsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h1 className="text-screen-title font-semibold text-ink">My Households</h1>
-        <p className="mt-0.5 text-caption text-muted-foreground">Switch between households you belong to, or set up another one.</p>
+      <div className="flex items-center gap-2">
+        <BackButton />
+        <div>
+          <h1 className="text-screen-title font-semibold text-ink">My Households</h1>
+          <p className="mt-0.5 text-caption text-muted-foreground">Switch between households you belong to, or set up another one.</p>
+        </div>
       </div>
 
       <div className="flex flex-col gap-2">

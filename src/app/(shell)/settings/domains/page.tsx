@@ -1,6 +1,7 @@
 "use client";
 
 import { toast } from "sonner";
+import { BackButton } from "@/components/back-button";
 import { DomainToggle } from "@/components/domain-toggle";
 import { useInventoryStore, useCurrentHousehold } from "@/lib/store";
 
@@ -29,11 +30,14 @@ export default function HouseholdDomainsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h1 className="text-screen-title font-semibold text-ink">What this household tracks</h1>
-        <p className="mt-0.5 text-caption text-muted-foreground">
-          {isOwner ? "Choose one or both — you can't turn both off." : "Only the household owner can change this."}
-        </p>
+      <div className="flex items-center gap-2">
+        <BackButton />
+        <div>
+          <h1 className="text-screen-title font-semibold text-ink">What this household tracks</h1>
+          <p className="mt-0.5 text-caption text-muted-foreground">
+            {isOwner ? "Choose one or both — you can't turn both off." : "Only the household owner can change this."}
+          </p>
+        </div>
       </div>
 
       <DomainToggle

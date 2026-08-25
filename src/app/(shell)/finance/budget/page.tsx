@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
+import { BackButton } from "@/components/back-button";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -142,9 +143,12 @@ export default function BudgetPage() {
 
   return (
     <Tabs value={tab} onValueChange={setTab} className="gap-5">
-      <div>
-        <h1 className="text-screen-title font-semibold text-ink">Budget</h1>
-        <p className="mt-0.5 text-caption text-muted-foreground">Set monthly targets and track spend against them.</p>
+      <div className="flex items-center gap-2">
+        <BackButton hideOnDesktop />
+        <div>
+          <h1 className="text-screen-title font-semibold text-ink">Budget</h1>
+          <p className="mt-0.5 text-caption text-muted-foreground">Set monthly targets and track spend against them.</p>
+        </div>
       </div>
 
       <TabsList>

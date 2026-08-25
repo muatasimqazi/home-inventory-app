@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
+import { BackButton } from "@/components/back-button";
 import { EmptyState } from "@/components/empty-state";
 import { EntityFormSheet } from "@/components/entity-form-sheet";
 import { LocationAccordionRow } from "@/components/location-tree";
@@ -55,9 +56,12 @@ export default function LocationsListPage() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-screen-title font-semibold text-ink">Locations</h1>
-          <p className="mt-0.5 text-caption text-muted-foreground">Browse household storage areas.</p>
+        <div className="flex items-center gap-2">
+          <BackButton hideOnDesktop />
+          <div>
+            <h1 className="text-screen-title font-semibold text-ink">Locations</h1>
+            <p className="mt-0.5 text-caption text-muted-foreground">Browse household storage areas.</p>
+          </div>
         </div>
         <Button size="icon-lg" className="rounded-md" onClick={openCreate} aria-label="Add location">
           <Icon name="plus" size={18} />

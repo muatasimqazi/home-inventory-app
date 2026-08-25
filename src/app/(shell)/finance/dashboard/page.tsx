@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Icon } from "@/components/icon";
+import { BackButton } from "@/components/back-button";
 import { IconChip } from "@/components/icon-chip";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -121,9 +122,12 @@ export default function FinanceDashboardPage() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div>
-        <h1 className="text-screen-title font-semibold text-ink">Finance</h1>
-        <p className="mt-0.5 text-caption text-muted-foreground">Where your household&apos;s money went.</p>
+      <div className="flex items-center gap-2">
+        <BackButton hideOnDesktop />
+        <div>
+          <h1 className="text-screen-title font-semibold text-ink">Finance</h1>
+          <p className="mt-0.5 text-caption text-muted-foreground">Where your household&apos;s money went.</p>
+        </div>
       </div>
 
       <div className="flex gap-0.5 rounded-lg bg-surface-muted p-0.75">

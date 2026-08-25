@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
+import { BackButton } from "@/components/back-button";
 import { IconChip } from "@/components/icon-chip";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -62,9 +63,12 @@ export default function RecurringBillsPage() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-screen-title font-semibold text-ink">Recurring Bills</h1>
-          <p className="mt-0.5 text-caption text-muted-foreground">Add manually, or detect subscriptions from your history or a statement.</p>
+        <div className="flex items-center gap-2">
+          <BackButton hideOnDesktop />
+          <div>
+            <h1 className="text-screen-title font-semibold text-ink">Recurring Bills</h1>
+            <p className="mt-0.5 text-caption text-muted-foreground">Add manually, or detect subscriptions from your history or a statement.</p>
+          </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Link

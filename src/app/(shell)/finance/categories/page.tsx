@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
+import { BackButton } from "@/components/back-button";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -47,9 +48,12 @@ export default function CategoriesAndRulesPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-screen-title font-semibold text-ink">Categories & Rules</h1>
-        <p className="mt-0.5 text-caption text-muted-foreground">Organize spending and automate categorization.</p>
+      <div className="flex items-center gap-2">
+        <BackButton hideOnDesktop />
+        <div>
+          <h1 className="text-screen-title font-semibold text-ink">Categories & Rules</h1>
+          <p className="mt-0.5 text-caption text-muted-foreground">Organize spending and automate categorization.</p>
+        </div>
       </div>
 
       <div>

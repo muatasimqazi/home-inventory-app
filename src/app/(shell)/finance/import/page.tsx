@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
+import { BackButton } from "@/components/back-button";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -187,9 +188,12 @@ export default function FinanceCsvImportPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h1 className="text-screen-title font-semibold text-ink">Import from CSV</h1>
-        <p className="mt-0.5 text-caption text-muted-foreground">Bring in transactions from a bank export.</p>
+      <div className="flex items-center gap-2">
+        <BackButton />
+        <div>
+          <h1 className="text-screen-title font-semibold text-ink">Import from CSV</h1>
+          <p className="mt-0.5 text-caption text-muted-foreground">Bring in transactions from a bank export.</p>
+        </div>
       </div>
 
       {accounts.length === 0 ? (

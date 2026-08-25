@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ActivityRow } from "@/components/activity-row";
+import { BackButton } from "@/components/back-button";
 import { EmptyState } from "@/components/empty-state";
 import { LoadMoreButton } from "@/components/load-more-button";
 import { usePaginated } from "@/hooks/use-paginated";
@@ -70,7 +71,10 @@ export default function ActivityFeedPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-screen-title font-medium text-ink">Activity</h1>
+      <div className="flex items-center gap-2">
+        <BackButton hideOnDesktop />
+        <h1 className="text-screen-title font-medium text-ink">Activity</h1>
+      </div>
 
       <div className="flex gap-2 overflow-x-auto pb-1">
         {FILTERS.map((f) => (

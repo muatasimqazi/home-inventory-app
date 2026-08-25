@@ -2,6 +2,7 @@
 
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
+import { BackButton } from "@/components/back-button";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
 import { TrendLineChart } from "@/components/charts/trend-line-chart";
@@ -44,9 +45,12 @@ export default function NetWorthTrendPage() {
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-screen-title font-semibold text-ink">Net Worth</h1>
-          <p className="mt-0.5 text-caption text-muted-foreground">Trend over time.</p>
+        <div className="flex items-center gap-2">
+          <BackButton hideOnDesktop />
+          <div>
+            <h1 className="text-screen-title font-semibold text-ink">Net Worth</h1>
+            <p className="mt-0.5 text-caption text-muted-foreground">Trend over time.</p>
+          </div>
         </div>
         <Button
           size="sm"

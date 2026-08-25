@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
+import { BackButton } from "@/components/back-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -104,9 +105,12 @@ export default function DeleteAccountPage() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div>
-        <h1 className="text-screen-title font-semibold text-ink">Delete Account</h1>
-        <p className="mt-0.5 text-caption text-muted-foreground">Permanently delete your account and everything you own.</p>
+      <div className="flex items-center gap-2">
+        <BackButton />
+        <div>
+          <h1 className="text-screen-title font-semibold text-ink">Delete Account</h1>
+          <p className="mt-0.5 text-caption text-muted-foreground">Permanently delete your account and everything you own.</p>
+        </div>
       </div>
 
       {preview === "loading" && (

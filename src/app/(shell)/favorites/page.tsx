@@ -1,5 +1,6 @@
 "use client";
 
+import { BackButton } from "@/components/back-button";
 import { EmptyState } from "@/components/empty-state";
 import { ItemCard } from "@/components/item-card";
 import { useInventoryStore } from "@/lib/store";
@@ -17,7 +18,10 @@ export default function FavoritesPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-screen-title font-medium text-ink">Favorites</h1>
+      <div className="flex items-center gap-2">
+        <BackButton hideOnDesktop />
+        <h1 className="text-screen-title font-medium text-ink">Favorites</h1>
+      </div>
 
       {favoriteItems.length === 0 ? (
         <EmptyState icon="heart" title="No favorites yet" description="Tap the heart on any item to keep it one tap away." />

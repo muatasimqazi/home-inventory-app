@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Icon } from "@/components/icon";
+import { BackButton } from "@/components/back-button";
 import { IconChip } from "@/components/icon-chip";
 import { EmptyState } from "@/components/empty-state";
 import { REFERENCE_LOCATIONS, loadReferenceItems, type ReferenceInventoryItem } from "@/lib/reference/starter-inventory";
@@ -46,11 +47,14 @@ export default function ReferenceCatalogPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h1 className="text-screen-title font-semibold text-ink">Common Items</h1>
-        <p className="mt-0.5 text-caption text-muted-foreground">
-          Browse a reference catalog of typical household items, organized by storage area.
-        </p>
+      <div className="flex items-center gap-2">
+        <BackButton hideOnDesktop />
+        <div>
+          <h1 className="text-screen-title font-semibold text-ink">Common Items</h1>
+          <p className="mt-0.5 text-caption text-muted-foreground">
+            Browse a reference catalog of typical household items, organized by storage area.
+          </p>
+        </div>
       </div>
 
       {items === null ? (

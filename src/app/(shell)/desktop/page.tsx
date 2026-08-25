@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Icon, type IconName } from "@/components/icon";
+import { BackButton } from "@/components/back-button";
 import { ActivityRow } from "@/components/activity-row";
 import { EmptyState } from "@/components/empty-state";
 import { useInventoryStore } from "@/lib/store";
@@ -18,9 +19,12 @@ export default function DesktopActivityDashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-desktop-title font-medium text-ink">Activity Dashboard</h1>
-        <p className="text-body text-muted-foreground">A management-oriented overview of the whole household inventory.</p>
+      <div className="flex items-center gap-2">
+        <BackButton hideOnDesktop />
+        <div>
+          <h1 className="text-desktop-title font-medium text-ink">Activity Dashboard</h1>
+          <p className="text-body text-muted-foreground">A management-oriented overview of the whole household inventory.</p>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

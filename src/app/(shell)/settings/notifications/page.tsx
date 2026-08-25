@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
+import { BackButton } from "@/components/back-button";
 import { Button } from "@/components/ui/button";
 import { usePushNotifications } from "@/hooks/use-push-notifications";
 import { useInventoryStore } from "@/lib/store";
@@ -104,9 +105,12 @@ export default function NotificationSettingsPage() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div>
-        <h1 className="text-screen-title font-semibold text-ink">Notifications</h1>
-        <p className="mt-0.5 text-caption text-muted-foreground">Get reminders on this device.</p>
+      <div className="flex items-center gap-2">
+        <BackButton />
+        <div>
+          <h1 className="text-screen-title font-semibold text-ink">Notifications</h1>
+          <p className="mt-0.5 text-caption text-muted-foreground">Get reminders on this device.</p>
+        </div>
       </div>
 
       <div className="flex flex-col gap-3 rounded-2xl border border-border bg-white p-4 shadow-sm">

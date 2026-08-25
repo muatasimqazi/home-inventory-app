@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
+import { BackButton } from "@/components/back-button";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { AddPersonSheet } from "@/components/add-person-sheet";
 import { Button } from "@/components/ui/button";
@@ -70,9 +71,12 @@ export default function PeoplePage() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-screen-title font-semibold text-ink">People</h1>
-          <p className="mt-0.5 text-caption text-muted-foreground">Household members and managed profiles.</p>
+        <div className="flex items-center gap-2">
+          <BackButton />
+          <div>
+            <h1 className="text-screen-title font-semibold text-ink">People</h1>
+            <p className="mt-0.5 text-caption text-muted-foreground">Household members and managed profiles.</p>
+          </div>
         </div>
         <Button size="sm" onClick={() => setAddPersonOpen(true)}>
           <Icon name="plus" size={14} /> Add person

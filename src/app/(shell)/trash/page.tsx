@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Icon, type IconName } from "@/components/icon";
+import { BackButton } from "@/components/back-button";
 import { EmptyState } from "@/components/empty-state";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { SearchBar } from "@/components/search-bar";
@@ -40,9 +41,12 @@ export default function TrashPage() {
 
   return (
     <Tabs value={tab} onValueChange={setTab} className="gap-4">
-      <div>
-        <h1 className="text-screen-title font-semibold text-ink">Trash</h1>
-        <p className="mt-0.5 text-caption text-muted-foreground">Restore items or remove them permanently.</p>
+      <div className="flex items-center gap-2">
+        <BackButton hideOnDesktop />
+        <div>
+          <h1 className="text-screen-title font-semibold text-ink">Trash</h1>
+          <p className="mt-0.5 text-caption text-muted-foreground">Restore items or remove them permanently.</p>
+        </div>
       </div>
 
       <TabsList>

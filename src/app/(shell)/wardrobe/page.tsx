@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { BackButton } from "@/components/back-button";
 import { EmptyState } from "@/components/empty-state";
 import { WardrobeItemCard } from "@/components/wardrobe-item-card";
 import { useInventoryStore } from "@/lib/store";
@@ -25,9 +26,12 @@ export default function WardrobePage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h1 className="text-screen-title font-medium text-ink">Wardrobe</h1>
-        <p className="mt-0.5 text-caption text-muted-foreground">Your clothing, cataloged.</p>
+      <div className="flex items-center gap-2">
+        <BackButton hideOnDesktop />
+        <div>
+          <h1 className="text-screen-title font-medium text-ink">Wardrobe</h1>
+          <p className="mt-0.5 text-caption text-muted-foreground">Your clothing, cataloged.</p>
+        </div>
       </div>
 
       {wardrobeItems.length === 0 ? (

@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { Icon } from "@/components/icon";
+import { BackButton } from "@/components/back-button";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -150,9 +151,12 @@ export default function CsvImportPage() {
 
   return (
     <div className="flex flex-col gap-4 rounded-2xl border border-border bg-white p-8 shadow-sm">
-      <div>
-        <h1 className="text-desktop-title font-semibold text-ink">CSV import</h1>
-        <p className="mt-0.5 text-body text-muted-foreground">Map spreadsheet columns before importing inventory.</p>
+      <div className="flex items-center gap-2">
+        <BackButton />
+        <div>
+          <h1 className="text-desktop-title font-semibold text-ink">CSV import</h1>
+          <p className="mt-0.5 text-body text-muted-foreground">Map spreadsheet columns before importing inventory.</p>
+        </div>
       </div>
 
       {stage === "upload" && (

@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
+import { BackButton } from "@/components/back-button";
 import { MoveSheet } from "@/components/move-sheet";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { EmptyState } from "@/components/empty-state";
@@ -93,9 +94,12 @@ export default function DesktopManagementPage() {
   return (
     <div className="flex h-[calc(100dvh-5rem)] flex-col gap-4">
       <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-desktop-title font-semibold text-ink">Inventory management</h1>
-          <p className="mt-0.5 text-caption text-muted-foreground">Search, edit, move, export, and print labels.</p>
+        <div className="flex items-center gap-2">
+          <BackButton hideOnDesktop />
+          <div>
+            <h1 className="text-desktop-title font-semibold text-ink">Inventory management</h1>
+            <p className="mt-0.5 text-caption text-muted-foreground">Search, edit, move, export, and print labels.</p>
+          </div>
         </div>
         <Button size="sm" onClick={openAddLocation}>
           <Icon name="plus" size={14} /> Add Location

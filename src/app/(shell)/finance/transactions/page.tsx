@@ -5,6 +5,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { useSearchParams } from "next/navigation";
 import { Icon } from "@/components/icon";
+import { BackButton } from "@/components/back-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -582,11 +583,16 @@ export default function TransactionsListPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      {backHref && (
+      {backHref ? (
         <Link href={backHref} className="flex items-center gap-1 text-caption font-medium text-muted-foreground">
           <Icon name="arrowLeft" size={14} />
           Back to {backLabel}
         </Link>
+      ) : (
+        // No specific referrer to name — same generic fallback every other
+        // sidebar-linked page uses (BackButton, hidden on desktop since the
+        // sidebar already covers it) rather than showing nothing at all.
+        <BackButton hideOnDesktop />
       )}
 
       <div className="flex items-start justify-between">

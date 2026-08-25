@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Icon, type IconName } from "@/components/icon";
+import { BackButton } from "@/components/back-button";
 
 /**
  * One shared "Import CSV" entry point, not two separate links scattered
@@ -21,9 +22,12 @@ const OPTIONS: { href: string; icon: IconName; label: string; description: strin
 export default function ImportChooserPage() {
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h1 className="text-screen-title font-semibold text-ink">Import from CSV</h1>
-        <p className="mt-0.5 text-caption text-muted-foreground">What are you importing?</p>
+      <div className="flex items-center gap-2">
+        <BackButton hideOnDesktop />
+        <div>
+          <h1 className="text-screen-title font-semibold text-ink">Import from CSV</h1>
+          <p className="mt-0.5 text-caption text-muted-foreground">What are you importing?</p>
+        </div>
       </div>
       <div className="flex flex-col gap-2">
         {OPTIONS.map((o) => (

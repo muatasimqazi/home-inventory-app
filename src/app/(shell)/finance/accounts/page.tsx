@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { Icon } from "@/components/icon";
+import { BackButton } from "@/components/back-button";
 import { IconChip } from "@/components/icon-chip";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -42,9 +43,12 @@ export default function AccountsListPage() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-screen-title font-semibold text-ink">Accounts</h1>
-          <p className="mt-0.5 text-caption text-muted-foreground">Checking, savings, cards, loans & investments.</p>
+        <div className="flex items-center gap-2">
+          <BackButton hideOnDesktop />
+          <div>
+            <h1 className="text-screen-title font-semibold text-ink">Accounts</h1>
+            <p className="mt-0.5 text-caption text-muted-foreground">Checking, savings, cards, loans & investments.</p>
+          </div>
         </div>
         <Button size="icon-lg" className="rounded-md" onClick={openCreate} aria-label="Add account">
           <Icon name="plus" size={18} />
