@@ -232,7 +232,12 @@ export default function ReceiptCapturePage() {
           onClick={() => {
             stopCameraStream();
             reset();
-            router.replace("/finance/dashboard");
+            // router.back(), not a hardcoded destination — this screen is
+            // reachable from more than just the Dashboard (Transactions'
+            // own camera shortcut, the Finance hub, the scan-chooser sheet),
+            // and closing without scanning should land back wherever the
+            // user actually came from, not always Dashboard.
+            router.back();
           }}
           aria-label="Close"
           className={cn("tap-target flex size-10 items-center justify-center rounded-full", dark ? "bg-white/10 text-white" : "bg-surface-muted text-ink")}
