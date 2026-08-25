@@ -21,6 +21,10 @@ import type {
   ItemDocumentLink,
   ItemDocumentLinkKind,
   AttachmentKind,
+  ItemStudioPhoto,
+  ItemStudioPhotoStyle,
+  ItemStudioPhotoAspectRatio,
+  ItemStudioPhotoStatus,
   PinnedLocation,
   PinnedLocationCategory,
   LabelBatch,
@@ -570,6 +574,58 @@ export function attachmentToInsertRow(att: Attachment): AttachmentRow {
     size_bytes: att.sizeBytes,
     created_by_user_id: att.createdByUserId,
     created_at: att.createdAt,
+  };
+}
+
+export interface ItemStudioPhotoRow {
+  id: string;
+  household_id: string;
+  item_id: string;
+  batch_id: string;
+  original_photo_path: string;
+  style: string;
+  aspect_ratio: string;
+  status: string;
+  generated_photo_path: string | null;
+  error_message: string | null;
+  created_by_user_id: string;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export function rowToItemStudioPhoto(row: ItemStudioPhotoRow): ItemStudioPhoto {
+  return {
+    id: row.id,
+    householdId: row.household_id,
+    itemId: row.item_id,
+    batchId: row.batch_id,
+    originalPhotoPath: row.original_photo_path,
+    style: row.style as ItemStudioPhotoStyle,
+    aspectRatio: row.aspect_ratio as ItemStudioPhotoAspectRatio,
+    status: row.status as ItemStudioPhotoStatus,
+    generatedPhotoPath: row.generated_photo_path,
+    errorMessage: row.error_message,
+    createdByUserId: row.created_by_user_id,
+    createdAt: row.created_at,
+    completedAt: row.completed_at,
+  };
+}
+
+export function itemStudioPhotoToInsertRow(p: ItemStudioPhoto): ItemStudioPhotoRow {
+  return {
+    id: p.id,
+    household_id: p.householdId,
+    item_id: p.itemId,
+    batch_id: p.batchId,
+    original_photo_path: p.originalPhotoPath,
+    style: p.style,
+    aspect_ratio: p.aspectRatio,
+    status: p.status,
+    generated_photo_path: p.generatedPhotoPath,
+    error_message: p.errorMessage,
+    created_by_user_id: p.createdByUserId,
+    created_at: p.createdAt,
+    completed_at: p.completedAt,
   };
 }
 

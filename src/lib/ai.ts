@@ -108,6 +108,27 @@ export interface ApplianceLabelDetection {
   confidence: number; // 0-1
 }
 
+// ---------------------------------------------------------------------------
+// Wardrobe item cataloging (docs/Wardrobe Inventory.md) — extends
+// VisionProvider with a fourth detection method, same shape as
+// ApplianceLabelDetection above: one clothing-item photo in, one
+// structured reading out. See lib/vision/detect.ts's detectWardrobeItem
+// for the real implementation. Generating the actual studio photos is a
+// separate capability (image generation, not vision analysis) — see
+// lib/vision/generate-studio-photo.ts, called via a dedicated route, not
+// through this VisionProvider interface.
+// ---------------------------------------------------------------------------
+
+export interface WardrobeItemDetection {
+  suggestedName: string;
+  category: string;
+  color: string;
+  /** Material guesses (e.g. "cotton", "leather") — same free-text-tag shape as DetectedItem.suggestedTags above, 0-3 entries. */
+  suggestedTags: string[];
+  confidence: number; // 0-1
+  photoEmoji: string;
+}
+
 export interface VisionProvider {
   /**
    * `locationName` is an optional hint — the household's own name for the
@@ -124,6 +145,8 @@ export interface VisionProvider {
   extractStatement(fileDataUrl: string): Promise<StatementTransactionExtraction[]>;
   /** Reads a manufacturer's nameplate/rating label off an appliance photo. */
   detectApplianceLabel(photos: string[]): Promise<ApplianceLabelDetection>;
+  /** Catalogs one clothing/wardrobe item from a photo — name/category/color/material guesses. */
+  detectWardrobeItem(photos: string[]): Promise<WardrobeItemDetection>;
 }
 
 /** Thrown by a VisionProvider on failure — `retryable` tells the UI whether "Try again" is a reasonable next step (true for anything transient, e.g. Gemini overload) vs. something that won't fix itself. */
@@ -251,7 +274,20 @@ export class MockVisionProvider implements VisionProvider {
     const shuffled = [...CANNED_APPLIANCE_LABELS].sort(() => Math.random() - 0.5);
     return shuffled[0];
   }
+
+  async detectWardrobeItem(): Promise<WardrobeItemDetection> {
+    await new Promise((resolve) => setTimeout(resolve, 1100));
+    const shuffled = [...CANNED_WARDROBE_ITEMS].sort(() => Math.random() - 0.5);
+    return shuffled[0];
+  }
 }
+
+const CANNED_WARDROBE_ITEMS: WardrobeItemDetection[] = [
+  { suggestedName: "Denim Jacket", category: "Clothing", color: "Blue", suggestedTags: ["denim", "cotton"], confidence: 0.9, photoEmoji: "🧥" },
+  { suggestedName: "Leather Boots", category: "Clothing", color: "Brown", suggestedTags: ["leather"], confidence: 0.86, photoEmoji: "👢" },
+  { suggestedName: "Floral Dress", category: "Clothing", color: "Multicolor", suggestedTags: ["polyester", "floral"], confidence: 0.79, photoEmoji: "👗" },
+  { suggestedName: "unidentified garment", category: "Clothing", color: "", suggestedTags: [], confidence: 0.4, photoEmoji: "👕" },
+];
 
 const CANNED_APPLIANCE_LABELS: ApplianceLabelDetection[] = [
   { suggestedName: "Samsung Refrigerator", photoEmoji: "🧊", manufacturer: "Samsung", modelNumber: "RF28R7351SG", serialNumber: "0A1B2C3D4E5F", manufactureDate: "2023-04", confidence: 0.91 },
@@ -369,6 +405,24 @@ export class HttpVisionProvider implements VisionProvider {
       throw new VisionDetectionError(body?.error ?? `Appliance label reading failed (${res.status}).`, body?.retryable ?? true);
     }
     return (await res.json()) as ApplianceLabelDetection;
+  }
+
+  async detectWardrobeItem(photos: string[]): Promise<WardrobeItemDetection> {
+    let res: Response;
+    try {
+      res = await fetch("/api/v1/vision/detect-wardrobe-item", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ photos }),
+      });
+    } catch {
+      throw new VisionDetectionError("Couldn't reach the server. Check your connection and try again.", true);
+    }
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new VisionDetectionError(body?.error ?? `Wardrobe item detection failed (${res.status}).`, body?.retryable ?? true);
+    }
+    return (await res.json()) as WardrobeItemDetection;
   }
 }
 

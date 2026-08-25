@@ -31,6 +31,7 @@ import {
   rowToItemDocumentLink,
   itemDocumentLinkToInsertRow,
   attachmentToInsertRow,
+  rowToItemStudioPhoto,
   rowToPinnedLocation,
   pinnedLocationToInsertRow,
   rowToLabelBatch,
@@ -84,6 +85,7 @@ import {
   type FavoriteRow,
   type ActivityLogRow,
   type AttachmentRow,
+  type ItemStudioPhotoRow,
   type ItemDocumentLinkRow,
   type PinnedLocationRow,
   type LabelBatchRow,
@@ -111,6 +113,7 @@ import type {
   ActivityEntityType,
   ActivityLogEntry,
   Attachment,
+  ItemStudioPhoto,
   ItemDocumentLink,
   AttachmentKind,
   CategoryRule,
@@ -299,6 +302,8 @@ interface InventoryState {
   activity: ActivityLogEntry[];
   favorites: Favorite[];
   attachments: Attachment[];
+  /** AI-generated ecommerce-style product photos (docs/Wardrobe Inventory.md) — read-only from the client's perspective, written only by the generate-studio-photo server route (under the caller's own RLS grants, not admin). */
+  itemStudioPhotos: ItemStudioPhoto[];
   /** AI-suggested manual/warranty links for Appliance items (0035_item_document_links.sql) — see ItemDocumentLink's own doc comment. */
   itemDocumentLinks: ItemDocumentLink[];
   /** Simple Home Map (PRD §29) — pinned critical locations (water shutoff, panel, etc.) plus renovation wall photos. Hydrated/Realtime-synced like every other per-household array above. */
@@ -653,6 +658,7 @@ interface HouseholdBundle {
   favorites: Favorite[];
   activity: ActivityLogEntry[];
   attachments: Attachment[];
+  itemStudioPhotos: ItemStudioPhoto[];
   itemDocumentLinks: ItemDocumentLink[];
   pinnedLocations: PinnedLocation[];
   labelBatches: LabelBatch[];
@@ -689,6 +695,7 @@ function snapshotBundle(state: InventoryState): HouseholdBundle {
     favorites: state.favorites,
     activity: state.activity,
     attachments: state.attachments,
+    itemStudioPhotos: state.itemStudioPhotos,
     itemDocumentLinks: state.itemDocumentLinks,
     pinnedLocations: state.pinnedLocations,
     labelBatches: state.labelBatches,
@@ -731,6 +738,7 @@ async function fetchHouseholdBundle(
     favoritesRes,
     activityRes,
     attachmentsRes,
+    itemStudioPhotosRes,
     itemDocumentLinksRes,
     pinnedLocationsRes,
     labelBatchesRes,
@@ -767,6 +775,7 @@ async function fetchHouseholdBundle(
     supabase.from("favorites").select("*, items!inner(household_id)").eq("user_id", userId).eq("items.household_id", householdId),
     supabase.from("activity_log").select("*").eq("household_id", householdId).order("created_at", { ascending: false }).limit(500),
     supabase.from("attachments").select("*").eq("household_id", householdId),
+    supabase.from("item_studio_photos").select("*").eq("household_id", householdId),
     supabase.from("item_document_links").select("*").eq("household_id", householdId),
     supabase.from("pinned_locations").select("*").eq("household_id", householdId),
     supabase.from("label_batches").select("*").eq("household_id", householdId).order("created_at", { ascending: false }),
@@ -805,7 +814,7 @@ async function fetchHouseholdBundle(
 
   const firstError =
     membersRes.error ?? invitesRes.error ?? apiKeysRes.error ?? peopleRes.error ?? locationsRes.error ?? containersRes.error ?? itemsRes.error ?? tagsRes.error ?? favoritesRes.error ?? activityRes.error ??
-    attachmentsRes.error ?? itemDocumentLinksRes.error ?? pinnedLocationsRes.error ?? labelBatchesRes.error ?? labelBatchEntriesRes.error ?? normalizationRulesRes.error ??
+    attachmentsRes.error ?? itemStudioPhotosRes.error ?? itemDocumentLinksRes.error ?? pinnedLocationsRes.error ?? labelBatchesRes.error ?? labelBatchEntriesRes.error ?? normalizationRulesRes.error ??
     accountsRes.error ?? financeAccountSharesRes.error ?? transactionsRes.error ?? financeCategoriesRes.error ?? categoryRulesRes.error ?? recurringBillsRes.error ?? financeBillSharesRes.error ??
     recurringCandidateDismissalsRes.error ??
     transactionAttachmentsRes.error ?? transactionCategoriesRes.error ?? categoryBudgetsRes.error ?? financeSettingsRes.error ?? itemPurchasesRes.error;
@@ -844,6 +853,7 @@ async function fetchHouseholdBundle(
     favorites: ((favoritesRes.data ?? []) as FavoriteRow[]).map(rowToFavorite),
     activity: ((activityRes.data ?? []) as ActivityLogRow[]).map(rowToActivityLogEntry),
     attachments: ((attachmentsRes.data ?? []) as AttachmentRow[]).map(rowToAttachment),
+    itemStudioPhotos: ((itemStudioPhotosRes.data ?? []) as ItemStudioPhotoRow[]).map(rowToItemStudioPhoto),
     itemDocumentLinks: ((itemDocumentLinksRes.data ?? []) as ItemDocumentLinkRow[]).map(rowToItemDocumentLink),
     pinnedLocations: ((pinnedLocationsRes.data ?? []) as PinnedLocationRow[]).map(rowToPinnedLocation),
     labelBatches: ((labelBatchesRes.data ?? []) as LabelBatchRow[]).map(rowToLabelBatch),
@@ -1065,6 +1075,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
   activity: [],
   favorites: [],
   attachments: [],
+  itemStudioPhotos: [],
   itemDocumentLinks: [],
   pinnedLocations: [],
   labelBatches: [],
@@ -1172,7 +1183,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       keyOf: (item: TDomain) => string,
       rowKeyOf: (row: Record<string, unknown>) => string,
       stateKey:
-        | "members" | "invites" | "people" | "locations" | "containers" | "tags" | "activity" | "attachments" | "itemDocumentLinks" | "pinnedLocations"
+        | "members" | "invites" | "people" | "locations" | "containers" | "tags" | "activity" | "attachments" | "itemStudioPhotos" | "itemDocumentLinks" | "pinnedLocations"
         | "labelBatches" | "labelBatchEntries" | "normalizationRules"
         | "accounts" | "financeAccountShares" | "transactions" | "financeCategories" | "categoryRules" | "categoryBudgets"
         // financeSettings is NOT in this union — it's a single nullable
@@ -1206,6 +1217,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     bind<TagRow, Tag>("tags", householdFilter, rowToTag, (t) => t.id, (r) => r.id as string, "tags");
     bind<ActivityLogRow, ActivityLogEntry>("activity_log", householdFilter, rowToActivityLogEntry, (a) => a.id, (r) => r.id as string, "activity");
     bind<AttachmentRow, Attachment>("attachments", householdFilter, rowToAttachment, (a) => a.id, (r) => r.id as string, "attachments");
+    bind<ItemStudioPhotoRow, ItemStudioPhoto>("item_studio_photos", householdFilter, rowToItemStudioPhoto, (p) => p.id, (r) => r.id as string, "itemStudioPhotos");
     bind<ItemDocumentLinkRow, ItemDocumentLink>("item_document_links", householdFilter, rowToItemDocumentLink, (l) => l.id, (r) => r.id as string, "itemDocumentLinks");
     bind<PinnedLocationRow, PinnedLocation>("pinned_locations", householdFilter, rowToPinnedLocation, (p) => p.id, (r) => r.id as string, "pinnedLocations");
     bind<LabelBatchRow, LabelBatch>("label_batches", householdFilter, rowToLabelBatch, (b) => b.id, (r) => r.id as string, "labelBatches");

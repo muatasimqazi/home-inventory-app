@@ -50,6 +50,14 @@ function barcodeScanHref(itemHref: string): string {
   return queryIndex === -1 ? "/capture/barcode" : `/capture/barcode${itemHref.slice(queryIndex)}`;
 }
 
+// Wardrobe capture (docs/Wardrobe Inventory.md, src/app/capture/wardrobe/)
+// — same path-prefix-swap pattern as applianceScanHref/barcodeScanHref
+// above.
+function wardrobeScanHref(itemHref: string): string {
+  const queryIndex = itemHref.indexOf("?");
+  return queryIndex === -1 ? "/capture/wardrobe" : `/capture/wardrobe${itemHref.slice(queryIndex)}`;
+}
+
 /**
  * The bottom-nav camera FAB used to link straight to inventory capture —
  * with Finance now a real second domain, "scan" is ambiguous (an item for
@@ -95,6 +103,12 @@ export function ScanChooserSheet({ open, onOpenChange, itemScanHref }: ScanChoos
                 onClick={() => go(barcodeScanHref(itemScanHref))}
               />
               <ChooserRow icon="zap" label="Scan Appliance" description="Read a model/serial label" onClick={() => go(applianceScanHref(itemScanHref))} />
+              <ChooserRow
+                icon="ai"
+                label="Scan Wardrobe"
+                description="Catalog a clothing item + generate studio photos"
+                onClick={() => go(wardrobeScanHref(itemScanHref))}
+              />
             </>
           )}
           {household.financeEnabled && (

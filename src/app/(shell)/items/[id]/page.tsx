@@ -11,6 +11,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { MoveSheet } from "@/components/move-sheet";
 import { ActivityRow } from "@/components/activity-row";
 import { ItemAttachments } from "@/components/item-attachments";
+import { ItemStudioPhotosSection } from "@/components/item-studio-photos-section";
 import { ItemOwnershipSection } from "@/components/item-ownership-section";
 import { ItemPurchaseSection } from "@/components/item-purchase-section";
 import { Button } from "@/components/ui/button";
@@ -259,6 +260,8 @@ export default function ItemDetailPage() {
       <ItemPurchaseSection itemId={item.id} />
 
       <ItemAttachments itemId={item.id} />
+
+      {item.status === "active" && <ItemStudioPhotosSection item={item} />}
 
       {item.status === "active" && (
         <>

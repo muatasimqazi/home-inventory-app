@@ -388,6 +388,79 @@ export async function detectApplianceLabel(photos: string[]): Promise<ApplianceL
 }
 
 // ---------------------------------------------------------------------------
+// Wardrobe item cataloging (docs/Wardrobe Inventory.md) — a fourth
+// detection task on the same PRIMARY_MODEL/FALLBACK_MODEL pair and the
+// same reliability engineering as detectItems/detectApplianceLabel above.
+// Separate schema/prompt/function for the same reason detectApplianceLabel
+// is: this reasons about one clothing item, not a whole scene.
+// ---------------------------------------------------------------------------
+
+const wardrobeItemSchema = z.object({
+  suggestedName: z.string().describe("A concise, human-readable name for the item, e.g. 'Denim Jacket' or 'Floral Midi Dress'."),
+  category: z.enum([...CATEGORIES] as [string, ...string[]]),
+  color: z.string().describe("The item's dominant color(s) in plain English, e.g. 'Navy Blue' or 'Black and White'. Empty string if genuinely indeterminate."),
+  suggestedTags: z.array(z.string()).describe("0-3 short lowercase tags — material guesses (e.g. 'cotton', 'leather', 'denim') and/or garment type, not brand or condition."),
+  confidence: z.number().min(0).max(1).describe("How confident you are in the identification, 0-1 — lower for anything ambiguous, partially obscured, or hard to classify."),
+  photoEmoji: z.string().describe("A single emoji that best represents this item."),
+});
+
+export type WardrobeItemDetection = z.infer<typeof wardrobeItemSchema>;
+
+function buildWardrobeItemMessages(photos: string[]): ModelMessage[] {
+  const labeledPhotos = photos.flatMap((photo, i) => [
+    { type: "text" as const, text: `Photo ${i}:` },
+    { type: "file" as const, mediaType: "image" as const, data: photo },
+  ]);
+
+  return [
+    {
+      role: "user",
+      content: [
+        {
+          type: "text",
+          text:
+            "You are cataloging a single wardrobe item (clothing, shoes, a bag, or an accessory) from a photo, for a " +
+            "home inventory app. Identify the item with a concise name, its category, its dominant color(s), and a " +
+            "couple of short lowercase material/type tags if relevant. Give an honest confidence score — lower for " +
+            "anything ambiguous, partially obscured, folded so its full shape isn't visible, or generic-looking.",
+        },
+        ...labeledPhotos,
+      ],
+    },
+  ];
+}
+
+async function runWardrobeItemDetection(model: LanguageModel, photos: string[]): Promise<WardrobeItemDetection> {
+  const { output } = await generateText({
+    model,
+    output: Output.object({ schema: wardrobeItemSchema }),
+    messages: buildWardrobeItemMessages(photos),
+    timeout: CALL_TIMEOUT_MS,
+    maxRetries: CALL_MAX_RETRIES,
+  });
+  return output;
+}
+
+/**
+ * Catalogs a single wardrobe item (name, category, color, material/type
+ * tags) from one or more photos of it. Same primary-then-fallback-model
+ * shape as detectItems/detectApplianceLabel.
+ */
+export async function detectWardrobeItem(photos: string[]): Promise<WardrobeItemDetection> {
+  try {
+    return await runWardrobeItemDetection(PRIMARY_MODEL, photos);
+  } catch (primaryError) {
+    console.error("Primary vision model failed (wardrobe item), falling back to", FALLBACK_MODEL, primaryError);
+    try {
+      return await runWardrobeItemDetection(FALLBACK_MODEL, photos);
+    } catch (fallbackError) {
+      console.error(`Fallback model ${FALLBACK_MODEL} also failed (wardrobe item):`, fallbackError);
+      throw fallbackError;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Appliance document links — text-only (no photo input, unlike every other
 // function in this file), but kept here rather than a separate module:
 // same PRIMARY_MODEL/FALLBACK_MODEL pair, same reliability engineering

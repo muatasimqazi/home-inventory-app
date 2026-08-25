@@ -223,6 +223,28 @@ export interface Attachment {
   createdAt: string;
 }
 
+/** AI-generated ecommerce-style product photo for an item (docs/Wardrobe Inventory.md) — background removed/replaced, garment preserved as-is. One row per style per generation attempt, never overwritten (a regeneration is a new row) — the full set for an item is its own generation history. */
+export type ItemStudioPhotoStyle = "white_background" | "transparent_background" | "studio_shadow" | "boutique_flat_lay" | "neutral_lifestyle";
+export type ItemStudioPhotoAspectRatio = "1:1" | "4:5";
+export type ItemStudioPhotoStatus = "queued" | "processing" | "complete" | "failed";
+
+export interface ItemStudioPhoto {
+  id: string;
+  householdId: string;
+  itemId: string;
+  /** Groups every style requested together in one generation call — a later single-style regeneration gets its own batchId, not this one. */
+  batchId: string;
+  originalPhotoPath: string;
+  style: ItemStudioPhotoStyle;
+  aspectRatio: ItemStudioPhotoAspectRatio;
+  status: ItemStudioPhotoStatus;
+  generatedPhotoPath: string | null;
+  errorMessage: string | null;
+  createdByUserId: string;
+  createdAt: string;
+  completedAt: string | null;
+}
+
 export type ItemDocumentLinkKind = "manual" | "warranty";
 
 /**
