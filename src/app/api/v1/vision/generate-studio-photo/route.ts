@@ -27,11 +27,13 @@ const MAX_STYLES = 3;
  * /api/v1/finance/detect-recurring.
  *
  * Synchronous by design (see the migration's own comment) — one
- * generateImage call per requested style, run in parallel, each caught
- * independently so one style failing doesn't take the others down with
- * it. Every attempt gets a row (complete or failed) — nothing is ever
- * silently dropped, satisfying "clear failure states" without a real job
- * queue.
+ * generateImage call per requested style, run **sequentially** (see
+ * generate-studio-photo.ts's own comment — concurrent calls sharing the
+ * same input image were the suspected cause of a real, reported quality
+ * bug), each caught independently so one style failing doesn't take the
+ * others down with it. Every attempt gets a row (complete or failed) —
+ * nothing is ever silently dropped, satisfying "clear failure states"
+ * without a real job queue.
  */
 export async function POST(request: Request) {
   let body: unknown;
@@ -88,36 +90,41 @@ export async function POST(request: Request) {
   const batchId = newId();
   const requestedAt = new Date().toISOString();
 
-  const results = await Promise.all(
-    (styles as ItemStudioPhotoStyle[]).map(async (style): Promise<ItemStudioPhoto> => {
-      const base = {
-        id: newId(),
-        householdId,
-        itemId,
-        batchId,
-        originalPhotoPath,
-        style,
-        aspectRatio: aspectRatio as ItemStudioPhotoAspectRatio,
-        createdByUserId: auth.userId,
-        createdAt: requestedAt,
-      };
-      try {
-        const generatedBase64 = await generateStudioPhoto(photoDataUrl, style, aspectRatio as ItemStudioPhotoAspectRatio);
-        const path = `${householdId}/${newId()}`;
-        // PNG unconditionally — the transparent_background style needs
-        // real alpha support, and PNG is a fine format for every other
-        // style too (a few KB bigger than JPEG, not worth a per-style
-        // content-type branch for this pass).
-        const { error: uploadError } = await supabase.storage.from("item-photos").upload(path, Buffer.from(generatedBase64, "base64"), { contentType: "image/png" });
-        if (uploadError) throw new Error(uploadError.message);
-        return { ...base, status: "complete", generatedPhotoPath: path, errorMessage: null, completedAt: new Date().toISOString() };
-      } catch (error) {
-        console.error(`generate-studio-photo: generation failed for style "${style}":`, error);
-        const message = error instanceof Error ? error.message : "Generation failed.";
-        return { ...base, status: "failed", generatedPhotoPath: null, errorMessage: message, completedAt: new Date().toISOString() };
-      }
-    })
-  );
+  // Sequential, not Promise.all — see generate-studio-photo.ts's own
+  // comment on CALL_TIMEOUT_MS: concurrent calls referencing the same
+  // input image were the suspected cause of a real, reported bug (later
+  // styles in a batch coming back as near-copies of the original photo
+  // instead of correctly transformed). One style at a time trades some
+  // total latency for actually-correct, independent output per style.
+  const results: ItemStudioPhoto[] = [];
+  for (const style of styles as ItemStudioPhotoStyle[]) {
+    const base = {
+      id: newId(),
+      householdId,
+      itemId,
+      batchId,
+      originalPhotoPath,
+      style,
+      aspectRatio: aspectRatio as ItemStudioPhotoAspectRatio,
+      createdByUserId: auth.userId,
+      createdAt: requestedAt,
+    };
+    try {
+      const generatedBase64 = await generateStudioPhoto(photoDataUrl, style, aspectRatio as ItemStudioPhotoAspectRatio);
+      const path = `${householdId}/${newId()}`;
+      // PNG unconditionally — the transparent_background style needs
+      // real alpha support, and PNG is a fine format for every other
+      // style too (a few KB bigger than JPEG, not worth a per-style
+      // content-type branch for this pass).
+      const { error: uploadError } = await supabase.storage.from("item-photos").upload(path, Buffer.from(generatedBase64, "base64"), { contentType: "image/png" });
+      if (uploadError) throw new Error(uploadError.message);
+      results.push({ ...base, status: "complete", generatedPhotoPath: path, errorMessage: null, completedAt: new Date().toISOString() });
+    } catch (error) {
+      console.error(`generate-studio-photo: generation failed for style "${style}":`, error);
+      const message = error instanceof Error ? error.message : "Generation failed.";
+      results.push({ ...base, status: "failed", generatedPhotoPath: null, errorMessage: message, completedAt: new Date().toISOString() });
+    }
+  }
 
   const { error: insertError } = await supabase.from("item_studio_photos").insert(results.map(itemStudioPhotoToInsertRow));
   if (insertError) {
