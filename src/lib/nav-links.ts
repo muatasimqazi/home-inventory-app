@@ -18,6 +18,7 @@ export interface NavLink {
  */
 export const INVENTORY_LINKS: NavLink[] = [
   { href: "/favorites", icon: "heart", label: "Favorites" },
+  { href: "/wardrobe", icon: "grid", label: "Wardrobe" },
   { href: "/home-map", icon: "pin", label: "Home Map" },
   { href: "/reference", icon: "list", label: "Common Items" },
   { href: "/desktop", icon: "activity", label: "Activity Dashboard" },

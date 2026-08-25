@@ -111,6 +111,11 @@ export function WardrobeStudioSheet({
   function handleSaveAsCover(path: string) {
     updateItem(item.id, { coverPhotoPath: path });
     toast.success("Set as cover photo");
+    // Closes this sheet — from the wardrobe capture flow, its parent's
+    // onOpenChange(false) handler is what actually navigates to the
+    // item page; from the item detail page's own "Create Studio Photo"
+    // entry point, closing is already the whole story (already there).
+    onOpenChange(false);
   }
 
   return (
@@ -193,21 +198,21 @@ export function WardrobeStudioSheet({
                   </div>
                   <p className="text-center text-caption font-medium text-ink">{STYLE_LABEL[r.style]}</p>
                   {r.status === "complete" && r.generatedPhotoPath ? (
-                    <div className="flex flex-col gap-1">
-                      <Button size="sm" variant="outline" onClick={() => handleSaveAsCover(r.generatedPhotoPath!)}>
-                        Save as cover photo
+                    <div className="flex flex-col gap-1.5">
+                      <Button className="h-11 w-full bg-ink text-white hover:bg-ink/90" onClick={() => handleSaveAsCover(r.generatedPhotoPath!)}>
+                        Save as cover
                       </Button>
                       <a
                         href={coverPhotoUrl(r.generatedPhotoPath)}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-center text-micro font-medium text-yellow-text"
+                        className="tap-target flex items-center justify-center text-caption font-medium text-yellow-text"
                       >
                         Download
                       </a>
                     </div>
                   ) : (
-                    <Button size="sm" variant="outline" onClick={() => handleRetry(r.style)} disabled={retryingStyle === r.style}>
+                    <Button variant="outline" className="h-11 w-full" onClick={() => handleRetry(r.style)} disabled={retryingStyle === r.style}>
                       {retryingStyle === r.style ? <Icon name="spinner" size={14} className="animate-spin" /> : "Retry"}
                     </Button>
                   )}
