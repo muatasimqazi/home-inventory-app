@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AskConversationEntry } from "@/components/ask-conversation-entry";
 import { useAskConversation } from "@/hooks/use-ask-conversation";
+import { useAskConversationStore } from "@/lib/ask-conversation-store";
 import { useInventoryStore } from "@/lib/store";
 import { useKeyboardInset } from "@/hooks/use-keyboard-inset";
 import { cn } from "@/lib/utils";
@@ -27,10 +28,14 @@ const EXAMPLE_QUESTIONS = [
  * it's mounted once in AppShell rather than living under one of them.
  *
  * Not a persisted chat thread (no DB table) — a lightweight session log
- * that lives as long as this component does, which in practice is the
- * whole authenticated session (AppShell doesn't remount on navigation
- * within the shell route group, so the conversation survives moving
- * between pages, just not a hard refresh).
+ * that lives as long as the browser tab does. The conversation itself
+ * lives in lib/ask-conversation-store.ts, shared by every Ask surface
+ * (this widget, the Finance dashboard's "Ask about your money" card,
+ * Search's fallback) rather than local state on this component, so it
+ * survives moving between pages — including a page that unmounted this
+ * very component's siblings — same as this panel's own `open` state
+ * (also store-backed, for the same reason: another surface needs to be
+ * able to open this panel even though it doesn't render it).
  *
  * The question/answer flow itself (state + the POST /api/v1/ask call) and
  * the per-entry chat-bubble rendering both live in shared modules now
@@ -40,7 +45,8 @@ const EXAMPLE_QUESTIONS = [
  */
 export function AskFab() {
   const householdId = useInventoryStore((s) => s.currentHouseholdId);
-  const [open, setOpen] = useState(false);
+  const open = useAskConversationStore((s) => s.panelOpen);
+  const togglePanel = useAskConversationStore((s) => s.togglePanel);
   const { entries, ask } = useAskConversation(householdId);
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -69,7 +75,7 @@ export function AskFab() {
     <>
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={togglePanel}
         aria-label={open ? "Close Ask" : "Ask"}
         className={cn(
           "tap-target fixed z-40 flex size-14 items-center justify-center rounded-full bg-ink text-white shadow-lg transition-transform active:scale-95 print:hidden",
@@ -118,7 +124,7 @@ export function AskFab() {
                 ))}
               </div>
             ) : (
-              entries.map((entry) => <AskConversationEntry key={entry.id} entry={entry} onRetry={ask} onNavigate={() => setOpen(false)} />)
+              entries.map((entry) => <AskConversationEntry key={entry.id} entry={entry} onRetry={ask} />)
             )}
             <div ref={scrollRef} />
           </div>

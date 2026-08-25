@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Icon } from "@/components/icon";
 import { Button } from "@/components/ui/button";
 import { stripMarkdown } from "@/lib/ask/strip-markdown";
+import { useAskConversationStore } from "@/lib/ask-conversation-store";
 import type { AskConversationEntry as Entry } from "@/hooks/use-ask-conversation";
 
 /**
@@ -9,8 +10,18 @@ import type { AskConversationEntry as Entry } from "@/hooks/use-ask-conversation
  * always had, extracted so the Search page's "same behavior as Ask"
  * fallback (see use-ask-conversation.ts) renders identically rather than
  * a second hand-drawn copy of the same chat bubbles.
+ *
+ * Tapping a reference always opens the shared floating Ask panel
+ * (ask-fab.tsx) before navigating — the conversation itself is already
+ * shared (lib/ask-conversation-store.ts), so whichever surface this entry
+ * is rendered on (the floating widget itself, the Finance dashboard's
+ * card, Search's fallback), landing on the transaction/item page leaves
+ * the same conversation open in that small window instead of stranding it
+ * on a page that just unmounted.
  */
-export function AskConversationEntry({ entry, onRetry, onNavigate }: { entry: Entry; onRetry: (question: string) => void; onNavigate?: () => void }) {
+export function AskConversationEntry({ entry, onRetry }: { entry: Entry; onRetry: (question: string) => void }) {
+  const openPanel = useAskConversationStore((s) => s.openPanel);
+
   return (
     <div className="flex flex-col gap-2">
       <div className="max-w-[85%] self-end rounded-2xl rounded-br-sm bg-ink px-3 py-2 text-caption text-white">{entry.question}</div>
@@ -35,7 +46,7 @@ export function AskConversationEntry({ entry, onRetry, onNavigate }: { entry: En
             <Link
               key={`${ref.kind}-${ref.id}`}
               href={ref.href}
-              onClick={onNavigate}
+              onClick={openPanel}
               className="flex items-center gap-2 rounded-xl border border-border bg-white p-2 shadow-sm"
             >
               {ref.imageUrl ? (
