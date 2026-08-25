@@ -23,7 +23,7 @@ function ChooserRow({
   icon: IconName;
   label: string;
   description: string;
-  /** One role from the brand's 5-role FAB color wheel (globals.css's --color-fab-* tokens) — includes its own text color, since Secondary and Neutral Light don't have enough contrast for a white icon and need a dark one instead. See this file's own comment on the per-row assignment. */
+  /** One role from the brand's 5-role FAB color wheel (globals.css's --color-fab-* tokens) — every role pairs with a white icon. See this file's own comment on the per-row assignment. */
   iconClassName: string;
   onClick: () => void;
 }) {
@@ -108,16 +108,16 @@ export function ScanChooserSheet({ open, onOpenChange, itemScanHref }: ScanChoos
         </SheetHeader>
         {/* Each row a fixed, distinct role from the brand's 5-role FAB
             color wheel (globals.css's --color-fab-* tokens: Primary sage,
-            Secondary honey, Accent terracotta, Neutral Dark charcoal,
-            Neutral Light alabaster) — was bg-yellow (the brand/primary
-            fill) on every row, indistinct from itself and from every
-            other primary-colored button in the app; briefly used a
-            hashed badge-color-wheel palette instead before settling on
-            this exact 5-role set. Hand-picked per action, not cycled —
-            "Item"/"Receipt" reuse the same role as their
-            CreateChooserSheet counterpart (Item/Transaction). Secondary
-            and Neutral Light are light enough to need a dark icon instead
-            of white to stay legible. */}
+            Secondary gold, Accent terracotta, Neutral Dark charcoal,
+            Neutral Light teal) — was bg-yellow (the brand/primary fill) on
+            every row, indistinct from itself and from every other
+            primary-colored button in the app; briefly used a hashed
+            badge-color-wheel palette instead before settling on this exact
+            5-role set. Hand-picked per action, not cycled — "Item"/
+            "Receipt" reuse the same role as their CreateChooserSheet
+            counterpart (Item/Transaction). Every role's white icon now
+            (Secondary/Neutral Light deepened in globals.css so white
+            stays legible on them too — see that token's own comment). */}
         <div className="flex flex-col gap-2 px-4 pb-6">
           {household.inventoryEnabled && (
             <>
@@ -132,7 +132,7 @@ export function ScanChooserSheet({ open, onOpenChange, itemScanHref }: ScanChoos
                 icon="scanBarcode"
                 label="Scan Barcode"
                 description="Look up a product by UPC/EAN"
-                iconClassName="bg-fab-neutral-light text-fab-neutral-dark"
+                iconClassName="bg-fab-neutral-light text-white"
                 onClick={() => go(barcodeScanHref(itemScanHref))}
               />
               <ChooserRow
@@ -156,7 +156,7 @@ export function ScanChooserSheet({ open, onOpenChange, itemScanHref }: ScanChoos
               icon="receipt"
               label="Scan Receipt"
               description="Auto-fill a Finance transaction"
-              iconClassName="bg-fab-secondary text-fab-neutral-dark"
+              iconClassName="bg-fab-secondary text-white"
               onClick={() => go("/finance/scan")}
             />
           )}

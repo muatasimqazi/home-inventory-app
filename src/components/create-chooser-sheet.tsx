@@ -22,7 +22,7 @@ function ChooserRow({
   icon: IconName;
   label: string;
   description: string;
-  /** One role from the brand's 5-role FAB color wheel (globals.css's --color-fab-* tokens) — includes its own text color, since Secondary and Neutral Light don't have enough contrast for a white icon and need a dark one instead. See this file's own comment on the per-row assignment. */
+  /** One role from the brand's 5-role FAB color wheel (globals.css's --color-fab-* tokens) — every role pairs with a white icon. See this file's own comment on the per-row assignment. */
   iconClassName: string;
   onClick: () => void;
 }) {
@@ -75,11 +75,12 @@ export function CreateChooserSheet({ open, onOpenChange }: CreateChooserSheetPro
           <SheetHeader>
             <SheetTitle className="text-section-title font-medium text-ink">Add</SheetTitle>
           </SheetHeader>
-          {/* Same 5-role brand FAB color wheel as ScanChooserSheet, and
-              the same role for the concepts the two sheets share — Item
-              stays Primary, Transaction stays Secondary (Scan Receipt's
-              role) — since a Scan Receipt and a manually-added
-              Transaction are the same underlying thing. */}
+          {/* Same 5-role brand FAB color wheel as ScanChooserSheet (every
+              role a white icon — see that file's own comment), and the
+              same role for the concepts the two sheets share — Item stays
+              Primary, Transaction stays Secondary (Scan Receipt's role) —
+              since a Scan Receipt and a manually-added Transaction are the
+              same underlying thing. */}
           <div className="flex flex-col gap-2 px-4 pb-6">
             <ChooserRow
               icon="box"
@@ -92,7 +93,7 @@ export function CreateChooserSheet({ open, onOpenChange }: CreateChooserSheetPro
               icon="pin"
               label="Location"
               description="A room or area you store things in"
-              iconClassName="bg-fab-neutral-light text-fab-neutral-dark"
+              iconClassName="bg-fab-neutral-light text-white"
               onClick={() => go("/locations?open=new")}
             />
             <ChooserRow
@@ -109,7 +110,7 @@ export function CreateChooserSheet({ open, onOpenChange }: CreateChooserSheetPro
               icon="receipt"
               label="Transaction"
               description="A purchase, payment, or transfer"
-              iconClassName="bg-fab-secondary text-fab-neutral-dark"
+              iconClassName="bg-fab-secondary text-white"
               onClick={() => go("/finance/transactions?open=new")}
             />
             <ChooserRow

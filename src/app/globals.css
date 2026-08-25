@@ -44,12 +44,19 @@
      different names) — kept as its own token here anyway so this block
      reads as one complete, self-contained 5-role set matching the source
      palette exactly, rather than 4 new tokens plus an unexplained reference
-     back to --color-yellow. */
+     back to --color-yellow.
+
+     Secondary and Neutral Light were originally light enough (honey #f8d376,
+     teal #69a197 — under 3:1 contrast against white) to need a dark icon
+     instead of white, the one inconsistency in an otherwise all-white-icon
+     wheel. Deepened both, same hue family, until white reads cleanly on
+     them too (3.8:1/6.4:1 — in the same range fab-accent's own 3.7:1
+     white-on-terracotta already sits at) — every row's icon is white now. */
   --color-fab-primary: #5c7a52; /* Sage/Forest Green */
-  --color-fab-secondary: #f8d376; /* Warm Honey/Ochre Yellow */
+  --color-fab-secondary: #a67c2e; /* Antique Gold — deepened from Warm Honey/Ochre Yellow (#f8d376) for a legible white icon */
   --color-fab-accent: #c46d4b; /* Terracotta/Burnt Orange */
   --color-fab-neutral-dark: #2b3326; /* Deep Pine Charcoal */
-  --color-fab-neutral-light: #69a197; /* Muted Teal — swapped in live from the original Creamy Alabaster spec */
+  --color-fab-neutral-light: #356860; /* Deep Teal — deepened from Muted Teal (#69a197) for a legible white icon */
 
   /* Bin ID badge palette — pastel-fill/border + deep text, hashed per container. Flat (no shadow). */
   --color-badge-red-bg: #fae7e7;
