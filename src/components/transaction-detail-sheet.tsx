@@ -8,6 +8,7 @@ import { Icon } from "@/components/icon";
 import { LineItemFormSheet } from "@/components/line-item-form-sheet";
 import { MerchantIcon } from "@/components/merchant-icon";
 import { LinkPurchaseSheet } from "@/components/link-purchase-sheet";
+import { MergeTransactionSheet } from "@/components/merge-transaction-sheet";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { rowToScannedReceiptLineItem, type ScannedReceiptLineItemRow } from "@/lib/supabase/mappers";
@@ -52,6 +53,10 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
   const [deleteLineItemConfirm, setDeleteLineItemConfirm] = useState<ScannedReceiptLineItem | null>(null);
   const [addingItem, setAddingItem] = useState(false);
   const [linkItemOpen, setLinkItemOpen] = useState(false);
+  // Duplicate-transaction prevention, part E — manual fallback for two
+  // transactions that already exist as separate rows for the same real
+  // charge.
+  const [mergeSheetOpen, setMergeSheetOpen] = useState(false);
 
   // Reaches into the store directly (not threaded down as props from
   // transactions/page.tsx) for the same reason this component already
@@ -218,6 +223,18 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
   function handleUnlinkItem(purchaseId: string) {
     unlinkItemPurchase(purchaseId);
     toast("Link removed");
+  }
+
+  async function handleMerge(keepId: string, discardId: string) {
+    const { error } = await getSupabaseBrowserClient().rpc("merge_transactions", { p_keep_transaction_id: keepId, p_discard_transaction_id: discardId });
+    if (error) {
+      toast.error(`Couldn't merge: ${error.message}`);
+      return;
+    }
+    toast.success("Merged");
+    // If the transaction open in this drawer was the one discarded, close
+    // it — it's now trashed and there's nothing left here to show.
+    if (transaction && discardId === transaction.id) onOpenChange(false);
   }
 
   if (!transaction) return null;
@@ -419,6 +436,9 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
             <Button variant="outline" className="flex-1" onClick={onEdit}>
               <Icon name="edit" size={16} /> Edit
             </Button>
+            <Button variant="outline" className="flex-1" onClick={() => setMergeSheetOpen(true)}>
+              <Icon name="link" size={16} /> Merge
+            </Button>
             <Button variant="outline" className="flex-1 border-danger/30 text-danger" onClick={onTrash}>
               <Icon name="trash" size={16} /> Trash
             </Button>
@@ -435,6 +455,8 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
       excludeIds={linkedPurchases.map((p) => p.itemId)}
       onPick={handlePickItemToLink}
     />
+
+    <MergeTransactionSheet open={mergeSheetOpen} onOpenChange={setMergeSheetOpen} transaction={transaction} allTransactions={allTransactions} onMerge={handleMerge} />
 
     <LineItemFormSheet
       // Same always-mounted-with-open-prop pattern as the transactions list

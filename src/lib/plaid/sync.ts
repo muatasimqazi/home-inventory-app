@@ -161,7 +161,16 @@ async function handleAdded(
   // one story across every import path. A match gets *adopted*
   // (plaid_transaction_id set, original source preserved) instead of
   // creating a second row for the same real-world charge.
-  const duplicate = findDuplicateTransaction({ accountId, amount, occurredAt, description: merchant ?? "" }, existingTxns);
+  //
+  // amountTolerancePercent: 30 — unlike CSV import (exact-amount only,
+  // its own review screen is the safety net), this path runs unattended
+  // and silently adopts a match, so a receipt-scanned amount that later
+  // posts a few dollars higher (a tip) or lower (a rounding/fee
+  // adjustment) still gets caught instead of silently duplicating. Safe
+  // to loosen here specifically: a false positive just tags an existing
+  // row with plaidTransactionId a little too eagerly (soft, reversible),
+  // never loses data the way a missed real duplicate would.
+  const duplicate = findDuplicateTransaction({ accountId, amount, occurredAt, description: merchant ?? "" }, existingTxns, { amountTolerancePercent: 30 });
   if (duplicate) {
     await admin.from("transactions").update({ plaid_transaction_id: pt.transaction_id, merchant_logo_url: pt.logo_url ?? null }).eq("id", duplicate.id);
     return null;

@@ -1,16 +1,18 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LinkPurchaseSheet } from "@/components/link-purchase-sheet";
+import { PossibleDuplicateBanner } from "@/components/possible-duplicate-banner";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useInventoryStore } from "@/lib/store";
 import { useReceiptScanSession } from "@/lib/receipt-scan-session-store";
+import { findPossibleDuplicateForDraft, type PossibleDuplicateMatch } from "@/lib/receipt-duplicate-check";
 import { useKeyboardInset } from "@/hooks/use-keyboard-inset";
 import { formatCurrency, getLocalTodayIso } from "@/lib/format";
 import { sortByLabel } from "@/lib/selectors";
@@ -41,6 +43,7 @@ export default function SingleReceiptReviewPage() {
   const reset = useReceiptScanSession((s) => s.reset);
 
   const accounts = sortByLabel(useInventoryStore((s) => s.accounts), (a) => a.name);
+  const transactions = useInventoryStore((s) => s.transactions);
   const financeCategories = useInventoryStore((s) => s.financeCategories);
   const members = useInventoryStore((s) => s.members);
   const currentUserId = useInventoryStore((s) => s.currentUserId);
@@ -52,6 +55,14 @@ export default function SingleReceiptReviewPage() {
   const unlinkItemPurchase = useInventoryStore((s) => s.unlinkItemPurchase);
 
   const [confirming, setConfirming] = useState(false);
+  const [attaching, setAttaching] = useState(false);
+  // Duplicate-transaction prevention, part C — checked once the account
+  // is known (either auto-resolved via card_last_four match, or picked
+  // here). `dismissedTransactionId` remembers a "No, this is separate"
+  // answer so re-running the check (e.g. after some other field changes)
+  // doesn't resurface the same already-answered prompt.
+  const [possibleDuplicate, setPossibleDuplicate] = useState<PossibleDuplicateMatch | null>(null);
+  const [dismissedTransactionId, setDismissedTransactionId] = useState<string | null>(null);
   // Which line item the "Link to item" sheet is open for — PRD §25's
   // assisted matching applies here too: a receipt can be linked to
   // inventory items before it's even confirmed into a real transaction
@@ -60,6 +71,19 @@ export default function SingleReceiptReviewPage() {
   const [linkingLineItemId, setLinkingLineItemId] = useState<string | null>(null);
 
   const draft = (drafts ?? []).find((d) => d.status === "pending");
+
+  useEffect(() => {
+    if (!draft?.accountId) return;
+    let cancelled = false;
+    findPossibleDuplicateForDraft(draft, transactions).then((match) => {
+      if (cancelled) return;
+      setPossibleDuplicate(match && match.transaction.id !== dismissedTransactionId ? match : null);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- deliberately keyed on accountId only, not every keystroke in amount/store/date — see this effect's own comment above.
+  }, [draft?.accountId]);
   const activeCategories = sortByLabel(
     financeCategories.filter((c) => c.status === "active"),
     (c) => c.name
@@ -73,6 +97,59 @@ export default function SingleReceiptReviewPage() {
         <Button onClick={() => router.replace("/finance/dashboard")}>Back to Finance</Button>
       </div>
     );
+  }
+
+  // Shared by handleConfirm (a freshly-inserted transaction) and
+  // handleAttach (an existing one, duplicate-transaction prevention part
+  // D) — everything after "there is now a real transaction id" is
+  // identical either way: attach the already-uploaded receipt photo, and
+  // backfill any item_purchases links made during review.
+  async function finishReceiptLink(transactionId: string) {
+    if (!draft || !batch) return;
+    const supabase = getSupabaseBrowserClient();
+
+    // Reuses the photo already uploaded to Storage during extraction
+    // (receipt-scan-session-store.ts's runExtraction) rather than
+    // uploading it again — same permanent-retention resolution
+    // (Addendum §6), one upload, not two.
+    const storagePath = batch.sourceImagePaths[draft.photoIndex];
+    if (storagePath) {
+      const dataUrl = useReceiptScanSession.getState().photos[draft.photoIndex];
+      const blob = dataUrl ? await (await fetch(dataUrl)).blob() : null;
+      await linkTransactionAttachment(transactionId, {
+        storagePath,
+        contentType: blob?.type || "image/jpeg",
+        sizeBytes: blob?.size || 1,
+        sourceDraftId: draft.id,
+      });
+    }
+
+    // Any item_purchases link made during review (this page's own "Link
+    // to item" affordance below) only had a scanned_receipt_line_item_id
+    // to point at — the confirmed transaction now exists, so backfill
+    // transactionId onto those links too (item_purchases' own comment:
+    // "or both once a draft resolves into a real transaction"). Realtime
+    // (store.ts's item_purchases subscription) picks up the resulting
+    // row change locally; no need to also patch local state here.
+    const lineItemIds = draft.lineItems.map((li) => li.id);
+    if (lineItemIds.length > 0) {
+      const { error: backfillError } = await supabase
+        .from("item_purchases")
+        .update({ transaction_id: transactionId })
+        .in("scanned_receipt_line_item_id", lineItemIds)
+        .is("transaction_id", null);
+      if (backfillError) {
+        // Not atomic with the RPC above — a real gap the reviewer
+        // correctly flagged as belonging inside that RPC instead,
+        // deferred rather than folded into this merge. Until then, at
+        // minimum don't let this fail silently: a link made during
+        // review would otherwise stay permanently anchored only by
+        // scanned_receipt_line_item_id and read as "pending" forever
+        // even though the receipt was, in fact, confirmed.
+        console.error("Couldn't backfill item_purchases.transaction_id:", backfillError.message);
+        toast.error("Confirmed, but couldn't finish linking an item to this receipt — check the item's Purchase & Warranty section.");
+      }
+    }
   }
 
   async function handleConfirm() {
@@ -103,58 +180,42 @@ export default function SingleReceiptReviewPage() {
         toast.error(`Couldn't confirm: ${error.message}`);
         return;
       }
-
-      // Reuses the photo already uploaded to Storage during extraction
-      // (receipt-scan-session-store.ts's runExtraction) rather than
-      // uploading it again — same permanent-retention resolution
-      // (Addendum §6), one upload, not two.
-      const storagePath = batch.sourceImagePaths[draft.photoIndex];
-      if (storagePath && data) {
-        const dataUrl = useReceiptScanSession.getState().photos[draft.photoIndex];
-        const blob = dataUrl ? await (await fetch(dataUrl)).blob() : null;
-        await linkTransactionAttachment(data.id, {
-          storagePath,
-          contentType: blob?.type || "image/jpeg",
-          sizeBytes: blob?.size || 1,
-          sourceDraftId: draft.id,
-        });
-      }
-
-      // Any item_purchases link made during review (this page's own "Link
-      // to item" affordance below) only had a scanned_receipt_line_item_id
-      // to point at — the confirmed transaction now exists, so backfill
-      // transactionId onto those links too (item_purchases' own comment:
-      // "or both once a draft resolves into a real transaction"). Realtime
-      // (store.ts's item_purchases subscription) picks up the resulting
-      // row change locally; no need to also patch local state here.
-      if (data) {
-        const lineItemIds = draft.lineItems.map((li) => li.id);
-        if (lineItemIds.length > 0) {
-          const { error: backfillError } = await supabase
-            .from("item_purchases")
-            .update({ transaction_id: data.id })
-            .in("scanned_receipt_line_item_id", lineItemIds)
-            .is("transaction_id", null);
-          if (backfillError) {
-            // Not atomic with confirm_scanned_transaction_draft() above —
-            // a real gap the reviewer correctly flagged as belonging
-            // inside that RPC instead, deferred rather than folded into
-            // this merge. Until then, at minimum don't let this fail
-            // silently: a link made during review would otherwise stay
-            // permanently anchored only by scanned_receipt_line_item_id
-            // and read as "pending" forever even though the receipt was,
-            // in fact, confirmed.
-            console.error("Couldn't backfill item_purchases.transaction_id:", backfillError.message);
-            toast.error("Confirmed, but couldn't finish linking an item to this receipt — check the item's Purchase & Warranty section.");
-          }
-        }
-      }
+      if (data) await finishReceiptLink(data.id);
 
       toast.success(`Confirmed — ${draft.store ?? "receipt"} added to your transactions`);
       reset();
       router.replace(`/finance/transactions`);
     } finally {
       setConfirming(false);
+    }
+  }
+
+  // Duplicate-transaction prevention, part D — the "Attach" side of the
+  // possible-duplicate banner: instead of confirm_scanned_transaction_
+  // draft() inserting a brand-new row, attach_scanned_draft_to_transaction
+  // reassigns this receipt's line items onto the transaction that's
+  // already there (Plaid-synced, most likely), and no second row for the
+  // same real charge ever gets created.
+  async function handleAttach() {
+    if (!draft || !possibleDuplicate) return;
+    setAttaching(true);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const { error } = await supabase.rpc("attach_scanned_draft_to_transaction", {
+        p_draft_id: draft.id,
+        p_transaction_id: possibleDuplicate.transaction.id,
+        p_category_id: draft.suggestedCategoryId,
+      });
+      if (error) {
+        toast.error(`Couldn't attach: ${error.message}`);
+        return;
+      }
+      await finishReceiptLink(possibleDuplicate.transaction.id);
+      toast.success("Attached to your existing transaction — nothing extra added");
+      reset();
+      router.replace("/finance/transactions");
+    } finally {
+      setAttaching(false);
     }
   }
 
@@ -200,6 +261,19 @@ export default function SingleReceiptReviewPage() {
             <Icon name="needsReview" size={16} className="mt-0.5 shrink-0 text-badge-orange-text" />
             <p className="text-caption text-badge-orange-text">{draft.reviewReason ?? "This receipt needs a closer look."}</p>
           </div>
+        )}
+
+        {possibleDuplicate && (
+          <PossibleDuplicateBanner
+            match={possibleDuplicate}
+            accountName={accounts.find((a) => a.id === draft.accountId)?.name}
+            attaching={attaching}
+            onAttach={handleAttach}
+            onDismiss={() => {
+              setDismissedTransactionId(possibleDuplicate.transaction.id);
+              setPossibleDuplicate(null);
+            }}
+          />
         )}
 
         <div className="rounded-2xl border border-border bg-white p-4">
