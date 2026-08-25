@@ -2509,8 +2509,30 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     if (!previous) return;
     const merged: Account = { ...previous, ...patch };
     set((s) => ({ accounts: s.accounts.map((a) => (a.id === accountId ? merged : a)) }));
+    // plaid_item_id/plaid_account_id deliberately excluded from the update
+    // payload — this action is only ever called from a user-initiated edit
+    // (AccountFormSheet); Plaid linkage is exclusively server-managed, via
+    // the admin client directly in exchange-public-token/disconnect's own
+    // routes, never through this action. Real bug this used to have:
+    // accountToInsertRow(merged) always resent whatever plaidItemId
+    // happened to be in the client's local cache, even though nothing
+    // about it had actually changed — accounts_validate_plaid_item
+    // (0015_plaid_bank_sync.sql) fires on *any* update that touches that
+    // column and rejects it if the id no longer resolves to a real
+    // plaid_items row, which a disconnect (or any other cause of local
+    // staleness — a missed realtime event, a stale household-switch
+    // cache, etc.) leaves dangling. So an ordinary, unrelated edit (a
+    // rename, a balance tweak) could fail with "Plaid item not found" —
+    // confirmed live, reported as exactly that message — simply because
+    // this action kept re-asserting a value it had no business touching
+    // at all. Omitting the columns means the trigger's own `update of
+    // plaid_item_id` scope never fires for a plain edit, regardless of
+    // whether the cached value is stale.
+    const updateRow: Partial<ReturnType<typeof accountToInsertRow>> = accountToInsertRow(merged);
+    delete updateRow.plaid_item_id;
+    delete updateRow.plaid_account_id;
     persistOrRevert(
-      supabase.from("accounts").update(accountToInsertRow(merged)).eq("id", accountId),
+      supabase.from("accounts").update(updateRow).eq("id", accountId),
       () => set((s) => ({ accounts: s.accounts.map((a) => (a.id === accountId ? previous : a)) })),
       "Couldn't update account"
     );
