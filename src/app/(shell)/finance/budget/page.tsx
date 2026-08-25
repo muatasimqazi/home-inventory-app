@@ -268,7 +268,12 @@ export default function BudgetPage() {
                 const remainingColor = over ? "text-money-negative-text" : "text-muted-foreground";
                 const monthStart = new Date(month.getFullYear(), month.getMonth(), 1);
                 const monthEnd = new Date(month.getFullYear(), month.getMonth() + 1, 0);
-                const transactionsHref = `/finance/transactions?category=${p.categoryId}&dateScope=custom&from=${toIsoDate(monthStart)}&to=${toIsoDate(monthEnd)}`;
+                // `back`/`backLabel` — Transactions has no back button of its
+                // own (it's a primary nav destination, reachable from many
+                // places), so a filtered arrival like this one carries where
+                // to return to explicitly rather than relying on browser
+                // history, which "click a budget row" users don't reliably have.
+                const transactionsHref = `/finance/transactions?category=${p.categoryId}&dateScope=custom&from=${toIsoDate(monthStart)}&to=${toIsoDate(monthEnd)}&back=${encodeURIComponent("/finance/budget")}&backLabel=${encodeURIComponent("Budget")}`;
                 return (
                   <div key={p.categoryId} className="flex items-center gap-1 px-4 py-3">
                     <Link href={transactionsHref} className="flex min-w-0 flex-1 flex-col gap-1.5 text-left">

@@ -102,6 +102,14 @@ export default function TransactionsListPage() {
 
   const searchParams = useSearchParams();
   const defaultAccountId = searchParams.get("accountId") ?? undefined;
+  // Set by referrers that land here pre-filtered (e.g. tapping a category
+  // on the Budget page) so there's a way back to them — Transactions is a
+  // primary nav destination with many possible referrers, so it can't
+  // assume one fixed parent the way a drill-in detail page can, and
+  // browser back isn't reliable enough to lean on alone (e.g. arriving via
+  // a shared link, or after the tab was reopened).
+  const backHref = searchParams.get("back");
+  const backLabel = searchParams.get("backLabel") ?? "back";
 
   // Filters are three independent dimensions, not one flat exclusive
   // choice — you can search "milk" AND restrict to this month AND
@@ -574,6 +582,13 @@ export default function TransactionsListPage() {
 
   return (
     <div className="flex flex-col gap-4">
+      {backHref && (
+        <Link href={backHref} className="flex items-center gap-1 text-caption font-medium text-muted-foreground">
+          <Icon name="arrowLeft" size={14} />
+          Back to {backLabel}
+        </Link>
+      )}
+
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-screen-title font-semibold text-ink">Transactions</h1>
