@@ -1,5 +1,5 @@
 import type { Account, AccountType, ActivityLogEntry, CategoryBudget, Container, FinanceCategory, Item, Location, RecurringBill, Tag, Transaction, TransactionCategory } from "./types";
-import { parseCalendarDate } from "./format";
+import { formatCurrency, parseCalendarDate } from "./format";
 
 /**
  * The full tag-style category set for one transaction (Categories
@@ -504,6 +504,193 @@ export function budgetVsActualForMonth(
       };
     })
     .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** Shared by trailingCategorySpend/spendingInsights below — the same tag-link-wins-over-primary-category, expense-only, not-trashed/excluded accumulation budgetVsActualForMonth does inline, factored out since both new selectors need it for more than one month at a time. */
+function spendByCategoryForMonth(transactions: Transaction[], transactionCategoryLinks: TransactionCategory[], categories: FinanceCategory[], month: Date): Map<string, number> {
+  const y = month.getFullYear();
+  const m = month.getMonth();
+  const tagsByTransactionId = new Map<string, string[]>();
+  for (const tc of transactionCategoryLinks) {
+    (tagsByTransactionId.get(tc.transactionId) ?? tagsByTransactionId.set(tc.transactionId, []).get(tc.transactionId)!).push(tc.categoryId);
+  }
+  const totals = new Map<string, number>();
+  for (const t of transactions) {
+    if (t.trashedAt || t.excludedFromReports || t.type !== "expense") continue;
+    const d = parseCalendarDate(t.occurredAt);
+    if (d.getFullYear() !== y || d.getMonth() !== m) continue;
+    for (const c of categoriesForTransaction(t, tagsByTransactionId.get(t.id) ?? [], categories)) {
+      totals.set(c.id, (totals.get(c.id) ?? 0) + Math.abs(t.amount));
+    }
+  }
+  return totals;
+}
+
+export interface CategorySpendSuggestion {
+  categoryId: string;
+  name: string;
+  /** Average monthly spend over the trailing window (excluding the current, still-in-progress month). */
+  trailingAvgSpend: number;
+  /** Spend in the single most recent complete month — gives Budget Recommendations' LLM prompt a second, more recent data point alongside the average. */
+  mostRecentMonthSpend: number;
+}
+
+/**
+ * Budgeting v2 (AI Budget Recommendations) — candidates for "you spend
+ * money here but haven't budgeted for it": active categories with real
+ * spend history in the trailing window but **no** CategoryBudget row yet.
+ * Deliberately excludes already-budgeted categories — this fills gaps, it
+ * doesn't second-guess a budget the user consciously set. `now` anchors
+ * the trailing window to real months, not `month`-the-page-is-viewing —
+ * recommendations are about the recent past in general, not tied to
+ * whichever month the Budget page happens to be showing.
+ */
+export function trailingCategorySpend(
+  transactions: Transaction[],
+  transactionCategoryLinks: TransactionCategory[],
+  categories: FinanceCategory[],
+  categoryBudgets: CategoryBudget[],
+  monthsBack = 3,
+  now: Date = new Date()
+): CategorySpendSuggestion[] {
+  const budgetedCategoryIds = new Set(categoryBudgets.map((b) => b.categoryId));
+  const nameById = new Map(categories.map((c) => [c.id, c.name]));
+  // Trailing = the monthsBack complete months before the current one
+  // (current month is still in progress, so it'd unfairly drag the
+  // average down for a category that's usually already fully spent by
+  // month-end but hasn't caught up yet this month).
+  const totalByCategoryId = new Map<string, number>();
+  let mostRecentMonth: Map<string, number> = new Map();
+  for (let i = 1; i <= monthsBack; i++) {
+    const month = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const spend = spendByCategoryForMonth(transactions, transactionCategoryLinks, categories, month);
+    if (i === 1) mostRecentMonth = spend;
+    for (const [categoryId, amount] of spend) {
+      totalByCategoryId.set(categoryId, (totalByCategoryId.get(categoryId) ?? 0) + amount);
+    }
+  }
+
+  const suggestions: CategorySpendSuggestion[] = [];
+  for (const [categoryId, total] of totalByCategoryId) {
+    if (budgetedCategoryIds.has(categoryId)) continue;
+    suggestions.push({
+      categoryId,
+      name: nameById.get(categoryId) ?? "Uncategorized",
+      trailingAvgSpend: Math.round((total / monthsBack) * 100) / 100,
+      mostRecentMonthSpend: Math.round((mostRecentMonth.get(categoryId) ?? 0) * 100) / 100,
+    });
+  }
+  return suggestions.sort((a, b) => b.trailingAvgSpend - a.trailingAvgSpend);
+}
+
+export interface ZeroBasedSlice {
+  categoryId: string;
+  name: string;
+  amount: number;
+  /** 0-100, of targetIncome. 0 when targetIncome is null/0 (nothing to divide by). */
+  percent: number;
+}
+
+export interface ZeroBasedAllocation {
+  targetIncome: number;
+  totalAllocated: number;
+  /** targetIncome - totalAllocated. Negative means every budgeted category's total exceeds the target income. */
+  unallocated: number;
+  slices: ZeroBasedSlice[];
+}
+
+/**
+ * Budgeting v2 (Zero-Based Budget Builder) — pure derivation over the
+ * *budget* side, not spend: "every dollar of planned income assigned
+ * somewhere," the actual definition of zero-based budgeting, as opposed
+ * to budgetVsActualForMonth's "budget vs. real spend" comparison above.
+ * targetIncome is a stored, user-set figure (FinanceSettings), not
+ * derived from real income transactions — deliberate, see the Budgeting
+ * v2 plan's income-source decision.
+ */
+export function zeroBasedAllocation(categoryBudgets: CategoryBudget[], categories: FinanceCategory[], targetMonthlyIncome: number | null): ZeroBasedAllocation {
+  const targetIncome = targetMonthlyIncome ?? 0;
+  const nameById = new Map(categories.map((c) => [c.id, c.name]));
+  const totalAllocated = Math.round(categoryBudgets.reduce((sum, b) => sum + b.monthlyAmount, 0) * 100) / 100;
+  const slices = categoryBudgets
+    .map((b) => ({
+      categoryId: b.categoryId,
+      name: nameById.get(b.categoryId) ?? "Uncategorized",
+      amount: b.monthlyAmount,
+      percent: targetIncome > 0 ? Math.round((b.monthlyAmount / targetIncome) * 1000) / 10 : 0,
+    }))
+    .sort((a, b) => b.amount - a.amount);
+  return {
+    targetIncome,
+    totalAllocated,
+    unallocated: Math.round((targetIncome - totalAllocated) * 100) / 100,
+    slices,
+  };
+}
+
+export interface SpendingInsight {
+  categoryId: string;
+  name: string;
+  direction: "up" | "down";
+  /** Absolute percent change vs. the trailing average, always positive — direction carries the sign. */
+  percentChange: number;
+  currentAmount: number;
+  trailingAvg: number;
+  message: string;
+}
+
+/**
+ * Budgeting v2 (dynamic insight cards) — pure arithmetic month-over-month
+ * comparison per category, no model call (same "no LLM for arithmetic"
+ * stance as recurring-bill detection). Flags a category only when it's a
+ * real, noticeable swing: |% change| >= 25%, the trailing average is at
+ * least $20 (skip categories too small for a % swing to mean anything —
+ * $3 to $5 is "up 67%" and also nobody cares), and the current month
+ * actually has spend to compare (nothing to say about a category with $0
+ * this month either way). Capped to the 3 biggest $ swings, not the 3
+ * biggest % swings — a $400 move matters more than a $6 one even if the
+ * percentage is smaller.
+ */
+export function spendingInsights(
+  transactions: Transaction[],
+  transactionCategoryLinks: TransactionCategory[],
+  categories: FinanceCategory[],
+  month: Date,
+  monthsBack = 3
+): SpendingInsight[] {
+  const nameById = new Map(categories.map((c) => [c.id, c.name]));
+  const current = spendByCategoryForMonth(transactions, transactionCategoryLinks, categories, month);
+
+  const trailingTotals = new Map<string, number>();
+  for (let i = 1; i <= monthsBack; i++) {
+    const priorMonth = new Date(month.getFullYear(), month.getMonth() - i, 1);
+    const spend = spendByCategoryForMonth(transactions, transactionCategoryLinks, categories, priorMonth);
+    for (const [categoryId, amount] of spend) {
+      trailingTotals.set(categoryId, (trailingTotals.get(categoryId) ?? 0) + amount);
+    }
+  }
+
+  const insights: SpendingInsight[] = [];
+  for (const [categoryId, currentAmount] of current) {
+    const trailingAvg = (trailingTotals.get(categoryId) ?? 0) / monthsBack;
+    if (trailingAvg < 20) continue;
+    const percentChange = ((currentAmount - trailingAvg) / trailingAvg) * 100;
+    if (Math.abs(percentChange) < 25) continue;
+    const name = nameById.get(categoryId) ?? "Uncategorized";
+    const direction: "up" | "down" = percentChange >= 0 ? "up" : "down";
+    const rounded = Math.round(Math.abs(percentChange));
+    insights.push({
+      categoryId,
+      name,
+      direction,
+      percentChange: rounded,
+      currentAmount: Math.round(currentAmount * 100) / 100,
+      trailingAvg: Math.round(trailingAvg * 100) / 100,
+      message: `${name} is ${direction} ${rounded}% this month (${formatCurrency(currentAmount)} vs your ${formatCurrency(trailingAvg)} average).`,
+    });
+  }
+
+  return insights.sort((a, b) => Math.abs(b.currentAmount - b.trailingAvg) - Math.abs(a.currentAmount - a.trailingAvg)).slice(0, 3);
 }
 
 /** Active, non-trashed transactions for one account, most recent first. */

@@ -9,9 +9,25 @@ const BADGE_PALETTE = [
   { bg: "bg-badge-blue-bg", border: "border-badge-blue-border", text: "text-badge-blue-text" },
 ] as const;
 
-export function displayCodeBadgeClasses(key: string): string {
+// Same 5 hues as BADGE_PALETTE above, in the same order, but as the raw
+// `--color-badge-*-text` CSS var name rather than a Tailwind class — for
+// spots that need an actual color value (an SVG `stroke`, say) instead of
+// a className. Keeping the order identical to BADGE_PALETTE means the
+// same key always hashes to visually the same hue in both places.
+const BADGE_TEXT_VARS = ["--color-badge-red-text", "--color-badge-green-text", "--color-badge-purple-text", "--color-badge-orange-text", "--color-badge-blue-text"] as const;
+
+function hashKey(key: string): number {
   let hash = 0;
   for (let i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
-  const { bg, border, text } = BADGE_PALETTE[hash % BADGE_PALETTE.length];
+  return hash;
+}
+
+export function displayCodeBadgeClasses(key: string): string {
+  const { bg, border, text } = BADGE_PALETTE[hashKey(key) % BADGE_PALETTE.length];
   return `${bg} ${border} ${text}`;
+}
+
+/** The `--color-badge-*-text` CSS var name (not a className) for the same hashed hue displayCodeBadgeClasses(key) would use — for a spot that needs a real color value, e.g. an SVG `stroke`. */
+export function badgeColorVar(key: string): string {
+  return BADGE_TEXT_VARS[hashKey(key) % BADGE_TEXT_VARS.length];
 }

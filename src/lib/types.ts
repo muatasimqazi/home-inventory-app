@@ -465,6 +465,13 @@ export interface CategoryBudget {
   updatedAt: string;
 }
 
+/** Budgeting v2 — one row per household, holding shared planning settings that aren't tied to any single category. Currently just the Zero-Based Budget Builder's target monthly income; `targetMonthlyIncome` is null until the household sets one (no row exists at all yet, in fact — the store treats "no row" and "row with a null amount" the same way). */
+export interface FinanceSettings {
+  householdId: string;
+  targetMonthlyIncome: number | null;
+  updatedAt: string;
+}
+
 export type TransactionType = "expense" | "income" | "transfer" | "payment" | "refund";
 export type TransactionStatus = "pending" | "posted";
 export type TransactionSource = "manual" | "csv_import" | "receipt_scan" | "plaid";

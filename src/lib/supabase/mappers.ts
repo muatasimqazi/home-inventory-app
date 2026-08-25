@@ -44,6 +44,7 @@ import type {
   FinanceCategoryStatus,
   CategoryRule,
   CategoryBudget,
+  FinanceSettings,
   RecurringBill,
   RecurringBillFrequency,
   FinanceBillShare,
@@ -925,6 +926,28 @@ export function categoryBudgetToInsertRow(b: CategoryBudget): CategoryBudgetRow 
     monthly_amount: b.monthlyAmount,
     created_at: b.createdAt,
     updated_at: b.updatedAt,
+  };
+}
+
+export interface FinanceSettingsRow {
+  household_id: string;
+  target_monthly_income: number | null;
+  updated_at: string;
+}
+
+export function rowToFinanceSettings(row: FinanceSettingsRow): FinanceSettings {
+  return {
+    householdId: row.household_id,
+    targetMonthlyIncome: row.target_monthly_income,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function financeSettingsToInsertRow(s: FinanceSettings): FinanceSettingsRow {
+  return {
+    household_id: s.householdId,
+    target_monthly_income: s.targetMonthlyIncome,
+    updated_at: s.updatedAt,
   };
 }
 

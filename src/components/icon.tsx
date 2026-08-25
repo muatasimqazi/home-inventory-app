@@ -64,6 +64,7 @@ import {
   Tag,
   Target,
   Trash2,
+  TrendingDown,
   TrendingUp,
   Upload,
   User,
@@ -145,6 +146,7 @@ const ICONS = {
   lock: Lock,
   cash: Banknote,
   target: Target,
+  trendingDown: TrendingDown,
   // Home Map (PRD §29) — one icon per pinned_locations category.
   droplet: Droplet,
   zap: Zap,
