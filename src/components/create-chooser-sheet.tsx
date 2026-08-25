@@ -22,13 +22,13 @@ function ChooserRow({
   icon: IconName;
   label: string;
   description: string;
-  /** One hue from the badge color wheel (badge-color.ts) — see this file's own comment on why these 5 rows each get a fixed, distinct one. */
+  /** One role from the brand's 5-role FAB color wheel (globals.css's --color-fab-* tokens) — includes its own text color, since Secondary and Neutral Light don't have enough contrast for a white icon and need a dark one instead. See this file's own comment on the per-row assignment. */
   iconClassName: string;
   onClick: () => void;
 }) {
   return (
     <button type="button" onClick={onClick} className="tap-target flex items-center gap-3 rounded-2xl border border-border bg-white p-4 text-left">
-      <span className={cn("flex size-12 shrink-0 items-center justify-center rounded-full text-white", iconClassName)}>
+      <span className={cn("flex size-12 shrink-0 items-center justify-center rounded-full", iconClassName)}>
         <Icon name={icon} size={22} />
       </span>
       <div className="min-w-0 flex-1">
@@ -75,25 +75,31 @@ export function CreateChooserSheet({ open, onOpenChange }: CreateChooserSheetPro
           <SheetHeader>
             <SheetTitle className="text-section-title font-medium text-ink">Add</SheetTitle>
           </SheetHeader>
-          {/* Same 5-hue badge color wheel as ScanChooserSheet, and the
-              same hue for the concepts the two sheets share — Item stays
-              green, Transaction stays red (Scan Receipt's hue) — since a
-              Scan Receipt and a manually-added Transaction are the same
-              underlying thing. */}
+          {/* Same 5-role brand FAB color wheel as ScanChooserSheet, and
+              the same role for the concepts the two sheets share — Item
+              stays Primary, Transaction stays Secondary (Scan Receipt's
+              role) — since a Scan Receipt and a manually-added
+              Transaction are the same underlying thing. */}
           <div className="flex flex-col gap-2 px-4 pb-6">
-            <ChooserRow icon="box" label="Item" description="Add something to your inventory" iconClassName="bg-badge-green-text" onClick={() => go("/add")} />
+            <ChooserRow
+              icon="box"
+              label="Item"
+              description="Add something to your inventory"
+              iconClassName="bg-fab-primary text-white"
+              onClick={() => go("/add")}
+            />
             <ChooserRow
               icon="pin"
               label="Location"
               description="A room or area you store things in"
-              iconClassName="bg-badge-blue-text"
+              iconClassName="bg-fab-neutral-light text-fab-neutral-dark"
               onClick={() => go("/locations?open=new")}
             />
             <ChooserRow
               icon="archive"
               label="Container"
               description="A bin, box, or shelf inside a Location"
-              iconClassName="bg-badge-orange-text"
+              iconClassName="bg-fab-accent text-white"
               onClick={() => {
                 onOpenChange(false);
                 setWizardOpen(true);
@@ -103,14 +109,14 @@ export function CreateChooserSheet({ open, onOpenChange }: CreateChooserSheetPro
               icon="receipt"
               label="Transaction"
               description="A purchase, payment, or transfer"
-              iconClassName="bg-badge-red-text"
+              iconClassName="bg-fab-secondary text-fab-neutral-dark"
               onClick={() => go("/finance/transactions?open=new")}
             />
             <ChooserRow
               icon="wallet"
               label="Account"
               description="A bank, card, or investment account"
-              iconClassName="bg-badge-purple-text"
+              iconClassName="bg-fab-neutral-dark text-white"
               onClick={() => go("/finance/accounts?open=new")}
             />
           </div>

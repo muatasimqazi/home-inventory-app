@@ -23,13 +23,13 @@ function ChooserRow({
   icon: IconName;
   label: string;
   description: string;
-  /** One hue from the badge color wheel (badge-color.ts) — see this file's own comment on why these 5 rows each get a fixed, distinct one. */
+  /** One role from the brand's 5-role FAB color wheel (globals.css's --color-fab-* tokens) — includes its own text color, since Secondary and Neutral Light don't have enough contrast for a white icon and need a dark one instead. See this file's own comment on the per-row assignment. */
   iconClassName: string;
   onClick: () => void;
 }) {
   return (
     <button type="button" onClick={onClick} className="tap-target flex items-center gap-3 rounded-2xl border border-border bg-white p-4 text-left">
-      <span className={cn("flex size-12 shrink-0 items-center justify-center rounded-full text-white", iconClassName)}>
+      <span className={cn("flex size-12 shrink-0 items-center justify-center rounded-full", iconClassName)}>
         <Icon name={icon} size={22} />
       </span>
       <div className="min-w-0 flex-1">
@@ -106,14 +106,18 @@ export function ScanChooserSheet({ open, onOpenChange, itemScanHref }: ScanChoos
         <SheetHeader>
           <SheetTitle className="text-section-title font-medium text-ink">Scan</SheetTitle>
         </SheetHeader>
-        {/* Each row a fixed, distinct hue from the same 5-hue badge color
-            wheel container-ID badges already use (badge-color.ts) — was
-            bg-yellow (the brand/primary fill) on every row, indistinct
-            from itself and from every other primary-colored button in the
-            app. Hand-picked per action rather than hashed
-            (displayCodeBadgeClasses's approach) since these are 5 fixed,
-            named actions, not arbitrary keys — "Item"/"Receipt" reuse the
-            same hue as their CreateChooserSheet counterpart. */}
+        {/* Each row a fixed, distinct role from the brand's 5-role FAB
+            color wheel (globals.css's --color-fab-* tokens: Primary sage,
+            Secondary honey, Accent terracotta, Neutral Dark charcoal,
+            Neutral Light alabaster) — was bg-yellow (the brand/primary
+            fill) on every row, indistinct from itself and from every
+            other primary-colored button in the app; briefly used a
+            hashed badge-color-wheel palette instead before settling on
+            this exact 5-role set. Hand-picked per action, not cycled —
+            "Item"/"Receipt" reuse the same role as their
+            CreateChooserSheet counterpart (Item/Transaction). Secondary
+            and Neutral Light are light enough to need a dark icon instead
+            of white to stay legible. */}
         <div className="flex flex-col gap-2 px-4 pb-6">
           {household.inventoryEnabled && (
             <>
@@ -121,28 +125,28 @@ export function ScanChooserSheet({ open, onOpenChange, itemScanHref }: ScanChoos
                 icon="camera"
                 label="Scan Item"
                 description="Add something to your inventory"
-                iconClassName="bg-badge-green-text"
+                iconClassName="bg-fab-primary text-white"
                 onClick={() => go(itemScanHref)}
               />
               <ChooserRow
                 icon="scanBarcode"
                 label="Scan Barcode"
                 description="Look up a product by UPC/EAN"
-                iconClassName="bg-badge-blue-text"
+                iconClassName="bg-fab-neutral-light text-fab-neutral-dark"
                 onClick={() => go(barcodeScanHref(itemScanHref))}
               />
               <ChooserRow
                 icon="zap"
                 label="Scan Appliance"
                 description="Read a model/serial label"
-                iconClassName="bg-badge-orange-text"
+                iconClassName="bg-fab-neutral-dark text-white"
                 onClick={() => go(applianceScanHref(itemScanHref))}
               />
               <ChooserRow
                 icon="ai"
                 label="Scan Wardrobe"
                 description="Catalog a clothing item + generate studio photos"
-                iconClassName="bg-badge-purple-text"
+                iconClassName="bg-fab-accent text-white"
                 onClick={() => go(wardrobeScanHref(itemScanHref))}
               />
             </>
@@ -152,7 +156,7 @@ export function ScanChooserSheet({ open, onOpenChange, itemScanHref }: ScanChoos
               icon="receipt"
               label="Scan Receipt"
               description="Auto-fill a Finance transaction"
-              iconClassName="bg-badge-red-text"
+              iconClassName="bg-fab-secondary text-fab-neutral-dark"
               onClick={() => go("/finance/scan")}
             />
           )}
