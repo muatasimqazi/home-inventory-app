@@ -22,6 +22,7 @@ import { usePaginated } from "@/hooks/use-paginated";
 import { useInventoryStore } from "@/lib/store";
 import { coverPhotoUrl } from "@/lib/cover-photo";
 import { rotateStoredPhoto } from "@/lib/crop-image";
+import { stockLocationPhotoUrl } from "@/lib/stock-location-photos";
 import { activeItemCountForContainer, buildBreadcrumb, breadcrumbLabel, directChildContainers, itemsIn } from "@/lib/selectors";
 import { useRemountKey } from "@/hooks/use-remount-key";
 
@@ -166,7 +167,13 @@ export default function LocationDetailPage() {
             hero treatment ItemPhotoGallery uses for items; md:max-w-md
             caps it on wide desktop viewports for the same reason that cap
             was added there (the shell's <main> has no global max-width). */}
-        <PhotoThumb emoji={location.coverPhotoEmoji ?? "📦"} coverPhotoPath={location.coverPhotoPath} className="aspect-square w-full" emojiClassName="text-8xl" fit="cover" />
+        <PhotoThumb
+          emoji={location.coverPhotoEmoji ?? "📦"}
+          coverPhotoPath={location.coverPhotoPath ?? stockLocationPhotoUrl(location.name)}
+          className="aspect-square w-full"
+          emojiClassName="text-8xl"
+          fit="cover"
+        />
         <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChosen} />
         <div className="absolute bottom-2 right-2 flex gap-2">
           {location.coverPhotoPath && (

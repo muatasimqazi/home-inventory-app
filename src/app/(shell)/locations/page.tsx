@@ -16,6 +16,7 @@ import { useInventoryStore } from "@/lib/store";
 import { activeItemCountForLocation, activeLocations } from "@/lib/selectors";
 import { useRemountKey } from "@/hooks/use-remount-key";
 import { REFERENCE_LOCATIONS } from "@/lib/reference/starter-inventory";
+import { stockLocationPhotoUrl } from "@/lib/stock-location-photos";
 
 export default function LocationsListPage() {
   const searchParams = useSearchParams();
@@ -116,7 +117,7 @@ export default function LocationsListPage() {
                           butts up against the text, not a corner. */}
                       <PhotoThumb
                         emoji={loc.coverPhotoEmoji ?? "📍"}
-                        coverPhotoPath={loc.coverPhotoPath}
+                        coverPhotoPath={loc.coverPhotoPath ?? stockLocationPhotoUrl(loc.name)}
                         className="absolute inset-0 size-full rounded-r-none"
                         emojiClassName="text-2xl"
                         fit="cover"

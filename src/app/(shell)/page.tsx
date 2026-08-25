@@ -33,6 +33,7 @@ import {
   upcomingRecurringBills,
 } from "@/lib/selectors";
 import { formatCurrency, formatShortDate } from "@/lib/format";
+import { stockLocationPhotoUrl } from "@/lib/stock-location-photos";
 import { cn } from "@/lib/utils";
 
 const ONBOARDING_THRESHOLD = 5;
@@ -243,7 +244,7 @@ export default function OverviewPage() {
                           the text, not a corner. */}
                       <PhotoThumb
                         emoji={loc.coverPhotoEmoji ?? "📍"}
-                        coverPhotoPath={loc.coverPhotoPath}
+                        coverPhotoPath={loc.coverPhotoPath ?? stockLocationPhotoUrl(loc.name)}
                         className="absolute inset-0 size-full rounded-r-none"
                         emojiClassName="text-xl"
                         fit="cover"

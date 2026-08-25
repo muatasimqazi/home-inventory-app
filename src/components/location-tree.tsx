@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Icon } from "@/components/icon";
 import { EmptyState } from "@/components/empty-state";
 import { PhotoThumb } from "@/components/photo-thumb";
+import { stockLocationPhotoUrl } from "@/lib/stock-location-photos";
 import { cn } from "@/lib/utils";
 import { displayCodeBadgeClasses } from "@/lib/badge-color";
 import { activeItemCountForLocation, directChildContainers, itemsIn } from "@/lib/selectors";
@@ -117,7 +118,7 @@ export function LocationAccordionRow({
               edge butts up against the text, not a corner. */}
           <PhotoThumb
             emoji={location.coverPhotoEmoji ?? "📦"}
-            coverPhotoPath={location.coverPhotoPath}
+            coverPhotoPath={location.coverPhotoPath ?? stockLocationPhotoUrl(location.name)}
             className="absolute inset-0 size-full rounded-r-none"
             emojiClassName="text-xl"
             fit="cover"
