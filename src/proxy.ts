@@ -44,6 +44,7 @@ const PUBLIC_PATHS = [
   "/api/v1/webhooks",
   "/api/v1/plaid/sync-all",
   "/api/v1/plaid/diagnose-duplicates", // temporary, read-only — see that route's own comment
+  "/api/v1/plaid/trash-duplicate-transactions", // temporary, one-off cleanup — see that route's own comment
   "/api/v1/push/send-due-bills",
   "/api/v1/push/send-capture-nudges",
   "/api/v1/push/send-debt-payments-due-today",
