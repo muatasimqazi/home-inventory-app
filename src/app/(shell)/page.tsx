@@ -108,7 +108,7 @@ export default function OverviewPage() {
   const thisMonth = cashFlowForMonth(scopedTransactions, new Date());
   const accountGroups = groupAccountsByType(scopedAccounts);
   const recentTransactionsList = recentTransactions(scopedTransactions, 5);
-  const upcomingBills = upcomingRecurringBills(scopedBills, 3);
+  const upcomingBills = upcomingRecurringBills(scopedBills, 5);
   const billsDueSoonCount = upcomingRecurringBills(scopedBills).filter((b) => daysUntil(b.nextDueDate) <= BILLS_DUE_SOON_DAYS).length;
 
   // The one "what needs doing" list on the page (see the banner below) —
@@ -422,7 +422,7 @@ export default function OverviewPage() {
               <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
                 {accountGroups
                   .flatMap((g) => g.accounts)
-                  .slice(0, 3)
+                  .slice(0, 5)
                   .map((a) => (
                     <Link key={a.id} href={`/finance/accounts/${a.id}`} className="flex items-center gap-3 px-4 py-3">
                       <IconChip icon={accountTypeIcon(a.type)} tone="muted" size="sm" />
