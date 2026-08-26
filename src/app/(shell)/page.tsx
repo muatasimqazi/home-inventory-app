@@ -250,7 +250,7 @@ export default function OverviewPage() {
                         fit="cover"
                       />
                     </div>
-                    <span className="min-w-0 flex-1 truncate self-center text-caption font-medium text-ink">{loc.name}</span>
+                    <span className="min-w-0 flex-1 truncate self-center text-body font-medium text-ink">{loc.name}</span>
                     {count > 0 && (
                       <span className="my-auto mr-3 shrink-0 rounded-full bg-badge-green-bg px-2 py-0.5 text-micro font-semibold text-badge-green-text">
                         {count}
