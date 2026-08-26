@@ -31,13 +31,31 @@ export function WardrobeItemCard({ item, studioPhotos, breadcrumbLabel, classNam
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
 
-  const photoPaths = [
-    ...(item.coverPhotoPath ? [item.coverPhotoPath] : []),
-    ...studioPhotos
-      .filter((p) => p.status === "complete" && p.generatedPhotoPath)
-      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-      .map((p) => p.generatedPhotoPath!),
-  ];
+  // The item's own original cover photo used to always lead this list,
+  // followed by the generated styles — but Ghost Mannequin's own prompt
+  // explicitly falls back to "a clean product shot on a pure white
+  // background" for anything that isn't a worn garment (see
+  // generate-studio-photo.ts), which can come back close enough to the
+  // plain original photo that the two read as duplicates side by side — a
+  // real, reported bug. Once any style has been generated, show only the
+  // generated styles (Ghost Mannequin first when present, then whichever
+  // others the user picked in WardrobeStudioSheet, in the order they were
+  // generated) — never the raw original alongside them. Falls back to just
+  // the cover photo, single-image, for an item that hasn't been through
+  // the Studio yet.
+  const completeStudioPhotos = studioPhotos
+    .filter((p) => p.status === "complete" && p.generatedPhotoPath)
+    .sort((a, b) => {
+      if (a.style === "ghost_mannequin" && b.style !== "ghost_mannequin") return -1;
+      if (b.style === "ghost_mannequin" && a.style !== "ghost_mannequin") return 1;
+      return a.createdAt.localeCompare(b.createdAt);
+    });
+  const photoPaths =
+    completeStudioPhotos.length > 0
+      ? completeStudioPhotos.map((p) => p.generatedPhotoPath!)
+      : item.coverPhotoPath
+        ? [item.coverPhotoPath]
+        : [];
 
   function handleScroll() {
     const el = scrollerRef.current;
