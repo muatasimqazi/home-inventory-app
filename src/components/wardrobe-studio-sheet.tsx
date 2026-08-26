@@ -7,7 +7,7 @@ import { Icon } from "@/components/icon";
 import { Button } from "@/components/ui/button";
 import { useInventoryStore } from "@/lib/store";
 import { coverPhotoUrl } from "@/lib/cover-photo";
-import { WARDROBE_STYLES, WARDROBE_STYLE_LABEL } from "@/lib/wardrobe-styles";
+import { WARDROBE_STYLE_LABEL, stylesForCategory } from "@/lib/wardrobe-styles";
 import { cn } from "@/lib/utils";
 import type { Item, ItemStudioPhoto, ItemStudioPhotoAspectRatio, ItemStudioPhotoStyle } from "@/lib/types";
 
@@ -20,7 +20,12 @@ import type { Item, ItemStudioPhoto, ItemStudioPhotoAspectRatio, ItemStudioPhoto
 // built specifically to pair with the front shot — a real rotation, not
 // another straight-on style — so defaulting to both now gives two
 // actually-different photos instead of two similar-looking ones.
-const DEFAULT_STYLES: ItemStudioPhotoStyle[] = ["ghost_mannequin", "ghost_mannequin_profile"];
+//
+// Both are garment-only (see GARMENT_ONLY_STYLES in wardrobe-styles.ts),
+// so they're only a sensible default for a Clothing item — everything
+// else falls back to the two universal, always-applicable treatments.
+const DEFAULT_CLOTHING_STYLES: ItemStudioPhotoStyle[] = ["ghost_mannequin", "ghost_mannequin_profile"];
+const DEFAULT_GENERAL_STYLES: ItemStudioPhotoStyle[] = ["white_background", "studio_shadow"];
 const MAX_STYLES = 3;
 
 /**
@@ -49,7 +54,17 @@ export function WardrobeStudioSheet({
   const currentHouseholdId = useInventoryStore((s) => s.currentHouseholdId);
   const updateItem = useInventoryStore((s) => s.updateItem);
 
-  const [selectedStyles, setSelectedStyles] = useState<Set<ItemStudioPhotoStyle>>(new Set(DEFAULT_STYLES));
+  // Garment-only styles (Ghost Mannequin, Boutique Flat Lay) only make
+  // sense for an actual piece of clothing — this sheet is also the item
+  // detail page's "Create Studio Photo" entry point, which works for any
+  // item, not just Wardrobe ones, so a lamp or an appliance shouldn't be
+  // offered a treatment that presupposes a worn garment.
+  const availableStyles = stylesForCategory(item.category);
+  const isClothing = item.category === "Clothing";
+
+  const [selectedStyles, setSelectedStyles] = useState<Set<ItemStudioPhotoStyle>>(
+    new Set(isClothing ? DEFAULT_CLOTHING_STYLES : DEFAULT_GENERAL_STYLES)
+  );
   const [aspectRatio, setAspectRatio] = useState<ItemStudioPhotoAspectRatio>("1:1");
   const [generating, setGenerating] = useState(false);
   const [retryingStyle, setRetryingStyle] = useState<ItemStudioPhotoStyle | null>(null);
@@ -130,7 +145,7 @@ export function WardrobeStudioSheet({
           <div>
             <p className="mb-2 text-caption text-muted-foreground">Styles (up to {MAX_STYLES})</p>
             <div className="flex flex-wrap gap-2">
-              {WARDROBE_STYLES.map((style) => {
+              {availableStyles.map((style) => {
                 const checked = selectedStyles.has(style);
                 const disabled = !checked && selectedStyles.size >= MAX_STYLES;
                 return (
