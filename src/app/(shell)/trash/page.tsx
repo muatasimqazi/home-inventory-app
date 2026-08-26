@@ -190,8 +190,8 @@ function InventoryTrashPanel() {
   return (
     <div className="flex flex-col gap-4 pb-20">
       {rows.length > 0 && (
-        <div className="flex items-start justify-between gap-3">
-          <SearchBar value={query} onChange={setQuery} placeholder="Search items, containers, locations..." />
+        <div className="flex items-center gap-3">
+          <SearchBar value={query} onChange={setQuery} placeholder="Search items, containers, locations..." className="flex-1" />
           <Button variant="outline" size="sm" onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}>
             {selectMode ? "Cancel" : "Select"}
           </Button>

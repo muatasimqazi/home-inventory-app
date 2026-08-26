@@ -610,8 +610,8 @@ export default function TransactionsListPage() {
         </div>
       </div>
 
-      <div className="flex items-start gap-3">
-        <SearchBar value={query} onChange={setQuery} placeholder="Search by vendor or item…" />
+      <div className="flex items-center gap-3">
+        <SearchBar value={query} onChange={setQuery} placeholder="Search by vendor or item…" className="flex-1" />
         {active.length > 0 && (
           <Button variant="outline" size="sm" onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}>
             {selectMode ? "Cancel" : "Select"}
