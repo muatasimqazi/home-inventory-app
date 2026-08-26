@@ -43,8 +43,14 @@ export function ItemPhotoGallery({ item, studioPhotos }: { item: Item; studioPho
 
   const photos: GalleryPhoto[] = [
     ...(item.coverPhotoPath ? [{ path: item.coverPhotoPath, isCover: true }] : []),
+    // Exclude whichever studio photo (if any) is the current cover photo —
+    // "Save as cover" (wardrobe-studio-sheet.tsx) points item.coverPhotoPath
+    // at a studio photo's own generatedPhotoPath, so without this filter
+    // that exact image would render twice: once as the cover-slot entry
+    // above, and again here under its style label, since it's still a
+    // "complete" row in studioPhotos regardless of being the cover.
     ...studioPhotos
-      .filter((p) => p.status === "complete" && p.generatedPhotoPath)
+      .filter((p) => p.status === "complete" && p.generatedPhotoPath && p.generatedPhotoPath !== item.coverPhotoPath)
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
       .map((p) => ({ path: p.generatedPhotoPath!, isCover: false, label: WARDROBE_STYLE_LABEL[p.style] })),
   ];
