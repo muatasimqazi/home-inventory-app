@@ -67,7 +67,7 @@ export default function NetWorthTrendPage() {
 
       <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
         <p className="text-caption font-medium tracking-wide text-muted-foreground uppercase">Current Net Worth</p>
-        <p className="mt-1 text-3xl font-semibold text-ink">{formatCurrency(worth)}</p>
+        <p className="mt-1 text-display font-semibold text-ink">{formatCurrency(worth)}</p>
       </div>
 
       <div>

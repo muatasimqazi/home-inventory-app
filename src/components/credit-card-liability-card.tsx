@@ -116,7 +116,7 @@ export function CreditCardLiabilityCard({ account, liability }: { account: Accou
           {purchaseApr && (
             <div>
               <p className="text-caption text-muted-foreground">{aprLabel(purchaseApr.aprType)}</p>
-              <p className="text-3xl font-semibold text-ink">{purchaseApr.aprPercentage.toFixed(2)}%</p>
+              <p className="text-display font-semibold text-ink">{purchaseApr.aprPercentage.toFixed(2)}%</p>
               {otherAprs.length > 0 && (
                 <div className="mt-2 flex flex-col gap-1">
                   {otherAprs.map((a) => (

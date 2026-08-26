@@ -60,7 +60,7 @@ export function BottomNav() {
         <span className={cn("flex size-5.5 items-center justify-center", active ? "text-ink" : "text-muted-foreground")}>
           <Icon name={tab.icon} size={22} />
         </span>
-        <span className={cn("text-[11px] leading-none", active ? "text-ink" : "text-muted-foreground")}>{tab.label}</span>
+        <span className={cn("text-micro leading-none", active ? "text-ink" : "text-muted-foreground")}>{tab.label}</span>
         <span className={cn("size-1.25 rounded-full", active ? "bg-yellow" : "bg-transparent")} aria-hidden />
       </Link>
     );

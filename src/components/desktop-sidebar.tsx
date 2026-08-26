@@ -114,7 +114,7 @@ export function DesktopSidebar() {
               >
                 <Icon name="needsReview" size={18} />
                 {collapsed ? (
-                  <ReviewBadge count={summary.needsReviewCount} className="absolute right-1 top-1 h-3.5 min-w-3.5 px-0.5 text-[9px]" />
+                  <ReviewBadge count={summary.needsReviewCount} className="absolute right-1 top-1 h-3.5 min-w-3.5 px-0.5" />
                 ) : (
                   <>
                     <span className="flex-1">Needs Review</span>

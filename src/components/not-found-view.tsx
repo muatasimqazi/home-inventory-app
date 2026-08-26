@@ -30,7 +30,7 @@ export function NotFoundView() {
       action={
         <Link
           href="/"
-          className="inline-flex h-11 items-center justify-center rounded-lg bg-ink px-6 text-sm font-medium text-white hover:bg-ink/90"
+          className="inline-flex h-11 items-center justify-center rounded-lg bg-ink px-6 text-body font-medium text-white hover:bg-ink/90"
         >
           Go home
         </Link>

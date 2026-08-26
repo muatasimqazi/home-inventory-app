@@ -281,7 +281,7 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
             that remainder scroll — same fix every bottom-sheet consumer
             in this codebase already applies to its own body div. */}
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pb-6">
-          <p className={cn("text-3xl font-semibold", transaction.amount < 0 ? "text-money-negative-text" : "text-badge-green-text")}>
+          <p className={cn("text-display font-semibold", transaction.amount < 0 ? "text-money-negative-text" : "text-badge-green-text")}>
             {formatCurrency(transaction.amount, { showPositiveSign: true })}
           </p>
 

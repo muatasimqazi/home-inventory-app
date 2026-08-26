@@ -70,7 +70,7 @@ export default function AccountDetailPage() {
           {account.institutionName}
           {account.cardLastFour ? ` · ...${account.cardLastFour}` : ""} · {ACCOUNT_TYPE_LABEL[account.type]}
         </p>
-        <p className={cn("mt-1 text-3xl font-semibold", account.currentBalance < 0 ? "text-money-negative-text" : "text-ink")}>
+        <p className={cn("mt-1 text-display font-semibold", account.currentBalance < 0 ? "text-money-negative-text" : "text-ink")}>
           {formatCurrency(account.currentBalance)}
         </p>
         <div className="mt-3 flex items-center gap-4 border-t border-border pt-3">
@@ -98,7 +98,7 @@ export default function AccountDetailPage() {
           <div className="mt-2 flex items-center gap-1.5">
             <Avatar size="sm">
               <AvatarImage src={creator.avatarUrl} alt="" />
-              <AvatarFallback className="text-[10px]">{creator.displayName.charAt(0)}</AvatarFallback>
+              <AvatarFallback>{creator.displayName.charAt(0)}</AvatarFallback>
             </Avatar>
             <p className="text-caption text-muted-foreground">Added by {creator.displayName}</p>
           </div>

@@ -96,7 +96,7 @@ export default function AccountsListPage() {
                             <span className="mt-1 flex items-center gap-1">
                               <Avatar size="sm" className="size-4">
                                 <AvatarImage src={creator.avatarUrl} alt="" />
-                                <AvatarFallback className="text-[9px]">{creator.displayName.charAt(0)}</AvatarFallback>
+                                <AvatarFallback className="text-micro">{creator.displayName.charAt(0)}</AvatarFallback>
                               </Avatar>
                               <span className="truncate text-caption text-muted-foreground">Added by {creator.displayName}</span>
                             </span>

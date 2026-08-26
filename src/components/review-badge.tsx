@@ -5,7 +5,7 @@ export function ReviewBadge({ count, className }: { count: number; className?: s
   return (
     <span
       className={cn(
-        "flex h-4 min-w-4 items-center justify-center rounded-full bg-ink px-1 text-[10px] font-medium leading-none text-white",
+        "flex h-4 min-w-4 items-center justify-center rounded-full bg-ink px-1 text-micro font-medium leading-none text-white",
         className
       )}
     >

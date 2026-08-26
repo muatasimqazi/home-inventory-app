@@ -155,7 +155,7 @@ export default function FinanceDashboardPage() {
 
       <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
         <p className="text-caption font-medium tracking-wide text-muted-foreground uppercase">Net Worth</p>
-        <p className="mt-1 text-3xl font-semibold text-ink">{formatCurrency(worth)}</p>
+        <p className="mt-1 text-display font-semibold text-ink">{formatCurrency(worth)}</p>
         {/* Trend line needs AccountBalanceSnapshot history (Net Worth Trend screen, not built this pass) — not faked here. */}
         <p className="mt-0.5 text-caption text-muted-foreground">Trend needs a few weeks of history to show.</p>
       </div>
