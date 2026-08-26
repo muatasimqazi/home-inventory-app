@@ -15,7 +15,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCaptureSession, type DetectionRow } from "@/lib/capture-session-store";
 import { useKeyboardInset } from "@/hooks/use-keyboard-inset";
-import { useInventoryStore, uploadCoverPhotoFile, type NewItemInput } from "@/lib/store";
+import { useInventoryStore, uploadCoverPhotoFile, removeItemBackgroundViaAPI, type NewItemInput } from "@/lib/store";
 import { stopCameraStream } from "@/lib/camera-stream";
 import { cropToItem, dataUrlToFile } from "@/lib/crop-image";
 import { buildBreadcrumb, sortByLabel } from "@/lib/selectors";
@@ -139,7 +139,7 @@ export default function CaptureReviewPage() {
   const isBulk = detections.length > 1;
   const blockedCount = included.filter(needsCorrection).length;
 
-  function buildInput(row: DetectionRow, coverPhotoPath: string | null): NewItemInput {
+  function buildInput(row: DetectionRow, coverPhotoPath: string | null, backgroundRemovedPhotoPath: string | null): NewItemInput {
     const ownerPerson = ownerPersonId === HOUSEHOLD_OWNER_VALUE ? null : (people.find((p) => p.id === ownerPersonId) ?? null);
     return {
       name: row.name.trim(),
@@ -150,6 +150,7 @@ export default function CaptureReviewPage() {
       estimatedValue: row.estimatedValue,
       photoEmoji: row.photoEmoji,
       coverPhotoPath,
+      backgroundRemovedPhotoPath,
       locationId: destination?.locationId ?? null,
       containerId: destination?.containerId ?? null,
       ownerPersonId: ownerPerson?.id ?? null,
@@ -204,26 +205,43 @@ export default function CaptureReviewPage() {
   // all. A failed upload doesn't block saving the item itself — it just
   // keeps the emoji fallback for that one row, and is reported once, after
   // Save, instead of per-row (see failedCovers in handleSave).
-  async function buildCoverPhotoPath(row: DetectionRow): Promise<{ path: string | null; failed: boolean }> {
+  //
+  // Also kicks off background removal (local segmentation via
+  // @imgly/background-removal-node, see lib/vision/remove-background.ts) on
+  // the same crop, in parallel with the cover upload — every AI-detected
+  // item gets this automatically, no per-item opt-in. Unlike the cover
+  // photo, a failed/slow background removal is never worth blocking or
+  // reporting on: it's a bonus alt photo, not core to saving the item, so
+  // its result is just `null` on failure — silently, no toast, no retry.
+  async function buildItemPhotos(row: DetectionRow): Promise<{ coverPath: string | null; coverFailed: boolean; backgroundRemovedPath: string | null }> {
     const sourcePhoto = photos[row.photoIndex] ?? photos[0];
-    if (!sourcePhoto || !currentHouseholdId) return { path: null, failed: false };
+    if (!sourcePhoto || !currentHouseholdId) return { coverPath: null, coverFailed: false, backgroundRemovedPath: null };
     const cropped = await cropToItem(sourcePhoto, row.boundingBox);
-    const file = await dataUrlToFile(cropped);
-    const uploaded = await uploadCoverPhotoFile(file, currentHouseholdId);
-    return uploaded.ok ? { path: uploaded.path, failed: false } : { path: null, failed: true };
+    const [uploaded, backgroundRemoved] = await Promise.all([
+      dataUrlToFile(cropped).then((file) => uploadCoverPhotoFile(file, currentHouseholdId)),
+      removeItemBackgroundViaAPI(cropped, currentHouseholdId).catch((error) => {
+        console.error("buildItemPhotos: background removal failed:", error);
+        return { ok: false as const, error: "unreachable" };
+      }),
+    ]);
+    return {
+      coverPath: uploaded.ok ? uploaded.path : null,
+      coverFailed: !uploaded.ok,
+      backgroundRemovedPath: backgroundRemoved.ok ? backgroundRemoved.path : null,
+    };
   }
 
   async function handleSave() {
     if (included.length === 0 || blockedCount > 0 || missingDestination) return;
     setSaving(true);
-    const coverResults = await Promise.all(included.map(buildCoverPhotoPath));
-    const failedCovers = coverResults.filter((r) => r.failed).length;
+    const photoResults = await Promise.all(included.map(buildItemPhotos));
+    const failedCovers = photoResults.filter((r) => r.coverFailed).length;
     // The capture flow is done at this point — release the camera for real
     // (it's kept alive across /capture <-> /capture/review round trips up
     // to now so "Add another photo" doesn't re-prompt for permission).
     stopCameraStream();
     if (included.length === 1) {
-      const item = createItem(buildInput(included[0], coverResults[0].path));
+      const item = createItem(buildInput(included[0], photoResults[0].coverPath, photoResults[0].backgroundRemovedPath));
       persistNormalizationRules(included);
       if (linkTransaction) {
         const linkRes = await linkItemPurchase({ itemId: item.id, transactionId: linkTransaction.id, source: "finance_nudge" });
@@ -237,7 +255,7 @@ export default function CaptureReviewPage() {
       // flow was actually started from (a Container/Location page).
       router.replace(`/items/${item.id}`);
     } else {
-      const created = createItemsBatch(included.map((row, i) => buildInput(row, coverResults[i].path)));
+      const created = createItemsBatch(included.map((row, i) => buildInput(row, photoResults[i].coverPath, photoResults[i].backgroundRemovedPath)));
       persistNormalizationRules(included);
       // A capture-nudge is keyed to one transaction, but the user may have
       // photographed more than one thing from that same purchase (e.g. a

@@ -54,6 +54,13 @@ export function ItemPhotoGallery({ item, studioPhotos }: { item: Item; studioPho
       .filter((p) => p.status === "complete" && p.generatedPhotoPath && p.generatedPhotoPath !== item.coverPhotoPath)
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
       .map((p) => ({ path: p.generatedPhotoPath!, isCover: false, label: WARDROBE_STYLE_LABEL[p.style] })),
+    // Auto-generated during capture (local segmentation, not user-chosen —
+    // see lib/vision/remove-background.ts). Same dedup reasoning as the
+    // studio-photo filter above: if this is already the cover (the user set
+    // it as cover, or it was promoted some other way), don't show it twice.
+    ...(item.backgroundRemovedPhotoPath && item.backgroundRemovedPhotoPath !== item.coverPhotoPath
+      ? [{ path: item.backgroundRemovedPhotoPath, isCover: false, label: "No Background" }]
+      : []),
   ];
 
   const safeIndex = Math.min(activeIndex, Math.max(0, photos.length - 1));

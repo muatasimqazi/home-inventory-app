@@ -186,6 +186,8 @@ export interface Item {
   photoEmoji: string;
   /** Path within the public "item-photos" Storage bucket (shared across items/locations/containers) — null falls back to photoEmoji. */
   coverPhotoPath: string | null;
+  /** Auto-generated during capture via local segmentation (@imgly/background-removal-node) — a background-removed variant of the cropped detection photo, alongside (not instead of) coverPhotoPath. null = removal hasn't run or failed (non-blocking; see capture/review/page.tsx) (supabase/migrations/0047_item_background_removed_photo.sql). */
+  backgroundRemovedPhotoPath: string | null;
   status: ItemStatus;
   needsReview: boolean;
   reviewReason?: string;

@@ -106,6 +106,7 @@ export async function POST(request: Request) {
     estimatedValue: null,
     photoEmoji: categoryEmoji(resolvedCategory),
     coverPhotoPath: null,
+    backgroundRemovedPhotoPath: null,
     status: "active",
     needsReview: false,
     tagIds: [],

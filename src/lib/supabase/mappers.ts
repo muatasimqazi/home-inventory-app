@@ -387,6 +387,7 @@ export interface ItemRow {
   estimated_value: number | null;
   photo_emoji: string;
   cover_photo_path: string | null;
+  background_removed_photo_path: string | null;
   status: string;
   needs_review: boolean;
   review_reason: string | null;
@@ -418,6 +419,7 @@ export function rowToItem(row: ItemRow, tagIds: string[]): Item {
     estimatedValue: row.estimated_value,
     photoEmoji: row.photo_emoji,
     coverPhotoPath: row.cover_photo_path,
+    backgroundRemovedPhotoPath: row.background_removed_photo_path,
     status: row.status as Item["status"],
     needsReview: row.needs_review,
     reviewReason: row.review_reason ?? undefined,
@@ -450,6 +452,7 @@ export function itemToInsertRow(it: Item): ItemRow {
     estimated_value: it.estimatedValue,
     photo_emoji: it.photoEmoji,
     cover_photo_path: it.coverPhotoPath,
+    background_removed_photo_path: it.backgroundRemovedPhotoPath,
     status: it.status,
     needs_review: it.needsReview,
     review_reason: it.reviewReason ?? null,

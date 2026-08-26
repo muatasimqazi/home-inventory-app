@@ -207,6 +207,14 @@ export interface NewItemInput {
    * upload until the destination row already exists to attach it to.
    */
   coverPhotoPath?: string | null;
+  /**
+   * Already-uploaded Storage path for a background-removed variant of the
+   * cover photo — set by the capture-review flow alongside coverPhotoPath,
+   * via removeItemBackgroundViaAPI. Omitted/null everywhere else (manual
+   * entry, container wizard, etc. never had a detection crop to remove the
+   * background from) (supabase/migrations/0047_item_background_removed_photo.sql).
+   */
+  backgroundRemovedPhotoPath?: string | null;
 }
 
 export interface NewPersonInput {
@@ -923,6 +931,35 @@ export async function uploadCoverPhotoFile(file: File, householdId: string): Pro
   const { error: uploadError } = await supabase.storage.from("item-photos").upload(path, normalized, { contentType: normalized.type });
   if (uploadError) return { ok: false, error: uploadError.message };
   return { ok: true, path };
+}
+
+/**
+ * Background-removal counterpart to uploadCoverPhotoFile above — same
+ * output shape (a path already sitting in the "item-photos" bucket), but
+ * calls POST /api/v1/vision/remove-background (local segmentation via
+ * @imgly/background-removal-node — see lib/vision/remove-background.ts)
+ * instead of uploading a file directly. Exported for capture/review/page.tsx
+ * to call alongside uploadCoverPhotoFile, on the same already-cropped
+ * detection photo, before the item row exists — same reasoning as
+ * uploadCoverPhotoFile's own doc comment above for doing this pre-insert
+ * rather than a separate post-create update.
+ */
+export async function removeItemBackgroundViaAPI(
+  photoDataUrl: string,
+  householdId: string
+): Promise<{ ok: true; path: string } | { ok: false; error: string }> {
+  try {
+    const res = await fetch("/api/v1/vision/remove-background", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ householdId, photo: photoDataUrl }),
+    });
+    const data = await res.json();
+    if (!res.ok) return { ok: false, error: data.error ?? "Couldn't remove the background." };
+    return { ok: true, path: data.path };
+  } catch {
+    return { ok: false, error: "Couldn't reach the server. Check your connection." };
+  }
 }
 
 /**
@@ -3974,6 +4011,7 @@ function buildItem(householdId: string, userId: string, input: NewItemInput): It
     estimatedValue: input.estimatedValue ?? null,
     photoEmoji: input.photoEmoji,
     coverPhotoPath: input.coverPhotoPath ?? null,
+    backgroundRemovedPhotoPath: input.backgroundRemovedPhotoPath ?? null,
     status: "active",
     needsReview: input.needsReview ?? false,
     reviewReason: input.reviewReason,
