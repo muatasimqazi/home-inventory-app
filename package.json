@@ -50,5 +50,11 @@
     "playwright": "^1.62.0",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "sharp",
+      "onnxruntime-node"
+    ]
   }
 }
