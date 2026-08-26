@@ -9,10 +9,8 @@ import { removeBackground } from "@imgly/background-removal-node";
 // primary/fallback model pair to fall back between — this either runs
 // locally and succeeds, or throws, same as any other local compute step.
 //
-// "small" trades a little segmentation quality for a materially faster,
-// lighter model — appropriate here since the input is already a tightly
-// cropped single-item photo (see cropToItem in lib/crop-image.ts), not an
-// arbitrary scene the model has to first locate the subject within.
+// "medium" is materially cleaner than "small" on real item photos while
+// still being reasonable for the app's one-photo-at-a-time capture flow.
 //
 // Model/WASM assets are NOT bundled in this package — by default
 // removeBackground() fetches them from IMG.LY's CDN on first use and
@@ -35,7 +33,7 @@ export async function removeItemBackground(photoDataUrl: string): Promise<Buffer
   const source = new Blob([Buffer.from(base64, "base64")], { type: mimeType });
 
   const blob = await removeBackground(source, {
-    model: "small",
+    model: "medium",
     output: { format: "image/png" },
   });
   return Buffer.from(await blob.arrayBuffer());
