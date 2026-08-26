@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { BackButton } from "@/components/back-button";
 import { EmptyState } from "@/components/empty-state";
+import { SearchBar } from "@/components/search-bar";
 import { WardrobeItemCard } from "@/components/wardrobe-item-card";
 import { useInventoryStore } from "@/lib/store";
 import { buildBreadcrumb, breadcrumbLabel } from "@/lib/selectors";
@@ -23,6 +25,10 @@ export default function WardrobePage() {
   const containers = useInventoryStore((s) => s.containers);
 
   const wardrobeItems = items.filter((it) => it.status === "active" && it.category === "Clothing");
+  const [query, setQuery] = useState("");
+  const filteredItems = query.trim()
+    ? wardrobeItems.filter((it) => it.name.toLowerCase().includes(query.trim().toLowerCase()))
+    : wardrobeItems;
 
   return (
     <div className="flex flex-col gap-4">
@@ -46,16 +52,23 @@ export default function WardrobePage() {
           }
         />
       ) : (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          {wardrobeItems.map((item) => (
-            <WardrobeItemCard
-              key={item.id}
-              item={item}
-              studioPhotos={itemStudioPhotos.filter((p) => p.itemId === item.id)}
-              breadcrumbLabel={breadcrumbLabel(buildBreadcrumb(item.locationId, item.containerId, locations, containers))}
-            />
-          ))}
-        </div>
+        <>
+          {wardrobeItems.length > 8 && <SearchBar value={query} onChange={setQuery} placeholder="Search wardrobe…" />}
+          {filteredItems.length === 0 ? (
+            <EmptyState icon="search" title={`No items match "${query.trim()}"`} description="Check the spelling or try a different word." />
+          ) : (
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              {filteredItems.map((item) => (
+                <WardrobeItemCard
+                  key={item.id}
+                  item={item}
+                  studioPhotos={itemStudioPhotos.filter((p) => p.itemId === item.id)}
+                  breadcrumbLabel={breadcrumbLabel(buildBreadcrumb(item.locationId, item.containerId, locations, containers))}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

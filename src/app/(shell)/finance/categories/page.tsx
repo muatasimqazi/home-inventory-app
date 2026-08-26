@@ -6,6 +6,7 @@ import { Icon } from "@/components/icon";
 import { BackButton } from "@/components/back-button";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
+import { SearchBar } from "@/components/search-bar";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { CategoryFormDialog } from "@/components/category-form-dialog";
 import { RuleFormDialog } from "@/components/rule-form-dialog";
@@ -35,11 +36,15 @@ export default function CategoriesAndRulesPage() {
   const [ruleDialogOpen, setRuleDialogOpen] = useState(false);
   const [ruleDialogKey, bumpRuleDialogKey] = useRemountKey();
   const [trashConfirmId, setTrashConfirmId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
 
   const activeCategories = sortByLabel(
     financeCategories.filter((c) => c.status === "active"),
     (c) => c.name
   );
+  const filteredCategories = query.trim()
+    ? activeCategories.filter((c) => c.name.toLowerCase().includes(query.trim().toLowerCase()))
+    : activeCategories;
 
   function handleTrashCategory(id: string) {
     // The DB blocks this outright (prevent_trash_referenced_category(),
@@ -70,49 +75,61 @@ export default function CategoriesAndRulesPage() {
         {activeCategories.length === 0 ? (
           <EmptyState icon="pieChart" title="No categories yet" description="Default categories will appear here, or add your own." />
         ) : (
-          // A real row list, not wrapped pills — pills read fine as a
-          // handful of inline tags (a transaction's 1-2 categories) but a
-          // household's full category set is dozens of them: cramped into
-          // wrapped pills, the trash/edit hit-targets shrink to be barely
-          // tappable and a name can't ever truncate, it just pushes the
-          // pill wider. One name per row, own line, actual tap targets —
-          // same divide-y row-list convention as Rules right below.
-          <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
-            {activeCategories.map((c) => (
-              <div key={c.id} className="flex items-center gap-3 px-4 py-3">
-                <span
-                  className={cn(
-                    "flex size-9 shrink-0 items-center justify-center rounded-full text-body font-semibold",
-                    categoryBadgeClasses(c.id)
-                  )}
-                  aria-hidden
-                >
-                  {c.name.charAt(0).toUpperCase()}
-                </span>
-                <p className="min-w-0 flex-1 truncate text-body font-medium text-ink">{c.name}</p>
-                {c.householdId !== null && (
-                  <div className="flex shrink-0 items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setEditingCategory(c)}
-                      aria-label={`Rename ${c.name}`}
-                      className="tap-target flex size-8 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-muted"
+          <>
+            {/* Only worth it once there's enough categories that scanning
+                beats typing — the comment on the row-list below is the
+                reason it's here at all: a household's full set is dozens. */}
+            {activeCategories.length > 8 && (
+              <SearchBar value={query} onChange={setQuery} placeholder="Search categories…" className="mb-2" />
+            )}
+            {filteredCategories.length === 0 ? (
+              <EmptyState icon="search" title={`No categories match "${query.trim()}"`} description="Check the spelling or try a different word." />
+            ) : (
+              // A real row list, not wrapped pills — pills read fine as a
+              // handful of inline tags (a transaction's 1-2 categories) but a
+              // household's full category set is dozens of them: cramped into
+              // wrapped pills, the trash/edit hit-targets shrink to be barely
+              // tappable and a name can't ever truncate, it just pushes the
+              // pill wider. One name per row, own line, actual tap targets —
+              // same divide-y row-list convention as Rules right below.
+              <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
+                {filteredCategories.map((c) => (
+                  <div key={c.id} className="flex items-center gap-3 px-4 py-3">
+                    <span
+                      className={cn(
+                        "flex size-9 shrink-0 items-center justify-center rounded-full text-body font-semibold",
+                        categoryBadgeClasses(c.id)
+                      )}
+                      aria-hidden
                     >
-                      <Icon name="edit" size={15} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setTrashConfirmId(c.id)}
-                      aria-label={`Trash ${c.name}`}
-                      className="tap-target flex size-8 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-muted"
-                    >
-                      <Icon name="trash" size={15} />
-                    </button>
+                      {c.name.charAt(0).toUpperCase()}
+                    </span>
+                    <p className="min-w-0 flex-1 truncate text-body font-medium text-ink">{c.name}</p>
+                    {c.householdId !== null && (
+                      <div className="flex shrink-0 items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setEditingCategory(c)}
+                          aria-label={`Rename ${c.name}`}
+                          className="tap-target flex size-8 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-muted"
+                        >
+                          <Icon name="edit" size={15} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTrashConfirmId(c.id)}
+                          aria-label={`Trash ${c.name}`}
+                          className="tap-target flex size-8 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-muted"
+                        >
+                          <Icon name="trash" size={15} />
+                        </button>
+                      </div>
+                    )}
                   </div>
-                )}
+                ))}
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </div>
 
