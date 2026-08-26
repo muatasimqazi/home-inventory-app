@@ -79,22 +79,32 @@ export default function HomeMapPage() {
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {sorted.map((pin) => (
-            // A <button> holding the delete <button> would be invalid HTML
-            // (interactive elements can't nest) — plain <div> wrapper with
-            // two sibling buttons instead, same shape as item-attachments.tsx's
-            // AttachmentTile (its own tile-plus-corner-delete-button pair).
-            <div key={pin.id} className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-white shadow-sm">
-              <button type="button" onClick={() => openEdit(pin)} className="flex flex-col text-left">
-                <PinnedLocationPhoto photoPath={pin.photoPath} category={pin.category} className="aspect-square w-full rounded-none" />
-                <div className="flex flex-col gap-0.5 p-3">
-                  <p className="truncate text-body font-medium text-ink">{pin.name}</p>
-                  <p className="truncate text-caption text-muted-foreground">{PINNED_LOCATION_CATEGORY_LABELS[pin.category]}</p>
-                  {pin.locationNote && <p className="truncate text-caption text-muted-foreground">{pin.locationNote}</p>}
-                </div>
-              </button>
+            // A <button> holding the delete/expand <button>s would be
+            // invalid HTML (interactive elements can't nest) — a div with
+            // role="button" instead, same "clickable row with real button
+            // descendants" convention trash/page.tsx's own rows use.
+            <div
+              key={pin.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => openEdit(pin)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") openEdit(pin);
+              }}
+              className="group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-border bg-white text-left shadow-sm"
+            >
+              <PinnedLocationPhoto photoPath={pin.photoPath} category={pin.category} className="aspect-square w-full rounded-none" enableLightbox />
+              <div className="flex flex-col gap-0.5 p-3">
+                <p className="truncate text-body font-medium text-ink">{pin.name}</p>
+                <p className="truncate text-caption text-muted-foreground">{PINNED_LOCATION_CATEGORY_LABELS[pin.category]}</p>
+                {pin.locationNote && <p className="truncate text-caption text-muted-foreground">{pin.locationNote}</p>}
+              </div>
               <button
                 type="button"
-                onClick={() => setDeletingPin(pin)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDeletingPin(pin);
+                }}
                 aria-label={`Remove ${pin.name}`}
                 className="tap-target absolute right-2 top-2 flex size-7 items-center justify-center rounded-full bg-white/90 text-muted-foreground shadow-sm hover:text-danger"
               >

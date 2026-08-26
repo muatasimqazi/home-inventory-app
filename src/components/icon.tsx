@@ -36,6 +36,7 @@ import {
   Mail,
   MapPin,
   MapPinOff,
+  Maximize2,
   MoreVertical,
   Move,
   Nfc,
@@ -133,6 +134,7 @@ const ICONS = {
   grid: LayoutGrid,
   list: List,
   mapPinOff: MapPinOff,
+  maximize: Maximize2,
   link: Link2,
   shieldCheck: ShieldCheck,
   // Finance domain (docs/Personal Finance PRD.md §35 "Major components")

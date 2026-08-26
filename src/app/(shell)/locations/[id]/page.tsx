@@ -10,6 +10,7 @@ import { EntityRow } from "@/components/entity-row";
 import { ItemCard } from "@/components/item-card";
 import { ItemRow } from "@/components/item-row";
 import { PhotoThumb } from "@/components/photo-thumb";
+import { PhotoExpandButton } from "@/components/photo-expand-button";
 import { ViewToggle, type ViewMode } from "@/components/view-toggle";
 import { EmptyState } from "@/components/empty-state";
 import { EntityFormSheet } from "@/components/entity-form-sheet";
@@ -74,6 +75,12 @@ export default function LocationDetailPage() {
   const { visible: paginatedDirectItems, hasMore, remaining, pageSize, loadMore } = usePaginated(directItems, params.id);
 
   if (!location) return notFound();
+
+  // What PhotoThumb below actually ends up displaying — the location's own
+  // photo, or else whichever stock photo (if any) matches its name; null
+  // only when neither exists and PhotoThumb falls back to the emoji, in
+  // which case there's nothing for the expand button to enlarge.
+  const displayPhotoPath = location.coverPhotoPath ?? stockLocationPhotoUrl(location.name);
 
   const childContainers = directChildContainers(containers, null, location.id);
 
@@ -169,12 +176,13 @@ export default function LocationDetailPage() {
             was added there (the shell's <main> has no global max-width). */}
         <PhotoThumb
           emoji={location.coverPhotoEmoji ?? "📦"}
-          coverPhotoPath={location.coverPhotoPath ?? stockLocationPhotoUrl(location.name)}
+          coverPhotoPath={displayPhotoPath}
           className="aspect-square w-full"
           emojiClassName="text-8xl"
           fit="cover"
         />
         <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChosen} />
+        {displayPhotoPath && <PhotoExpandButton photos={[displayPhotoPath]} className="absolute top-2 right-2" />}
         <div className="absolute bottom-2 right-2 flex gap-2">
           {location.coverPhotoPath && (
             <button

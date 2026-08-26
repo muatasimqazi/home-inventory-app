@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
 import { PhotoThumb } from "@/components/photo-thumb";
+import { PhotoExpandButton } from "@/components/photo-expand-button";
 import { coverPhotoUrl } from "@/lib/cover-photo";
 import { rotateStoredPhoto } from "@/lib/crop-image";
 import { useInventoryStore } from "@/lib/store";
@@ -123,6 +124,7 @@ export function ItemPhotoGallery({ item, studioPhotos }: { item: Item; studioPho
         <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChosen} />
 
         {active.label && <span className="absolute left-2 top-2 rounded-full bg-black/50 px-2.5 py-1 text-micro font-medium text-white">{active.label}</span>}
+        <PhotoExpandButton photos={photos.map((p) => p.path)} index={safeIndex} className="absolute top-2 right-2" />
 
         {active.isCover ? (
           <div className="absolute bottom-2 right-2 flex gap-2">

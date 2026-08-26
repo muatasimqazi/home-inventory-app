@@ -3,6 +3,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { HydrationGate } from "@/components/hydration-gate";
 import { DomainGate } from "@/components/domain-gate";
+import { PhotoLightbox } from "@/components/photo-lightbox";
 
 export const metadata: Metadata = {
   title: "Shohaz",
@@ -63,6 +64,9 @@ export default function RootLayout({
           offset={{ top: "calc(env(safe-area-inset-top) + 72px)" }}
           mobileOffset={{ top: "calc(env(safe-area-inset-top) + 72px)" }}
         />
+        {/* One instance for the whole app — any component opens it via
+            useLightboxStore().openLightbox(...), no per-page wiring. */}
+        <PhotoLightbox />
       </body>
     </html>
   );

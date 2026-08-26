@@ -39,7 +39,7 @@ export function EntityCard({ href, emoji, coverPhotoPath, title, subtitle, badge
           for why a normal-flow percentage-height image can't live
           directly in an aspect-ratio-sized box. */}
       <div className="relative aspect-145/92 w-full overflow-hidden">
-        <PhotoThumb emoji={emoji} coverPhotoPath={coverPhotoPath} className="absolute inset-0 size-full" fit="cover" />
+        <PhotoThumb emoji={emoji} coverPhotoPath={coverPhotoPath} className="absolute inset-0 size-full" fit="cover" enableLightbox />
         {badge && (
           <span
             className={cn(

@@ -32,6 +32,7 @@ export function ItemCard({ item, breadcrumbLabel, className, onToggleSelect, sel
           label={item.category}
           className="absolute inset-0 size-full"
           fit="cover"
+          enableLightbox
         />
         {onToggleSelect ? (
           <div

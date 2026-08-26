@@ -51,6 +51,7 @@ export function ContainerCard({ container, itemCount, breadcrumbLabel, status, c
           className="absolute inset-0 size-full rounded-none"
           emojiClassName="text-8xl"
           fit="cover"
+          enableLightbox
         />
         {container.displayCode && (
           <span

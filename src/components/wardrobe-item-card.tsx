@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { PhotoThumb } from "@/components/photo-thumb";
+import { PhotoExpandButton } from "@/components/photo-expand-button";
 import { coverPhotoUrl } from "@/lib/cover-photo";
 import { categoryAccentClass } from "@/lib/category";
 import type { Item, ItemStudioPhoto } from "@/lib/types";
@@ -83,9 +84,10 @@ export function WardrobeItemCard({ item, studioPhotos, breadcrumbLabel, classNam
                 <span key={i} className={cn("size-1.5 rounded-full", i === activeIndex ? "bg-white" : "bg-white/50")} />
               ))}
             </div>
+            <PhotoExpandButton photos={photoPaths} index={activeIndex} className="absolute top-1.5 right-1.5" />
           </>
         ) : (
-          <PhotoThumb emoji={item.photoEmoji} coverPhotoPath={item.coverPhotoPath} label={item.category} className="absolute inset-0 size-full" fit="cover" />
+          <PhotoThumb emoji={item.photoEmoji} coverPhotoPath={item.coverPhotoPath} label={item.category} className="absolute inset-0 size-full" fit="cover" enableLightbox />
         )}
       </div>
       <p className="mt-2 truncate text-item-title font-medium text-ink">{item.name}</p>

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { coverPhotoUrl } from "@/lib/cover-photo";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PhotoExpandButton } from "@/components/photo-expand-button";
 
 interface PhotoThumbProps {
   emoji: string;
@@ -14,6 +15,8 @@ interface PhotoThumbProps {
   emojiClassName?: string;
   /** "contain" (default) shows the whole photo, letterboxed if needed — the right choice for most contexts (item photos, form previews). "cover" fills the box edge-to-edge, cropping as needed — v3's full-bleed treatment for storage-container cards specifically, opt-in per caller rather than a global default so existing letterboxed contexts don't silently start cropping. */
   fit?: "contain" | "cover";
+  /** Adds a small bottom-right "view larger" button that opens the photo in the full-screen PhotoLightbox — opt-in per caller (see photo-expand-button.tsx) rather than automatic, since plenty of callers are small row-list thumbnails (EntityRow, ItemRow, ...) too cramped for a real tap target, or already sit under other overlaid controls (ItemPhotoGallery's rotate/remove/camera buttons) that would collide with a fixed corner position. No-op when there's no real photo — nothing to enlarge past the emoji fallback. */
+  enableLightbox?: boolean;
 }
 
 /**
@@ -21,7 +24,7 @@ interface PhotoThumbProps {
  * emoji, so the fallback still reads as designed rather than a flat gray
  * placeholder box.
  */
-export function PhotoThumb({ emoji, coverPhotoPath, label, className, emojiClassName, fit = "contain" }: PhotoThumbProps) {
+export function PhotoThumb({ emoji, coverPhotoPath, label, className, emojiClassName, fit = "contain", enableLightbox }: PhotoThumbProps) {
   // Real photos load from Supabase Storage — not instant, and this
   // component is used everywhere (item/container/location cards and
   // detail pages) with nothing shown in the meantime before this: a blank
@@ -61,6 +64,7 @@ export function PhotoThumb({ emoji, coverPhotoPath, label, className, emojiClass
             loaded ? "opacity-100" : "opacity-0"
           )}
         />
+        {enableLightbox && <PhotoExpandButton photos={[coverPhotoPath]} className="absolute right-1.5 bottom-1.5" />}
       </div>
     );
   }

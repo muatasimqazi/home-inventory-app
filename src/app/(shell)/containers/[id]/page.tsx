@@ -10,6 +10,7 @@ import { EntityRow } from "@/components/entity-row";
 import { ItemCard } from "@/components/item-card";
 import { ItemRow } from "@/components/item-row";
 import { PhotoThumb } from "@/components/photo-thumb";
+import { PhotoExpandButton } from "@/components/photo-expand-button";
 import { ViewToggle, type ViewMode } from "@/components/view-toggle";
 import { EmptyState } from "@/components/empty-state";
 import { BreadcrumbTrail } from "@/components/breadcrumb-trail";
@@ -163,6 +164,7 @@ export default function ContainerDetailPage() {
       <div className="relative">
         <PhotoThumb emoji={container.coverPhotoEmoji ?? "📦"} coverPhotoPath={container.coverPhotoPath} className="h-48 w-full" emojiClassName="text-8xl" fit="cover" />
         <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChosen} />
+        {container.coverPhotoPath && <PhotoExpandButton photos={[container.coverPhotoPath]} className="absolute top-2 right-2" />}
         <div className="absolute bottom-2 right-2 flex gap-2">
           {container.coverPhotoPath && (
             <button

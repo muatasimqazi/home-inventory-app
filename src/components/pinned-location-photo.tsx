@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Icon } from "@/components/icon";
+import { PhotoExpandButton } from "@/components/photo-expand-button";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { PINNED_LOCATION_CATEGORY_ICONS } from "@/lib/pinned-locations";
 import type { PinnedLocationCategory } from "@/lib/types";
@@ -12,6 +13,8 @@ interface PinnedLocationPhotoProps {
   category: PinnedLocationCategory;
   className?: string;
   iconClassName?: string;
+  /** See photo-thumb.tsx's identical prop — opt-in "view larger" corner button, no-op while the signed URL is still resolving or there's no photo at all. */
+  enableLightbox?: boolean;
 }
 
 /**
@@ -23,7 +26,7 @@ interface PinnedLocationPhotoProps {
  * transaction-detail-sheet.tsx. Falls back to a category icon when there's
  * no photo yet, or while the URL is still resolving.
  */
-export function PinnedLocationPhoto({ photoPath, category, className, iconClassName }: PinnedLocationPhotoProps) {
+export function PinnedLocationPhoto({ photoPath, category, className, iconClassName, enableLightbox }: PinnedLocationPhotoProps) {
   const [url, setUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -44,9 +47,14 @@ export function PinnedLocationPhoto({ photoPath, category, className, iconClassN
 
   if (url) {
     return (
-      <div className={cn("overflow-hidden rounded-2xl bg-brand-100", className)}>
+      <div className={cn("relative overflow-hidden rounded-2xl bg-brand-100", className)}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={url} alt="" className="size-full object-cover" />
+        {/* Signed URL, not a storage path — coverPhotoUrl (which
+            PhotoExpandButton hands off to PhotoLightbox) passes any
+            already-resolved http(s) URL through unchanged, so there's no
+            path/URL mismatch here despite this bucket being private. */}
+        {enableLightbox && <PhotoExpandButton photos={[url]} className="absolute right-1.5 bottom-1.5" />}
       </div>
     );
   }
