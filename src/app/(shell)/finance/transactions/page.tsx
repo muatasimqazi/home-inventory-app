@@ -78,6 +78,10 @@ function groupByDay(transactions: Transaction[]): [string, Transaction[]][] {
   return Array.from(map.entries());
 }
 
+function accountLabel(account: { name: string; institutionName: string | null }): string {
+  return account.institutionName ? `${account.name} · ${account.institutionName}` : account.name;
+}
+
 export default function TransactionsListPage() {
   const currentHouseholdId = useInventoryStore((s) => s.currentHouseholdId);
   const accounts = useInventoryStore((s) => s.accounts);
@@ -112,7 +116,7 @@ export default function TransactionsListPage() {
   const backHref = searchParams.get("back");
   const backLabel = searchParams.get("backLabel") ?? "back";
 
-  // Filters are three independent dimensions, not one flat exclusive
+  // Filters are independent dimensions, not one flat exclusive
   // choice — you can search "milk" AND restrict to this month AND
   // uncategorized-only all at once. Each reads its initial value once from
   // the URL (same lazy-initializer, read-only-on-mount convention already
@@ -126,6 +130,10 @@ export default function TransactionsListPage() {
   const [customFrom, setCustomFrom] = useState(() => searchParams.get("from") ?? "");
   const [customTo, setCustomTo] = useState(() => searchParams.get("to") ?? "");
   const [uncategorizedOnly, setUncategorizedOnly] = useState(() => searchParams.get("uncategorized") === "1");
+  // Prefer the explicit filter param, but accept ?accountId= for direct
+  // links as long as it is not the existing "open the create sheet and
+  // prefill this account" deep-link shape.
+  const [accountFilterId, setAccountFilterId] = useState(() => searchParams.get("account") ?? (searchParams.get("open") === "new" ? null : searchParams.get("accountId")) ?? "all");
   // "all" (not "" — Radix Select's SelectItem can't take an empty-string
   // value) means no category filter.
   const [categoryFilterId, setCategoryFilterId] = useState(() => searchParams.get("category") ?? "all");
@@ -362,6 +370,11 @@ export default function TransactionsListPage() {
   }
 
   const active = transactions.filter((t) => !t.trashedAt);
+  const filterableAccounts = sortByLabel(
+    accounts.filter((a) => a.status !== "trashed"),
+    accountLabel
+  );
+  const selectedAccount = accountFilterId === "all" ? null : filterableAccounts.find((a) => a.id === accountFilterId) ?? null;
   // Active only, alphabetical — same shape every other category dropdown
   // in this app uses (e.g. AccountFormSheet, RecurringBillFormSheet), so
   // an archived category can't be picked as a filter (nothing on screen
@@ -380,6 +393,8 @@ export default function TransactionsListPage() {
   const trimmedQuery = query.trim().toLowerCase();
 
   const filtered = active.filter((t) => {
+    if (accountFilterId !== "all" && t.accountId !== accountFilterId) return false;
+
     if (dateScope === "month") {
       // parseCalendarDate — see groupByDay's own comment above; the raw
       // Date constructor on a bare "YYYY-MM-DD" parses as UTC midnight and
@@ -422,13 +437,13 @@ export default function TransactionsListPage() {
   const sorted = [...filtered].sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
   // "Load more" over the fully-loaded, already-filtered+sorted list — the
   // reset key covers every filter dimension above (date scope/custom
-  // range/search/uncategorized-only/category) so changing any of them jumps
+  // range/search/uncategorized-only/account/category) so changing any of them jumps
   // back to the first page, but stays stable across a Realtime-driven
   // update to `transactions` itself, so a scrolled-down user's progress
   // survives a live edit elsewhere.
   const { visible: paginatedTransactions, hasMore, remaining, pageSize, loadMore } = usePaginated(
     sorted,
-    `${dateScope}:${customFrom}:${customTo}:${trimmedQuery}:${uncategorizedOnly}:${categoryFilterId}`
+    `${dateScope}:${customFrom}:${customTo}:${trimmedQuery}:${uncategorizedOnly}:${accountFilterId}:${categoryFilterId}`
   );
   const groups = groupByDay(paginatedTransactions);
   const detailTxn = transactions.find((t) => t.id === detailId) ?? null;
@@ -637,6 +652,26 @@ export default function TransactionsListPage() {
           ] as [DateScope, string][]).map(([value, label]) => (
             <FilterChip key={value} label={label} active={dateScope === value} onClick={() => setDateScope(value)} />
           ))}
+          {filterableAccounts.length > 0 && (
+            <Select value={accountFilterId} onValueChange={setAccountFilterId}>
+              <SelectTrigger
+                className={cn(
+                  "tap-target data-[size=default]:h-auto max-w-[220px] shrink-0 gap-1 rounded-full border px-3 py-1.5 text-caption font-medium",
+                  accountFilterId !== "all" ? "border-ink bg-ink text-white [&_svg]:text-white" : "border-border bg-white text-ink"
+                )}
+              >
+                <SelectValue>{accountFilterId === "all" ? "Account" : selectedAccount ? accountLabel(selectedAccount) : "Unknown account"}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All accounts</SelectItem>
+                {filterableAccounts.map((a) => (
+                  <SelectItem key={a.id} value={a.id}>
+                    {accountLabel(a)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           {activeFinanceCategories.length > 0 && (
             <Select value={categoryFilterId} onValueChange={setCategoryFilterId}>
               <SelectTrigger
@@ -775,6 +810,7 @@ export default function TransactionsListPage() {
           title="No transactions"
           description={
             trimmedQuery || dateScope !== "all" || uncategorizedOnly || categoryFilterId !== "all"
+              || accountFilterId !== "all"
               ? "Nothing matches these filters yet."
               : "Nothing here yet."
           }
