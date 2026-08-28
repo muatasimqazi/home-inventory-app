@@ -369,11 +369,12 @@ export default function TransactionsListPage() {
     toast.success("Item added");
   }
 
-  const active = transactions.filter((t) => !t.trashedAt);
   const filterableAccounts = sortByLabel(
     accounts.filter((a) => a.status !== "trashed"),
     accountLabel
   );
+  const visibleAccountIds = new Set(accounts.map((a) => a.id));
+  const active = transactions.filter((t) => !t.trashedAt && visibleAccountIds.has(t.accountId));
   const selectedAccount = accountFilterId === "all" ? null : filterableAccounts.find((a) => a.id === accountFilterId) ?? null;
   // Active only, alphabetical — same shape every other category dropdown
   // in this app uses (e.g. AccountFormSheet, RecurringBillFormSheet), so

@@ -848,6 +848,16 @@ async function fetchHouseholdBundle(
   if (creditCardLiabilitiesRes.error) throw new Error(creditCardLiabilitiesRes.error.message);
 
   type ItemRowWithTags = ItemRow & { item_tags: { tag_id: string }[] | null };
+  const accountRows = (accountsRes.data ?? []) as AccountRow[];
+  const visibleAccountIds = new Set(accountRows.map((a) => a.id));
+  // Defense in depth for the finance privacy model: transactions are only
+  // meaningful if their account is also visible to the caller. RLS should
+  // already enforce this through can_view_account(account_id), but keeping
+  // the hydrated client bundle internally consistent prevents a bad policy
+  // or realtime edge from surfacing another member's private-account rows
+  // in transaction lists.
+  const transactionRows = ((transactionsRes.data ?? []) as TransactionRow[]).filter((t) => visibleAccountIds.has(t.account_id));
+  const visibleTransactionIds = new Set(transactionRows.map((t) => t.id));
 
   return {
     members: ((membersRes.data ?? []) as MemberRow[]).map(rowToMember),
@@ -867,9 +877,9 @@ async function fetchHouseholdBundle(
     labelBatches: ((labelBatchesRes.data ?? []) as LabelBatchRow[]).map(rowToLabelBatch),
     labelBatchEntries: ((labelBatchEntriesRes.data ?? []) as LabelBatchEntryRow[]).map(rowToLabelBatchEntry),
     normalizationRules: ((normalizationRulesRes.data ?? []) as NormalizationRuleRow[]).map(rowToNormalizationRule),
-    accounts: ((accountsRes.data ?? []) as AccountRow[]).map(rowToAccount),
-    financeAccountShares: ((financeAccountSharesRes.data ?? []) as FinanceAccountShareRow[]).map(rowToFinanceAccountShare),
-    transactions: ((transactionsRes.data ?? []) as TransactionRow[]).map(rowToTransaction),
+    accounts: accountRows.map(rowToAccount),
+    financeAccountShares: ((financeAccountSharesRes.data ?? []) as FinanceAccountShareRow[]).filter((s) => visibleAccountIds.has(s.account_id)).map(rowToFinanceAccountShare),
+    transactions: transactionRows.map(rowToTransaction),
     financeCategories: ((financeCategoriesRes.data ?? []) as FinanceCategoryRow[]).map(rowToFinanceCategory),
     categoryRules: ((categoryRulesRes.data ?? []) as CategoryRuleRow[]).map(rowToCategoryRule),
     recurringBills: ((recurringBillsRes.data ?? []) as RecurringBillRow[]).map(rowToRecurringBill),
@@ -877,11 +887,13 @@ async function fetchHouseholdBundle(
     recurringCandidateDismissals: ((recurringCandidateDismissalsRes.data ?? []) as RecurringCandidateDismissalRow[]).map(rowToRecurringCandidateDismissal),
     accountBalanceSnapshots: ((snapshotsRes.data ?? []) as AccountBalanceSnapshotRow[]).map(rowToAccountBalanceSnapshot),
     creditCardLiabilities: ((creditCardLiabilitiesRes.data ?? []) as CreditCardLiabilityRow[]).map(rowToCreditCardLiability),
-    transactionAttachments: ((transactionAttachmentsRes.data ?? []) as TransactionAttachmentRow[]).map(rowToTransactionAttachment),
-    transactionCategories: ((transactionCategoriesRes.data ?? []) as TransactionCategoryRow[]).map(rowToTransactionCategory),
+    transactionAttachments: ((transactionAttachmentsRes.data ?? []) as TransactionAttachmentRow[]).filter((a) => visibleTransactionIds.has(a.transaction_id)).map(rowToTransactionAttachment),
+    transactionCategories: ((transactionCategoriesRes.data ?? []) as TransactionCategoryRow[]).filter((c) => visibleTransactionIds.has(c.transaction_id)).map(rowToTransactionCategory),
     categoryBudgets: ((categoryBudgetsRes.data ?? []) as CategoryBudgetRow[]).map(rowToCategoryBudget),
     financeSettings: financeSettingsRes.data ? rowToFinanceSettings(financeSettingsRes.data as FinanceSettingsRow) : null,
-    itemPurchases: ((itemPurchasesRes.data ?? []) as ItemPurchaseRow[]).map(rowToItemPurchase),
+    itemPurchases: ((itemPurchasesRes.data ?? []) as ItemPurchaseRow[])
+      .filter((p) => !p.transaction_id || visibleTransactionIds.has(p.transaction_id))
+      .map(rowToItemPurchase),
     lastUsedDestination: null,
   };
 }
@@ -1269,7 +1281,23 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     // a private account another member hasn't shared never arrives here.
     bind<AccountRow, Account>("accounts", householdFilter, rowToAccount, (a) => a.id, (r) => r.id as string, "accounts");
     bind<FinanceAccountShareRow, FinanceAccountShare>("finance_account_shares", householdFilter, rowToFinanceAccountShare, (s) => s.id, (r) => r.id as string, "financeAccountShares");
-    bind<TransactionRow, Transaction>("transactions", householdFilter, rowToTransaction, (t) => t.id, (r) => r.id as string, "transactions");
+    const transactionHandler = arrayMergeHandler<TransactionRow, Transaction>(
+      rowToTransaction,
+      (t) => t.id,
+      (r) => r.id as string,
+      (updater) => set((s) => ({ transactions: updater(s.transactions) }))
+    );
+    channel.on("postgres_changes", { event: "*", schema: "public", table: "transactions", filter: householdFilter }, (payload) => {
+      const change = payload as unknown as RealtimeRowChange;
+      if (change.eventType !== "DELETE") {
+        const row = change.new as unknown as TransactionRow;
+        if (!get().accounts.some((a) => a.id === row.account_id)) {
+          set((s) => ({ transactions: s.transactions.filter((t) => t.id !== row.id) }));
+          return;
+        }
+      }
+      transactionHandler(change);
+    });
     bind<CategoryRuleRow, CategoryRule>("category_rules", householdFilter, rowToCategoryRule, (r) => r.id, (r) => r.id as string, "categoryRules");
     bind<CategoryBudgetRow, CategoryBudget>("category_budgets", householdFilter, rowToCategoryBudget, (b) => b.id, (r) => r.id as string, "categoryBudgets");
     // finance_settings: single nullable row per household, not an array —
