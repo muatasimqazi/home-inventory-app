@@ -103,7 +103,12 @@ export async function POST(request: Request) {
       availableBalance: pa.balances.available,
       startingBalance: pa.balances.current !== null ? normalizeAccountBalance(mapPlaidAccountType(pa.type, pa.subtype), pa.balances.current) : 0,
       cardLastFour: pa.mask,
-      ownerUserId: null, // Plaid-linked accounts land as joint/household by default — matches every other account creation path's default
+      // A bank connection is created from one member's Plaid Link session,
+      // so default its accounts to that member's personal/private scope.
+      // They can explicitly share or convert the account later from the
+      // account detail screen; defaulting to joint leaks private bank
+      // transactions to the household before that choice is made.
+      ownerUserId: auth.userId,
       status: "active",
       openedAt: null,
       trashedAt: null,
