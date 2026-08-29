@@ -65,6 +65,7 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
   // here (for refund-transaction options) is cheap vs. prop-drilling
   // through the one real caller.
   const allTransactions = useInventoryStore((s) => s.transactions);
+  const accounts = useInventoryStore((s) => s.accounts);
   const currentHouseholdId = useInventoryStore((s) => s.currentHouseholdId);
   const items = useInventoryStore((s) => s.items);
   const itemPurchases = useInventoryStore((s) => s.itemPurchases);
@@ -456,7 +457,14 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
       onPick={handlePickItemToLink}
     />
 
-    <MergeTransactionSheet open={mergeSheetOpen} onOpenChange={setMergeSheetOpen} transaction={transaction} allTransactions={allTransactions} onMerge={handleMerge} />
+    <MergeTransactionSheet
+      open={mergeSheetOpen}
+      onOpenChange={setMergeSheetOpen}
+      transaction={transaction}
+      accounts={accounts}
+      allTransactions={allTransactions}
+      onMerge={handleMerge}
+    />
 
     <LineItemFormSheet
       // Same always-mounted-with-open-prop pattern as the transactions list

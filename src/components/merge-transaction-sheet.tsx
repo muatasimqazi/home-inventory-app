@@ -6,7 +6,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { formatCurrency, formatShortDate, parseCalendarDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { Transaction } from "@/lib/types";
+import type { Account, Transaction } from "@/lib/types";
 
 const CANDIDATE_WINDOW_DAYS = 7;
 
@@ -23,22 +23,30 @@ export function MergeTransactionSheet({
   open,
   onOpenChange,
   transaction,
+  accounts,
   allTransactions,
   onMerge,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   transaction: Transaction;
+  accounts: Account[];
   allTransactions: Transaction[];
   onMerge: (keepId: string, discardId: string) => Promise<void>;
 }) {
   const [picked, setPicked] = useState<Transaction | null>(null);
 
   const txnDate = parseCalendarDate(transaction.occurredAt);
+  const accountById = new Map(accounts.map((a) => [a.id, a]));
   const candidates = allTransactions
-    .filter((t) => t.id !== transaction.id && t.accountId === transaction.accountId && !t.trashedAt && !t.linkedTransactionId)
+    .filter((t) => t.id !== transaction.id && !t.trashedAt && !t.linkedTransactionId)
     .filter((t) => Math.abs(parseCalendarDate(t.occurredAt).getTime() - txnDate.getTime()) / (1000 * 60 * 60 * 24) <= CANDIDATE_WINDOW_DAYS)
-    .sort((a, b) => Math.abs(Math.abs(a.amount) - Math.abs(transaction.amount)) - Math.abs(Math.abs(b.amount) - Math.abs(transaction.amount)));
+    .sort((a, b) => {
+      const sameAccountA = a.accountId === transaction.accountId ? 0 : 1;
+      const sameAccountB = b.accountId === transaction.accountId ? 0 : 1;
+      if (sameAccountA !== sameAccountB) return sameAccountA - sameAccountB;
+      return Math.abs(Math.abs(a.amount) - Math.abs(transaction.amount)) - Math.abs(Math.abs(b.amount) - Math.abs(transaction.amount));
+    });
 
   // Prefer keeping whichever side is NOT the Plaid-sourced one — same
   // convention the automated adoption path (plaid/sync.ts's handleAdded)
@@ -61,25 +69,29 @@ export function MergeTransactionSheet({
           </SheetHeader>
           <div className="flex flex-col gap-3 px-4 pb-6">
             <p className="text-caption text-muted-foreground">
-              Same account, within a week of {formatShortDate(transaction.occurredAt)}. Picking one merges its receipt details onto whichever transaction survives, and trashes the other.
+              Within a week of {formatShortDate(transaction.occurredAt)}. Same-account matches are listed first, but bank-synced duplicates from another visible account can be merged too.
             </p>
             {candidates.length === 0 ? (
-              <EmptyState icon="receipt" title="Nothing nearby" description="No other transactions on this account within a week of this one." />
+              <EmptyState icon="receipt" title="Nothing nearby" description="No other visible transactions within a week of this one." />
             ) : (
               <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white">
-                {candidates.map((t) => (
-                  <button key={t.id} type="button" onClick={() => setPicked(t)} className="flex items-center gap-3 px-3 py-2.5 text-left">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-caption font-medium text-ink">{t.merchant ?? t.description ?? "Transaction"}</p>
-                      <p className="truncate text-micro text-muted-foreground">
-                        {formatShortDate(t.occurredAt)} · {t.source === "plaid" ? "Bank Sync" : t.source === "receipt_scan" ? "Receipt Scan" : t.source === "csv_import" ? "CSV Import" : "Manual"}
-                      </p>
-                    </div>
-                    <span className={cn("shrink-0 text-caption font-medium", t.amount < 0 ? "text-money-negative-text" : "text-badge-green-text")}>
-                      {formatCurrency(t.amount, { showPositiveSign: true })}
-                    </span>
-                  </button>
-                ))}
+                {candidates.map((t) => {
+                  const candidateAccount = accountById.get(t.accountId);
+                  return (
+                    <button key={t.id} type="button" onClick={() => setPicked(t)} className="flex items-center gap-3 px-3 py-2.5 text-left">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-caption font-medium text-ink">{t.merchant ?? t.description ?? "Transaction"}</p>
+                        <p className="truncate text-micro text-muted-foreground">
+                          {formatShortDate(t.occurredAt)} · {t.source === "plaid" ? "Bank Sync" : t.source === "receipt_scan" ? "Receipt Scan" : t.source === "csv_import" ? "CSV Import" : "Manual"}
+                          {candidateAccount ? ` · ${candidateAccount.name}` : ""}
+                        </p>
+                      </div>
+                      <span className={cn("shrink-0 text-caption font-medium", t.amount < 0 ? "text-money-negative-text" : "text-badge-green-text")}>
+                        {formatCurrency(t.amount, { showPositiveSign: true })}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
