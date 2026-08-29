@@ -32,7 +32,7 @@ function looseCandidates(draft: ScannedTransactionDraft, transactions: Transacti
 
   return transactions
     .filter((t) => {
-      if (t.trashedAt || t.accountId !== draft.accountId) return false;
+      if (t.trashedAt) return false;
       const days = Math.abs(parseCalendarDate(t.occurredAt).getTime() - draftDate.getTime()) / (1000 * 60 * 60 * 24);
       if (days > LOOSE_WINDOW_DAYS) return false;
       const sameSign = Math.sign(t.amount) === Math.sign(amount);
@@ -63,7 +63,11 @@ export async function findPossibleDuplicateForDraft(draft: ScannedTransactionDra
   const merchant = draft.store ?? "";
   const occurredAt = draft.suggestedDate ?? new Date().toISOString().slice(0, 10);
 
-  const exact = findDuplicateTransaction({ accountId: draft.accountId, amount, occurredAt, description: merchant }, transactions, { amountTolerancePercent: 30 });
+  const exact = findDuplicateTransaction(
+    { accountId: draft.accountId, amount, occurredAt, description: merchant },
+    transactions,
+    { amountTolerancePercent: 30, includeOtherAccounts: true }
+  );
   if (exact) return { transaction: exact, reasoning: null };
 
   const candidates = looseCandidates(draft, transactions);

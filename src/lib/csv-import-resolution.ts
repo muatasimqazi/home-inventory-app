@@ -77,15 +77,23 @@ export interface FindDuplicateOptions {
    * today's exact-match behavior unchanged.
    */
   amountTolerancePercent?: number;
+  /**
+   * Default false: duplicate matching stays scoped to the candidate's own
+   * account. Receipt-vs-bank reconciliation opts into true because a
+   * receipt can be scanned against a placeholder/manual account while the
+   * real bank feed posts to the linked card account.
+   */
+  includeOtherAccounts?: boolean;
 }
 
 /** Returns the first existing (non-trashed) transaction this candidate row looks like a duplicate of, or null if none match all three criteria. */
 export function findDuplicateTransaction(candidate: CsvImportCandidate, existing: Transaction[], options?: FindDuplicateOptions): Transaction | null {
   const tolerancePercent = options?.amountTolerancePercent ?? 0;
+  const includeOtherAccounts = options?.includeOtherAccounts ?? false;
   return (
     existing.find((t) => {
       if (t.trashedAt) return false;
-      if (t.accountId !== candidate.accountId) return false;
+      if (!includeOtherAccounts && t.accountId !== candidate.accountId) return false;
       if (!amountsWithinTolerance(t.amount, candidate.amount, tolerancePercent)) return false;
       if (daysBetween(t.occurredAt, candidate.occurredAt) > DATE_WINDOW_DAYS) return false;
       const existingText = t.merchant ?? t.description ?? "";

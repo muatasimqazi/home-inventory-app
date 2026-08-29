@@ -42,10 +42,15 @@ export function MergeTransactionSheet({
     .filter((t) => t.id !== transaction.id && !t.trashedAt && !t.linkedTransactionId)
     .filter((t) => Math.abs(parseCalendarDate(t.occurredAt).getTime() - txnDate.getTime()) / (1000 * 60 * 60 * 24) <= CANDIDATE_WINDOW_DAYS)
     .sort((a, b) => {
+      const amountDiff = Math.abs(Math.abs(a.amount) - Math.abs(transaction.amount)) - Math.abs(Math.abs(b.amount) - Math.abs(transaction.amount));
+      if (amountDiff !== 0) return amountDiff;
+      const dateDiff =
+        Math.abs(parseCalendarDate(a.occurredAt).getTime() - txnDate.getTime()) -
+        Math.abs(parseCalendarDate(b.occurredAt).getTime() - txnDate.getTime());
+      if (dateDiff !== 0) return dateDiff;
       const sameAccountA = a.accountId === transaction.accountId ? 0 : 1;
       const sameAccountB = b.accountId === transaction.accountId ? 0 : 1;
-      if (sameAccountA !== sameAccountB) return sameAccountA - sameAccountB;
-      return Math.abs(Math.abs(a.amount) - Math.abs(transaction.amount)) - Math.abs(Math.abs(b.amount) - Math.abs(transaction.amount));
+      return sameAccountA - sameAccountB;
     });
 
   // Prefer keeping whichever side is NOT the Plaid-sourced one — same
@@ -69,7 +74,7 @@ export function MergeTransactionSheet({
           </SheetHeader>
           <div className="flex flex-col gap-3 px-4 pb-6">
             <p className="text-caption text-muted-foreground">
-              Within a week of {formatShortDate(transaction.occurredAt)}. Same-account matches are listed first, but bank-synced duplicates from another visible account can be merged too.
+              Within a week of {formatShortDate(transaction.occurredAt)}. Closest amount/date matches are listed first, including bank-synced duplicates from another visible account.
             </p>
             {candidates.length === 0 ? (
               <EmptyState icon="receipt" title="Nothing nearby" description="No other visible transactions within a week of this one." />
