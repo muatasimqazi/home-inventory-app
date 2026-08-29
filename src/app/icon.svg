@@ -1,15 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
   <title id="title">Shohaz app icon</title>
-  <desc id="desc">A teal rounded-square home mark with a yellow roofline and one highlighted yellow inventory box.</desc>
-  <!-- Full-bleed to the canvas edge, not inset on a white backdrop like the
-       original draft — most "any"-purpose consumers (installed PWA/home-
-       screen icon on Android, desktop, some browsers) show this PNG as-is
-       with no cropping of their own, so a white margin around a smaller
-       shape here doesn't get cropped away — it just shows through as a
-       visible white border around the icon. rx keeps the same baked-in
-       rounding for platforms that don't mask it themselves, sized to the
-       full 1024 canvas instead of the old 876-wide inset rect. -->
-  <rect width="1024" height="1024" rx="224" fill="#316A68"/>
+  <desc id="desc">A teal rounded-square home mark with a yellow roofline and one highlighted AI-powered inventory box.</desc>
+  <rect width="1024" height="1024" fill="#FFFFFF"/>
+  <rect x="74" y="28" width="876" height="940" rx="210" fill="#316A68"/>
   <path
     d="M246 476 L512 244 L778 476"
     fill="none"
@@ -22,6 +15,24 @@
     <rect x="314" y="552" width="118" height="118" rx="20" fill="#FFFFFF"/>
     <rect x="453" y="552" width="118" height="118" rx="20" fill="#FFFFFF"/>
     <rect x="592" y="552" width="118" height="118" rx="20" fill="#F8D377"/>
+    <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <g stroke="#1A1D29" opacity="0.22">
+        <path
+          d="M651 583 C655 602 656 606 675 611 C656 616 655 620 651 639 C647 620 646 616 627 611 C646 606 647 602 651 583 Z"
+          stroke-width="10"
+        />
+        <circle cx="628" cy="634" r="5" stroke-width="8"/>
+        <path d="M675 588 V600 M669 594 H681" stroke-width="8"/>
+      </g>
+      <g stroke="#FFFFFF">
+        <path
+          d="M651 583 C655 602 656 606 675 611 C656 616 655 620 651 639 C647 620 646 616 627 611 C646 606 647 602 651 583 Z"
+          stroke-width="6"
+        />
+        <circle cx="628" cy="634" r="5" stroke-width="4"/>
+        <path d="M675 588 V600 M669 594 H681" stroke-width="4"/>
+      </g>
+    </g>
     <rect x="314" y="696" width="118" height="118" rx="20" fill="#FFFFFF"/>
     <rect x="453" y="696" width="118" height="118" rx="20" fill="#FFFFFF"/>
     <rect x="592" y="696" width="118" height="118" rx="20" fill="#FFFFFF"/>

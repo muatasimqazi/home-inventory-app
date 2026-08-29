@@ -28,8 +28,8 @@ self.addEventListener("push", (event) => {
   const title = payload.title || "Shohaz";
   const options = {
     body: payload.body || "",
-    icon: "/icons/icon-192.png",
-    badge: "/icons/icon-192.png",
+    icon: "/icons/icon-192x192.png",
+    badge: "/icons/icon-192x192.png",
     // Carries the URL to open on click — set by the send job per
     // notification (e.g. a specific bill's Recurring Bills page).
     data: { url: payload.url || "/" },
