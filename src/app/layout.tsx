@@ -8,10 +8,14 @@ import { PhotoLightbox } from "@/components/photo-lightbox";
 export const metadata: Metadata = {
   title: "Shohaz",
   description: "Catalog, search, and locate everything in your home.",
-  // No manual `icons` field — favicon.ico, icon.svg, and apple-icon.png in
-  // this same app/ directory are Next's file-convention icons (see
-  // app-icons.md), auto-detected and auto-linked into <head> with no
-  // metadata entry needed; adding one here would just duplicate them.
+  // favicon.ico, icon.svg, and apple-icon.png in this same app/ directory
+  // are Next's file-convention icons (see app-icons.md), auto-detected and
+  // auto-linked into <head>. The explicit apple-touch-icon below points at
+  // the legacy root URL iOS/Safari web clips commonly probe and cache
+  // separately from Next's generated /apple-icon route.
+  icons: {
+    apple: [{ url: "/apple-touch-icon.png?v=2", sizes: "180x180", type: "image/png" }],
+  },
   //
   // Standalone/"installed" mode still needs its own config though — iOS
   // reads appleWebApp separately from either icon source to decide how the
