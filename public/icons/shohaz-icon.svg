@@ -1,8 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
   <title id="title">Shohaz app icon</title>
   <desc id="desc">A teal rounded-square home mark with a yellow roofline and one highlighted AI-powered inventory box.</desc>
-  <rect width="1024" height="1024" fill="#FFFFFF"/>
-  <rect x="74" y="28" width="876" height="940" rx="210" fill="#316A68"/>
+  <rect width="1024" height="1024" fill="#316A68"/>
   <path
     d="M246 476 L512 244 L778 476"
     fill="none"
