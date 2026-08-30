@@ -36,9 +36,15 @@ function SignInInner() {
     setError(null);
     setMode("authenticating");
     const supabase = getSupabaseBrowserClient();
+    // Carries the same ?next= destination the password path already
+    // respects (line ~80) through Google's own external redirect —
+    // without this, an OAuth sign-in coming from a scanned NFC/QR link
+    // (or any other deep link) would land wherever /auth/callback's own
+    // fallback points instead of back where the user actually came from.
+    const next = searchParams.get("next") ?? "/dashboard";
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${appOrigin()}/auth/callback` },
+      options: { redirectTo: `${appOrigin()}/auth/callback?next=${encodeURIComponent(next)}` },
     });
     // On success the browser navigates away to Google — this only returns
     // if the redirect itself failed to start.

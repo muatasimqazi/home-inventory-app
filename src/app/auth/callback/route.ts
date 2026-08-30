@@ -11,7 +11,14 @@ export const runtime = "nodejs";
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/";
+  // "/" is the public marketing homepage (src/app/page.tsx, "Add public
+  // homepage") — this fallback predates that page and was never updated,
+  // so a Google sign-in with no explicit ?next= (the common case; the
+  // param is only set when sign-in/page.tsx forwards one through) landed
+  // signed-in users back on the marketing page instead of the app. The
+  // password sign-in path already defaults to /dashboard for the same
+  // reason (see sign-in/page.tsx's own comment on that line).
+  const next = searchParams.get("next") ?? "/dashboard";
 
   if (!code) {
     return NextResponse.redirect(`${origin}/sign-in?error=missing_code`);
