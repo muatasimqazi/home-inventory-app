@@ -16,23 +16,191 @@
  * over Ink & Coral, Plum & Gold, Warm Neutral & Indigo, Stone & Rust, and
  * an icon-derived Teal & Gold for a calmer, lower-fatigue daily-use fit.
  */
+
+/*
+ * Raw runtime CSS custom properties for every token whose value differs
+ * between light and dark mode — @theme inline below maps each Tailwind
+ * token name (--color-x) onto one of these via var(...).
+ *
+ * This indirection is required, not stylistic: verified against the
+ * compiled CSS that Tailwind v4's "inline" mode bakes a theme variable's
+ * *own literal value* directly into every utility that uses it (e.g.
+ * --color-ink: #1a1d29 compiled straight to `.text-ink{color:#1a1d29}`,
+ * completely ignoring a later `.dark { --color-ink: ... }` override,
+ * since no generated utility ever reads that custom property at
+ * runtime). Only a token whose declared value is itself a var(...)
+ * reference keeps that reference live in the compiled utility — the
+ * exact pattern Tailwind's own docs show for this — so every token that
+ * needs to repaint under .dark has to be declared that way, pointing at
+ * a real variable defined here rather than a literal.
+ *
+ * Tokens that never change between themes (--color-white, --color-yellow,
+ * the FAB/category-accent fills, --color-ink-fill, ...) skip this and
+ * stay direct literals inside @theme inline further down — inline's
+ * literal-baking is exactly what's wanted for a theme-constant.
+ */
+:root {
+  --radius: 16px;
+
+  --ink: #1a1d29; /* heading text — near-black neutral, not warm-toned like v2's #212121 */
+  --background: #ffffff; /* pure white in v3 — v2 used a tinted #faf8f6 so cards would read as elevated; v3's card border+shadow recipe carries that elevation instead */
+  --card: #ffffff; /* a deliberate light-mode coincidence that this equals --background — v3's card border+shadow recipe carries elevation, not a background-color step; dark mode below does step card away from background, since shadows barely read there */
+  --popover: #ffffff;
+  --surface-muted: #f3f4f6; /* neutral-100 — Tailwind gray-100, kept in the same neutral family as text-muted below rather than v2's warm #f1eded */
+  --border: #ebf0f4; /* card border — cool neutral, not v2's warm #e4ddd8 */
+  --text-muted: #6b7280; /* secondary/label text — neutral gray, explicitly not sage-tinted (an earlier #8d9683 sage-gray read as "muddy" and was rejected) */
+  --danger: #a31b1b;
+  --yellow-text: #3f5a38; /* darker sage for literal text links/CTA text sitting on white — v3's standing link-color rule: fills get --color-yellow, text-on-white gets this darker variant for contrast */
+  --brand-100: #e8ede5;
+  --brand-200: #b7c7ae;
+  --brand-700: #3f5a38; /* same value as --yellow-text — the dark end of the ramp and the link-text color are the same color by design */
+
+  /* Bin ID badge palette — pastel-fill/border + deep text, hashed per container. */
+  --badge-red-bg: #fae7e7;
+  --badge-red-border: #f2c4c4;
+  --badge-red-text: #a31b1b;
+  --badge-green-bg: #e8f2e9;
+  --badge-green-border: #c8e0ca;
+  --badge-green-text: #1b5e20;
+  --badge-purple-bg: #f3e8f7;
+  --badge-purple-border: #e3cdee;
+  --badge-purple-text: #4a148c;
+  --badge-orange-bg: #fdeedf;
+  --badge-orange-border: #f6d9b8;
+  --badge-orange-text: #b34700;
+  --badge-blue-bg: #e6eef7;
+  --badge-blue-border: #c4d6ec;
+  --badge-blue-text: #1a4a80;
+
+  /* Finance domain — deliberately distinct from --danger so an ordinary
+     expense amount never borrows the token reserved for irreversible
+     actions. */
+  --money-negative-bg: #fbeee7;
+  --money-negative-border: #f0d2bc;
+  --money-negative-text: #9c4221;
+
+  /* v3 card shadow recipe (rgba base 8,19,30 — a near-ink tint instead of
+     pure black), named -card- to stay distinct from the @theme-facing
+     --shadow-sm/--shadow-lg/--shadow-sheet names below (those two can't
+     share a name — see the .dark block's own note on this). */
+  --shadow-card-sm: 0px 0px 2px 0px rgba(8, 19, 30, 0.04), 0px 2px 8px 0px rgba(8, 19, 30, 0.02);
+  --shadow-card-lg: 0px 1px 4px rgba(8, 19, 30, 0.05), 0px 10px 22px rgba(8, 19, 30, 0.1);
+  --shadow-card-sheet: 0 -8px 24px -6px rgba(8, 19, 30, 0.12);
+}
+
+/*
+ * Dark mode — overrides the raw variables :root defines above. Matches
+ * the @custom-variant dark declaration at the top of this file, which
+ * next-themes' `class` strategy is what actually applies/removes.
+ *
+ * --white is deliberately absent — nothing above declares one; literal
+ * white text/icons on a colored fill (button labels, FAB icons, badge
+ * text on a solid color) reads --color-white directly, a theme-constant
+ * declared as a literal in @theme inline further down, unrelated to this
+ * block. --card (and --popover) exist so surfaces that used to alias
+ * white have their own value to step away from --background in dark
+ * mode, without disturbing --color-white itself.
+ */
+.dark {
+  /* Structure — page is the darkest surface, card one step lighter. A
+     deliberate departure from light mode's page==card convention (where
+     the border+shadow recipe alone carries elevation): shadows barely
+     read against a dark ground, so a real background-color step becomes
+     the primary elevation cue instead. */
+  --background: #12141a;
+  --card: #1b1e26;
+  --popover: #1b1e26;
+  --surface-muted: #242832;
+  --border: #2e323c;
+
+  /* Text — ink flips to a softened near-white (not pure #fff, easier on
+     the eyes at this brightness), muted lightens to stay legible against
+     the new dark ground. */
+  --ink: #f0f1f4;
+  --text-muted: #9aa1ac;
+
+  /* Brand link/text-only sage (--color-yellow itself is unchanged — it's
+     a button/FAB *fill* with white text on top, self-contained contrast
+     independent of page theme, so it stays a literal in @theme inline
+     rather than routing through a raw variable at all). This is the
+     "text sitting directly on the page" variant, which does need to
+     lighten — same relationship as light mode's own "fills get
+     --color-yellow, text-on-background gets this variant" rule, just
+     solved for a dark background instead of white. brand-700 keeps its
+     light-mode "identical value to yellow-text by design" relationship.
+     --color-ink-fill is unchanged for the identical reason and, like
+     --color-yellow, was never given a raw variable above — it stays
+     #1a1d29 in both themes, a fixed near-black fill that reads correctly
+     with white text/icons on top regardless of the page's own theme. */
+  --yellow-text: #a7c99a;
+  --brand-100: #24301f;
+  --brand-200: #3c4f34;
+  --brand-700: #a7c99a;
+
+  /* text-danger (91 call sites, on-background text) heavily outnumbers
+     bg-danger (18, a fill with white text on top) — biased toward
+     legible text on the new dark ground; still a real (if slightly
+     less punchy) red as a fill. Revisit if a destructive button reads
+     weak in dark mode during visual QA. */
+  --danger: #ef6b64;
+
+  /* Bin ID badge palette — dark mode inverts the light palette's pastel-
+     bg/deep-text pattern to deep-saturated-bg/light-text, the standard
+     dark-mode badge treatment. */
+  --badge-red-bg: #3a1f1f;
+  --badge-red-border: #5c2b2b;
+  --badge-red-text: #f2a8a8;
+  --badge-green-bg: #1c2e1e;
+  --badge-green-border: #2c4530;
+  --badge-green-text: #a8d6ae;
+  --badge-purple-bg: #2e2138;
+  --badge-purple-border: #453056;
+  --badge-purple-text: #d4b3ea;
+  --badge-orange-bg: #3a2812;
+  --badge-orange-border: #5c3f1d;
+  --badge-orange-text: #f0bb80;
+  --badge-blue-bg: #1c2836;
+  --badge-blue-border: #2a3d52;
+  --badge-blue-text: #a8c8ea;
+
+  /* Same bg/border/text inversion as the badge palette above. */
+  --money-negative-bg: #3a2418;
+  --money-negative-border: #5c3a26;
+  --money-negative-text: #e0a67e;
+
+  /* Shadows lose most of their job on a dark ground (a black shadow on an
+     already-dark page barely registers) — the border color above becomes
+     the primary separation cue instead; these just get a modest opacity
+     bump rather than a full redesign. */
+  --shadow-card-sm: 0px 0px 2px 0px rgba(0, 0, 0, 0.4), 0px 2px 8px 0px rgba(0, 0, 0, 0.25);
+  --shadow-card-lg: 0px 1px 4px rgba(0, 0, 0, 0.5), 0px 10px 22px rgba(0, 0, 0, 0.4);
+  --shadow-card-sheet: 0 -8px 24px -6px rgba(0, 0, 0, 0.6);
+
+  /* --color-fab-* (the 5-role FAB chooser wheel) and --color-accent-*
+     (the category-accent trio) are deliberately left unchanged — both are
+     small colored fills with their own self-contained contrast (a white
+     icon/text on a saturated color), independent of the page's theme. */
+}
+
 @theme inline {
-  /* Core palette (v3 sage/neutral) */
-  --color-ink: #1a1d29; /* heading text — near-black neutral, not warm-toned like v2's #212121 */
-  --color-ink-fill: #1a1d29; /* same fill/text split as --color-yellow/--color-yellow-text below, just discovered on ink too: bg-ink/border-ink/ring-ink call sites (primary buttons, active pills, badges, FAB, the camera viewfinder's always-dark chrome) always pair this with white text/icons on top, a pairing whose contrast is independent of page theme — this token exists so those call sites can point at a value that, unlike --color-ink itself, deliberately does not lighten in dark mode */
+  /* Core palette (v3 sage/neutral) — routed through the raw variables
+     above wherever the value needs to differ by theme (see the comment
+     above :root); left as direct literals wherever it doesn't. */
+  --color-ink: var(--ink);
+  --color-ink-fill: #1a1d29; /* same fill/text split as --color-yellow/--color-yellow-text below, just discovered on ink too: bg-ink/border-ink/ring-ink call sites (primary buttons, active pills, badges, FAB, the camera viewfinder's always-dark chrome) always pair this with white text/icons on top, a pairing whose contrast is independent of page theme — this token deliberately does not lighten in dark mode, unlike --color-ink itself */
   --color-yellow: #5c7a52; /* brand action color (sage) — fills only (buttons/FAB/active nav-tab); treat as "the brand accent" token, not literally yellow */
-  --color-yellow-text: #3f5a38; /* darker sage for literal text links/CTA text sitting on white — v3's standing link-color rule: fills get --color-yellow, text-on-white gets this darker variant for contrast */
-  --color-white: #ffffff; /* neutral-0 */
-  --color-surface-muted: #f3f4f6; /* neutral-100 — Tailwind gray-100, kept in the same neutral family as the new text-muted below rather than v2's warm #f1eded */
-  --color-border: #ebf0f4; /* card border — cool neutral, not v2's warm #e4ddd8 */
-  --color-text-muted: #6b7280; /* secondary/label text — neutral gray, explicitly not sage-tinted (an earlier #8d9683 sage-gray read as "muddy" and was rejected) */
-  --color-danger: #a31b1b;
+  --color-yellow-text: var(--yellow-text);
+  --color-white: #ffffff; /* neutral-0 — literal text/icons on a colored fill; never themed, see the .dark block's own note */
+  --color-surface-muted: var(--surface-muted);
+  --color-border: var(--border);
+  --color-text-muted: var(--text-muted);
+  --color-danger: var(--danger);
   --color-danger-foreground: #ffffff;
 
   /* Brand scale, for spots that need the fuller ramp than --color-yellow alone — sage ramp, not v2's taupe */
-  --color-brand-100: #e8ede5;
-  --color-brand-200: #b7c7ae;
-  --color-brand-700: #3f5a38; /* same value as --color-yellow-text — the dark end of the ramp and the link-text color are the same color by design */
+  --color-brand-100: var(--brand-100);
+  --color-brand-200: var(--brand-200);
+  --color-brand-700: var(--brand-700);
 
   /* Category accent trio — muted data accents only (dots/rails/chips), never chrome/actions or large fills */
   --color-accent-yellow: #c9974b;
@@ -60,37 +228,37 @@
   --color-fab-neutral-light: #356860; /* Deep Teal — deepened from Muted Teal (#69a197) for a legible white icon */
 
   /* Bin ID badge palette — pastel-fill/border + deep text, hashed per container. Flat (no shadow). */
-  --color-badge-red-bg: #fae7e7;
-  --color-badge-red-border: #f2c4c4;
-  --color-badge-red-text: #a31b1b;
-  --color-badge-green-bg: #e8f2e9;
-  --color-badge-green-border: #c8e0ca;
-  --color-badge-green-text: #1b5e20;
-  --color-badge-purple-bg: #f3e8f7;
-  --color-badge-purple-border: #e3cdee;
-  --color-badge-purple-text: #4a148c;
-  --color-badge-orange-bg: #fdeedf;
-  --color-badge-orange-border: #f6d9b8;
-  --color-badge-orange-text: #b34700;
-  --color-badge-blue-bg: #e6eef7;
-  --color-badge-blue-border: #c4d6ec;
-  --color-badge-blue-text: #1a4a80;
+  --color-badge-red-bg: var(--badge-red-bg);
+  --color-badge-red-border: var(--badge-red-border);
+  --color-badge-red-text: var(--badge-red-text);
+  --color-badge-green-bg: var(--badge-green-bg);
+  --color-badge-green-border: var(--badge-green-border);
+  --color-badge-green-text: var(--badge-green-text);
+  --color-badge-purple-bg: var(--badge-purple-bg);
+  --color-badge-purple-border: var(--badge-purple-border);
+  --color-badge-purple-text: var(--badge-purple-text);
+  --color-badge-orange-bg: var(--badge-orange-bg);
+  --color-badge-orange-border: var(--badge-orange-border);
+  --color-badge-orange-text: var(--badge-orange-text);
+  --color-badge-blue-bg: var(--badge-blue-bg);
+  --color-badge-blue-border: var(--badge-blue-border);
+  --color-badge-blue-text: var(--badge-blue-text);
 
   /* Finance domain (docs/Personal Finance Design Alignment.md §1) —
      positive amounts reuse --color-badge-green-* verbatim (no new token,
      "good number" already means the same thing there). Negative is new:
      deliberately distinct from --color-danger so an ordinary expense
      amount never borrows the one token reserved for irreversible actions. */
-  --color-money-negative-bg: #fbeee7;
-  --color-money-negative-border: #f0d2bc;
-  --color-money-negative-text: #9c4221;
+  --color-money-negative-bg: var(--money-negative-bg);
+  --color-money-negative-border: var(--money-negative-border);
+  --color-money-negative-text: var(--money-negative-text);
 
   /* shadcn semantic slots, mapped onto the Shohaz palette */
-  --color-background: #ffffff; /* pure white in v3 — v2 used a tinted #faf8f6 so cards would read as elevated; v3's card border+shadow recipe (below) carries that elevation instead */
+  --color-background: var(--background);
   --color-foreground: var(--color-ink);
-  --color-card: var(--color-white);
+  --color-card: var(--card);
   --color-card-foreground: var(--color-ink);
-  --color-popover: var(--color-white);
+  --color-popover: var(--popover);
   --color-popover-foreground: var(--color-ink);
   --color-primary: var(--color-yellow);
   --color-primary-foreground: var(--color-white);
@@ -134,10 +302,14 @@
      of v2's pure black rgba(0,0,0,...)) replaces --shadow-sm, the token
      every card's `shadow-sm` utility reads. --shadow-lg keeps v2's
      offset/blur/opacity progression, recolored to the same base tint for
-     consistency; v3 didn't specify an elevated-state value explicitly. */
-  --shadow-sm: 0px 0px 2px 0px rgba(8, 19, 30, 0.04), 0px 2px 8px 0px rgba(8, 19, 30, 0.02);
-  --shadow-lg: 0px 1px 4px rgba(8, 19, 30, 0.05), 0px 10px 22px rgba(8, 19, 30, 0.1);
-  --shadow-sheet: 0 -8px 24px -6px rgba(8, 19, 30, 0.12);
+     consistency; v3 didn't specify an elevated-state value explicitly.
+     Routed through --shadow-card-* (declared on :root/.dark above) rather
+     than named directly --shadow-sm/-lg/-sheet there, since those are the
+     exact names @theme needs on the left here — a variable can't alias
+     itself. */
+  --shadow-sm: var(--shadow-card-sm);
+  --shadow-lg: var(--shadow-card-lg);
+  --shadow-sheet: var(--shadow-card-sheet);
 
   /* Typography scale — PRD §3, Display through Micro */
   --text-display: 30px;
@@ -156,116 +328,6 @@
   --text-caption--line-height: 16px;
   --text-micro: 11px;
   --text-micro--line-height: 14px;
-}
-
-:root {
-  --radius: 16px;
-}
-
-/*
- * Dark mode — overrides the same CSS custom properties @theme inline
- * defines above (every one of those tokens generates its utility classes
- * as `var(--color-x)`, never an inlined literal, specifically because of
- * the `inline` keyword — so redefining the variable here, scoped under
- * .dark, is all that's needed for every existing bg-ink/text-muted-
- * foreground/etc. call site app-wide to repaint automatically; matches
- * the @custom-variant dark declaration at the top of this file, which
- * next-themes' `class` strategy is what actually applies/removes).
- *
- * --color-white is deliberately NOT overridden here — it's relied on for
- * literal white text/icons sitting on a colored fill (button labels, FAB
- * icons, badge text on a solid color), which already has correct
- * contrast in both themes and must stay pure white regardless. Anything
- * that instead needs to become a real dark *surface* reads --color-card
- * (see globals below), a separate token that only aliased --color-white
- * in light mode.
- *
- * shadcn's own semantic slots (--color-secondary, --color-muted,
- * --color-card-foreground, --color-input, --color-ring, etc., defined a
- * few lines up via var(--color-x)) need no re-declaration here — they
- * already point at the tokens this block redefines, so they inherit
- * automatically through that same indirection.
- */
-.dark {
-  /* Structure — page is the darkest surface, card one step lighter. A
-     deliberate departure from light mode's page==card convention (where
-     the border+shadow recipe alone carries elevation): shadows barely
-     read against a dark ground, so a real background-color step becomes
-     the primary elevation cue instead. */
-  --color-background: #12141a;
-  --color-card: #1b1e26;
-  --color-popover: #1b1e26;
-  --color-surface-muted: #242832;
-  --color-border: #2e323c;
-
-  /* Text — ink flips to a softened near-white (not pure #fff, easier on
-     the eyes at this brightness), muted lightens to stay legible against
-     the new dark ground. */
-  --color-ink: #f0f1f4;
-  --color-text-muted: #9aa1ac;
-
-  /* --color-ink-fill is NOT overridden here either, for the identical
-     reason --color-yellow isn't — see its declaration up in @theme
-     inline. It stays #1a1d29 in both themes: a fixed near-black fill
-     reads correctly with white text/icons on top regardless of the
-     page's own theme, exactly like --color-yellow. */
-
-  /* Brand link/text-only sage (--color-yellow itself is unchanged below —
-     it's a button/FAB *fill* with white text on top, self-contained
-     contrast independent of page theme). This is the "text sitting
-     directly on the page" variant, which does need to lighten — same
-     relationship as light mode's own "fills get --color-yellow, text-on-
-     background gets this variant" rule, just solved for a dark
-     background instead of white. brand-700 keeps its light-mode
-     "identical value to yellow-text by design" relationship. */
-  --color-yellow-text: #a7c99a;
-  --color-brand-100: #24301f;
-  --color-brand-200: #3c4f34;
-  --color-brand-700: #a7c99a;
-
-  /* text-danger (91 call sites, on-background text) heavily outnumbers
-     bg-danger (18, a fill with white text on top) — biased toward
-     legible text on the new dark ground; still a real (if slightly
-     less punchy) red as a fill. Revisit if a destructive button reads
-     weak in dark mode during visual QA. */
-  --color-danger: #ef6b64;
-
-  /* Bin ID badge palette — dark mode inverts the light palette's pastel-
-     bg/deep-text pattern to deep-saturated-bg/light-text, the standard
-     dark-mode badge treatment. */
-  --color-badge-red-bg: #3a1f1f;
-  --color-badge-red-border: #5c2b2b;
-  --color-badge-red-text: #f2a8a8;
-  --color-badge-green-bg: #1c2e1e;
-  --color-badge-green-border: #2c4530;
-  --color-badge-green-text: #a8d6ae;
-  --color-badge-purple-bg: #2e2138;
-  --color-badge-purple-border: #453056;
-  --color-badge-purple-text: #d4b3ea;
-  --color-badge-orange-bg: #3a2812;
-  --color-badge-orange-border: #5c3f1d;
-  --color-badge-orange-text: #f0bb80;
-  --color-badge-blue-bg: #1c2836;
-  --color-badge-blue-border: #2a3d52;
-  --color-badge-blue-text: #a8c8ea;
-
-  /* Same bg/border/text inversion as the badge palette above. */
-  --color-money-negative-bg: #3a2418;
-  --color-money-negative-border: #5c3a26;
-  --color-money-negative-text: #e0a67e;
-
-  /* Shadows lose most of their job on a dark ground (a black shadow on an
-     already-dark page barely registers) — the border color above becomes
-     the primary separation cue instead; these just get a modest opacity
-     bump rather than a full redesign. */
-  --shadow-sm: 0px 0px 2px 0px rgba(0, 0, 0, 0.4), 0px 2px 8px 0px rgba(0, 0, 0, 0.25);
-  --shadow-lg: 0px 1px 4px rgba(0, 0, 0, 0.5), 0px 10px 22px rgba(0, 0, 0, 0.4);
-  --shadow-sheet: 0 -8px 24px -6px rgba(0, 0, 0, 0.6);
-
-  /* --color-fab-* (the 5-role FAB chooser wheel) and --color-accent-*
-     (the category-accent trio) are deliberately left unchanged — both are
-     small colored fills with their own self-contained contrast (a white
-     icon/text on a saturated color), independent of the page's theme. */
 }
 
 @layer base {

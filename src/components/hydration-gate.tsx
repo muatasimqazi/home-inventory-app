@@ -71,7 +71,7 @@ export function HydrationGate({ children }: { children: ReactNode }) {
         </main>
         {/* Same min-h-17.5/border-t/px-2 shape as the real bottom nav, so
             there's no visible size jump once the real one mounts. */}
-        <nav aria-hidden className="fixed inset-x-0 bottom-0 z-40 flex min-h-17.5 items-center border-t border-border bg-white px-2 pb-[env(safe-area-inset-bottom)] md:hidden">
+        <nav aria-hidden className="fixed inset-x-0 bottom-0 z-40 flex min-h-17.5 items-center border-t border-border bg-card px-2 pb-[env(safe-area-inset-bottom)] md:hidden">
           <div className="flex flex-1 items-center justify-around">
             <Skeleton className="size-8 rounded-full" />
             <Skeleton className="size-8 rounded-full" />
