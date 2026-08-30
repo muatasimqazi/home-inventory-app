@@ -39,6 +39,7 @@ import { NextResponse, type NextRequest } from "next/server";
 // deployment protection, and everything else about the route can be
 // completely correct and it'll still never fire.
 const PUBLIC_PATHS = [
+  "/",
   "/sign-in",
   "/reset-password",
   "/privacy",
@@ -97,8 +98,8 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  if (user && pathname === "/sign-in") {
-    return NextResponse.redirect(new URL("/", request.url));
+  if (user && (pathname === "/" || pathname === "/sign-in")) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
   return response;

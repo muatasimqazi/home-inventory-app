@@ -108,7 +108,7 @@ function ResetPasswordInner() {
             <Icon name="check" size={24} className="text-ink" />
             <p className="text-body font-medium text-ink">Password updated</p>
             <p className="text-caption text-muted-foreground">Use your new password the next time you sign in.</p>
-            <Button size="lg" onClick={() => router.push("/")}>
+            <Button size="lg" onClick={() => router.push("/dashboard")}>
               Continue
             </Button>
           </div>

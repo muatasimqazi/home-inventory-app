@@ -27,7 +27,7 @@ function SignInInner() {
   const [mode, setMode] = useState<Mode>("default");
   const emailInputRef = useRef<HTMLInputElement>(null);
   useAutoFocusVisible(emailInputRef, [mode]);
-  const [authAction, setAuthAction] = useState<AuthAction>("signin");
+  const [authAction, setAuthAction] = useState<AuthAction>(searchParams.get("action") === "signup" ? "signup" : "signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(searchParams.get("error"));
@@ -77,7 +77,7 @@ function SignInInner() {
     }
     // Sends the user back to wherever the proxy intercepted them from
     // (e.g. a scanned NFC/QR link at /c/[token]) instead of always "/".
-    router.push(searchParams.get("next") ?? "/");
+    router.push(searchParams.get("next") ?? "/dashboard");
   }
 
   return (

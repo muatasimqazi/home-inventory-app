@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 // nothing becomes harder to reach, it just no longer gets a uniquely
 // privileged slot relative to Finance.
 const LEFT_TABS: { href: string; icon: IconName; label: string }[] = [
-  { href: "/", icon: "home", label: "Home" },
+  { href: "/dashboard", icon: "home", label: "Home" },
   { href: "/search", icon: "search", label: "Search" },
 ];
 
@@ -49,7 +49,7 @@ export function BottomNav() {
   const keyboardInset = useKeyboardInset();
 
   function renderTab(tab: (typeof LEFT_TABS)[number]) {
-    const active = tab.href === "/" ? pathname === "/" : pathname.startsWith(tab.href);
+    const active = pathname === tab.href || pathname.startsWith(`${tab.href}/`);
     return (
       <Link
         key={tab.href}

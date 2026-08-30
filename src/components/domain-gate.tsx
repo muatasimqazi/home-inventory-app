@@ -41,7 +41,7 @@ export function DomainGate({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (blockedDomain) {
       toast.error(`${blockedDomain} isn't enabled for this household.`);
-      router.replace("/");
+      router.replace("/dashboard");
     }
   }, [blockedDomain, router]);
 

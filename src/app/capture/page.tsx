@@ -256,7 +256,7 @@ function CameraCaptureInner() {
           type="button"
           onClick={() => {
             stopCameraStream();
-            router.replace("/");
+            router.replace("/dashboard");
           }}
           aria-label="Close camera"
           className={cn(

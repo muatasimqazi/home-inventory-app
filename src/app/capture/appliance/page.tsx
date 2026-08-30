@@ -240,7 +240,7 @@ function ApplianceCaptureInner() {
           type="button"
           onClick={() => {
             stopCameraStream();
-            router.replace("/");
+            router.replace("/dashboard");
           }}
           aria-label="Close camera"
           className={cn(
@@ -277,7 +277,7 @@ function ApplianceCaptureInner() {
             </div>
             <button
               type="button"
-              onClick={() => router.replace("/")}
+              onClick={() => router.replace("/dashboard")}
               className="tap-target h-11 w-full max-w-xs rounded-full bg-ink text-body font-medium text-white"
             >
               Cancel

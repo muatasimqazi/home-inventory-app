@@ -91,7 +91,7 @@ export function DesktopSidebar() {
         <div>
           {!collapsed && <p className="px-3 pb-1 text-micro font-semibold tracking-wide text-muted-foreground uppercase">Overview</p>}
           <nav className="flex flex-col gap-1" aria-label="Overview">
-            <SidebarLink href="/" icon="home" label="Overview" pathname={pathname} exact collapsed={collapsed} />
+            <SidebarLink href="/dashboard" icon="home" label="Overview" pathname={pathname} exact collapsed={collapsed} />
           </nav>
         </div>
 

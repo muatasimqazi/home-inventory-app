@@ -209,7 +209,7 @@ function HouseholdSetupInner() {
       return;
     }
     toast.success(`You've joined ${result.household?.name}`);
-    router.push("/");
+    router.push("/dashboard");
   }
 
   // Pre-fills the email the join form checks against — we already know it
@@ -475,7 +475,7 @@ function HouseholdSetupInner() {
               <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={() => router.push("/capture")}>
                 Open Camera
               </Button>
-              <Button size="lg" variant="outline" onClick={() => router.push("/")}>
+              <Button size="lg" variant="outline" onClick={() => router.push("/dashboard")}>
                 Skip for now
               </Button>
             </>
