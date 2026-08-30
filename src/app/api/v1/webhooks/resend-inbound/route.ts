@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { isPaidSubscriptionTier } from "@/lib/billing";
 import { extractReceiptFromEmail } from "@/lib/vision/extract-email-receipt";
 import { resolveCategory, resolveAccountByCardLastFour, draftNeedsReview } from "@/lib/receipt-resolution";
 import {
@@ -119,6 +120,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, routed: false });
   }
   const householdId: string = householdRow.id;
+
+  // Email Receipts is a Plus feature (settings/email-receipts/page.tsx's
+  // own gate) — every household still has a receiptsToken (set at
+  // creation, not toggled), so the address itself never stops existing;
+  // this is the real enforcement, silently declining to process mail for
+  // a Free household rather than relying only on the settings page not
+  // showing the address (someone who already had it from before a
+  // downgrade could otherwise keep using it). 200 either way — nothing
+  // here is retryable by Resend resending the same email.
+  if (!isPaidSubscriptionTier(householdRow.subscription_tier)) {
+    return NextResponse.json({ ok: true, routed: false, reason: "plan" });
+  }
 
   const [{ data: memberRows }, { data: accountRows }, { data: categoryRows }, { data: ruleRows }] = await Promise.all([
     admin.from("members").select("*").eq("household_id", householdId),

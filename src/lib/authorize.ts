@@ -1,5 +1,6 @@
 import "server-only";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import type { SubscriptionTier } from "@/lib/types";
 
 export type AuthorizeResult = { ok: true; userId: string } | { ok: false; error: string; status: number };
 
@@ -48,4 +49,31 @@ export async function requireHouseholdOwner(householdId: string): Promise<Author
   if (membership.role !== "owner") return { ok: false, error: "Only the household owner can do this.", status: 403 };
 
   return { ok: true, userId: user.id };
+}
+
+/**
+ * Same shape as requireHouseholdMember, but additionally requires the
+ * household's current subscription_tier to be one of `allowedTiers` — the
+ * real, server-side enforcement for a gated paid feature (docs/Product
+ * Requirements Document.md doesn't have a billing section yet; the gate
+ * list itself lives in each gated route's own comment for now). A route
+ * with a real UI entry point also mirrors this client-side with
+ * UpgradeDialog so the user sees a clear paywall instead of submitting a
+ * request that was always going to fail — this check is what actually
+ * stops it, the client-side one is just so they don't have to find out
+ * the hard way. 402 (Payment Required) rather than 403 — this isn't a
+ * permissions problem, it's a plan problem.
+ */
+export async function requireHouseholdPlan(householdId: string, allowedTiers: readonly SubscriptionTier[]): Promise<AuthorizeResult> {
+  const memberResult = await requireHouseholdMember(householdId);
+  if (!memberResult.ok) return memberResult;
+
+  const supabase = await getSupabaseServerClient();
+  const { data: household } = await supabase.from("households").select("subscription_tier").eq("id", householdId).maybeSingle();
+  const tier = household?.subscription_tier as SubscriptionTier | undefined;
+  if (!tier || !allowedTiers.includes(tier)) {
+    return { ok: false, error: "This feature needs a paid plan.", status: 402 };
+  }
+
+  return memberResult;
 }

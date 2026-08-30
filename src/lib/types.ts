@@ -6,6 +6,7 @@
 export const TRASH_RETENTION_DAYS = 30;
 
 export type Role = "owner" | "member";
+export type SubscriptionTier = "free" | "plus" | "pro";
 
 export interface Household {
   id: string;
@@ -16,6 +17,15 @@ export interface Household {
   /** Chosen once at household-setup (both default true — see supabase/migrations/0033_household_domains.sql). UI-level only: hides/shows nav entry points, doesn't restrict data access. At least one of the two is always true, DB-enforced. */
   financeEnabled: boolean;
   inventoryEnabled: boolean;
+  /** App-level billing plan for this shared household workspace. */
+  subscriptionTier: SubscriptionTier;
+  /** Stripe subscription status for paid plans, or "free" for unpaid households. */
+  subscriptionStatus: string;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+  stripePriceId: string | null;
+  subscriptionCurrentPeriodEnd: string | null;
+  subscriptionUpdatedAt: string;
 }
 
 export interface Member {

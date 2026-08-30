@@ -5,6 +5,9 @@ import { usePlaidLink, type PlaidLinkOnSuccess } from "react-plaid-link";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
 import { Button } from "@/components/ui/button";
+import { UpgradeDialog } from "@/components/upgrade-dialog";
+import { isPaidSubscriptionTier } from "@/lib/billing";
+import { useCurrentHousehold } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import type { PlaidItem } from "@/lib/types";
 
@@ -48,11 +51,13 @@ export function formatLastSynced(iso: string | null): string {
 
 /** "Linked banks" section on the Accounts page (Bank Sync Addendum §8) — connect/reconnect/sync/disconnect, all against GET/POST /api/v1/plaid/*, never the client-side store (plaid_items has no RLS policies for the browser, see the Addendum's §4 security model). */
 export function LinkedBanksCard({ householdId }: { householdId: string }) {
+  const household = useCurrentHousehold();
   const [items, setItems] = useState<PlaidItem[] | null>(null);
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [launcherKey, setLauncherKey] = useState(0);
   const [connecting, setConnecting] = useState(false);
   const [busyItemId, setBusyItemId] = useState<string | null>(null);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
 
   const refetchItems = useCallback(async () => {
     const res = await fetch(`/api/v1/plaid/items?householdId=${encodeURIComponent(householdId)}`);
@@ -75,6 +80,17 @@ export function LinkedBanksCard({ householdId }: { householdId: string }) {
   }, [householdId]);
 
   async function startConnect(plaidItemId?: string) {
+    // Gated client-side only for a genuinely NEW connection — reconnecting
+    // an already-linked bank (plaidItemId set) keeps working regardless of
+    // plan, so a household that downgraded doesn't lose sync on accounts
+    // it already connected. The real enforcement is server-side
+    // (link-token/route.ts's own requireHouseholdPlan) either way; this is
+    // just so a Free household sees a clear paywall instead of a request
+    // that was always going to 402.
+    if (!plaidItemId && !isPaidSubscriptionTier(household.subscriptionTier)) {
+      setUpgradeOpen(true);
+      return;
+    }
     setConnecting(true);
     try {
       const res = await fetch("/api/v1/plaid/link-token", {
@@ -208,6 +224,8 @@ export function LinkedBanksCard({ householdId }: { householdId: string }) {
           ))}
         </div>
       )}
+
+      <UpgradeDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} feature="Bank transaction imports" />
     </div>
   );
 }

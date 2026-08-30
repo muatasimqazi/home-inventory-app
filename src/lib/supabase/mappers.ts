@@ -82,6 +82,13 @@ export interface HouseholdRow {
   receipts_token: string;
   finance_enabled: boolean;
   inventory_enabled: boolean;
+  subscription_tier: string;
+  subscription_status: string;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  stripe_price_id: string | null;
+  subscription_current_period_end: string | null;
+  subscription_updated_at: string;
 }
 
 export function rowToHousehold(row: HouseholdRow): Household {
@@ -92,6 +99,13 @@ export function rowToHousehold(row: HouseholdRow): Household {
     receiptsToken: row.receipts_token,
     financeEnabled: row.finance_enabled,
     inventoryEnabled: row.inventory_enabled,
+    subscriptionTier: row.subscription_tier as Household["subscriptionTier"],
+    subscriptionStatus: row.subscription_status,
+    stripeCustomerId: row.stripe_customer_id,
+    stripeSubscriptionId: row.stripe_subscription_id,
+    stripePriceId: row.stripe_price_id,
+    subscriptionCurrentPeriodEnd: row.subscription_current_period_end,
+    subscriptionUpdatedAt: row.subscription_updated_at,
   };
 }
 

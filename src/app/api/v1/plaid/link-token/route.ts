@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { Products, CountryCode } from "plaid";
 import { getPlaidClient } from "@/lib/plaid/client";
-import { requireHouseholdMember } from "@/lib/plaid/authorize";
+import { requireHouseholdMember, requireHouseholdPlan } from "@/lib/authorize";
+import { PAID_SUBSCRIPTION_TIERS } from "@/lib/billing";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { appOrigin } from "@/lib/urls";
 
@@ -26,7 +27,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "`householdId` is required." }, { status: 400 });
   }
 
-  const auth = await requireHouseholdMember(householdId);
+  const isReconnect = typeof plaidItemId === "string" && plaidItemId;
+  // Bank sync is a Plus feature (docs: none yet, see settings/billing's
+  // BILLING_PLAN_FEATURES) — gated only for a genuinely NEW connection.
+  // Reconnecting an already-linked bank stays free regardless of plan, so
+  // a household that downgraded doesn't lose sync on an account it
+  // already connected; mirrored client-side by linked-banks-card.tsx's
+  // own UpgradeDialog check for the same "new vs. reconnect" split.
+  const auth = isReconnect ? await requireHouseholdMember(householdId) : await requireHouseholdPlan(householdId, PAID_SUBSCRIPTION_TIERS);
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   let accessToken: string | undefined;

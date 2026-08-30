@@ -100,6 +100,7 @@ export default function SettingsPage() {
         <SettingsRow icon="printer" label="Label printing" sublabel="Container ID labels" href="/desktop/labels" />
         <SettingsRow icon="upload" label="Import CSV" sublabel="Items or transactions" href="/import" />
         <SettingsRow icon="bell" label="Notifications" sublabel="Bill reminders and more" href="/settings/notifications" />
+        <SettingsRow icon="creditCard" label="Billing" sublabel={`Current plan: ${household.subscriptionTier === "free" ? "Free" : household.subscriptionTier === "plus" ? "Plus" : "Pro"}`} href="/settings/billing" />
         <SettingsRow icon="attachment" label="Email Receipts" sublabel="Forward purchases with no physical receipt" href="/settings/email-receipts" />
         <SettingsRow icon="download" label="Data & Export" sublabel="CSV, PDF, JSON" href="/settings/export" />
         <SettingsRow icon="shieldCheck" label="Privacy Policy" href="/privacy" />
