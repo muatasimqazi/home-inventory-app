@@ -13,8 +13,8 @@ import { EmptyState } from "@/components/empty-state";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { RecurringBillFormSheet } from "@/components/recurring-bill-form-sheet";
 import { useInventoryStore } from "@/lib/store";
-import { upcomingRecurringBills, upcomingDebtPaymentBills, daysUntil } from "@/lib/selectors";
-import { formatCurrency } from "@/lib/format";
+import { upcomingRecurringBills, upcomingDebtPaymentBills, daysUntil, advanceDueDate } from "@/lib/selectors";
+import { formatCurrency, formatShortDate } from "@/lib/format";
 import { useRemountKey } from "@/hooks/use-remount-key";
 import type { RecurringBill } from "@/lib/types";
 
@@ -48,6 +48,18 @@ export default function RecurringBillsPage() {
   const otherMembers = members.filter((m) => m.userId !== currentUserId);
   const editingBill = recurringBills.find((b) => b.id === editingId);
   const editingShares = financeBillShares.filter((s) => s.billId === editingId);
+
+  // Lightweight by design (PRD §18's "manual only" recurring bills stay
+  // separate from the transaction ledger) — just moves next_due_date
+  // forward one period so this occurrence stops showing as due and the
+  // reminder cron doesn't re-fire for it, same as toggling a checklist
+  // item. Doesn't create a transaction; a bill already tracked via Plaid
+  // sync or logged separately would otherwise get double-counted.
+  function markPaid(bill: RecurringBill) {
+    const nextDueDate = advanceDueDate(bill.nextDueDate, bill.frequency);
+    updateRecurringBill(bill.id, { nextDueDate });
+    toast.success(`Marked ${bill.name} as paid — next due ${formatShortDate(nextDueDate)}`);
+  }
 
   function applySharing(billId: string, isPersonal: boolean, nextIds: string[], previousShares: { sharedWithUserId: string }[]) {
     if (!isPersonal) {
@@ -105,7 +117,15 @@ export default function RecurringBillsPage() {
               </div>
               <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
                 {debtBills.map((b) => (
-                  <BillRow key={b.id} bill={b} icon="creditCard" tone="yellow" onEdit={() => setEditingId(b.id)} onTrash={() => setTrashConfirmId(b.id)} />
+                  <BillRow
+                    key={b.id}
+                    bill={b}
+                    icon="creditCard"
+                    tone="yellow"
+                    onEdit={() => setEditingId(b.id)}
+                    onTrash={() => setTrashConfirmId(b.id)}
+                    onMarkPaid={() => markPaid(b)}
+                  />
                 ))}
               </div>
             </section>
@@ -116,7 +136,15 @@ export default function RecurringBillsPage() {
               {debtBills.length > 0 && <h2 className="text-section-title font-medium text-ink">Other Bills</h2>}
               <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
                 {otherBills.map((b) => (
-                  <BillRow key={b.id} bill={b} icon="repeat" tone="muted" onEdit={() => setEditingId(b.id)} onTrash={() => setTrashConfirmId(b.id)} />
+                  <BillRow
+                    key={b.id}
+                    bill={b}
+                    icon="repeat"
+                    tone="muted"
+                    onEdit={() => setEditingId(b.id)}
+                    onTrash={() => setTrashConfirmId(b.id)}
+                    onMarkPaid={() => markPaid(b)}
+                  />
                 ))}
               </div>
             </section>
@@ -190,12 +218,14 @@ function BillRow({
   tone,
   onEdit,
   onTrash,
+  onMarkPaid,
 }: {
   bill: RecurringBill;
   icon: "creditCard" | "repeat";
   tone: "yellow" | "muted";
   onEdit: () => void;
   onTrash: () => void;
+  onMarkPaid: () => void;
 }) {
   const days = daysUntil(bill.nextDueDate);
   return (
@@ -214,7 +244,18 @@ function BillRow({
         </div>
       </button>
       <span className="shrink-0 text-body font-semibold text-ink">{formatCurrency(bill.expectedAmount)}</span>
-      <button type="button" onClick={onTrash} aria-label={`Trash ${bill.name}`} className="shrink-0 text-muted-foreground">
+      {/* Advances next_due_date to the following period — see markPaid's
+          own comment on why this stays a lightweight toggle (no
+          transaction created) rather than a full payment-logging flow. */}
+      <button
+        type="button"
+        onClick={onMarkPaid}
+        aria-label={`Mark ${bill.name} as paid`}
+        className="tap-target flex size-9 shrink-0 items-center justify-center rounded-full bg-badge-green-bg text-badge-green-text"
+      >
+        <Icon name="check" size={16} />
+      </button>
+      <button type="button" onClick={onTrash} aria-label={`Trash ${bill.name}`} className="tap-target flex size-9 shrink-0 items-center justify-center text-muted-foreground">
         <Icon name="trash" size={16} />
       </button>
     </div>

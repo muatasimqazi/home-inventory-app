@@ -1,4 +1,4 @@
-import type { Account, AccountType, ActivityLogEntry, CategoryBudget, Container, FinanceCategory, Item, Location, RecurringBill, Tag, Transaction, TransactionCategory } from "./types";
+import type { Account, AccountType, ActivityLogEntry, CategoryBudget, Container, FinanceCategory, Item, Location, RecurringBill, RecurringBillFrequency, Tag, Transaction, TransactionCategory } from "./types";
 import { formatCurrency, parseCalendarDate } from "./format";
 import { normalizeMerchant } from "./recurring-detection";
 
@@ -329,6 +329,37 @@ export function contextualCaptureHref(pathname: string, containers: Container[])
 export function daysUntil(dateIso: string): number {
   const diff = new Date(dateIso).getTime() - Date.now();
   return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+}
+
+/**
+ * Advances a recurring bill's due date by one period of its frequency —
+ * used when marking a bill paid, to move the reminder to the next
+ * occurrence instead of waiting for the date to actually pass (send-due-
+ * bills' own cron keys its "already reminded for this occurrence" check
+ * off next_due_date, so this is also what stops today's reminder from
+ * re-firing once paid).
+ *
+ * Calendar-based for monthly/quarterly/yearly, not day-counted: a bill
+ * due the 31st needs to land on the last real day of a shorter month
+ * next time (Jan 31 monthly -> Feb 28, not the "roll over into March"
+ * behavior plain Date.setMonth arithmetic would otherwise produce),
+ * matching how a real due-date actually recurs.
+ */
+export function advanceDueDate(dateIso: string, frequency: RecurringBillFrequency): string {
+  const [year, month, day] = dateIso.split("-").map(Number);
+
+  if (frequency === "weekly" || frequency === "biweekly") {
+    const daysToAdd = frequency === "weekly" ? 7 : 14;
+    return new Date(Date.UTC(year, month - 1, day + daysToAdd)).toISOString().slice(0, 10);
+  }
+
+  const monthsToAdd = frequency === "monthly" ? 1 : frequency === "quarterly" ? 3 : 12;
+  const totalMonths = month - 1 + monthsToAdd;
+  const targetYear = year + Math.floor(totalMonths / 12);
+  const targetMonth = totalMonths % 12; // 0-indexed
+  const lastDayOfTargetMonth = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+  const clampedDay = Math.min(day, lastDayOfTargetMonth);
+  return new Date(Date.UTC(targetYear, targetMonth, clampedDay)).toISOString().slice(0, 10);
 }
 
 // ---------------------------------------------------------------------------
