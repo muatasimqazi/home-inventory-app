@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 // Guaranteed-unauthenticated routes per src/proxy.ts's own PUBLIC_PATHS —
 // hydrate() would just hit the "not signed in" branch here, so skip it
 // entirely rather than waste a round trip.
-const PUBLIC_PATHS = ["/sign-in", "/auth/callback"];
+const PUBLIC_PATHS = ["/sign-in", "/reset-password", "/auth/callback"];
 
 /**
  * Runs hydrate() once for every real route in the app — not just the

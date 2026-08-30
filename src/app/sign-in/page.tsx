@@ -133,6 +133,11 @@ function SignInInner() {
             <Button size="lg" onClick={submitEmailForm} disabled={!email || !password}>
               {authAction === "signup" ? "Create account" : "Continue"}
             </Button>
+            {authAction === "signin" && (
+              <button type="button" onClick={() => router.push("/reset-password")} className="text-caption text-muted-foreground">
+                Forgot password?
+              </button>
+            )}
             <button
               type="button"
               onClick={() => {

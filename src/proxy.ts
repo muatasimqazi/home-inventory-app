@@ -40,6 +40,7 @@ import { NextResponse, type NextRequest } from "next/server";
 // completely correct and it'll still never fire.
 const PUBLIC_PATHS = [
   "/sign-in",
+  "/reset-password",
   "/auth/callback",
   "/api/v1/webhooks",
   "/api/v1/plaid/sync-all",
