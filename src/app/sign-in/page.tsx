@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Icon } from "@/components/icon";
 import { Button } from "@/components/ui/button";
@@ -178,7 +179,17 @@ function SignInInner() {
           </div>
         )}
 
-        <p className="text-center text-micro text-muted-foreground">By continuing, you agree this is a demo build of Schuaz.</p>
+        <p className="text-center text-micro text-muted-foreground">
+          By continuing, you agree to Schuaz&apos;s{" "}
+          <Link href="/terms" className="underline underline-offset-2">
+            Terms
+          </Link>{" "}
+          and{" "}
+          <Link href="/privacy" className="underline underline-offset-2">
+            Privacy Policy
+          </Link>
+          .
+        </p>
       </div>
     </div>
   );

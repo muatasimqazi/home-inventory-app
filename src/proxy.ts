@@ -41,6 +41,8 @@ import { NextResponse, type NextRequest } from "next/server";
 const PUBLIC_PATHS = [
   "/sign-in",
   "/reset-password",
+  "/privacy",
+  "/terms",
   "/auth/callback",
   "/api/v1/webhooks",
   "/api/v1/plaid/sync-all",

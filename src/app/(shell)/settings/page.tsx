@@ -102,6 +102,8 @@ export default function SettingsPage() {
         <SettingsRow icon="bell" label="Notifications" sublabel="Bill reminders and more" href="/settings/notifications" />
         <SettingsRow icon="attachment" label="Email Receipts" sublabel="Forward purchases with no physical receipt" href="/settings/email-receipts" />
         <SettingsRow icon="download" label="Data & Export" sublabel="CSV, PDF, JSON" href="/settings/export" />
+        <SettingsRow icon="shieldCheck" label="Privacy Policy" href="/privacy" />
+        <SettingsRow icon="file" label="Terms of Service" href="/terms" />
         <SettingsRow icon="tag" label="Tags" sublabel={`${tags.length} tags`} href="/tags" />
         <SettingsRow icon="needsReview" label="Needs-Review Queue" href="/review" />
         <SettingsRow icon="activity" label="Activity Feed" href="/activity" />
