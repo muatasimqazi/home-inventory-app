@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
-  <title id="title">Shohaz app icon (maskable)</title>
+  <title id="title">Schuaz app icon (maskable)</title>
   <desc id="desc">Full-bleed teal background with the roofline-and-inventory-grid mark scaled into the safe zone, for platforms that crop app icons into a circle/squircle (Android adaptive icons).</desc>
   <!-- Full-bleed background, no inset/rounding of its own — the OS applies
        its own mask shape on top, so any transparent or white margin here

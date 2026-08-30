@@ -68,7 +68,7 @@ export function DesktopSidebar() {
         <img src="/icon.svg" alt="" width={36} height={36} className="size-9 shrink-0 rounded-[10px]" />
         {!collapsed && (
           <div className="min-w-0 flex-1">
-            <p className="text-body font-semibold text-ink">Shohaz</p>
+            <p className="text-body font-semibold text-ink">Schuaz</p>
             <p className="truncate text-caption text-muted-foreground">{household.name}</p>
           </div>
         )}

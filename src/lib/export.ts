@@ -49,7 +49,7 @@ export function buildLabelPdfManifest(batch: LabelBatch | null, entries: LabelBa
     labels: entries.map((e) => ({ tagToken: e.tagToken, displayCode: e.displayCode, containerId: e.containerId })),
   };
   return {
-    fileName: `shohaz-label-pdf-manifest-${new Date().toISOString().slice(0, 10)}.json`,
+    fileName: `schuaz-label-pdf-manifest-${new Date().toISOString().slice(0, 10)}.json`,
     content: JSON.stringify(manifest, null, 2),
     mimeType: "application/json",
     mock: true,

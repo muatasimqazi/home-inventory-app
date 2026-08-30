@@ -187,7 +187,7 @@ export default function CsvImportPage() {
 
       {stage === "mapping" && (
         <div className="flex flex-col gap-4 rounded-xl bg-white p-5 shadow-sm">
-          <p className="text-caption text-muted-foreground">{rows.length} rows found. Map your CSV columns to Shohaz fields.</p>
+          <p className="text-caption text-muted-foreground">{rows.length} rows found. Map your CSV columns to Schuaz fields.</p>
           <div className="grid grid-cols-2 gap-3">
             {SHOHAZ_FIELDS.map((field) => (
               <div key={field.key}>

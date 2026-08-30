@@ -28,7 +28,7 @@ export default function DataExportPage() {
 
   function buildInventoryCsv(): ExportResult {
     return {
-      fileName: `shohaz-inventory-${dateStamp}.csv`,
+      fileName: `schuaz-inventory-${dateStamp}.csv`,
       content: itemsToCsv(items, containers, locations, tags),
       mimeType: "text/csv",
     };
@@ -43,7 +43,7 @@ export default function DataExportPage() {
         .map((it) => ({ itemId: it.id, name: it.name, photoPlaceholder: it.photoEmoji })),
     };
     return {
-      fileName: `shohaz-photo-archive-manifest-${dateStamp}.json`,
+      fileName: `schuaz-photo-archive-manifest-${dateStamp}.json`,
       content: JSON.stringify(manifest, null, 2),
       mimeType: "application/json",
       mock: true,
@@ -70,7 +70,7 @@ export default function DataExportPage() {
       labelBatchEntries,
     });
     return {
-      fileName: `shohaz-household-export-${dateStamp}.json`,
+      fileName: `schuaz-household-export-${dateStamp}.json`,
       content: JSON.stringify(snapshot, null, 2),
       mimeType: "application/json",
     };

@@ -13,7 +13,7 @@ import type { MetadataRoute } from "next";
 // wholesale, though — it was exported for a generically-named "Home
 // Inventory" placeholder (different name/description, teal
 // background_color/theme_color) rather than this app's actual identity, so
-// name/description/colors below stay Shohaz's own (white/near-black,
+// name/description/colors below stay Schuaz's own (white/near-black,
 // updated to the v3 sage/neutral palette — see the design-language
 // reference) rather than switching the whole app's theme to match the
 // icon art.
@@ -25,8 +25,8 @@ import type { MetadataRoute } from "next";
 // manual metadata needed).
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Shohaz",
-    short_name: "Shohaz",
+    name: "Schuaz",
+    short_name: "Schuaz",
     description: "Catalog, search, and locate everything in your home.",
     start_url: "/",
     display: "standalone",

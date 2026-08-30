@@ -282,7 +282,7 @@ function SetupScreen({
             <div className="min-w-0 flex-1">
               <p className="text-body font-semibold text-ink">iPhone can&apos;t write NFC tags directly</p>
               <p className="mt-1 text-caption text-muted-foreground">
-                Write this container&apos;s link using Shohaz on an Android phone, or any third-party NFC writer app — once
+                Write this container&apos;s link using Schuaz on an Android phone, or any third-party NFC writer app — once
                 written, tapping the tag opens it on any iPhone natively, no app or setup step needed.
               </p>
             </div>
@@ -347,7 +347,7 @@ function QrOnlyScreen({ code, resolveUrl, container }: { code: string; resolveUr
       <div>
         <h2 className="text-screen-title font-semibold text-ink">Print QR label</h2>
         <p className="mt-1 text-body text-muted-foreground">
-          This device cannot link NFC tags. Use a QR label, or open Shohaz on a supported phone.
+          This device cannot link NFC tags. Use a QR label, or open Schuaz on a supported phone.
         </p>
       </div>
 
@@ -367,7 +367,7 @@ function QrOnlyScreen({ code, resolveUrl, container }: { code: string; resolveUr
         </span>
         <div>
           <p className="text-body font-semibold text-ink">Want NFC too?</p>
-          <p className="mt-1 text-caption text-muted-foreground">Use Shohaz on a supported phone to write or link tags.</p>
+          <p className="mt-1 text-caption text-muted-foreground">Use Schuaz on a supported phone to write or link tags.</p>
         </div>
       </div>
     </>
@@ -379,7 +379,7 @@ function WritingScreen({ code, resolveUrl, writing }: { code: string; resolveUrl
     <>
       <div>
         <h2 className="text-screen-title font-semibold text-ink">Write container link to tag</h2>
-        <p className="mt-1 text-body text-muted-foreground">This writes a direct Shohaz container link onto a writable NFC tag.</p>
+        <p className="mt-1 text-body text-muted-foreground">This writes a direct Schuaz container link onto a writable NFC tag.</p>
       </div>
 
       <div className="flex items-center justify-between rounded-2xl border border-border bg-white p-4 shadow-sm">

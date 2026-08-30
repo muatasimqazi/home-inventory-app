@@ -53,7 +53,7 @@ const LOCATIONS_PREVIEW_LIMIT = 6;
 
 /**
  * The former Home page was an inventory-only dashboard living at "/" —
- * fine while Shohaz had one domain, but a household-hub home needs to
+ * fine while Schuaz had one domain, but a household-hub home needs to
  * represent every domain, not lead with one. This is that: a cross-domain
  * Overview (Household Hub Addendum §6's "what needs attention" view) with
  * a Home Inventory section (the old Home page's content, now scoped under
@@ -275,7 +275,7 @@ export default function OverviewPage() {
             <EmptyState
               icon="camera"
               title="Start cataloging your home"
-              description="Capture a few items and Shohaz will remember exactly where they live."
+              description="Capture a few items and Schuaz will remember exactly where they live."
               action={
                 <Link
                   href="/capture"

@@ -13,7 +13,7 @@ import { useCurrentHousehold } from "@/lib/store";
 // deliberate action requiring a newly-verified Resend domain, not
 // something either file should read from a shared env var that could
 // drift out of sync with what's actually configured there).
-const RECEIPTS_DOMAIN = "receipts.shohaz.muatasim.com";
+const RECEIPTS_DOMAIN = "receipts.schuaz.com";
 
 /**
  * Email Receipts (Bugs & Features backlog, item 8) — shows the

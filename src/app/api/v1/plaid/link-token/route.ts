@@ -42,7 +42,7 @@ export async function POST(request: Request) {
   try {
     const plaidClient = getPlaidClient();
     const response = await plaidClient.linkTokenCreate({
-      client_name: "Shohaz",
+      client_name: "Schuaz",
       language: "en",
       country_codes: [CountryCode.Us],
       user: { client_user_id: householdId },

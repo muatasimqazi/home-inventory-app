@@ -36,7 +36,7 @@ const EVENT_TYPES: { domainKey: string; eventType: string; label: string; descri
     domainKey: "activity",
     eventType: "household.activity",
     label: "Household activity",
-    description: "Every change anyone makes in Shohaz — including your own",
+    description: "Every change anyone makes in Schuaz — including your own",
   },
 ];
 
@@ -123,9 +123,9 @@ export default function NotificationSettingsPage() {
             <p className="text-caption text-muted-foreground">
               {state === "checking" && "Checking…"}
               {state === "unsupported" && "Notifications aren't supported in this browser."}
-              {state === "denied" && "Blocked — enable notifications for Shohaz in your browser or OS settings, then try again."}
+              {state === "denied" && "Blocked — enable notifications for Schuaz in your browser or OS settings, then try again."}
               {state === "subscribed" && "Notifications are on for this device."}
-              {state === "not-subscribed" && "Off. Turn on to get reminders (like bills due soon) even when Shohaz isn't open."}
+              {state === "not-subscribed" && "Off. Turn on to get reminders (like bills due soon) even when Schuaz isn't open."}
             </p>
           </div>
         </div>
@@ -169,7 +169,7 @@ export default function NotificationSettingsPage() {
       )}
 
       <p className="text-center text-micro text-muted-foreground">
-        Push only reaches devices that have Shohaz installed (added to your home screen) and notifications enabled — everything above is
+        Push only reaches devices that have Schuaz installed (added to your home screen) and notifications enabled — everything above is
         always visible in-app too.
       </p>
     </div>

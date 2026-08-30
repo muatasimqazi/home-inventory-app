@@ -242,7 +242,7 @@ function WardrobeCaptureInner() {
               <div>
                 <p className="text-item-title font-semibold text-ink">Camera access is off</p>
                 <p className="mt-1 text-body text-muted-foreground">
-                  Enable camera access for Shohaz in your browser settings to scan a wardrobe item.
+                  Enable camera access for Schuaz in your browser settings to scan a wardrobe item.
                 </p>
               </div>
             </div>

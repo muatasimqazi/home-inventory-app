@@ -6,7 +6,7 @@ import { DomainGate } from "@/components/domain-gate";
 import { PhotoLightbox } from "@/components/photo-lightbox";
 
 export const metadata: Metadata = {
-  title: "Shohaz",
+  title: "Schuaz",
   description: "Catalog, search, and locate everything in your home.",
   // favicon.ico, icon.svg, and apple-icon.png in this same app/ directory
   // are Next's file-convention icons (see app-icons.md), auto-detected and
@@ -24,7 +24,7 @@ export const metadata: Metadata = {
   // without it "Add to Home Screen" just opens a normal tab.
   appleWebApp: {
     capable: true,
-    title: "Shohaz",
+    title: "Schuaz",
     statusBarStyle: "black-translucent",
   },
 };

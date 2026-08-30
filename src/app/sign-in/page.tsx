@@ -85,7 +85,7 @@ function SignInInner() {
         <div className="flex flex-col items-center gap-3 text-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/icon.svg" alt="" width={56} height={56} className="size-14 rounded-2xl" />
-          <p className="text-display font-semibold text-ink">Shohaz</p>
+          <p className="text-display font-semibold text-ink">Schuaz</p>
           <p className="text-body text-muted-foreground">Find anything you own, in seconds.</p>
         </div>
 
@@ -178,7 +178,7 @@ function SignInInner() {
           </div>
         )}
 
-        <p className="text-center text-micro text-muted-foreground">By continuing, you agree this is a demo build of Shohaz.</p>
+        <p className="text-center text-micro text-muted-foreground">By continuing, you agree this is a demo build of Schuaz.</p>
       </div>
     </div>
   );

@@ -23,7 +23,7 @@ export const runtime = "nodejs";
 // re-verifying a new domain in Resend and updating every household's
 // already-shared address, a deliberate action, not a deploy-time config
 // swap.
-const RECEIPTS_DOMAIN = "receipts.shohaz.muatasim.com";
+const RECEIPTS_DOMAIN = "receipts.schuaz.com";
 
 function toCents(dollars: number | null | undefined): number | null {
   if (dollars === null || dollars === undefined || Number.isNaN(dollars)) return null;

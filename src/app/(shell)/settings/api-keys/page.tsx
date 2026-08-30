@@ -140,7 +140,7 @@ export default function ApiKeysPage() {
       )}
 
       {activeKeys.length === 0 && !revealed ? (
-        <EmptyState icon="key" title="No API keys yet" description="Generate one to connect Shohaz to Home Assistant or Shortcuts." />
+        <EmptyState icon="key" title="No API keys yet" description="Generate one to connect Schuaz to Home Assistant or Shortcuts." />
       ) : (
         activeKeys.length > 0 && (
           <div className="rounded-xl bg-white shadow-sm">
