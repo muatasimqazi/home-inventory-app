@@ -20,10 +20,12 @@ export const runtime = "nodejs";
 
 // The subdomain configured as this app's inbound-email receiving domain
 // in Resend's dashboard — every household's forwarding address is
-// `${receiptsToken}@${RECEIPTS_DOMAIN}`. Not an env var: changing it means
-// re-verifying a new domain in Resend and updating every household's
-// already-shared address, a deliberate action, not a deploy-time config
-// swap.
+// `${receiptsToken}@${RECEIPTS_DOMAIN}`. A dedicated subdomain, not the
+// bare domain, so schuaz.com's own MX stays free for a real
+// human-monitored inbox later if wanted. Not an env var: changing it
+// means re-verifying a new domain in Resend and updating every
+// household's already-shared address, a deliberate action, not a
+// deploy-time config swap.
 const RECEIPTS_DOMAIN = "receipts.schuaz.com";
 
 function toCents(dollars: number | null | undefined): number | null {

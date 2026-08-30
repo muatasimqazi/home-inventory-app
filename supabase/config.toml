@@ -233,26 +233,58 @@ otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 
-# Use a production-ready SMTP server
-# [auth.email.smtp]
-# enabled = true
-# host = "smtp.sendgrid.net"
-# port = 587
-# user = "apikey"
-# pass = "env(SENDGRID_API_KEY)"
-# admin_email = "admin@email.com"
-# sender_name = "Admin"
+# Routes local dev's Auth emails through Resend too, same provider and
+# sender identity as production (set live via the Management API, not
+# through this file — see this section's own note above the templates
+# below) — smtp.resend.com's username is always the literal string
+# "resend", the password is the Resend API key itself.
+[auth.email.smtp]
+enabled = true
+host = "smtp.resend.com"
+port = 465
+user = "resend"
+pass = "env(RESEND_API_KEY)"
+admin_email = "noreply@schuaz.com"
+sender_name = "Schuaz"
 
-# Uncomment to customize email template
-# [auth.email.template.invite]
-# subject = "You have been invited"
-# content_path = "./supabase/templates/invite.html"
+# Schuaz-branded Auth emails. These paths are used by the local Supabase
+# stack; hosted production templates still need to be applied in the
+# Supabase Dashboard or through the Management API — scripts/update-
+# supabase-auth-email-templates.ts does exactly that, and already has
+# (2026-08-30: pushed live, subjects/bodies confirmed matching).
+[auth.email.template.confirmation]
+subject = "Confirm your Schuaz email"
+content_path = "./supabase/templates/auth/confirmation.html"
 
-# Uncomment to customize notification email template
-# [auth.email.notification.password_changed]
-# enabled = true
-# subject = "Your password has been changed"
-# content_path = "./templates/password_changed_notification.html"
+[auth.email.template.recovery]
+subject = "Reset your Schuaz password"
+content_path = "./supabase/templates/auth/recovery.html"
+
+[auth.email.template.magic_link]
+subject = "Sign in to Schuaz"
+content_path = "./supabase/templates/auth/magic-link.html"
+
+[auth.email.template.invite]
+subject = "You are invited to Schuaz"
+content_path = "./supabase/templates/auth/invite.html"
+
+[auth.email.template.email_change]
+subject = "Confirm your new Schuaz email"
+content_path = "./supabase/templates/auth/email-change.html"
+
+[auth.email.template.reauthentication]
+subject = "Your Schuaz verification code"
+content_path = "./supabase/templates/auth/reauthentication.html"
+
+[auth.email.notification.password_changed]
+enabled = true
+subject = "Your Schuaz password was changed"
+content_path = "./supabase/templates/auth/password-changed.html"
+
+[auth.email.notification.email_changed]
+enabled = true
+subject = "Your Schuaz email was changed"
+content_path = "./supabase/templates/auth/email-changed.html"
 
 [auth.sms]
 # Allow/disallow new user signups via SMS to your project.
