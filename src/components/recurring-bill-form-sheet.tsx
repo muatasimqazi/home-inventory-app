@@ -29,6 +29,8 @@ interface RecurringBillFormSheetProps {
   categories: FinanceCategory[];
   otherMembers: Member[];
   initialSharedWithUserIds?: string[];
+  /** Just requests confirmation — the parent owns the actual trash + its own ConfirmDialog, same pattern as LineItemFormSheet's onRequestDelete. Irrelevant in create mode — a not-yet-saved bill has nothing to trash, so this (and the button below) only apply when `initial` is set. */
+  onRequestTrash?: () => void;
   onSubmit: (values: {
     name: string;
     expectedAmount: number;
@@ -66,6 +68,7 @@ export function RecurringBillFormSheet({
   categories,
   otherMembers,
   initialSharedWithUserIds = [],
+  onRequestTrash,
   onSubmit,
 }: RecurringBillFormSheetProps) {
   const [name, setName] = useState(initial?.name ?? "");
@@ -274,6 +277,12 @@ export function RecurringBillFormSheet({
           <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={handleSubmit}>
             Save
           </Button>
+
+          {initial && onRequestTrash && (
+            <Button variant="outline" className="border-danger/30 text-danger" onClick={onRequestTrash}>
+              <Icon name="trash" size={16} /> Move to Trash
+            </Button>
+          )}
         </div>
       </SheetContent>
     </Sheet>

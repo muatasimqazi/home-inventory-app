@@ -117,15 +117,7 @@ export default function RecurringBillsPage() {
               </div>
               <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
                 {debtBills.map((b) => (
-                  <BillRow
-                    key={b.id}
-                    bill={b}
-                    icon="creditCard"
-                    tone="yellow"
-                    onEdit={() => setEditingId(b.id)}
-                    onTrash={() => setTrashConfirmId(b.id)}
-                    onMarkPaid={() => markPaid(b)}
-                  />
+                  <BillRow key={b.id} bill={b} icon="creditCard" tone="yellow" onEdit={() => setEditingId(b.id)} onMarkPaid={() => markPaid(b)} />
                 ))}
               </div>
             </section>
@@ -136,15 +128,7 @@ export default function RecurringBillsPage() {
               {debtBills.length > 0 && <h2 className="text-section-title font-medium text-ink">Other Bills</h2>}
               <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
                 {otherBills.map((b) => (
-                  <BillRow
-                    key={b.id}
-                    bill={b}
-                    icon="repeat"
-                    tone="muted"
-                    onEdit={() => setEditingId(b.id)}
-                    onTrash={() => setTrashConfirmId(b.id)}
-                    onMarkPaid={() => markPaid(b)}
-                  />
+                  <BillRow key={b.id} bill={b} icon="repeat" tone="muted" onEdit={() => setEditingId(b.id)} onMarkPaid={() => markPaid(b)} />
                 ))}
               </div>
             </section>
@@ -175,6 +159,7 @@ export default function RecurringBillsPage() {
           categories={financeCategories}
           otherMembers={otherMembers}
           initialSharedWithUserIds={editingShares.map((s) => s.sharedWithUserId)}
+          onRequestTrash={() => setTrashConfirmId(editingBill.id)}
           onSubmit={(values) => {
             updateRecurringBill(editingBill.id, {
               name: values.name,
@@ -211,20 +196,25 @@ export default function RecurringBillsPage() {
   );
 }
 
-/** Shared row shape for both the "Credit Cards & Loans" and "Other Bills" sections — everything but the icon/tone and which section it's in is identical. */
+/**
+ * Shared row shape for both the "Credit Cards & Loans" and "Other Bills"
+ * sections — everything but the icon/tone and which section it's in is
+ * identical. Trashing lives inside the edit sheet (RecurringBillFormSheet's
+ * own "Move to Trash" button) rather than as a row-level icon — one
+ * clearly-labeled action per row (Mark as paid) instead of stacking a
+ * second icon-only button next to it that read as clutter.
+ */
 function BillRow({
   bill,
   icon,
   tone,
   onEdit,
-  onTrash,
   onMarkPaid,
 }: {
   bill: RecurringBill;
   icon: "creditCard" | "repeat";
   tone: "yellow" | "muted";
   onEdit: () => void;
-  onTrash: () => void;
   onMarkPaid: () => void;
 }) {
   const days = daysUntil(bill.nextDueDate);
@@ -247,17 +237,9 @@ function BillRow({
       {/* Advances next_due_date to the following period — see markPaid's
           own comment on why this stays a lightweight toggle (no
           transaction created) rather than a full payment-logging flow. */}
-      <button
-        type="button"
-        onClick={onMarkPaid}
-        aria-label={`Mark ${bill.name} as paid`}
-        className="tap-target flex size-9 shrink-0 items-center justify-center rounded-full bg-badge-green-bg text-badge-green-text"
-      >
-        <Icon name="check" size={16} />
-      </button>
-      <button type="button" onClick={onTrash} aria-label={`Trash ${bill.name}`} className="tap-target flex size-9 shrink-0 items-center justify-center text-muted-foreground">
-        <Icon name="trash" size={16} />
-      </button>
+      <Button variant="outline" size="sm" className="shrink-0 border-badge-green-border text-badge-green-text hover:bg-badge-green-bg" onClick={onMarkPaid}>
+        Mark as paid
+      </Button>
     </div>
   );
 }
