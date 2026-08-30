@@ -78,7 +78,7 @@ export function AskFab() {
         onClick={togglePanel}
         aria-label={open ? "Close Ask" : "Ask"}
         className={cn(
-          "tap-target fixed z-40 flex size-14 items-center justify-center rounded-full bg-ink text-white shadow-lg transition-transform active:scale-95 print:hidden",
+          "tap-target fixed z-40 flex size-14 items-center justify-center rounded-full bg-ink-fill text-white shadow-lg transition-transform active:scale-95 print:hidden",
           "right-4 bottom-[calc(4.375rem+env(safe-area-inset-bottom)+0.75rem)]",
           "md:right-6 md:bottom-6"
         )}
@@ -102,7 +102,7 @@ export function AskFab() {
           // via the class anyway — the transform is a harmless no-op there.
           style={{ transform: keyboardInset > 0 ? `translateY(-${keyboardInset}px)` : undefined }}
         >
-          <div className="flex shrink-0 items-center gap-2 border-b border-border bg-white px-4 py-3">
+          <div className="flex shrink-0 items-center gap-2 border-b border-border bg-card px-4 py-3">
             <Icon name="ai" size={18} className="text-yellow" />
             <p className="text-body font-semibold text-ink">Ask</p>
           </div>
@@ -116,7 +116,7 @@ export function AskFab() {
                     key={q}
                     type="button"
                     onClick={() => ask(q)}
-                    className="tap-target flex items-center gap-2 rounded-2xl border border-border bg-white px-3 py-2.5 text-left text-caption text-ink shadow-sm"
+                    className="tap-target flex items-center gap-2 rounded-2xl border border-border bg-card px-3 py-2.5 text-left text-caption text-ink shadow-sm"
                   >
                     <Icon name="ai" size={13} className="shrink-0 text-yellow" />
                     {q}
@@ -134,7 +134,7 @@ export function AskFab() {
               e.preventDefault();
               submit(input);
             }}
-            className="flex shrink-0 gap-2 border-t border-border bg-white p-3"
+            className="flex shrink-0 gap-2 border-t border-border bg-card p-3"
           >
             <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask anything…" className="h-10 flex-1 text-caption" />
             <Button type="submit" size="icon" className={cn(!input.trim() && "opacity-50")} disabled={!input.trim()} aria-label="Send">

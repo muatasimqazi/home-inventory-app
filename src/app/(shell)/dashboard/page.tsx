@@ -141,7 +141,7 @@ export default function OverviewPage() {
           >
             <Icon name="plus" size={20} />
           </button>
-          <Link href="/activity" aria-label="Activity" className="tap-target relative flex size-11 items-center justify-center rounded-md border border-border bg-white">
+          <Link href="/activity" aria-label="Activity" className="tap-target relative flex size-11 items-center justify-center rounded-md border border-border bg-card">
             <Icon name="bell" size={20} className="text-ink" />
             <ReviewBadge count={unreadCount} className="absolute -right-1 -top-1 bg-danger" />
           </Link>
@@ -158,7 +158,7 @@ export default function OverviewPage() {
           toggle that actually affects them. A plain card, not a grid, now
           that it's never more than this one tile. */}
       {household.inventoryEnabled && (
-        <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
           <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">Inventory</p>
           <p className="mt-1 text-item-title font-semibold text-ink">
             {summary.totalActiveItems} item{summary.totalActiveItems === 1 ? "" : "s"}
@@ -188,7 +188,7 @@ export default function OverviewPage() {
           </div>
         </div>
       ) : (
-        <div className="flex items-center gap-2 rounded-2xl border border-border bg-white px-4 py-3 shadow-sm">
+        <div className="flex items-center gap-2 rounded-2xl border border-border bg-card px-4 py-3 shadow-sm">
           <Icon name="check" size={16} className="shrink-0 text-badge-green-text" />
           <p className="text-caption text-muted-foreground">All caught up — nothing needs attention right now.</p>
         </div>
@@ -218,7 +218,7 @@ export default function OverviewPage() {
                   <Link
                     key={loc.id}
                     href={`/locations/${loc.id}`}
-                    className="tap-target flex items-stretch gap-2.5 overflow-hidden rounded-2xl border border-border bg-white shadow-sm"
+                    className="tap-target flex items-stretch gap-2.5 overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
                   >
                     {/* Edge-to-edge top-to-bottom (and flush left) — no
                         padding around the photo itself, unlike the rest of
@@ -332,7 +332,7 @@ export default function OverviewPage() {
         {activeItems.length >= ONBOARDING_THRESHOLD && latestActivity ? (
           <Link
             href="/activity"
-            className="flex items-center justify-between rounded-[10px] border border-border bg-white px-4 py-3 text-caption"
+            className="flex items-center justify-between rounded-[10px] border border-border bg-card px-4 py-3 text-caption"
           >
             <span className="truncate text-muted-foreground">
               {actor?.displayName ?? "Someone"} {latestActivity.action} {latestActivity.entityName}
@@ -363,7 +363,7 @@ export default function OverviewPage() {
             onClick={() => setView("mine")}
             className={cn(
               "rounded-md px-4 py-1.5 text-caption font-semibold transition-colors",
-              view === "mine" ? "bg-white text-yellow shadow-sm" : "text-muted-foreground"
+              view === "mine" ? "bg-card text-yellow shadow-sm" : "text-muted-foreground"
             )}
           >
             My Dashboard
@@ -373,7 +373,7 @@ export default function OverviewPage() {
             onClick={() => setView("household")}
             className={cn(
               "rounded-md px-4 py-1.5 text-caption font-semibold transition-colors",
-              view === "household" ? "bg-white text-yellow shadow-sm" : "text-muted-foreground"
+              view === "household" ? "bg-card text-yellow shadow-sm" : "text-muted-foreground"
             )}
           >
             Household
@@ -385,13 +385,13 @@ export default function OverviewPage() {
             to the toggle above, since these are exactly the two numbers
             that toggle affects (My Dashboard vs. Household scoping). */}
         <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
+          <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
             <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">Net Worth</p>
             <p className="mt-1 text-item-title font-semibold text-ink">{formatCurrency(worth)}</p>
             <p className="mt-0.5 text-caption text-muted-foreground">Trend needs a few weeks</p>
           </div>
 
-          <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
+          <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
             <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">Cash Flow · This Month</p>
             <div className="mt-1.5 flex items-center gap-4">
               <div>
@@ -415,11 +415,11 @@ export default function OverviewPage() {
               </Link>
             </div>
             {accountGroups.length === 0 ? (
-              <p className="rounded-2xl border border-dashed border-border bg-white p-4 text-center text-caption text-muted-foreground">
+              <p className="rounded-2xl border border-dashed border-border bg-card p-4 text-center text-caption text-muted-foreground">
                 No accounts yet — add one from Finance.
               </p>
             ) : (
-              <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
+              <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-card shadow-sm">
                 {accountGroups
                   .flatMap((g) => g.accounts)
                   .slice(0, 5)
@@ -453,9 +453,9 @@ export default function OverviewPage() {
               </Link>
             </div>
             {upcomingBills.length === 0 ? (
-              <p className="rounded-2xl border border-dashed border-border bg-white p-4 text-center text-caption text-muted-foreground">Nothing due soon.</p>
+              <p className="rounded-2xl border border-dashed border-border bg-card p-4 text-center text-caption text-muted-foreground">Nothing due soon.</p>
             ) : (
-              <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
+              <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-card shadow-sm">
                 {upcomingBills.map((b) => (
                   <Link key={b.id} href={`/finance/recurring?billId=${b.id}`} className="flex items-center gap-3 px-4 py-3">
                     <IconChip icon="repeat" tone="muted" size="sm" />
@@ -479,9 +479,9 @@ export default function OverviewPage() {
             </Link>
           </div>
           {recentTransactionsList.length === 0 ? (
-            <p className="rounded-2xl border border-dashed border-border bg-white p-4 text-center text-caption text-muted-foreground">No transactions yet.</p>
+            <p className="rounded-2xl border border-dashed border-border bg-card p-4 text-center text-caption text-muted-foreground">No transactions yet.</p>
           ) : (
-            <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
+            <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-card shadow-sm">
               {recentTransactionsList.map((t) => (
                 <Link key={t.id} href={`/finance/transactions?transactionId=${t.id}`} className="flex items-center gap-3 px-4 py-3">
                   <MerchantIcon logoUrl={t.merchantLogoUrl} merchantName={t.merchant ?? t.description} className="size-9" />

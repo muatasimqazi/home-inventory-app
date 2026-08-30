@@ -127,7 +127,7 @@ export function CategoryBudgetFormDialog({ open, onOpenChange, editing, unbudget
               Cancel
             </Button>
           )}
-          <Button size="lg" className="flex-auto bg-ink text-white hover:bg-ink/90" onClick={handleSubmit}>
+          <Button size="lg" className="flex-auto bg-ink-fill text-white hover:bg-ink-fill/90" onClick={handleSubmit}>
             Save
           </Button>
         </DialogFooter>

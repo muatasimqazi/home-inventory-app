@@ -248,7 +248,7 @@ function CameraCaptureInner() {
   const dark = mode === "live" || mode === "preview";
 
   return (
-    <div className={cn("fixed inset-0 z-50 flex flex-col", dark ? "bg-ink" : "bg-background")}>
+    <div className={cn("fixed inset-0 z-50 flex flex-col", dark ? "bg-ink-fill" : "bg-background")}>
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFilePicked} />
 
       <header className="flex items-center justify-between px-4 pt-[max(1rem,env(safe-area-inset-top))]">
@@ -261,7 +261,7 @@ function CameraCaptureInner() {
           aria-label="Close camera"
           className={cn(
             "tap-target flex size-10 items-center justify-center rounded-full",
-            dark ? "bg-white/10 text-white" : "bg-white text-ink shadow-sm"
+            dark ? "bg-white/10 text-white" : "bg-card text-ink shadow-sm"
           )}
         >
           <Icon name="close" size={20} />
@@ -284,7 +284,7 @@ function CameraCaptureInner() {
 
         {mode === "denied" && (
           <div className="flex h-full flex-col items-center justify-center gap-4 px-8 text-center">
-            <div className="flex w-full max-w-xs flex-col items-center gap-3 rounded-2xl border border-border bg-white p-8">
+            <div className="flex w-full max-w-xs flex-col items-center gap-3 rounded-2xl border border-border bg-card p-8">
               <div className="flex size-14 items-center justify-center rounded-full bg-brand-100">
                 <Icon name="camera" size={26} className="text-yellow" />
               </div>
@@ -298,7 +298,7 @@ function CameraCaptureInner() {
             <button
               type="button"
               onClick={() => router.replace("/add")}
-              className="tap-target h-11 w-full max-w-xs rounded-full bg-ink text-body font-medium text-white"
+              className="tap-target h-11 w-full max-w-xs rounded-full bg-ink-fill text-body font-medium text-white"
             >
               Enter manually
             </button>
@@ -309,7 +309,7 @@ function CameraCaptureInner() {
           <div className="flex h-full flex-col items-center justify-center gap-4 px-8 text-center">
             {detectError ? (
               <>
-                <div className="flex w-full max-w-xs flex-col items-center gap-3 rounded-2xl border border-border bg-white p-8">
+                <div className="flex w-full max-w-xs flex-col items-center gap-3 rounded-2xl border border-border bg-card p-8">
                   <div className="flex size-14 items-center justify-center rounded-full bg-danger/10">
                     <Icon name="danger" size={26} className="text-danger" />
                   </div>
@@ -323,7 +323,7 @@ function CameraCaptureInner() {
                     <button
                       type="button"
                       onClick={handleReviewAndSave}
-                      className="tap-target h-11 w-full rounded-full bg-ink text-body font-medium text-white"
+                      className="tap-target h-11 w-full rounded-full bg-ink-fill text-body font-medium text-white"
                     >
                       Try again
                     </button>
@@ -331,7 +331,7 @@ function CameraCaptureInner() {
                   <button
                     type="button"
                     onClick={() => setMode("live")}
-                    className="tap-target h-11 w-full rounded-full border border-border bg-white text-body font-medium text-ink"
+                    className="tap-target h-11 w-full rounded-full border border-border bg-card text-body font-medium text-ink"
                   >
                     Back to camera
                   </button>
@@ -378,7 +378,7 @@ function CameraCaptureInner() {
                 {rotatingPreview ? <Icon name="spinner" size={18} className="animate-spin" /> : <Icon name="rotate" size={18} />}
               </button>
             </div>
-            <div className="flex flex-col gap-3 bg-ink px-6 py-4">
+            <div className="flex flex-col gap-3 bg-ink-fill px-6 py-4">
               <p className="text-center text-caption text-white/60">Drag the corners to crop just the part you want.</p>
               <div className="flex gap-3">
                 <button
@@ -411,7 +411,7 @@ function CameraCaptureInner() {
           live-mode controls already use this same non-overlapping sibling
           pattern; this just brings capture/page.tsx in line with it. */}
       {mode === "live" && (
-        <div className="flex flex-col items-center gap-4 bg-ink px-6 pb-[max(2rem,env(safe-area-inset-bottom))] pt-6">
+        <div className="flex flex-col items-center gap-4 bg-ink-fill px-6 pb-[max(2rem,env(safe-area-inset-bottom))] pt-6">
           {photos.length > 0 && (
             <button
               type="button"
@@ -444,7 +444,7 @@ function CameraCaptureInner() {
       )}
 
       {mode === "live" && photos.length > 0 && (
-        <div className="flex gap-2 overflow-x-auto bg-ink px-4 pb-4">
+        <div className="flex gap-2 overflow-x-auto bg-ink-fill px-4 pb-4">
           {photos.map((p, i) => (
             <div key={i} className="relative shrink-0">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -453,7 +453,7 @@ function CameraCaptureInner() {
                 type="button"
                 onClick={() => removePhoto(i)}
                 aria-label="Remove photo"
-                className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full bg-white text-ink"
+                className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full bg-white text-ink-fill"
               >
                 <Icon name="close" size={12} />
               </button>

@@ -13,7 +13,7 @@ interface EmptyStateProps {
 /** Illustrated (icon + copy + action), never a bare caption — PRD §3/§10.4. */
 export function EmptyState({ icon, title, description, action, className }: EmptyStateProps) {
   return (
-    <div className={cn("flex flex-col items-center justify-center gap-3 rounded-xl bg-white px-6 py-12 text-center", className)}>
+    <div className={cn("flex flex-col items-center justify-center gap-3 rounded-xl bg-card px-6 py-12 text-center", className)}>
       <div className="flex size-14 items-center justify-center rounded-full bg-surface-muted">
         <Icon name={icon} size={26} className="text-muted-foreground" />
       </div>

@@ -78,12 +78,12 @@ export default function BillingSettingsPage() {
         </div>
       )}
       {checkoutResult === "cancelled" && (
-        <div className="rounded-2xl border border-border bg-white p-4 text-caption text-muted-foreground shadow-sm">
+        <div className="rounded-2xl border border-border bg-card p-4 text-caption text-muted-foreground shadow-sm">
           Checkout cancelled. Your current plan is unchanged.
         </div>
       )}
 
-      <section className="rounded-2xl border border-border bg-white p-4 shadow-sm">
+      <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-caption text-muted-foreground">Current plan</p>
@@ -108,7 +108,7 @@ export default function BillingSettingsPage() {
           const selected = currentTier === tier;
           const paidTier = tier === "plus" || tier === "pro" ? tier : null;
           return (
-            <section key={tier} className={cn("flex flex-col gap-4 rounded-2xl border bg-white p-4 shadow-sm", selected ? "border-yellow" : "border-border")}>
+            <section key={tier} className={cn("flex flex-col gap-4 rounded-2xl border bg-card p-4 shadow-sm", selected ? "border-yellow" : "border-border")}>
               <div>
                 <div className="flex items-center justify-between gap-2">
                   <h2 className="text-section-title font-semibold text-ink">{BILLING_PLAN_LABEL[tier]}</h2>

@@ -50,7 +50,7 @@ export default function MyHouseholdsPage() {
               }}
               className={cn(
                 "flex items-center gap-3 rounded-2xl border p-4 text-left shadow-sm disabled:opacity-50",
-                active ? "border-yellow bg-brand-100" : "border-border bg-white"
+                active ? "border-yellow bg-brand-100" : "border-border bg-card"
               )}
             >
               <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-yellow">

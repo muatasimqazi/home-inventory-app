@@ -35,7 +35,7 @@ export function BackButton({ className, hideOnDesktop = false }: { className?: s
       onClick={() => router.back()}
       aria-label="Back"
       className={cn(
-        "tap-target flex size-9 shrink-0 items-center justify-center rounded-full bg-white shadow-sm",
+        "tap-target flex size-9 shrink-0 items-center justify-center rounded-full bg-card shadow-sm",
         hideOnDesktop && "md:hidden",
         className
       )}

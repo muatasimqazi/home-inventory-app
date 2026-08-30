@@ -18,7 +18,7 @@ interface WardrobeItemCardProps {
 
 /**
  * The Wardrobe catalog page's card — same outer shell as the general-
- * purpose ItemCard (aspect-145/92 photo box, rounded-xl bg-white p-3
+ * purpose ItemCard (aspect-145/92 photo box, rounded-xl bg-card p-3
  * shadow-sm, name/breadcrumb below, category accent bar), but the photo
  * box holds a swipeable strip of every photo this item has (its own
  * cover photo, then each completed Studio-generated style) instead of
@@ -65,7 +65,7 @@ export function WardrobeItemCard({ item, studioPhotos, breadcrumbLabel, classNam
   }
 
   return (
-    <Link href={`/items/${item.id}`} className={cn("flex flex-col overflow-hidden rounded-xl bg-white p-3 shadow-sm transition-shadow hover:shadow-lg", className)}>
+    <Link href={`/items/${item.id}`} className={cn("flex flex-col overflow-hidden rounded-xl bg-card p-3 shadow-sm transition-shadow hover:shadow-lg", className)}>
       <div className="relative aspect-145/92 w-full overflow-hidden rounded-lg">
         {photoPaths.length > 1 ? (
           <>

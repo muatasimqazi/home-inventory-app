@@ -71,7 +71,7 @@ export function BudgetVsActualChart({ months, budgetedAmount, highlightMonth }: 
             <span className="h-0.5 w-2.5 rounded-full bg-yellow" /> Budget {formatCompact(budgetedAmount)}
           </span>
           <span className="flex items-center gap-1 text-muted-foreground">
-            <span className="size-2 rounded-full bg-ink" /> Actual {formatCompact(highlighted.spend)}
+            <span className="size-2 rounded-full bg-ink-fill" /> Actual {formatCompact(highlighted.spend)}
           </span>
         </div>
       )}

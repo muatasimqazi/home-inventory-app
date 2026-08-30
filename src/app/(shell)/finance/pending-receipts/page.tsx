@@ -204,7 +204,7 @@ export default function PendingReceiptsPage() {
       ) : (
         <div className="flex flex-col gap-3">
           {groups.map((group) => (
-            <div key={group.draft.id} className="flex flex-col gap-3 rounded-2xl border border-border bg-white p-4 shadow-sm">
+            <div key={group.draft.id} className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
               <div className="flex items-start gap-3">
                 <IconChip icon={group.batch.source === "email" ? "attachment" : "receipt"} tone="muted" />
                 <div className="min-w-0 flex-1">

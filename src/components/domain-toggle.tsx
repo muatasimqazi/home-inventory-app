@@ -34,7 +34,7 @@ export function DomainToggle({
       disabled={disabled}
       aria-pressed={checked}
       className={cn(
-        "tap-target flex items-center gap-3 rounded-2xl border bg-white p-4 text-left shadow-sm disabled:opacity-70",
+        "tap-target flex items-center gap-3 rounded-2xl border bg-card p-4 text-left shadow-sm disabled:opacity-70",
         checked ? "border-yellow" : "border-border"
       )}
     >

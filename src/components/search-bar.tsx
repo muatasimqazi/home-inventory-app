@@ -30,7 +30,7 @@ export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(function S
   return (
     <div
       className={cn(
-        "relative flex h-13.5 items-center rounded-2xl border border-border bg-white shadow-sm",
+        "relative flex h-13.5 items-center rounded-2xl border border-border bg-card shadow-sm",
         className
       )}
     >

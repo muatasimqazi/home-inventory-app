@@ -168,7 +168,7 @@ export default function LabelPrintingPage() {
   return (
     <div className="flex flex-col gap-6 pb-10 print:pb-0">
       <div className="flex items-center gap-3 print:hidden">
-        <button onClick={() => router.back()} className="tap-target flex size-9 shrink-0 items-center justify-center rounded-full bg-white shadow-sm">
+        <button onClick={() => router.back()} className="tap-target flex size-9 shrink-0 items-center justify-center rounded-full bg-card shadow-sm">
           <Icon name="arrowLeft" size={18} />
         </button>
         <div>
@@ -178,7 +178,7 @@ export default function LabelPrintingPage() {
       </div>
 
       <div className="grid gap-6 print:hidden md:grid-cols-[320px_1fr]">
-        <div className="flex flex-col gap-5 rounded-xl bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-5 rounded-xl bg-card p-4 shadow-sm">
           <div>
             <p className="mb-2 text-caption font-medium text-ink">Select containers</p>
             <div className="flex max-h-64 flex-col gap-3 overflow-y-auto">
@@ -268,7 +268,7 @@ export default function LabelPrintingPage() {
             <Button size="lg" variant="outline" className="flex-1" onClick={handleExportPdf} disabled={committing}>
               <Icon name="download" size={16} /> Export as PDF
             </Button>
-            <Button size="lg" className="flex-1 bg-ink text-white hover:bg-ink/90" onClick={handlePrint} disabled={committing}>
+            <Button size="lg" className="flex-1 bg-ink-fill text-white hover:bg-ink-fill/90" onClick={handlePrint} disabled={committing}>
               {committing ? (
                 <Icon name="spinner" size={16} className="animate-spin" />
               ) : (
@@ -279,7 +279,7 @@ export default function LabelPrintingPage() {
         </div>
 
         <div className="flex min-w-0 flex-col gap-4">
-          <div className="min-w-0 rounded-xl bg-white p-4 shadow-sm">
+          <div className="min-w-0 rounded-xl bg-card p-4 shadow-sm">
             <p className="mb-3 text-caption font-medium text-ink">Live preview</p>
             {previewEntries.length === 0 ? (
               <p className="text-caption text-muted-foreground">Select containers or add unassigned labels to preview the sheet.</p>
@@ -318,7 +318,7 @@ export default function LabelPrintingPage() {
           </div>
 
           {labelBatches.length > 0 && (
-            <div className="rounded-xl bg-white p-4 shadow-sm">
+            <div className="rounded-xl bg-card p-4 shadow-sm">
               <p className="mb-3 text-caption font-medium text-ink">Recent batches</p>
               <div className="flex flex-col divide-y divide-border">
                 {labelBatches.slice(0, 8).map((batch) => {

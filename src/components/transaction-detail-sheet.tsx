@@ -286,7 +286,7 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
             {formatCurrency(transaction.amount, { showPositiveSign: true })}
           </p>
 
-          <div className="grid grid-cols-2 gap-3 rounded-2xl border border-border bg-white p-4">
+          <div className="grid grid-cols-2 gap-3 rounded-2xl border border-border bg-card p-4">
             <div>
               <p className="text-caption text-muted-foreground">Date</p>
               <p className="text-body font-medium text-ink">{formatDate(transaction.occurredAt)}</p>
@@ -364,11 +364,11 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
                 </button>
               </div>
               {lineItems.length === 0 ? (
-                <p className="rounded-2xl border border-dashed border-border bg-white p-4 text-center text-caption text-muted-foreground">
+                <p className="rounded-2xl border border-dashed border-border bg-card p-4 text-center text-caption text-muted-foreground">
                   No items recorded for this receipt yet.
                 </p>
               ) : (
-                <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white">
+                <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-card">
                   {lineItems.map((li) => (
                     <button key={li.id} type="button" onClick={() => setEditingLineItem(li)} className="flex items-center gap-3 px-3 py-2.5 text-left">
                       <div className="min-w-0 flex-1">
@@ -405,11 +405,11 @@ export function TransactionDetailSheet({ open, onOpenChange, transaction, accoun
               </button>
             </div>
             {linkedPurchases.length === 0 ? (
-              <p className="rounded-2xl border border-dashed border-border bg-white p-4 text-center text-caption text-muted-foreground">
+              <p className="rounded-2xl border border-dashed border-border bg-card p-4 text-center text-caption text-muted-foreground">
                 Not linked to anything in your inventory yet.
               </p>
             ) : (
-              <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white">
+              <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-card">
                 {linkedPurchases.map((purchase) => {
                   const linkedItem = items.find((it) => it.id === purchase.itemId);
                   return (

@@ -102,7 +102,7 @@ export function ItemPurchaseSection({ itemId }: { itemId: string }) {
   const editable = item.status === "active";
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-border bg-white p-4 shadow-sm">
+    <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
       <div className="flex items-center justify-between">
         <h2 className="text-body font-semibold text-ink">Purchase & Warranty</h2>
         {editable && (

@@ -69,7 +69,7 @@ export default function ApplianceReviewPage() {
 
   if (detecting || !fields || !detection) {
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-white">
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-card">
         <Icon name="spinner" size={28} className="animate-spin text-ink" />
         <p className="text-body text-muted-foreground">Reading the label…</p>
       </div>
@@ -125,7 +125,7 @@ export default function ApplianceReviewPage() {
 
   return (
     <div className="min-h-dvh bg-surface-muted pb-28">
-      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-white px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-card px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <button
           type="button"
           onClick={() => router.replace("/capture/appliance")}
@@ -139,7 +139,7 @@ export default function ApplianceReviewPage() {
       </header>
 
       <div className="mx-auto flex max-w-xl flex-col gap-4 px-4 py-4">
-        <div className={cn("flex items-center justify-between rounded-xl bg-white px-4 py-3 shadow-sm", missingDestination && "ring-1 ring-danger")}>
+        <div className={cn("flex items-center justify-between rounded-xl bg-card px-4 py-3 shadow-sm", missingDestination && "ring-1 ring-danger")}>
           <div className="min-w-0">
             <p className="text-caption text-muted-foreground">Saving to</p>
             {missingDestination ? (
@@ -153,7 +153,7 @@ export default function ApplianceReviewPage() {
           </Button>
         </div>
 
-        <div className="flex flex-col gap-4 rounded-xl bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-4 rounded-xl bg-card p-4 shadow-sm">
           {photo ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={photo} alt="Appliance label" className="h-48 w-full rounded-lg bg-surface-muted object-contain" />
@@ -226,7 +226,7 @@ export default function ApplianceReviewPage() {
         </div>
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-border bg-white px-4 py-3" style={{ bottom: keyboardInset }}>
+      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-border bg-card px-4 py-3" style={{ bottom: keyboardInset }}>
         <div className="mx-auto flex max-w-xl flex-col gap-2">
           {missingDestination && (
             <p className="text-center text-caption text-danger">Choose a location above before saving — otherwise this can&apos;t be found later.</p>

@@ -148,14 +148,14 @@ export default function DetectedRecurringPage() {
       </div>
 
       {loading && (
-        <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-white p-12 shadow-sm">
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-card p-12 shadow-sm">
           <Icon name="spinner" size={28} className="animate-spin text-ink" />
           <p className="text-body text-ink">Scanning transaction history…</p>
         </div>
       )}
 
       {!loading && error && (
-        <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-white p-12 shadow-sm">
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-card p-12 shadow-sm">
           <div className="flex size-14 items-center justify-center rounded-full bg-danger/10">
             <Icon name="danger" size={26} className="text-danger" />
           </div>
@@ -180,7 +180,7 @@ export default function DetectedRecurringPage() {
             const account = accountById.get(c.accountId);
             const busy = busyId === c.id;
             return (
-              <div key={c.id} className="flex flex-col gap-3 rounded-2xl border border-border bg-white p-4 shadow-sm">
+              <div key={c.id} className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
                 <div className="flex items-start gap-3">
                   <IconChip icon="ai" tone="muted" />
                   <div className="min-w-0 flex-1">

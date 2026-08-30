@@ -145,17 +145,17 @@ export default function ContainerDetailPage() {
   return (
     <div className="flex flex-col gap-5 pb-6">
       <div className="flex items-center justify-between">
-        <button onClick={() => router.back()} className="tap-target flex size-9 items-center justify-center rounded-full bg-white shadow-sm">
+        <button onClick={() => router.back()} className="tap-target flex size-9 items-center justify-center rounded-full bg-card shadow-sm">
           <Icon name="arrowLeft" size={18} />
         </button>
         <div className="flex items-center gap-2">
-          <Link href={`/containers/${container.id}/label`} className="tap-target flex size-9 items-center justify-center rounded-full bg-white shadow-sm">
+          <Link href={`/containers/${container.id}/label`} className="tap-target flex size-9 items-center justify-center rounded-full bg-card shadow-sm">
             <Icon name="qrCode" size={18} />
           </Link>
-          <button onClick={() => setEditOpen(true)} className="tap-target flex size-9 items-center justify-center rounded-full bg-white shadow-sm">
+          <button onClick={() => setEditOpen(true)} className="tap-target flex size-9 items-center justify-center rounded-full bg-card shadow-sm">
             <Icon name="edit" size={18} />
           </button>
-          <button onClick={() => setDeleteOpen(true)} className="tap-target flex size-9 items-center justify-center rounded-full bg-white shadow-sm">
+          <button onClick={() => setDeleteOpen(true)} className="tap-target flex size-9 items-center justify-center rounded-full bg-card shadow-sm">
             <Icon name="trash" size={18} className="text-danger" />
           </button>
         </div>
@@ -172,7 +172,7 @@ export default function ContainerDetailPage() {
               onClick={handleRotatePhoto}
               disabled={rotatingPhoto}
               aria-label="Rotate photo"
-              className="tap-target flex size-9 items-center justify-center rounded-full bg-white/90 shadow-sm disabled:opacity-60"
+              className="tap-target flex size-9 items-center justify-center rounded-full bg-white/90 text-ink-fill shadow-sm disabled:opacity-60"
             >
               {rotatingPhoto ? <Icon name="spinner" size={16} className="animate-spin" /> : <Icon name="rotate" size={16} />}
             </button>
@@ -182,7 +182,7 @@ export default function ContainerDetailPage() {
               type="button"
               onClick={() => removeContainerCoverPhoto(container.id)}
               aria-label="Remove photo"
-              className="tap-target flex size-9 items-center justify-center rounded-full bg-white/90 shadow-sm"
+              className="tap-target flex size-9 items-center justify-center rounded-full bg-white/90 text-ink-fill shadow-sm"
             >
               <Icon name="close" size={16} />
             </button>
@@ -192,7 +192,7 @@ export default function ContainerDetailPage() {
             onClick={() => photoInputRef.current?.click()}
             disabled={uploadingPhoto}
             aria-label={container.coverPhotoPath ? "Change photo" : "Add photo"}
-            className="tap-target flex size-9 items-center justify-center rounded-full bg-white/90 shadow-sm disabled:opacity-60"
+            className="tap-target flex size-9 items-center justify-center rounded-full bg-white/90 text-ink-fill shadow-sm disabled:opacity-60"
           >
             {uploadingPhoto ? <Icon name="spinner" size={16} className="animate-spin" /> : <Icon name="camera" size={16} />}
           </button>
@@ -230,13 +230,13 @@ export default function ContainerDetailPage() {
       <div className="grid grid-cols-2 gap-2">
         <Link
           href={`/add?locationId=${container.locationId}&containerId=${container.id}`}
-          className="tap-target flex items-center justify-center gap-2 rounded-2xl border border-border bg-white py-3 text-body font-medium text-ink shadow-sm"
+          className="tap-target flex items-center justify-center gap-2 rounded-2xl border border-border bg-card py-3 text-body font-medium text-ink shadow-sm"
         >
           <Icon name="edit" size={16} /> Add manually
         </Link>
         <Link
           href={`/capture/barcode?locationId=${container.locationId}&containerId=${container.id}`}
-          className="tap-target flex items-center justify-center gap-2 rounded-2xl border border-border bg-white py-3 text-body font-medium text-ink shadow-sm"
+          className="tap-target flex items-center justify-center gap-2 rounded-2xl border border-border bg-card py-3 text-body font-medium text-ink shadow-sm"
         >
           <Icon name="scanBarcode" size={16} /> Scan Barcode
         </Link>
@@ -345,7 +345,7 @@ export default function ContainerDetailPage() {
       )}
 
       {itemSelectMode && selectedItemIds.size > 0 && (
-        <div className="fixed inset-x-4 bottom-[calc(5.125rem+env(safe-area-inset-bottom))] z-40 flex items-center justify-between rounded-2xl bg-ink px-4 py-3 text-white shadow-lg md:bottom-4">
+        <div className="fixed inset-x-4 bottom-[calc(5.125rem+env(safe-area-inset-bottom))] z-40 flex items-center justify-between rounded-2xl bg-ink-fill px-4 py-3 text-white shadow-lg md:bottom-4">
           {/* bottom-20 (80px) was tuned to clear the old floating pill nav,
               and wasn't safe-area-aware even then — bottom-nav.tsx is now a
               docked bar whose icon row is a fixed 70px (min-h-17.5)

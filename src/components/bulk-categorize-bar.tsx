@@ -40,7 +40,7 @@ export function BulkCategorizeBar({ selectedCount, categories, onApply }: BulkCa
 
   return (
     <>
-      <div className="fixed inset-x-4 bottom-[calc(5.125rem+env(safe-area-inset-bottom))] z-40 flex items-center justify-between rounded-2xl bg-ink px-4 py-3 text-white shadow-lg md:bottom-4">
+      <div className="fixed inset-x-4 bottom-[calc(5.125rem+env(safe-area-inset-bottom))] z-40 flex items-center justify-between rounded-2xl bg-ink-fill px-4 py-3 text-white shadow-lg md:bottom-4">
         <span className="text-body">
           {selectedCount} transaction{selectedCount === 1 ? "" : "s"} selected
         </span>

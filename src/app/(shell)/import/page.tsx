@@ -31,7 +31,7 @@ export default function ImportChooserPage() {
       </div>
       <div className="flex flex-col gap-2">
         {OPTIONS.map((o) => (
-          <Link key={o.href} href={o.href} className="tap-target flex items-center gap-3 rounded-2xl border border-border bg-white p-4 shadow-sm">
+          <Link key={o.href} href={o.href} className="tap-target flex items-center gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
             <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-yellow text-white">
               <Icon name={o.icon} size={22} />
             </span>

@@ -145,7 +145,7 @@ function PickerGroup({ label, rows, onPick }: { label?: string; rows: PickerRow[
   return (
     <div className="flex flex-col gap-1.5">
       {label && <p className="text-caption font-medium tracking-wide text-muted-foreground uppercase">{label}</p>}
-      <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white">
+      <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-card">
         {rows.map((row) => (
           <button
             key={row.id}

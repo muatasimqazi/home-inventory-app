@@ -71,7 +71,7 @@ export default function AccountsListPage() {
           {groups.map((group) => (
             <div key={group.label}>
               <p className="mb-2 text-caption font-medium tracking-wide text-muted-foreground uppercase">{group.label}</p>
-              <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
+              <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-card shadow-sm">
                 {group.accounts.map((a) => {
                   // Only meaningful on a joint account — a personal
                   // account already shows the "Personal" badge in this

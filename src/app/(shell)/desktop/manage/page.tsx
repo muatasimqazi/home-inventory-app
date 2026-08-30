@@ -107,7 +107,7 @@ export default function DesktopManagementPage() {
       </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-[280px_1fr] gap-4">
-        <div className="flex min-h-0 flex-col overflow-y-auto rounded-xl bg-white p-3 shadow-sm">
+        <div className="flex min-h-0 flex-col overflow-y-auto rounded-xl bg-card p-3 shadow-sm">
           <div className="flex-1">
             {locations.length === 0 ? (
               <p className="p-2 text-caption text-muted-foreground">No locations yet — add one to get started.</p>
@@ -132,7 +132,7 @@ export default function DesktopManagementPage() {
           )}
         </div>
 
-        <div className="flex min-h-0 flex-col gap-3 overflow-y-auto rounded-xl bg-white p-4 shadow-sm">
+        <div className="flex min-h-0 flex-col gap-3 overflow-y-auto rounded-xl bg-card p-4 shadow-sm">
           {rows.length === 0 ? (
             <EmptyState
               icon="box"
@@ -198,7 +198,7 @@ export default function DesktopManagementPage() {
       </div>
 
       {selectedItems.size > 0 && (
-        <div className="flex items-center justify-between rounded-xl bg-ink px-4 py-3 text-white shadow-lg">
+        <div className="flex items-center justify-between rounded-xl bg-ink-fill px-4 py-3 text-white shadow-lg">
           <span className="text-body">{selectedItems.size} selected</span>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" className="border-white/30 bg-transparent text-white hover:bg-white/10" onClick={() => setSelectedItems(new Set())}>

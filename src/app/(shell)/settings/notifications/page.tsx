@@ -113,7 +113,7 @@ export default function NotificationSettingsPage() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-3 rounded-2xl border border-border bg-white p-4 shadow-sm">
+      <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
         <div className="flex items-start gap-3">
           <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-brand-100">
             <Icon name="bell" size={18} className="text-yellow" />
@@ -131,7 +131,7 @@ export default function NotificationSettingsPage() {
         </div>
 
         {state === "not-subscribed" && (
-          <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={handleEnable} disabled={busy}>
+          <Button size="lg" className="bg-ink-fill text-white hover:bg-ink-fill/90" onClick={handleEnable} disabled={busy}>
             {busy ? <Icon name="spinner" size={16} className="animate-spin" /> : "Enable reminders"}
           </Button>
         )}
@@ -145,7 +145,7 @@ export default function NotificationSettingsPage() {
       {state === "subscribed" && (
         <div>
           <p className="mb-2 text-caption font-medium tracking-wide text-muted-foreground uppercase">What to notify me about</p>
-          <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
+          <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-card shadow-sm">
             {EVENT_TYPES.map(({ domainKey, eventType, label, description }) => {
               const key = `${domainKey}.${eventType}`;
               const enabled = prefs[key] ?? true;

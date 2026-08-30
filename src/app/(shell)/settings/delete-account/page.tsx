@@ -114,13 +114,13 @@ export default function DeleteAccountPage() {
       </div>
 
       {preview === "loading" && (
-        <div className="flex items-center justify-center rounded-2xl border border-border bg-white p-8 shadow-sm">
+        <div className="flex items-center justify-center rounded-2xl border border-border bg-card p-8 shadow-sm">
           <Icon name="spinner" size={20} className="animate-spin text-muted-foreground" />
         </div>
       )}
 
       {preview === "error" && (
-        <div className="rounded-2xl border border-border bg-white p-4 text-body text-muted-foreground shadow-sm">
+        <div className="rounded-2xl border border-border bg-card p-4 text-body text-muted-foreground shadow-sm">
           Couldn&apos;t load your account details. Try again in a moment.
         </div>
       )}
@@ -149,7 +149,7 @@ export default function DeleteAccountPage() {
           )}
 
           {!isBlocked && (
-            <div className="flex flex-col gap-3 rounded-2xl border border-border bg-white p-4 shadow-sm">
+            <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
               <p className="text-caption font-medium tracking-wide text-muted-foreground uppercase">This will</p>
 
               {preview.willBeDeleted.length > 0 && (

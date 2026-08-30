@@ -69,9 +69,9 @@ export default function HouseholdDetailsPage() {
             setNameError(null);
             setEditOpen(true);
           }}
-          className="tap-target flex items-center gap-3 rounded-2xl border border-border bg-white p-4 text-left shadow-sm"
+          className="tap-target flex items-center gap-3 rounded-2xl border border-border bg-card p-4 text-left shadow-sm"
         >
-          <span className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-ink text-white">
+          <span className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-ink-fill text-white">
             <Icon name="home" size={20} />
           </span>
           <div className="min-w-0 flex-1">
@@ -81,8 +81,8 @@ export default function HouseholdDetailsPage() {
           <Icon name="edit" size={16} className="shrink-0 text-muted-foreground" />
         </button>
       ) : (
-        <div className="flex items-center gap-3 rounded-2xl border border-border bg-white p-4 shadow-sm">
-          <span className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-ink text-white">
+        <div className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
+          <span className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-ink-fill text-white">
             <Icon name="home" size={20} />
           </span>
           <div className="min-w-0 flex-1">
@@ -116,12 +116,12 @@ export default function HouseholdDetailsPage() {
                   setNameInput(e.target.value);
                   if (nameError) setNameError(null);
                 }}
-                className="h-11 bg-white"
+                className="h-11 bg-card"
                 ref={nameInputRef}
               />
               {nameError && <p className="mt-1 text-caption text-danger">{nameError}</p>}
             </div>
-            <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={handleSave} disabled={saving}>
+            <Button size="lg" className="bg-ink-fill text-white hover:bg-ink-fill/90" onClick={handleSave} disabled={saving}>
               {saving ? <Icon name="spinner" size={16} className="animate-spin" /> : "Save"}
             </Button>
           </div>
@@ -133,7 +133,7 @@ export default function HouseholdDetailsPage() {
 
 function SettingsLinkRow({ icon, label, sublabel, href }: { icon: "users" | "grid"; label: string; sublabel: string; href: string }) {
   return (
-    <Link href={href} className="tap-target flex items-center gap-3 rounded-2xl border border-border bg-white p-4 shadow-sm">
+    <Link href={href} className="tap-target flex items-center gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
       <Icon name={icon} size={18} className="shrink-0 text-muted-foreground" />
       <div className="min-w-0 flex-1">
         <p className="text-body font-medium text-ink">{label}</p>

@@ -84,7 +84,7 @@ export default function ActivityFeedPage() {
             onClick={() => setFilter(f.value)}
             className={cn(
               "tap-target shrink-0 rounded-full border px-3 py-1.5 text-caption font-medium",
-              filter === f.value ? "border-ink bg-ink text-white" : "border-border bg-white text-ink"
+              filter === f.value ? "border-ink-fill bg-ink-fill text-white" : "border-border bg-card text-ink"
             )}
           >
             {f.label}
@@ -97,7 +97,7 @@ export default function ActivityFeedPage() {
       ) : (
         <div className="flex flex-col gap-4">
           {groups.map(([day, entries]) => (
-            <div key={day} className="rounded-xl bg-white p-4 shadow-sm">
+            <div key={day} className="rounded-xl bg-card p-4 shadow-sm">
               <p className="mb-1 text-caption font-medium text-muted-foreground">{day}</p>
               <div className="divide-y divide-border">
                 {entries.map((entry) => (

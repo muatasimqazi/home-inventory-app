@@ -28,19 +28,19 @@ export default function HomePage() {
           </div>
 
           <div className="grid gap-3 md:grid-cols-3">
-            <section className="rounded-2xl border border-border bg-white p-4 shadow-sm">
+            <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
               <h2 className="text-body font-medium">Inventory</h2>
               <p className="mt-2 text-caption text-muted-foreground">
                 Add items with photos, organize them by location or container, print labels, and search later when you need to find something.
               </p>
             </section>
-            <section className="rounded-2xl border border-border bg-white p-4 shadow-sm">
+            <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
               <h2 className="text-body font-medium">Receipts and Finance</h2>
               <p className="mt-2 text-caption text-muted-foreground">
                 Scan receipts, import transactions, connect bank accounts with Plaid, categorize spending, and review recurring bills.
               </p>
             </section>
-            <section className="rounded-2xl border border-border bg-white p-4 shadow-sm">
+            <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
               <h2 className="text-body font-medium">Household Access</h2>
               <p className="mt-2 text-caption text-muted-foreground">
                 Google sign-in is used only to create and secure your account, keep your data associated with you, and let invited household members
@@ -58,7 +58,7 @@ export default function HomePage() {
             </Link>
             <Link
               href="/sign-in"
-              className="tap-target inline-flex h-12 items-center justify-center rounded-2xl border border-border bg-white px-6 text-body font-medium text-ink shadow-sm"
+              className="tap-target inline-flex h-12 items-center justify-center rounded-2xl border border-border bg-card px-6 text-body font-medium text-ink shadow-sm"
             >
               Sign in
             </Link>

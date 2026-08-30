@@ -93,7 +93,7 @@ export default function QrScannerPage() {
   const dark = mode === "scanning";
 
   return (
-    <div className={cn("fixed inset-0 z-50 flex flex-col", dark ? "bg-ink text-white" : "bg-background text-ink")}>
+    <div className={cn("fixed inset-0 z-50 flex flex-col", dark ? "bg-ink-fill text-white" : "bg-background text-ink")}>
       <header className="flex items-center justify-between px-4 pt-[max(1rem,env(safe-area-inset-top))]">
         <button
           type="button"
@@ -101,7 +101,7 @@ export default function QrScannerPage() {
           aria-label="Close scanner"
           className={cn(
             "tap-target flex size-10 items-center justify-center rounded-full",
-            dark ? "bg-white/10" : "bg-white shadow-sm"
+            dark ? "bg-white/10" : "bg-card shadow-sm"
           )}
         >
           <Icon name="close" size={20} />
@@ -125,7 +125,7 @@ export default function QrScannerPage() {
               <div className="size-56 rounded-2xl border-2 border-yellow" />
             </div>
             {detectionSupport === "unavailable" && (
-              <div className="absolute inset-x-0 bottom-0 bg-ink/90 px-6 py-4 text-center text-caption text-white/80">
+              <div className="absolute inset-x-0 bottom-0 bg-ink-fill/90 px-6 py-4 text-center text-caption text-white/80">
                 Automatic scanning isn&apos;t supported in this browser — enter the code below instead.
               </div>
             )}

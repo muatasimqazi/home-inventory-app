@@ -41,14 +41,14 @@ export default function PersonProfilePage() {
   return (
     <div className="flex flex-col gap-5 pb-6">
       <div className="flex items-center justify-between">
-        <button onClick={() => router.back()} className="tap-target flex size-9 items-center justify-center rounded-full bg-white shadow-sm">
+        <button onClick={() => router.back()} className="tap-target flex size-9 items-center justify-center rounded-full bg-card shadow-sm">
           <Icon name="arrowLeft" size={18} />
         </button>
         <h1 className="text-body font-medium text-ink">Profile</h1>
         <div className="size-9" />
       </div>
 
-      <div className="flex items-center gap-3 rounded-2xl border border-border bg-white px-4 py-4 shadow-sm">
+      <div className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-4 shadow-sm">
         <Avatar className="size-14">
           {person.avatarPath ? (
             <AvatarImage src={coverPhotoUrl(person.avatarPath)} alt="" />

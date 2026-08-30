@@ -58,7 +58,7 @@ export default function ReferenceCatalogPage() {
       </div>
 
       {items === null ? (
-        <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-white p-12 shadow-sm">
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-card p-12 shadow-sm">
           <Icon name="spinner" size={28} className="animate-spin text-ink" />
           <p className="text-body text-ink">Loading catalog…</p>
         </div>
@@ -72,7 +72,7 @@ export default function ReferenceCatalogPage() {
               <Link
                 key={loc}
                 href={`/reference/${encodeURIComponent(loc)}`}
-                className="tap-target flex items-center gap-3 rounded-2xl border border-border bg-white px-4 py-3 shadow-sm"
+                className="tap-target flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 shadow-sm"
               >
                 <IconChip icon="box" tone="muted" />
                 <p className="min-w-0 flex-1 truncate text-body font-medium text-ink">{loc}</p>

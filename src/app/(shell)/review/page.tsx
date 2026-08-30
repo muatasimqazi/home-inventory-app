@@ -73,7 +73,7 @@ export default function NeedsReviewPage() {
           {queue.map((item) => {
             const draft = draftFor(item.id, item.name, item.category);
             return (
-              <div key={item.id} className="flex flex-col gap-3 rounded-xl bg-white p-3 shadow-sm md:flex-row md:items-start">
+              <div key={item.id} className="flex flex-col gap-3 rounded-xl bg-card p-3 shadow-sm md:flex-row md:items-start">
                 <div className="flex items-start gap-3 md:w-64 md:shrink-0">
                   <input
                     type="checkbox"
@@ -134,7 +134,7 @@ export default function NeedsReviewPage() {
       )}
 
       {selected.size > 0 && (
-        <div className="sticky bottom-4 flex items-center justify-between rounded-xl bg-ink px-4 py-3 text-white shadow-lg">
+        <div className="sticky bottom-4 flex items-center justify-between rounded-xl bg-ink-fill px-4 py-3 text-white shadow-lg">
           <span className="text-body">{selected.size} selected</span>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" className="border-white/30 bg-transparent text-white hover:bg-white/10" onClick={() => setSelected(new Set())}>

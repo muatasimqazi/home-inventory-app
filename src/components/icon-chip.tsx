@@ -10,7 +10,7 @@ interface IconChipProps {
 
 const TONES: Record<NonNullable<IconChipProps["tone"]>, string> = {
   yellow: "bg-yellow text-white",
-  ink: "bg-ink text-white",
+  ink: "bg-ink-fill text-white",
   muted: "bg-surface-muted text-ink",
   danger: "bg-danger/10 text-danger",
 };

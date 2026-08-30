@@ -223,7 +223,7 @@ export default function ReceiptCapturePage() {
   const dark = mode === "live" || mode === "preview";
 
   return (
-    <div className={cn("fixed inset-0 z-50 flex flex-col", dark ? "bg-ink" : "bg-background")}>
+    <div className={cn("fixed inset-0 z-50 flex flex-col", dark ? "bg-ink-fill" : "bg-background")}>
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFilePicked} />
 
       <header className="flex items-center justify-between px-4 pt-[max(1rem,env(safe-area-inset-top))]">
@@ -258,7 +258,7 @@ export default function ReceiptCapturePage() {
 
         {mode === "denied" && (
           <div className="flex h-full flex-col items-center justify-center gap-4 px-8 text-center">
-            <div className="flex w-full max-w-xs flex-col items-center gap-3 rounded-2xl border border-border bg-white p-8">
+            <div className="flex w-full max-w-xs flex-col items-center gap-3 rounded-2xl border border-border bg-card p-8">
               <div className="flex size-14 items-center justify-center rounded-full bg-brand-100">
                 <Icon name="receipt" size={26} className="text-yellow" />
               </div>
@@ -293,7 +293,7 @@ export default function ReceiptCapturePage() {
               {photos.length > 0 ? "Choose another photo" : "Choose a photo"}
             </button>
             {photos.length > 0 && (
-              <button type="button" onClick={handleAnalyze} className="tap-target h-11 w-full max-w-xs rounded-full bg-ink text-body font-medium text-white">
+              <button type="button" onClick={handleAnalyze} className="tap-target h-11 w-full max-w-xs rounded-full bg-ink-fill text-body font-medium text-white">
                 Analyze {photos.length} photo{photos.length === 1 ? "" : "s"}
               </button>
             )}
@@ -304,7 +304,7 @@ export default function ReceiptCapturePage() {
           <div className="flex h-full flex-col items-center justify-center gap-4 px-8 text-center">
             {extractError ? (
               <>
-                <div className="flex w-full max-w-xs flex-col items-center gap-3 rounded-2xl border border-border bg-white p-8">
+                <div className="flex w-full max-w-xs flex-col items-center gap-3 rounded-2xl border border-border bg-card p-8">
                   <div className="flex size-14 items-center justify-center rounded-full bg-danger/10">
                     <Icon name="danger" size={26} className="text-danger" />
                   </div>
@@ -315,7 +315,7 @@ export default function ReceiptCapturePage() {
                 </div>
                 <div className="flex w-full max-w-xs flex-col gap-2">
                   {extractError.retryable && (
-                    <button type="button" onClick={handleAnalyze} className="tap-target h-11 w-full rounded-full bg-ink text-body font-medium text-white">
+                    <button type="button" onClick={handleAnalyze} className="tap-target h-11 w-full rounded-full bg-ink-fill text-body font-medium text-white">
                       Try again
                     </button>
                   )}
@@ -365,7 +365,7 @@ export default function ReceiptCapturePage() {
                 {rotatingPreview ? <Icon name="spinner" size={18} className="animate-spin" /> : <Icon name="rotate" size={18} />}
               </button>
             </div>
-            <div className="flex flex-col gap-3 bg-ink px-6 py-4">
+            <div className="flex flex-col gap-3 bg-ink-fill px-6 py-4">
               <p className="text-center text-caption text-white/60">Drag the corners to crop out everything but the receipt.</p>
               <div className="flex gap-3">
                 <button
@@ -391,7 +391,7 @@ export default function ReceiptCapturePage() {
       </div>
 
       {mode === "live" && (
-        <div className="flex flex-col gap-3 bg-ink px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-3">
+        <div className="flex flex-col gap-3 bg-ink-fill px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-3">
           {photos.length > 0 && (
             <div className="flex gap-2 overflow-x-auto">
               {photos.map((p, i) => (
@@ -433,7 +433,7 @@ export default function ReceiptCapturePage() {
               disabled={photos.length === 0}
               className={cn(
                 "tap-target flex h-11 items-center justify-center rounded-full px-4 text-body font-medium",
-                photos.length === 0 ? "bg-white/10 text-white/40" : "bg-white text-ink"
+                photos.length === 0 ? "bg-white/10 text-white/40" : "bg-white text-ink-fill"
               )}
             >
               Analyze

@@ -18,7 +18,7 @@ export function LabelCard({ resolveUrl, displayCode, name, locationName, toggle,
 
   return (
     <div
-      className="flex items-center gap-2 overflow-hidden border border-dashed border-border bg-white p-2"
+      className="flex items-center gap-2 overflow-hidden border border-dashed border-border bg-card p-2"
       style={{ width: `${widthMm}mm`, height: `${heightMm}mm` }}
     >
       <QRCodeSVG value={resolveUrl} size={qrSize} bgColor="#ffffff" fgColor="#212121" />

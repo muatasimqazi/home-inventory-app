@@ -182,13 +182,13 @@ export function LinkedBanksCard({ householdId }: { householdId: string }) {
       </div>
 
       {linkToken && (
-        <div className="mb-3 rounded-2xl border border-border bg-white p-3">
+        <div className="mb-3 rounded-2xl border border-border bg-card p-3">
           <PlaidLinkLauncher key={launcherKey} token={linkToken} onSuccess={handleSuccess} onExit={() => setLinkToken(null)} />
         </div>
       )}
 
       {items && items.length > 0 && (
-        <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
+        <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-card shadow-sm">
           {items.map((item) => (
             <div key={item.id} className="flex items-center gap-3 px-4 py-3.5">
               <div className="min-w-0 flex-1">

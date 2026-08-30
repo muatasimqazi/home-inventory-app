@@ -115,7 +115,7 @@ export function EntityFormSheet({
             <button
               type="button"
               onClick={() => photoInputRef.current?.click()}
-              className="flex size-20 items-center justify-center overflow-hidden rounded-xl border border-dashed border-border bg-white"
+              className="flex size-20 items-center justify-center overflow-hidden rounded-xl border border-dashed border-border bg-card"
             >
               {photoPreviewUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -185,7 +185,7 @@ export function EntityFormSheet({
             <label className="mb-1 block text-caption text-muted-foreground">Description (optional)</label>
             <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
           </div>
-          <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={handleSubmit}>
+          <Button size="lg" className="bg-ink-fill text-white hover:bg-ink-fill/90" onClick={handleSubmit}>
             Save
           </Button>
         </div>

@@ -77,7 +77,7 @@ export function ConfirmDialog({
           </Button>
           <Button
             size="lg"
-            className={tone === "danger" ? "flex-auto" : "flex-auto bg-ink text-white hover:bg-ink/90"}
+            className={tone === "danger" ? "flex-auto" : "flex-auto bg-ink-fill text-white hover:bg-ink-fill/90"}
             variant={tone === "danger" ? "destructive" : "default"}
             onClick={handleConfirm}
             disabled={pending}

@@ -35,7 +35,7 @@ export default function DesktopActivityDashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
-        <section className="flex flex-col gap-3 rounded-xl bg-white p-5 shadow-sm">
+        <section className="flex flex-col gap-3 rounded-xl bg-card p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <h2 className="text-section-title font-medium text-ink">Recent activity</h2>
             <Link href="/activity" className="text-caption font-medium text-ink">
@@ -53,7 +53,7 @@ export default function DesktopActivityDashboardPage() {
           )}
         </section>
 
-        <section className="flex flex-col gap-3 rounded-xl bg-white p-5 shadow-sm">
+        <section className="flex flex-col gap-3 rounded-xl bg-card p-5 shadow-sm">
           <h2 className="text-section-title font-medium text-ink">Items by Location</h2>
           <div className="flex flex-col gap-2">
             {locations.map((loc) => (
@@ -86,7 +86,7 @@ function StatTile({
   tone?: "default" | "attention";
 }) {
   return (
-    <Link href={href} className="flex flex-col gap-2 rounded-xl bg-white p-4 shadow-sm hover:shadow-lg">
+    <Link href={href} className="flex flex-col gap-2 rounded-xl bg-card p-4 shadow-sm hover:shadow-lg">
       <div className={`flex size-9 items-center justify-center rounded-lg ${tone === "attention" ? "bg-danger/10 text-danger" : "bg-yellow text-white"}`}>
         <Icon name={icon} size={18} />
       </div>

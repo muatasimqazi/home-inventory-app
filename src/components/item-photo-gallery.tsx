@@ -115,7 +115,7 @@ export function ItemPhotoGallery({ item, studioPhotos }: { item: Item; studioPho
           onClick={() => photoInputRef.current?.click()}
           disabled={uploadingPhoto}
           aria-label="Add photo"
-          className="tap-target absolute bottom-2 right-2 flex size-9 items-center justify-center rounded-full bg-white/90 shadow-sm disabled:opacity-60"
+          className="tap-target absolute bottom-2 right-2 flex size-9 items-center justify-center rounded-full bg-white/90 text-ink-fill shadow-sm disabled:opacity-60"
         >
           {uploadingPhoto ? <Icon name="spinner" size={16} className="animate-spin" /> : <Icon name="camera" size={16} />}
         </button>
@@ -140,7 +140,7 @@ export function ItemPhotoGallery({ item, studioPhotos }: { item: Item; studioPho
               onClick={handleRotatePhoto}
               disabled={rotatingPhoto}
               aria-label="Rotate photo"
-              className="tap-target flex size-9 items-center justify-center rounded-full bg-white/90 shadow-sm disabled:opacity-60"
+              className="tap-target flex size-9 items-center justify-center rounded-full bg-white/90 text-ink-fill shadow-sm disabled:opacity-60"
             >
               {rotatingPhoto ? <Icon name="spinner" size={16} className="animate-spin" /> : <Icon name="rotate" size={16} />}
             </button>
@@ -148,7 +148,7 @@ export function ItemPhotoGallery({ item, studioPhotos }: { item: Item; studioPho
               type="button"
               onClick={() => removeItemCoverPhoto(item.id)}
               aria-label="Remove photo"
-              className="tap-target flex size-9 items-center justify-center rounded-full bg-white/90 shadow-sm"
+              className="tap-target flex size-9 items-center justify-center rounded-full bg-white/90 text-ink-fill shadow-sm"
             >
               <Icon name="close" size={16} />
             </button>
@@ -157,7 +157,7 @@ export function ItemPhotoGallery({ item, studioPhotos }: { item: Item; studioPho
               onClick={() => photoInputRef.current?.click()}
               disabled={uploadingPhoto}
               aria-label="Change photo"
-              className="tap-target flex size-9 items-center justify-center rounded-full bg-white/90 shadow-sm disabled:opacity-60"
+              className="tap-target flex size-9 items-center justify-center rounded-full bg-white/90 text-ink-fill shadow-sm disabled:opacity-60"
             >
               {uploadingPhoto ? <Icon name="spinner" size={16} className="animate-spin" /> : <Icon name="camera" size={16} />}
             </button>
@@ -166,7 +166,7 @@ export function ItemPhotoGallery({ item, studioPhotos }: { item: Item; studioPho
           <button
             type="button"
             onClick={() => handleSetAsCover(active.path)}
-            className="tap-target absolute bottom-2 right-2 rounded-full bg-white/90 px-3 text-caption font-medium text-ink shadow-sm"
+            className="tap-target absolute bottom-2 right-2 rounded-full bg-white/90 px-3 text-caption font-medium text-ink-fill shadow-sm"
           >
             Set as cover
           </button>
@@ -181,7 +181,7 @@ export function ItemPhotoGallery({ item, studioPhotos }: { item: Item; studioPho
               type="button"
               onClick={() => setActiveIndex(i)}
               aria-label={p.label ?? "Cover photo"}
-              className={cn("size-14 shrink-0 overflow-hidden rounded-lg border-2", i === safeIndex ? "border-ink" : "border-transparent")}
+              className={cn("size-14 shrink-0 overflow-hidden rounded-lg border-2", i === safeIndex ? "border-ink-fill" : "border-transparent")}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={coverPhotoUrl(p.path)} alt={p.label ?? item.name} className="size-full object-cover" />

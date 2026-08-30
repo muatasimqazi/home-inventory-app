@@ -25,7 +25,7 @@ export default function TagLabelPage() {
 
   return (
     <div className="flex flex-col gap-5 pb-6 print:pb-0">
-      <button onClick={() => router.back()} className="tap-target flex size-9 items-center justify-center rounded-full bg-white shadow-sm print:hidden">
+      <button onClick={() => router.back()} className="tap-target flex size-9 items-center justify-center rounded-full bg-card shadow-sm print:hidden">
         <Icon name="arrowLeft" size={18} />
       </button>
       <div className="print:hidden">
@@ -33,7 +33,7 @@ export default function TagLabelPage() {
         <p className="mt-0.5 text-caption text-muted-foreground">Generate a durable QR label for this container.</p>
       </div>
 
-      <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-white p-8 print:border-0 print:shadow-none">
+      <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-card p-8 print:border-0 print:shadow-none">
         <QRCodeSVG value={resolveUrl} size={180} bgColor="#ffffff" fgColor="#212121" />
         <div className="text-center">
           <p className="text-item-title font-medium text-ink">{container.name}</p>
@@ -50,7 +50,7 @@ export default function TagLabelPage() {
       <button
         type="button"
         onClick={() => router.push(`/containers/${container.id}/nfc-setup`)}
-        className="flex items-start gap-3 rounded-2xl border border-border bg-white p-4 text-left shadow-sm print:hidden"
+        className="flex items-start gap-3 rounded-2xl border border-border bg-card p-4 text-left shadow-sm print:hidden"
       >
         <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-brand-100">
           <Icon name="nfc" size={20} className="text-brand-700" />
@@ -71,7 +71,7 @@ export default function TagLabelPage() {
         <Icon name="chevronRight" size={16} className="mt-1 shrink-0 text-muted-foreground" />
       </button>
 
-      <Button size="lg" onClick={() => window.print()} className="bg-ink text-white hover:bg-ink/90 print:hidden">
+      <Button size="lg" onClick={() => window.print()} className="bg-ink-fill text-white hover:bg-ink-fill/90 print:hidden">
         <Icon name="tag" size={16} /> Print label
       </Button>
     </div>

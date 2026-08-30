@@ -23,7 +23,7 @@ export default function TagDetailPage() {
   return (
     <div className="flex flex-col gap-5 pb-6">
       <div className="flex items-center justify-between">
-        <button onClick={() => router.back()} className="tap-target flex size-9 items-center justify-center rounded-full bg-white shadow-sm">
+        <button onClick={() => router.back()} className="tap-target flex size-9 items-center justify-center rounded-full bg-card shadow-sm">
           <Icon name="arrowLeft" size={18} />
         </button>
         <h1 className="text-body font-medium text-ink">#{tag.name}</h1>

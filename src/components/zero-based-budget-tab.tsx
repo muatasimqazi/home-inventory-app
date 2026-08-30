@@ -64,7 +64,7 @@ export function ZeroBasedBudgetTab({
         action={
           <Button
             size="sm"
-            className="bg-ink text-white hover:bg-ink/90"
+            className="bg-ink-fill text-white hover:bg-ink-fill/90"
             onClick={() => {
               setDraft("");
               setEditing(true);
@@ -79,11 +79,11 @@ export function ZeroBasedBudgetTab({
 
   if (editing) {
     return (
-      <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
         <label className="mb-1 block text-caption text-muted-foreground">Target monthly income</label>
         <div className="flex items-center gap-2">
           <Input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="$0.00" className="h-11 flex-1" inputMode="decimal" autoFocus />
-          <Button size="sm" className="bg-ink text-white hover:bg-ink/90" onClick={saveIncome}>
+          <Button size="sm" className="bg-ink-fill text-white hover:bg-ink-fill/90" onClick={saveIncome}>
             Save
           </Button>
           <Button size="sm" variant="outline" onClick={() => setEditing(false)}>
@@ -98,7 +98,7 @@ export function ZeroBasedBudgetTab({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
         <div className="flex items-center justify-between gap-2">
           <p className="text-caption font-medium tracking-wide text-muted-foreground uppercase">Target Income</p>
           <button type="button" onClick={() => { setDraft(String(allocation.targetIncome)); setEditing(true); }} className="text-caption font-medium text-yellow-text">
@@ -121,7 +121,7 @@ export function ZeroBasedBudgetTab({
       </div>
 
       {allocation.slices.length > 0 && (
-        <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
+        <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-card shadow-sm">
           {allocation.slices.map((s, i) => (
             <div key={s.categoryId} className="flex items-center gap-3 px-4 py-3">
               <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: shadeForRank(i) }} />

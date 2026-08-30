@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { ThemeProvider } from "next-themes";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { HydrationGate } from "@/components/hydration-gate";
@@ -32,7 +33,13 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#1a1d29", // v3 palette — near-black ink, was v2's warm-toned #212121
+  // Matches whichever theme is actually active (see ThemeProvider below) —
+  // light keeps the app's white page background, dark matches
+  // globals.css's .dark --color-background.
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#12141a" },
+  ],
   // Helps Chromium (Android) reposition fixed UI above the keyboard, but
   // Safari/iOS has never implemented interactive-widget, so this alone does
   // nothing there — the real cross-browser fix is useKeyboardInset (see
@@ -53,24 +60,35 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full antialiased">
+    <html lang="en" className="h-full antialiased" suppressHydrationWarning>
       <body className="min-h-full flex flex-col">
-        <HydrationGate>
-          <DomainGate>{children}</DomainGate>
-        </HydrationGate>
-        {/* Default 16px top offset lands inside the app's back-button/header
-            row (~56-64px tall); push toasts below it instead. Sonner uses a
-            *separate* mobileOffset (not offset) below a 600px viewport, so
-            both must be set identically or phones silently fall back to the
-            unoffset default — this app is viewed almost exclusively on phones. */}
-        <Toaster
-          position="top-center"
-          offset={{ top: "calc(env(safe-area-inset-top) + 72px)" }}
-          mobileOffset={{ top: "calc(env(safe-area-inset-top) + 72px)" }}
-        />
-        {/* One instance for the whole app — any component opens it via
-            useLightboxStore().openLightbox(...), no per-page wiring. */}
-        <PhotoLightbox />
+        {/* attribute="class" toggles the .dark class this app's own
+            @custom-variant dark selector (globals.css) reads; "system"
+            resolves prefers-color-scheme into a real class for us, so no
+            separate media-query branch is needed anywhere else. Persists
+            the user's choice to localStorage itself — see the Settings
+            page's Light/Dark/System control for the write side.
+            suppressHydrationWarning above is next-themes' own documented
+            requirement: it sets the class on <html> before React hydrates,
+            which would otherwise mismatch the server-rendered markup. */}
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <HydrationGate>
+            <DomainGate>{children}</DomainGate>
+          </HydrationGate>
+          {/* Default 16px top offset lands inside the app's back-button/header
+              row (~56-64px tall); push toasts below it instead. Sonner uses a
+              *separate* mobileOffset (not offset) below a 600px viewport, so
+              both must be set identically or phones silently fall back to the
+              unoffset default — this app is viewed almost exclusively on phones. */}
+          <Toaster
+            position="top-center"
+            offset={{ top: "calc(env(safe-area-inset-top) + 72px)" }}
+            mobileOffset={{ top: "calc(env(safe-area-inset-top) + 72px)" }}
+          />
+          {/* One instance for the whole app — any component opens it via
+              useLightboxStore().openLightbox(...), no per-page wiring. */}
+          <PhotoLightbox />
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -197,7 +197,7 @@ export default function FinanceCsvImportPage() {
       </div>
 
       {accounts.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-border bg-white p-4 text-center text-caption text-muted-foreground">
+        <p className="rounded-2xl border border-dashed border-border bg-card p-4 text-center text-caption text-muted-foreground">
           Add an account first — CSV rows import into one specific account.
         </p>
       ) : (
@@ -210,7 +210,7 @@ export default function FinanceCsvImportPage() {
                 const file = e.dataTransfer.files?.[0];
                 if (file) handleFile(file);
               }}
-              className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border bg-white p-12 text-center"
+              className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border bg-card p-12 text-center"
             >
               <Icon name="file" size={28} className="text-muted-foreground" />
               <p className="text-body font-semibold text-ink">Drop CSV file here</p>
@@ -229,7 +229,7 @@ export default function FinanceCsvImportPage() {
           )}
 
           {stage === "mapping" && (
-            <div className="flex flex-col gap-4 rounded-2xl border border-border bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
               <p className="text-caption text-muted-foreground">{rows.length} rows found in {fileName}.</p>
 
               <div>
@@ -279,7 +279,7 @@ export default function FinanceCsvImportPage() {
           )}
 
           {stage === "review" && (
-            <div className="flex flex-col gap-4 rounded-2xl border border-border bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
               <div className="flex items-center justify-between">
                 <p className="text-caption text-muted-foreground">{candidates.length} rows parsed.</p>
                 {duplicateCount > 0 && (
@@ -326,7 +326,7 @@ export default function FinanceCsvImportPage() {
           )}
 
           {stage === "importing" && (
-            <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-white p-12 shadow-sm">
+            <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-card p-12 shadow-sm">
               <Icon name="spinner" size={28} className="animate-spin text-ink" />
               <p className="text-body text-ink">Importing… {progress}%</p>
               <div className="h-2 w-64 overflow-hidden rounded-full bg-surface-muted">
@@ -336,7 +336,7 @@ export default function FinanceCsvImportPage() {
           )}
 
           {stage === "complete" && summary && (
-            <div className="flex flex-col gap-4 rounded-2xl border border-border bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
               <div className="flex items-center gap-3">
                 <div className="flex size-11 items-center justify-center rounded-full bg-badge-green-bg text-badge-green-text">
                   <Icon name="check" size={20} />
@@ -356,7 +356,7 @@ export default function FinanceCsvImportPage() {
                 >
                   View transactions
                 </Link>
-                <Button size="lg" className="flex-1 bg-ink text-white hover:bg-ink/90" onClick={reset}>
+                <Button size="lg" className="flex-1 bg-ink-fill text-white hover:bg-ink-fill/90" onClick={reset}>
                   Import another file
                 </Button>
               </div>

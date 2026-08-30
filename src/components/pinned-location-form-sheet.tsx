@@ -112,7 +112,7 @@ export function PinnedLocationFormSheet({
             <button
               type="button"
               onClick={() => photoInputRef.current?.click()}
-              className="flex size-20 items-center justify-center overflow-hidden rounded-xl border border-dashed border-border bg-white"
+              className="flex size-20 items-center justify-center overflow-hidden rounded-xl border border-dashed border-border bg-card"
             >
               {photoPreviewUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -154,7 +154,7 @@ export function PinnedLocationFormSheet({
           <div>
             <label className="mb-1 block text-caption text-muted-foreground">Category</label>
             <Select value={category} onValueChange={(v) => setCategory(v as PinnedLocationCategory)}>
-              <SelectTrigger className="h-11 w-full bg-white">
+              <SelectTrigger className="h-11 w-full bg-card">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -177,7 +177,7 @@ export function PinnedLocationFormSheet({
             />
           </div>
 
-          <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={handleSubmit} disabled={saving}>
+          <Button size="lg" className="bg-ink-fill text-white hover:bg-ink-fill/90" onClick={handleSubmit} disabled={saving}>
             {saving ? <Icon name="spinner" size={16} className="animate-spin" /> : "Save"}
           </Button>
         </div>

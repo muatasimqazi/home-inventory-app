@@ -19,7 +19,7 @@ export default function TagsPage() {
 
   return (
     <div className="flex flex-col gap-5 pb-6">
-      <button onClick={() => router.back()} className="tap-target flex size-9 items-center justify-center rounded-full bg-white shadow-sm md:hidden">
+      <button onClick={() => router.back()} className="tap-target flex size-9 items-center justify-center rounded-full bg-card shadow-sm md:hidden">
         <Icon name="arrowLeft" size={18} />
       </button>
       <div>
@@ -39,7 +39,7 @@ export default function TagsPage() {
             <Link
               key={tag.id}
               href={`/tags/${tag.id}`}
-              className="tap-target flex items-center gap-3 rounded-2xl border border-border bg-white px-4 py-3 shadow-sm"
+              className="tap-target flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 shadow-sm"
             >
               <span className="flex size-10 shrink-0 items-center justify-center rounded-[10px] bg-brand-100">
                 <Icon name="tag" size={16} className="text-yellow" />

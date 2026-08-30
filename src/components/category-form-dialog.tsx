@@ -46,7 +46,7 @@ export function CategoryFormDialog({ open, onOpenChange, initialName = "", onSub
           </Button>
           <Button
             size="lg"
-            className="flex-auto bg-ink text-white hover:bg-ink/90"
+            className="flex-auto bg-ink-fill text-white hover:bg-ink-fill/90"
             onClick={() => {
               if (!name.trim()) {
                 setError("Name is required.");

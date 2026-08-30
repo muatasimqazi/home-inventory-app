@@ -49,7 +49,7 @@ export default function HomeMapPage() {
 
   return (
     <div className="flex flex-col gap-5 pb-6">
-      <button onClick={() => router.back()} className="tap-target flex size-9 items-center justify-center rounded-full bg-white shadow-sm md:hidden">
+      <button onClick={() => router.back()} className="tap-target flex size-9 items-center justify-center rounded-full bg-card shadow-sm md:hidden">
         <Icon name="arrowLeft" size={18} />
       </button>
 
@@ -91,7 +91,7 @@ export default function HomeMapPage() {
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") openEdit(pin);
               }}
-              className="group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-border bg-white text-left shadow-sm"
+              className="group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-border bg-card text-left shadow-sm"
             >
               <PinnedLocationPhoto photoPath={pin.photoPath} category={pin.category} className="aspect-square w-full rounded-none" enableLightbox />
               <div className="flex flex-col gap-0.5 p-3">
@@ -106,7 +106,7 @@ export default function HomeMapPage() {
                   setDeletingPin(pin);
                 }}
                 aria-label={`Remove ${pin.name}`}
-                className="tap-target absolute right-2 top-2 flex size-7 items-center justify-center rounded-full bg-white/90 text-muted-foreground shadow-sm hover:text-danger"
+                className="tap-target absolute right-2 top-2 flex size-7 items-center justify-center rounded-full bg-white/90 text-ink-fill/70 shadow-sm hover:text-danger"
               >
                 <Icon name="close" size={14} />
               </button>

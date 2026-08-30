@@ -105,7 +105,7 @@ export default function LocationsListPage() {
                     <Link
                       key={loc.id}
                       href={`/locations/${loc.id}`}
-                      className="flex items-stretch gap-3 overflow-hidden rounded-2xl border border-border bg-white shadow-sm"
+                      className="flex items-stretch gap-3 overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
                     >
                       {/* Edge-to-edge top-to-bottom (and flush left) — the
                           photo has no padding of its own; the text side keeps

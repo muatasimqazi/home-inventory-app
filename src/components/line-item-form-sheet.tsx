@@ -223,7 +223,7 @@ function LineItemFormSheetInner({
 
           {error && <p className="text-caption text-danger">{error}</p>}
 
-          <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={handleSubmit}>
+          <Button size="lg" className="bg-ink-fill text-white hover:bg-ink-fill/90" onClick={handleSubmit}>
             {isCreate ? "Add Item" : "Save"}
           </Button>
 
@@ -252,13 +252,13 @@ function LineItemFormSheetInner({
                 <p className="text-caption font-semibold text-ink">Mark as Returned</p>
 
                 {refundOptions.length > 0 && (
-                  <div className="flex gap-0.5 rounded-lg bg-white p-0.75">
+                  <div className="flex gap-0.5 rounded-lg bg-card p-0.75">
                     <button
                       type="button"
                       onClick={() => setReturnMode("new")}
                       className={cn(
                         "flex-1 rounded-md py-1.5 text-caption font-semibold transition-colors",
-                        returnMode === "new" ? "bg-ink text-white" : "text-muted-foreground"
+                        returnMode === "new" ? "bg-ink-fill text-white" : "text-muted-foreground"
                       )}
                     >
                       New refund
@@ -268,7 +268,7 @@ function LineItemFormSheetInner({
                       onClick={() => setReturnMode("existing")}
                       className={cn(
                         "flex-1 rounded-md py-1.5 text-caption font-semibold transition-colors",
-                        returnMode === "existing" ? "bg-ink text-white" : "text-muted-foreground"
+                        returnMode === "existing" ? "bg-ink-fill text-white" : "text-muted-foreground"
                       )}
                     >
                       Link existing
@@ -288,12 +288,12 @@ function LineItemFormSheetInner({
                         }}
                         placeholder="$0.00"
                         inputMode="decimal"
-                        className="h-11 bg-white"
+                        className="h-11 bg-card"
                       />
                     </div>
                     <div>
                       <label className="mb-1 block text-caption text-muted-foreground">Date</label>
-                      <Input type="date" value={refundDate} onChange={(e) => setRefundDate(e.target.value)} className="h-11 bg-white" />
+                      <Input type="date" value={refundDate} onChange={(e) => setRefundDate(e.target.value)} className="h-11 bg-card" />
                     </div>
                   </div>
                 ) : (
@@ -309,7 +309,7 @@ function LineItemFormSheetInner({
                           if (returnError) setReturnError(null);
                         }}
                       >
-                        <SelectTrigger className="h-11 w-full bg-white">
+                        <SelectTrigger className="h-11 w-full bg-card">
                           <SelectValue placeholder="Choose a refund transaction" />
                         </SelectTrigger>
                         <SelectContent>
@@ -331,7 +331,7 @@ function LineItemFormSheetInner({
                         }}
                         placeholder="$0.00"
                         inputMode="decimal"
-                        className="h-11 bg-white"
+                        className="h-11 bg-card"
                       />
                     </div>
                   </>
@@ -343,7 +343,7 @@ function LineItemFormSheetInner({
                   <Button variant="outline" size="sm" className="flex-1" onClick={() => setShowReturnForm(false)}>
                     Cancel
                   </Button>
-                  <Button size="sm" className="flex-1 bg-ink text-white hover:bg-ink/90" onClick={handleConfirmReturn}>
+                  <Button size="sm" className="flex-1 bg-ink-fill text-white hover:bg-ink-fill/90" onClick={handleConfirmReturn}>
                     Confirm Return
                   </Button>
                 </div>

@@ -149,7 +149,7 @@ export default function StatementImportPage() {
       </div>
 
       {accounts.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-border bg-white p-4 text-center text-caption text-muted-foreground">
+        <p className="rounded-2xl border border-dashed border-border bg-card p-4 text-center text-caption text-muted-foreground">
           Add an account first — detected bills get attached to one.
         </p>
       ) : (
@@ -178,7 +178,7 @@ export default function StatementImportPage() {
                   const file = e.dataTransfer.files?.[0];
                   if (file) handleFile(file);
                 }}
-                className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border bg-white p-12 text-center"
+                className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border bg-card p-12 text-center"
               >
                 <Icon name="file" size={28} className="text-muted-foreground" />
                 <p className="text-body font-semibold text-ink">Drop statement PDF here</p>
@@ -200,7 +200,7 @@ export default function StatementImportPage() {
           )}
 
           {stage === "analyzing" && (
-            <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-white p-12 shadow-sm">
+            <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-card p-12 shadow-sm">
               {error ? (
                 <>
                   <div className="flex size-14 items-center justify-center rounded-full bg-danger/10">
@@ -230,7 +230,7 @@ export default function StatementImportPage() {
           )}
 
           {stage === "review" && (
-            <div className="flex flex-col gap-4 rounded-2xl border border-border bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
               <p className="text-caption text-muted-foreground">
                 {transactionCount} transaction{transactionCount === 1 ? "" : "s"} found · {rows.length} recurring pattern{rows.length === 1 ? "" : "s"} detected
               </p>
@@ -242,7 +242,7 @@ export default function StatementImportPage() {
               ) : (
                 <div className="flex flex-col gap-3">
                   {rows.map((r) => (
-                    <div key={r.id} className={cn("flex flex-col gap-2 rounded-xl border p-3", r.alreadyTracked ? "border-border bg-surface-muted" : "border-border bg-white")}>
+                    <div key={r.id} className={cn("flex flex-col gap-2 rounded-xl border p-3", r.alreadyTracked ? "border-border bg-surface-muted" : "border-border bg-card")}>
                       <div className="flex items-start gap-3">
                         <input
                           type="checkbox"
@@ -323,7 +323,7 @@ export default function StatementImportPage() {
           )}
 
           {stage === "creating" && (
-            <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-white p-12 shadow-sm">
+            <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-card p-12 shadow-sm">
               <Icon name="spinner" size={28} className="animate-spin text-ink" />
               <p className="text-body text-ink">Adding… {progress}%</p>
               <div className="h-2 w-64 overflow-hidden rounded-full bg-surface-muted">
@@ -333,7 +333,7 @@ export default function StatementImportPage() {
           )}
 
           {stage === "complete" && summary && (
-            <div className="flex flex-col gap-4 rounded-2xl border border-border bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
               <div className="flex items-center gap-3">
                 <div className="flex size-11 items-center justify-center rounded-full bg-badge-green-bg text-badge-green-text">
                   <Icon name="check" size={20} />
@@ -350,7 +350,7 @@ export default function StatementImportPage() {
                 <Link href="/finance/recurring" className="tap-target flex h-11 flex-1 items-center justify-center rounded-md border border-border text-body font-medium text-ink">
                   View recurring bills
                 </Link>
-                <Button size="lg" className="flex-1 bg-ink text-white hover:bg-ink/90" onClick={reset}>
+                <Button size="lg" className="flex-1 bg-ink-fill text-white hover:bg-ink-fill/90" onClick={reset}>
                   Import another statement
                 </Button>
               </div>

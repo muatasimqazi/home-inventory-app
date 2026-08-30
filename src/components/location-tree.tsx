@@ -43,7 +43,7 @@ function ContainerNode({ container, locationId, containers, items, depth, openId
         )}
         <Link
           href={`/containers/${container.id}`}
-          className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-border bg-white px-3 py-2 text-caption text-ink"
+          className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-caption text-ink"
         >
           {container.displayCode && (
             <span className={cn("shrink-0 rounded-full border px-2 py-0.5 text-micro font-semibold", displayCodeBadgeClasses(container.id))}>
@@ -99,7 +99,7 @@ export function LocationAccordionRow({
   const totalItemCount = activeItemCountForLocation(items, location.id);
 
   return (
-    <div className="overflow-hidden rounded-xl bg-white shadow-sm">
+    <div className="overflow-hidden rounded-xl bg-card shadow-sm">
       <button type="button" onClick={onToggle} className="tap-target flex w-full items-stretch gap-3 text-left">
         {/* Real cover photo, not just the emoji fallback — this row used to
             render location.coverPhotoEmoji unconditionally and never

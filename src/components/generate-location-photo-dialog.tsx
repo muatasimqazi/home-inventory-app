@@ -72,7 +72,7 @@ export function GenerateLocationPhotoDialog({ open, onOpenChange, initialRoomTyp
               }}
               className={cn(
                 "rounded-full border px-3 py-1.5 text-caption font-medium",
-                roomType === preset ? "border-ink bg-ink text-white" : "border-border bg-white text-ink"
+                roomType === preset ? "border-ink-fill bg-ink-fill text-white" : "border-border bg-card text-ink"
               )}
             >
               {preset}
@@ -111,7 +111,7 @@ export function GenerateLocationPhotoDialog({ open, onOpenChange, initialRoomTyp
           </Button>
           <Button
             size="lg"
-            className="flex-auto bg-ink text-white hover:bg-ink/90"
+            className="flex-auto bg-ink-fill text-white hover:bg-ink-fill/90"
             onClick={() => {
               if (!roomType.trim()) {
                 setError("Room type is required.");

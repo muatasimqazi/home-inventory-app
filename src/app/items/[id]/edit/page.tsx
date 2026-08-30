@@ -130,7 +130,7 @@ function EditItemForm({
 
   return (
     <div className="min-h-dvh bg-background">
-      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-white px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-card px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <button
           type="button"
           onClick={() => router.back()}
@@ -283,12 +283,12 @@ function EditItemForm({
         </Field>
       </div>
 
-      <div className="sticky bottom-0 border-t border-border bg-white px-4 py-3" style={{ bottom: keyboardInset }}>
+      <div className="sticky bottom-0 border-t border-border bg-card px-4 py-3" style={{ bottom: keyboardInset }}>
         <div className="mx-auto flex max-w-lg gap-2">
           <Button variant="outline" size="lg" className="flex-1" onClick={() => router.back()}>
             Cancel
           </Button>
-          <Button size="lg" className="flex-1 bg-ink text-white hover:bg-ink/90" onClick={handleSave}>
+          <Button size="lg" className="flex-1 bg-ink-fill text-white hover:bg-ink-fill/90" onClick={handleSave}>
             Save
           </Button>
         </div>

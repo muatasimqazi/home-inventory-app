@@ -169,7 +169,7 @@ function SignInInner() {
         ) : (
           <div className="flex w-full flex-col gap-3">
             {error && <p className="text-center text-caption text-danger">{error}</p>}
-            <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={continueWithGoogle}>
+            <Button size="lg" className="bg-ink-fill text-white hover:bg-ink-fill/90" onClick={continueWithGoogle}>
               Continue with Google
             </Button>
             <Button

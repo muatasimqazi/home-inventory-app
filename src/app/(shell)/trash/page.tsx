@@ -208,7 +208,7 @@ function InventoryTrashPanel() {
                 onClick={() => setFilter(t)}
                 className={cn(
                   "tap-target shrink-0 rounded-full border px-3 py-1.5 text-caption font-medium",
-                  filter === t ? "border-ink bg-ink text-white" : "border-border bg-white text-ink"
+                  filter === t ? "border-ink-fill bg-ink-fill text-white" : "border-border bg-card text-ink"
                 )}
               >
                 {t === "all" ? "All" : `${INVENTORY_TYPE_LABEL[t]}s`}
@@ -237,8 +237,8 @@ function InventoryTrashPanel() {
                 tabIndex={selectMode ? 0 : undefined}
                 onClick={selectMode ? () => toggleSelected(key) : undefined}
                 className={cn(
-                  "flex items-center gap-3 rounded-2xl border bg-white p-3 shadow-sm",
-                  isSelected ? "border-ink ring-1 ring-ink" : "border-border"
+                  "flex items-center gap-3 rounded-2xl border bg-card p-3 shadow-sm",
+                  isSelected ? "border-ink-fill ring-1 ring-ink-fill" : "border-border"
                 )}
               >
                 {selectMode && (
@@ -282,7 +282,7 @@ function InventoryTrashPanel() {
       )}
 
       {selectMode && selected.size > 0 && (
-        <div className="fixed inset-x-4 bottom-[calc(5.125rem+env(safe-area-inset-bottom))] z-40 flex items-center justify-between rounded-2xl bg-ink px-4 py-3 text-white shadow-lg md:bottom-4">
+        <div className="fixed inset-x-4 bottom-[calc(5.125rem+env(safe-area-inset-bottom))] z-40 flex items-center justify-between rounded-2xl bg-ink-fill px-4 py-3 text-white shadow-lg md:bottom-4">
           <span className="text-body">{selected.size} selected</span>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" className="border-white/30 bg-transparent text-white hover:bg-white/10" onClick={bulkRestore}>
@@ -405,7 +405,7 @@ function FinanceTrashPanel() {
               onClick={() => setFilter(t)}
               className={cn(
                 "tap-target shrink-0 rounded-full border px-3 py-1.5 text-caption font-medium",
-                filter === t ? "border-ink bg-ink text-white" : "border-border bg-white text-ink"
+                filter === t ? "border-ink-fill bg-ink-fill text-white" : "border-border bg-card text-ink"
               )}
             >
               {t === "all" ? "All" : FINANCE_TYPE_LABEL_PLURAL[t]}
@@ -421,7 +421,7 @@ function FinanceTrashPanel() {
           {paginatedRows.map((row) => {
             const key = financeRowKey(row);
             return (
-              <div key={key} className="flex items-center gap-3 rounded-2xl border border-border bg-white p-3 shadow-sm">
+              <div key={key} className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 shadow-sm">
                 <span className="flex size-11 shrink-0 items-center justify-center rounded-[10px] bg-surface-muted">
                   <Icon name={FINANCE_TYPE_ICON[row.type]} size={18} className="text-muted-foreground" />
                 </span>

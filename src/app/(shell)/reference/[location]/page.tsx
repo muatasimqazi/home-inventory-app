@@ -69,7 +69,7 @@ export default function ReferenceLocationDetailPage() {
       <div className="flex items-center justify-between">
         <button
           onClick={() => router.back()}
-          className="tap-target flex size-9 items-center justify-center rounded-full bg-white shadow-sm"
+          className="tap-target flex size-9 items-center justify-center rounded-full bg-card shadow-sm"
           aria-label="Back"
         >
           <Icon name="arrowLeft" size={18} />
@@ -79,7 +79,7 @@ export default function ReferenceLocationDetailPage() {
       </div>
 
       {locationItems === null ? (
-        <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-white p-12 shadow-sm">
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-card p-12 shadow-sm">
           <Icon name="spinner" size={28} className="animate-spin text-ink" />
           <p className="text-body text-ink">Loading catalog…</p>
         </div>
@@ -90,7 +90,7 @@ export default function ReferenceLocationDetailPage() {
           {locationItems.map((item) => (
             <div
               key={item.name}
-              className="flex items-center gap-3 rounded-xl border border-border bg-white px-4 py-3 shadow-sm"
+              className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-sm"
             >
               <div className="min-w-0 flex-1">
                 <p className="truncate text-body font-medium text-ink">{item.name}</p>

@@ -103,7 +103,7 @@ export default function NfcSetupPage() {
 
   return (
     <div className="min-h-dvh bg-background">
-      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-white px-4 py-3">
+      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-card px-4 py-3">
         <button
           type="button"
           onClick={goBack}
@@ -147,11 +147,11 @@ export default function NfcSetupPage() {
         )}
       </div>
 
-      <div className="sticky bottom-0 border-t border-border bg-white px-4 py-3">
+      <div className="sticky bottom-0 border-t border-border bg-card px-4 py-3">
         <div className="mx-auto flex max-w-lg flex-col gap-2">
           {screen === "setup" && platform === "ios" && (
             <>
-              <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={markTagWritten}>
+              <Button size="lg" className="bg-ink-fill text-white hover:bg-ink-fill/90" onClick={markTagWritten}>
                 I&apos;ve written this tag
               </Button>
               <Button size="lg" variant="outline" onClick={() => router.push(`/containers/${container.id}/label`)}>
@@ -161,7 +161,7 @@ export default function NfcSetupPage() {
           )}
           {screen === "setup" && platform === "android" && (
             <>
-              <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={startWriting}>
+              <Button size="lg" className="bg-ink-fill text-white hover:bg-ink-fill/90" onClick={startWriting}>
                 Write NFC tag
               </Button>
               <Button size="lg" variant="outline" onClick={() => router.push(`/containers/${container.id}/label`)}>
@@ -171,7 +171,7 @@ export default function NfcSetupPage() {
           )}
           {screen === "setup" && platform === "other" && (
             <>
-              <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={() => router.push(`/containers/${container.id}/label`)}>
+              <Button size="lg" className="bg-ink-fill text-white hover:bg-ink-fill/90" onClick={() => router.push(`/containers/${container.id}/label`)}>
                 Print QR label
               </Button>
               <Button size="lg" variant="outline" onClick={() => router.push(`/containers/${container.id}`)}>
@@ -181,7 +181,7 @@ export default function NfcSetupPage() {
           )}
           {screen === "writing" && (
             <>
-              <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={confirmWrite} disabled={writing}>
+              <Button size="lg" className="bg-ink-fill text-white hover:bg-ink-fill/90" onClick={confirmWrite} disabled={writing}>
                 {writing ? <Icon name="spinner" size={16} className="animate-spin" /> : "Start writing"}
               </Button>
               <Button size="lg" variant="outline" onClick={() => router.push(`/containers/${container.id}/label`)} disabled={writing}>
@@ -191,7 +191,7 @@ export default function NfcSetupPage() {
           )}
           {screen === "linked" && (
             <>
-              <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={() => router.push(`/containers/${container.id}/label`)}>
+              <Button size="lg" className="bg-ink-fill text-white hover:bg-ink-fill/90" onClick={() => router.push(`/containers/${container.id}/label`)}>
                 Print labels
               </Button>
               <Button size="lg" variant="outline" onClick={() => router.push(`/containers/${container.id}`)}>
@@ -221,11 +221,11 @@ function StatusPill({ tone, children }: { tone: "neutral" | "green"; children: R
 function TagPreviewRow({ code, resolveUrl, qrSize = 112 }: { code: string; resolveUrl: string; qrSize?: number }) {
   return (
     <div className="flex items-center justify-center gap-6 py-2">
-      <div className="rounded-lg border border-border bg-white p-2">
+      <div className="rounded-lg border border-border bg-card p-2">
         <QRCodeSVG value={resolveUrl} size={qrSize} bgColor="#ffffff" fgColor="#212121" />
       </div>
       <div className="flex flex-col items-center gap-1.5">
-        <div className="flex size-20 items-center justify-center rounded-2xl border border-border bg-white">
+        <div className="flex size-20 items-center justify-center rounded-2xl border border-border bg-card">
           <Icon name="nfc" size={32} className="text-ink" />
         </div>
         <p className="font-mono text-micro font-semibold text-ink">{code}</p>
@@ -258,7 +258,7 @@ function SetupScreen({
         </p>
       </div>
 
-      <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
         <TagPreviewRow code={code} resolveUrl={resolveUrl} />
         <div className="mt-2 flex items-center justify-center gap-2">
           <StatusPill tone="neutral">QR ready</StatusPill>
@@ -275,7 +275,7 @@ function SetupScreen({
           needed), so the real answer is "write it from elsewhere". */}
       {platform === "ios" ? (
         <>
-          <div className="flex items-start gap-3 rounded-2xl border border-border bg-white p-4 shadow-sm">
+          <div className="flex items-start gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
             <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-brand-100">
               <Icon name="smartphone" size={20} className="text-brand-700" />
             </span>
@@ -294,7 +294,7 @@ function SetupScreen({
               navigator.clipboard.writeText(resolveUrl);
               toast.success("Link copied");
             }}
-            className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-white p-4 text-left shadow-sm"
+            className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-card p-4 text-left shadow-sm"
           >
             <div className="min-w-0">
               <p className="text-body font-semibold text-ink">Copy container link</p>
@@ -307,7 +307,7 @@ function SetupScreen({
         <button
           type="button"
           onClick={onWriteNfc}
-          className="flex items-start gap-3 rounded-2xl border border-border bg-white p-4 text-left shadow-sm"
+          className="flex items-start gap-3 rounded-2xl border border-border bg-card p-4 text-left shadow-sm"
         >
           <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-brand-100">
             <Icon name="nfc" size={20} className="text-brand-700" />
@@ -315,7 +315,7 @@ function SetupScreen({
           <span className="min-w-0 flex-1">
             <span className="flex items-center gap-2">
               <span className="text-body font-semibold text-ink">Write container link to tag</span>
-              <span className="rounded-md bg-ink px-1.5 py-0.5 text-micro font-semibold text-white">Best</span>
+              <span className="rounded-md bg-ink-fill px-1.5 py-0.5 text-micro font-semibold text-white">Best</span>
             </span>
             <span className="mt-1 block text-caption text-muted-foreground">Writes the container link to a writable NFC tag.</span>
           </span>
@@ -324,7 +324,7 @@ function SetupScreen({
 
       {platform === "android" && (
         <div className="flex items-center gap-3 rounded-2xl border border-badge-green-border bg-badge-green-bg p-4">
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-lg border border-badge-green-border bg-white">
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-lg border border-badge-green-border bg-card">
             <Icon name="nfc" size={20} className="text-badge-green-text" />
           </span>
           <div>
@@ -351,17 +351,17 @@ function QrOnlyScreen({ code, resolveUrl, container }: { code: string; resolveUr
         </p>
       </div>
 
-      <div className="flex items-start gap-3 rounded-2xl border border-border bg-white p-4 shadow-sm">
+      <div className="flex items-start gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
         <span className="rounded-lg bg-brand-100 px-3 py-1.5 text-micro font-semibold text-brand-700">Web/Desktop · QR only</span>
       </div>
 
-      <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-white p-6 shadow-sm">
+      <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-card p-6 shadow-sm">
         <QRCodeSVG value={resolveUrl} size={158} bgColor="#ffffff" fgColor="#212121" />
         <span className="rounded-lg bg-badge-red-bg px-3 py-1.5 font-mono text-caption font-semibold text-badge-red-text">{code}</span>
         <p className="text-center text-caption text-muted-foreground">Print this QR code for {container.name}.</p>
       </div>
 
-      <div className="flex items-start gap-3 rounded-2xl border border-border bg-white p-4 shadow-sm">
+      <div className="flex items-start gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
         <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-brand-100">
           <Icon name="smartphone" size={20} className="text-brand-700" />
         </span>
@@ -382,7 +382,7 @@ function WritingScreen({ code, resolveUrl, writing }: { code: string; resolveUrl
         <p className="mt-1 text-body text-muted-foreground">This writes a direct Schuaz container link onto a writable NFC tag.</p>
       </div>
 
-      <div className="flex items-center justify-between rounded-2xl border border-border bg-white p-4 shadow-sm">
+      <div className="flex items-center justify-between rounded-2xl border border-border bg-card p-4 shadow-sm">
         <StepDot label="Review link" state="done" />
         <div className="h-px flex-1 bg-border" />
         <StepDot label="Hold tag" state={writing ? "active" : "pending"} />
@@ -390,14 +390,14 @@ function WritingScreen({ code, resolveUrl, writing }: { code: string; resolveUrl
         <StepDot label="Done" state="pending" />
       </div>
 
-      <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
         <p className="text-micro font-semibold text-muted-foreground">NDEF URL</p>
         <p className="mt-1 break-all text-body font-semibold text-ink">{resolveUrl}</p>
         <p className="mt-1 text-caption text-muted-foreground">Anyone with access can open this container detail screen.</p>
       </div>
 
-      <div className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-white p-6 shadow-sm">
-        <div className={cn("flex size-20 items-center justify-center rounded-2xl border border-border bg-white", writing && "animate-pulse")}>
+      <div className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card p-6 shadow-sm">
+        <div className={cn("flex size-20 items-center justify-center rounded-2xl border border-border bg-card", writing && "animate-pulse")}>
           <Icon name="nfc" size={32} className="text-ink" />
         </div>
         <p className="font-mono text-micro font-semibold text-ink">{code}</p>
@@ -483,14 +483,14 @@ function LinkedScreen({
         </p>
       </div>
 
-      <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
         <TagPreviewRow code={code} resolveUrl={resolveUrl} qrSize={118} />
         <div className="mt-2 flex justify-center">
           <StatusPill tone="green">NFC linked on this device</StatusPill>
         </div>
       </div>
 
-      <div className="flex items-center justify-between rounded-2xl border border-border bg-white p-4 shadow-sm">
+      <div className="flex items-center justify-between rounded-2xl border border-border bg-card p-4 shadow-sm">
         <div>
           <p className="text-item-title font-semibold text-ink">Test the tag</p>
           <p className="mt-1 text-caption text-muted-foreground">Hold your phone near the tag to confirm it opens this container.</p>
@@ -503,7 +503,7 @@ function LinkedScreen({
       <button
         type="button"
         onClick={onWriteDifferentTag}
-        className="flex items-center justify-between rounded-2xl border border-border bg-white p-4 text-left shadow-sm"
+        className="flex items-center justify-between rounded-2xl border border-border bg-card p-4 text-left shadow-sm"
       >
         <div>
           <p className="text-body font-semibold text-ink">Write a different tag</p>
@@ -512,7 +512,7 @@ function LinkedScreen({
         <Icon name="chevronRight" size={16} className="shrink-0 text-muted-foreground" />
       </button>
 
-      <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
         <p className="text-body font-semibold text-ink">Need another label?</p>
         <p className="mt-1 text-caption text-muted-foreground">Print QR + {code} for your 25mm rounded tag.</p>
       </div>

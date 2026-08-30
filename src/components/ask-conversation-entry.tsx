@@ -24,8 +24,8 @@ export function AskConversationEntry({ entry, onRetry }: { entry: Entry; onRetry
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="max-w-[85%] self-end rounded-2xl rounded-br-sm bg-ink px-3 py-2 text-caption text-white">{entry.question}</div>
-      <div className="flex max-w-[90%] items-start gap-2 self-start rounded-2xl rounded-bl-sm border border-border bg-white px-3 py-2">
+      <div className="max-w-[85%] self-end rounded-2xl rounded-br-sm bg-ink-fill px-3 py-2 text-caption text-white">{entry.question}</div>
+      <div className="flex max-w-[90%] items-start gap-2 self-start rounded-2xl rounded-bl-sm border border-border bg-card px-3 py-2">
         <Icon name="ai" size={13} className="mt-0.5 shrink-0 text-yellow" />
         {entry.pending ? (
           <Icon name="spinner" size={14} className="animate-spin text-muted-foreground" />
@@ -47,7 +47,7 @@ export function AskConversationEntry({ entry, onRetry }: { entry: Entry; onRetry
               key={`${ref.kind}-${ref.id}`}
               href={ref.href}
               onClick={openPanel}
-              className="flex items-center gap-2 rounded-xl border border-border bg-white p-2 shadow-sm"
+              className="flex items-center gap-2 rounded-xl border border-border bg-card p-2 shadow-sm"
             >
               {ref.imageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element

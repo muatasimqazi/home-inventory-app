@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 import { useAutoFocusVisible } from "@/hooks/use-autofocus-visible";
 import { useRouter } from "next/navigation";
+import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { Icon, type IconName } from "@/components/icon";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { useInventoryStore, useCurrentHousehold } from "@/lib/store";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { listTimeZones, detectedTimeZone } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 // Sentinel for "no override, use this device's own zone" — Member.timezone
 // itself stays null in that case; Select just can't bind a literal empty
@@ -74,9 +76,9 @@ export default function SettingsPage() {
           setNameError(null);
           setEditOpen(true);
         }}
-        className="tap-target flex items-center gap-3 rounded-2xl border border-border bg-white p-4 text-left shadow-sm"
+        className="tap-target flex items-center gap-3 rounded-2xl border border-border bg-card p-4 text-left shadow-sm"
       >
-        <div className="flex size-12 items-center justify-center rounded-full bg-ink text-body font-medium text-white">
+        <div className="flex size-12 items-center justify-center rounded-full bg-ink-fill text-body font-medium text-white">
           {me?.displayName.slice(0, 1) ?? "?"}
         </div>
         <div className="min-w-0 flex-1">
@@ -85,6 +87,14 @@ export default function SettingsPage() {
         </div>
         <Icon name="edit" size={16} className="shrink-0 text-muted-foreground" />
       </button>
+
+      <div className="flex items-center justify-between rounded-2xl border border-border bg-card p-4 shadow-sm">
+        <div>
+          <p className="text-body font-medium text-ink">Appearance</p>
+          <p className="text-caption text-muted-foreground">Light, dark, or match this device</p>
+        </div>
+        <ThemeToggle />
+      </div>
 
       <p className="text-caption font-medium tracking-wide text-muted-foreground uppercase">Settings</p>
       <div className="flex flex-col gap-2">
@@ -121,7 +131,7 @@ export default function SettingsPage() {
           await getSupabaseBrowserClient().auth.signOut();
           router.push("/sign-in");
         }}
-        className="tap-target flex items-center justify-center gap-2 rounded-2xl border border-border bg-white py-3 text-body font-medium text-danger"
+        className="tap-target flex items-center justify-center gap-2 rounded-2xl border border-border bg-card py-3 text-body font-medium text-danger"
       >
         <Icon name="logOut" size={16} /> Sign out
       </button>
@@ -147,7 +157,7 @@ export default function SettingsPage() {
                   setNameInput(e.target.value);
                   if (nameError) setNameError(null);
                 }}
-                className="h-11 bg-white"
+                className="h-11 bg-card"
                 ref={nameInputRef}
               />
               {nameError && <p className="mt-1 text-caption text-danger">{nameError}</p>}
@@ -155,7 +165,7 @@ export default function SettingsPage() {
             <div>
               <label className="mb-1 block text-caption text-muted-foreground">Time zone</label>
               <Select value={timezoneInput} onValueChange={setTimezoneInput}>
-                <SelectTrigger className="h-11 w-full bg-white">
+                <SelectTrigger className="h-11 w-full bg-card">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -171,12 +181,54 @@ export default function SettingsPage() {
                 Used for “today” — e.g. a scanned receipt with no readable date, or the day a bill reminder fires. Leave on Automatic unless this device&apos;s own time zone is wrong or you want a fixed “home” zone while traveling.
               </p>
             </div>
-            <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={handleSaveProfile} disabled={saving}>
+            <Button size="lg" className="bg-ink-fill text-white hover:bg-ink-fill/90" onClick={handleSaveProfile} disabled={saving}>
               {saving ? <Icon name="spinner" size={16} className="animate-spin" /> : "Save"}
             </Button>
           </div>
         </SheetContent>
       </Sheet>
+    </div>
+  );
+}
+
+const THEME_OPTIONS: { value: "light" | "dark" | "system"; label: string; icon: IconName }[] = [
+  { value: "light", label: "Light", icon: "sun" },
+  { value: "dark", label: "Dark", icon: "moon" },
+  { value: "system", label: "System", icon: "smartphone" },
+];
+
+const noSubscription = () => () => {};
+
+/** SSR/first paint has no real answer (next-themes reads localStorage/matchMedia only after mount) — this same useSyncExternalStore trick as nfc-setup/page.tsx's usePlatform avoids the cascading-render footgun of setState-in-an-effect. */
+function useMounted(): boolean {
+  return useSyncExternalStore(noSubscription, () => true, () => false);
+}
+
+/** Drives next-themes directly — it persists the choice to localStorage itself, no store/DB round-trip needed. Resolved theme is unknown until mounted (see useMounted above), so this renders a neutral placeholder until then to avoid a hydration flash of the wrong active pill. */
+function ThemeToggle() {
+  const { theme, setTheme } = useTheme();
+  const mounted = useMounted();
+
+  return (
+    <div className="flex shrink-0 gap-1 rounded-full bg-surface-muted p-1">
+      {THEME_OPTIONS.map((opt) => {
+        const active = mounted && (theme ?? "system") === opt.value;
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            aria-label={opt.label}
+            aria-pressed={active}
+            onClick={() => setTheme(opt.value)}
+            className={cn(
+              "tap-target flex size-9 items-center justify-center rounded-full transition-colors",
+              active ? "bg-yellow text-white" : "text-muted-foreground"
+            )}
+          >
+            <Icon name={opt.icon} size={16} />
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -193,7 +245,7 @@ function SettingsRow({
   href: string;
 }) {
   return (
-    <Link href={href} className="tap-target flex items-center gap-3 rounded-2xl border border-border bg-white px-4 py-3 shadow-sm">
+    <Link href={href} className="tap-target flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 shadow-sm">
       <span className="flex size-10 shrink-0 items-center justify-center rounded-[10px] bg-brand-100">
         <Icon name={icon} size={18} className="text-yellow" />
       </span>

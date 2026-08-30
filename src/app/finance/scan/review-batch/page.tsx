@@ -185,7 +185,7 @@ export default function BulkStatementReviewPage() {
 
   return (
     <div className="min-h-dvh bg-background pb-28">
-      <header className="flex items-center gap-3 border-b border-border bg-white px-4 py-3">
+      <header className="flex items-center gap-3 border-b border-border bg-card px-4 py-3">
         <button
           type="button"
           onClick={() => {
@@ -205,7 +205,7 @@ export default function BulkStatementReviewPage() {
 
       <div className="flex flex-col gap-3 p-4">
         {pending.map((draft) => (
-          <div key={draft.id} className="rounded-2xl border border-border bg-white p-4">
+          <div key={draft.id} className="rounded-2xl border border-border bg-card p-4">
             <div className="flex items-start justify-between gap-2">
               <div>
                 <p className="text-body font-semibold text-ink">{draft.store || "Unknown store"}</p>
@@ -258,7 +258,7 @@ export default function BulkStatementReviewPage() {
               <Button variant="outline" size="sm" className="flex-1" onClick={() => handleDismiss(draft)}>
                 Dismiss
               </Button>
-              <Button size="sm" className="flex-1 bg-ink text-white hover:bg-ink/90" onClick={() => handleConfirmOne(draft)} disabled={confirmingId === draft.id}>
+              <Button size="sm" className="flex-1 bg-ink-fill text-white hover:bg-ink-fill/90" onClick={() => handleConfirmOne(draft)} disabled={confirmingId === draft.id}>
                 {confirmingId === draft.id ? <Icon name="spinner" size={14} className="animate-spin" /> : "Confirm"}
               </Button>
             </div>
@@ -267,10 +267,10 @@ export default function BulkStatementReviewPage() {
       </div>
 
       <div
-        className="fixed inset-x-0 bottom-0 border-t border-border bg-white px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+        className="fixed inset-x-0 bottom-0 border-t border-border bg-card px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
         style={{ bottom: keyboardInset }}
       >
-        <Button size="lg" className="w-full bg-ink text-white hover:bg-ink/90" onClick={handleConfirmAll} disabled={confirmingAll || readyCount === 0}>
+        <Button size="lg" className="w-full bg-ink-fill text-white hover:bg-ink-fill/90" onClick={handleConfirmAll} disabled={confirmingAll || readyCount === 0}>
           {confirmingAll ? <Icon name="spinner" size={16} className="animate-spin" /> : `Confirm all ready (${readyCount})`}
         </Button>
       </div>

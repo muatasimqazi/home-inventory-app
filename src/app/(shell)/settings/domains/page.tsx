@@ -42,7 +42,7 @@ export default function HouseholdDomainsPage() {
 
       <DomainToggle
         icon="box"
-        tone="bg-ink"
+        tone="bg-ink-fill"
         title="Inventory"
         description="Catalog what you own — items, locations, containers"
         checked={household.inventoryEnabled}

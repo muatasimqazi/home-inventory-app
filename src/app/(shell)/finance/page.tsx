@@ -34,7 +34,7 @@ export default function FinanceIndexPage() {
           <p className="mt-0.5 text-caption text-muted-foreground">Household finances, all in one place.</p>
         </div>
       </div>
-      <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
+      <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-card shadow-sm">
         {SECTIONS.map((s) => (
           <Link key={s.href} href={s.href} className="flex items-center gap-3 px-4 py-3.5">
             <span className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-surface-muted text-ink">

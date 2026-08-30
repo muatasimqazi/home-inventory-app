@@ -92,7 +92,7 @@ export default function CategoriesAndRulesPage() {
               // tappable and a name can't ever truncate, it just pushes the
               // pill wider. One name per row, own line, actual tap targets —
               // same divide-y row-list convention as Rules right below.
-              <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
+              <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-card shadow-sm">
                 {filteredCategories.map((c) => (
                   <div key={c.id} className="flex items-center gap-3 px-4 py-3">
                     <span
@@ -143,7 +143,7 @@ export default function CategoriesAndRulesPage() {
         {categoryRules.length === 0 ? (
           <EmptyState icon="repeat" title="No rules yet" description="Rules auto-categorize future transactions by merchant or description." />
         ) : (
-          <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
+          <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-card shadow-sm">
             {categoryRules.map((rule) => {
               const category = financeCategories.find((c) => c.id === rule.categoryId);
               return (

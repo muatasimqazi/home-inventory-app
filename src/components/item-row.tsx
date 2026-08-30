@@ -38,8 +38,8 @@ export function ItemRow({ item, breadcrumbLabel, onToggleSelect, selected }: Ite
   );
 
   const rowClassName = cn(
-    "tap-target flex items-center gap-3 rounded-2xl border bg-white px-3 py-2 shadow-sm",
-    selected ? "border-ink ring-1 ring-ink" : "border-border"
+    "tap-target flex items-center gap-3 rounded-2xl border bg-card px-3 py-2 shadow-sm",
+    selected ? "border-ink-fill ring-1 ring-ink-fill" : "border-border"
   );
 
   if (onToggleSelect) {

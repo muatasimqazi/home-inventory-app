@@ -56,7 +56,7 @@ export function BudgetRecommendationsCard({
   const nameById = new Map(candidates.map((c) => [c.categoryId, c.name]));
 
   return (
-    <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
+    <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
           <Icon name="ai" size={14} className="text-yellow" />
@@ -98,7 +98,7 @@ export function BudgetRecommendationsCard({
               <div className="flex shrink-0 items-center gap-1.5">
                 <Button
                   size="sm"
-                  className="bg-ink text-white hover:bg-ink/90"
+                  className="bg-ink-fill text-white hover:bg-ink-fill/90"
                   onClick={() => {
                     onApply(s.categoryId, s.suggestedAmount);
                     setAppliedIds((prev) => new Set(prev).add(s.categoryId));

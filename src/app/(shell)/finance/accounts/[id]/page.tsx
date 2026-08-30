@@ -65,7 +65,7 @@ export default function AccountDetailPage() {
         </button>
       </div>
 
-      <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
         <p className="text-caption text-muted-foreground">
           {account.institutionName}
           {account.cardLastFour ? ` · ...${account.cardLastFour}` : ""} · {ACCOUNT_TYPE_LABEL[account.type]}
@@ -122,9 +122,9 @@ export default function AccountDetailPage() {
           </Link>
         </div>
         {accountTransactions.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-border bg-white p-4 text-center text-caption text-muted-foreground">No transactions yet.</p>
+          <p className="rounded-2xl border border-dashed border-border bg-card p-4 text-center text-caption text-muted-foreground">No transactions yet.</p>
         ) : (
-          <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
+          <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-card shadow-sm">
             {accountTransactions.map((t) => (
               <Link key={t.id} href={`/finance/transactions?transactionId=${t.id}`} className="flex items-center gap-3 px-4 py-3">
                 <div className="min-w-0 flex-1">

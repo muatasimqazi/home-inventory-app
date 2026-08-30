@@ -90,7 +90,7 @@ export function CreditCardLiabilityCard({ account, liability }: { account: Accou
   const otherAprs = liability && purchaseApr ? liability.aprs.filter((a) => a !== purchaseApr) : [];
 
   return (
-    <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
+    <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
       <p className="mb-3 text-caption font-medium tracking-wide text-muted-foreground uppercase">Credit Card Details</p>
 
       {!liability ? (

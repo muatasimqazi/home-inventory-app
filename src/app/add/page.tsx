@@ -195,7 +195,7 @@ function ManualAddItemInner() {
 
   return (
     <div className="min-h-dvh bg-background">
-      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-white px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-card px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <button
           type="button"
           onClick={() => router.back()}
@@ -216,7 +216,7 @@ function ManualAddItemInner() {
           <button
             type="button"
             onClick={() => photoInputRef.current?.click()}
-            className="flex size-28 items-center justify-center overflow-hidden rounded-xl border border-dashed border-border bg-white"
+            className="flex size-28 items-center justify-center overflow-hidden rounded-xl border border-dashed border-border bg-card"
           >
             {photoPreviewUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -263,11 +263,11 @@ function ManualAddItemInner() {
                 setTimeout(() => setNameSuggestionsOpen(false), 150);
               }}
               placeholder="e.g. Cordless Drill"
-              className="h-11 bg-white"
+              className="h-11 bg-card"
               ref={nameInputRef}
             />
             {nameSuggestionsOpen && nameSuggestions.length > 0 && (
-              <div className="absolute z-10 mt-1 w-full overflow-hidden rounded-lg border border-border bg-white shadow-lg">
+              <div className="absolute z-10 mt-1 w-full overflow-hidden rounded-lg border border-border bg-card shadow-lg">
                 {nameSuggestions.map((s) => (
                   <button
                     key={`${s.location}:${s.name}`}
@@ -291,7 +291,7 @@ function ManualAddItemInner() {
 
         <Field label="Category">
           <Select value={category} onValueChange={setCategory}>
-            <SelectTrigger className="h-11 w-full bg-white">
+            <SelectTrigger className="h-11 w-full bg-card">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -315,7 +315,7 @@ function ManualAddItemInner() {
               setOwnerPersonId(v);
             }}
           >
-            <SelectTrigger className="h-11 w-full bg-white">
+            <SelectTrigger className="h-11 w-full bg-card">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -345,7 +345,7 @@ function ManualAddItemInner() {
             type="button"
             onClick={() => setMoveOpen(true)}
             className={cn(
-              "tap-target flex h-11 w-full items-center justify-between rounded-lg border bg-white px-3 text-left",
+              "tap-target flex h-11 w-full items-center justify-between rounded-lg border bg-card px-3 text-left",
               locationError ? "border-danger" : "border-border"
             )}
           >
@@ -385,7 +385,7 @@ function ManualAddItemInner() {
               max={9999}
               value={quantity}
               onChange={(e) => setQuantity(e.target.value)}
-              className="h-11 w-28 bg-white"
+              className="h-11 w-28 bg-card"
             />
           </Field>
 
@@ -397,7 +397,7 @@ function ManualAddItemInner() {
               placeholder="Not tracked"
               value={minQuantity}
               onChange={(e) => setMinQuantity(e.target.value)}
-              className="h-11 w-28 bg-white"
+              className="h-11 w-28 bg-card"
             />
           </Field>
         </div>
@@ -411,7 +411,7 @@ function ManualAddItemInner() {
                   value={extraDetails[field.key] ?? ""}
                   onChange={(e) => setExtraDetails((d) => ({ ...d, [field.key]: e.target.value }))}
                   placeholder={field.placeholder ? `${field.label} (${field.placeholder})` : field.label}
-                  className="h-11 bg-white"
+                  className="h-11 bg-card"
                 />
               ))}
             </div>
@@ -430,7 +430,7 @@ function ManualAddItemInner() {
                 }
               }}
               placeholder="Add a tag and press Enter"
-              className="h-11 flex-1 bg-white"
+              className="h-11 flex-1 bg-card"
             />
           </div>
           {tags.length > 0 && (
@@ -456,7 +456,7 @@ function ManualAddItemInner() {
             onChange={(e) => setDescription(e.target.value)}
             rows={2}
             placeholder="Material, color, distinguishing details"
-            className="bg-white"
+            className="bg-card"
           />
         </Field>
 
@@ -470,22 +470,22 @@ function ManualAddItemInner() {
               value={estimatedValue}
               onChange={(e) => setEstimatedValue(e.target.value)}
               placeholder="—"
-              className="h-11 bg-white pl-6"
+              className="h-11 bg-card pl-6"
             />
           </div>
         </Field>
 
         <Field label="Notes">
-          <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} placeholder="Optional notes" className="bg-white" />
+          <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} placeholder="Optional notes" className="bg-card" />
         </Field>
       </div>
 
-      <div className="sticky bottom-0 border-t border-border bg-white px-4 py-3" style={{ bottom: keyboardInset }}>
+      <div className="sticky bottom-0 border-t border-border bg-card px-4 py-3" style={{ bottom: keyboardInset }}>
         <div className="mx-auto flex max-w-lg gap-2">
           <Button variant="outline" size="lg" className="flex-1" onClick={() => router.back()}>
             Cancel
           </Button>
-          <Button size="lg" className="flex-1 bg-ink text-white hover:bg-ink/90" onClick={handleSave} disabled={saving}>
+          <Button size="lg" className="flex-1 bg-ink-fill text-white hover:bg-ink-fill/90" onClick={handleSave} disabled={saving}>
             {saving ? <Icon name="spinner" size={16} className="animate-spin" /> : "Save item"}
           </Button>
         </div>

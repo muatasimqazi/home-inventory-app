@@ -141,7 +141,7 @@ export function MoveSheet({ open, onOpenChange, currentLocationId, currentContai
                   // search-bar.tsx's identical fix: iOS Safari auto-zooms
                   // the page on focus for any input under 16px and doesn't
                   // reliably zoom back out on blur.
-                  className="tap-target h-11 w-full rounded-xl border border-border bg-white pr-3 pl-10 text-base text-ink outline-none placeholder:text-muted-foreground focus:border-yellow md:text-body"
+                  className="tap-target h-11 w-full rounded-xl border border-border bg-card pr-3 pl-10 text-base text-ink outline-none placeholder:text-muted-foreground focus:border-yellow md:text-body"
                 />
               </div>
             )}

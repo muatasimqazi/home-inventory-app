@@ -75,7 +75,7 @@ export default function ItemDetailPage() {
 
   return (
     <div className="flex flex-col gap-5 pb-6">
-      <button onClick={() => router.back()} className="tap-target flex size-9 items-center justify-center rounded-full bg-white shadow-sm">
+      <button onClick={() => router.back()} className="tap-target flex size-9 items-center justify-center rounded-full bg-card shadow-sm">
         <Icon name="arrowLeft" size={18} />
       </button>
 
@@ -108,7 +108,7 @@ export default function ItemDetailPage() {
         <BreadcrumbTrail segments={breadcrumb} />
       </div>
 
-      <dl className="grid grid-cols-2 gap-4 rounded-2xl border border-border bg-white p-4 shadow-sm">
+      <dl className="grid grid-cols-2 gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
         <div>
           <dt className="text-caption text-muted-foreground">Quantity</dt>
           <dd className="mt-1.5 flex items-center gap-2">
@@ -167,7 +167,7 @@ export default function ItemDetailPage() {
       </dl>
 
       {extraFields.length > 0 && (
-        <div className="flex flex-col gap-3 rounded-2xl border border-border bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
           <div className="flex items-center justify-between">
             <h2 className="text-body font-semibold text-ink">Extra details</h2>
             <span className="rounded-full bg-brand-100 px-2.5 py-1 text-micro font-medium text-yellow">{item.category}</span>
@@ -207,7 +207,7 @@ export default function ItemDetailPage() {
               aria-pressed={favorite}
               className={cn(
                 "tap-target flex items-center justify-center gap-1.5 rounded-lg text-body font-medium",
-                favorite ? "bg-ink text-white" : "border border-border text-ink"
+                favorite ? "bg-ink-fill text-white" : "border border-border text-ink"
               )}
             >
               <Icon name="heart" size={16} className={favorite ? "fill-white" : undefined} /> Favorite
@@ -250,7 +250,7 @@ export default function ItemDetailPage() {
       )}
 
       {itemActivity.length > 0 && (
-        <div className="flex flex-col gap-1 rounded-2xl border border-border bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-1 rounded-2xl border border-border bg-card p-4 shadow-sm">
           <h2 className="text-section-title font-medium text-ink">Activity</h2>
           <div className="divide-y divide-border">
             {itemActivity.map((entry) => (

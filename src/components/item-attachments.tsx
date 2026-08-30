@@ -101,7 +101,7 @@ export function ItemAttachments({ itemId }: { itemId: string }) {
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-border bg-white p-4 shadow-sm">
+    <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
       <h2 className="text-body font-semibold text-ink">Attachments</h2>
       <div className="grid grid-cols-4 gap-2">
         {KINDS.map((kind) => (
@@ -230,7 +230,7 @@ function AttachmentTile({
   };
 
   return (
-    <div className="relative flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border border-border bg-white">
+    <div className="relative flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border border-border bg-card">
       <button type="button" onClick={handleOpen} className="flex flex-col items-center gap-1">
         <span
           className={cn(
@@ -246,7 +246,7 @@ function AttachmentTile({
         type="button"
         onClick={() => onDelete(attachment.id)}
         aria-label={`Remove ${attachment.fileName}`}
-        className="tap-target absolute -right-1 -top-1 flex size-5 items-center justify-center rounded-full border border-border bg-white text-muted-foreground hover:text-danger"
+        className="tap-target absolute -right-1 -top-1 flex size-5 items-center justify-center rounded-full border border-border bg-card text-muted-foreground hover:text-danger"
       >
         <Icon name="close" size={11} />
       </button>

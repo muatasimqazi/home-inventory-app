@@ -212,7 +212,7 @@ export function AddPersonSheet({ open, onOpenChange, onCreated, canInvite = true
               </div>
             </div>
 
-            <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={handleContinue}>
+            <Button size="lg" className="bg-ink-fill text-white hover:bg-ink-fill/90" onClick={handleContinue}>
               Continue
             </Button>
           </div>
@@ -224,7 +224,7 @@ export function AddPersonSheet({ open, onOpenChange, onCreated, canInvite = true
               A managed profile doesn&apos;t need an email or password — {name || "they"} can still own belongings and show up in filters.
               You can invite {name || "them"} to sign in for themselves any time.
             </p>
-            <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={handleManagedProfile} disabled={saving}>
+            <Button size="lg" className="bg-ink-fill text-white hover:bg-ink-fill/90" onClick={handleManagedProfile} disabled={saving}>
               {saving ? <Icon name="spinner" size={16} className="animate-spin" /> : "Not right now"}
             </Button>
             {canInvite && (
@@ -241,7 +241,7 @@ export function AddPersonSheet({ open, onOpenChange, onCreated, canInvite = true
               <label className="mb-1 block text-caption text-muted-foreground">Email address</label>
               <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@example.com" className="h-11" ref={emailInputRef} />
             </div>
-            <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={handleSendInvite} disabled={!email.trim()}>
+            <Button size="lg" className="bg-ink-fill text-white hover:bg-ink-fill/90" onClick={handleSendInvite} disabled={!email.trim()}>
               Send invite
             </Button>
             <button

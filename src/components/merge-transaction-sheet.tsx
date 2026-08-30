@@ -79,7 +79,7 @@ export function MergeTransactionSheet({
             {candidates.length === 0 ? (
               <EmptyState icon="receipt" title="Nothing nearby" description="No other visible transactions within a week of this one." />
             ) : (
-              <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white">
+              <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-card">
                 {candidates.map((t) => {
                   const candidateAccount = accountById.get(t.accountId);
                   return (

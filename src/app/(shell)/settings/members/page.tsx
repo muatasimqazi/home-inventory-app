@@ -83,7 +83,7 @@ export default function PeoplePage() {
         </Button>
       </div>
 
-      <div className="rounded-2xl border border-border bg-white shadow-sm">
+      <div className="rounded-2xl border border-border bg-card shadow-sm">
         {people.map((p, i) => {
           const member = p.linkedUserId ? members.find((m) => m.userId === p.linkedUserId) : undefined;
           const isLast = i === people.length - 1 && invites.length === 0;
@@ -159,7 +159,7 @@ export default function PeoplePage() {
         <button
           type="button"
           onClick={() => setLeaveOpen(true)}
-          className="tap-target rounded-xl border border-border bg-white py-3 text-center text-body font-medium text-danger shadow-sm"
+          className="tap-target rounded-xl border border-border bg-card py-3 text-center text-body font-medium text-danger shadow-sm"
         >
           Leave Household
         </button>
@@ -383,7 +383,7 @@ function EditPersonSheet({
               </div>
             </div>
 
-            <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={handleSave}>
+            <Button size="lg" className="bg-ink-fill text-white hover:bg-ink-fill/90" onClick={handleSave}>
               Save
             </Button>
           </div>
@@ -438,7 +438,7 @@ function InvitePersonSheet({
           </div>
           <Button
             size="lg"
-            className="bg-ink text-white hover:bg-ink/90"
+            className="bg-ink-fill text-white hover:bg-ink-fill/90"
             disabled={!email.trim()}
             onClick={() => {
               onSend(email.trim());

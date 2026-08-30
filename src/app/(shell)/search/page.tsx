@@ -200,7 +200,7 @@ function SearchPageInner() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-2">
-        <Link href="/dashboard" className="tap-target flex size-9 shrink-0 items-center justify-center rounded-full bg-white shadow-sm">
+        <Link href="/dashboard" className="tap-target flex size-9 shrink-0 items-center justify-center rounded-full bg-card shadow-sm">
           <Icon name="arrowLeft" size={18} />
         </Link>
         <SearchBar ref={inputRef} value={query} onChange={setQuery} className="flex-1" />
@@ -311,7 +311,7 @@ function ReferenceResultRow({ refItem, locationId }: { refItem: ReferenceInvento
   const params = new URLSearchParams({ name: refItem.name, category: refItem.category });
   if (locationId) params.set("locationId", locationId);
   return (
-    <Link href={`/add?${params.toString()}`} className="flex items-center gap-3 rounded-2xl border border-border bg-white p-3 shadow-sm">
+    <Link href={`/add?${params.toString()}`} className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 shadow-sm">
       <IconChip icon="plus" tone="muted" />
       <div className="min-w-0 flex-1">
         <p className="truncate text-item-title font-medium text-ink">{refItem.name}</p>
@@ -327,7 +327,7 @@ function SearchResultRow({ result }: { result: SearchResult }) {
   if (result.kind === "item") {
     const { item, breadcrumbLabel } = result;
     return (
-      <Link href={`/items/${item.id}`} className="flex items-center gap-3 rounded-2xl border border-border bg-white p-3 shadow-sm">
+      <Link href={`/items/${item.id}`} className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 shadow-sm">
         <PhotoThumb
           emoji={item.photoEmoji}
           coverPhotoPath={item.coverPhotoPath}
@@ -346,7 +346,7 @@ function SearchResultRow({ result }: { result: SearchResult }) {
   if (result.kind === "container") {
     const { container, breadcrumbLabel, itemCount } = result;
     return (
-      <Link href={`/containers/${container.id}`} className="flex items-center gap-3 rounded-2xl border border-border bg-white p-3 shadow-sm">
+      <Link href={`/containers/${container.id}`} className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 shadow-sm">
         <PhotoThumb
           emoji={container.coverPhotoEmoji ?? "📦"}
           coverPhotoPath={container.coverPhotoPath}
@@ -372,7 +372,7 @@ function SearchResultRow({ result }: { result: SearchResult }) {
   if (result.kind === "transaction") {
     const { transaction: t, matchedItemName } = result;
     return (
-      <Link href={`/finance/transactions?transactionId=${t.id}`} className="flex items-center gap-3 rounded-2xl border border-border bg-white p-3 shadow-sm">
+      <Link href={`/finance/transactions?transactionId=${t.id}`} className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 shadow-sm">
         <IconChip icon="receipt" tone="muted" />
         <div className="min-w-0 flex-1">
           <p className="truncate text-item-title font-medium text-ink">{matchedItemName ?? t.merchant ?? t.description ?? "Transaction"}</p>
@@ -390,7 +390,7 @@ function SearchResultRow({ result }: { result: SearchResult }) {
 
   const { account } = result;
   return (
-    <Link href={`/finance/accounts/${account.id}`} className="flex items-center gap-3 rounded-2xl border border-border bg-white p-3 shadow-sm">
+    <Link href={`/finance/accounts/${account.id}`} className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 shadow-sm">
       <IconChip icon={accountTypeIcon(account.type)} tone="muted" />
       <div className="min-w-0 flex-1">
         <p className="truncate text-item-title font-medium text-ink">{account.name}</p>
@@ -410,7 +410,7 @@ function FilterChip({ label, active, onClick }: { label: string; active: boolean
       onClick={onClick}
       className={cn(
         "tap-target shrink-0 rounded-full border px-3 py-1.5 text-caption font-medium",
-        active ? "border-ink bg-ink text-white" : "border-border bg-white text-ink"
+        active ? "border-ink-fill bg-ink-fill text-white" : "border-border bg-card text-ink"
       )}
     >
       {label}

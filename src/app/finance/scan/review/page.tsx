@@ -240,7 +240,7 @@ export default function SingleReceiptReviewPage() {
 
   return (
     <div className="min-h-dvh bg-background pb-28">
-      <header className="flex items-center gap-3 border-b border-border bg-white px-4 py-3">
+      <header className="flex items-center gap-3 border-b border-border bg-card px-4 py-3">
         <button
           type="button"
           onClick={() => {
@@ -276,7 +276,7 @@ export default function SingleReceiptReviewPage() {
           />
         )}
 
-        <div className="rounded-2xl border border-border bg-white p-4">
+        <div className="rounded-2xl border border-border bg-card p-4">
           <label className="mb-1 block text-caption text-muted-foreground">Store</label>
           <Input value={draft.store ?? ""} onChange={(e) => updateDraft(draft.id, { store: e.target.value })} className="h-11" />
 
@@ -332,7 +332,7 @@ export default function SingleReceiptReviewPage() {
           <h2 className="mb-2 text-item-title font-semibold text-ink">
             Items ({draft.lineItems.length})
           </h2>
-          <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white">
+          <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-card">
             {draft.lineItems.map((li) => {
               const linkedPurchase = itemPurchases.find((p) => p.scannedReceiptLineItemId === li.id);
               const linkedItem = linkedPurchase ? items.find((it) => it.id === linkedPurchase.itemId) : undefined;
@@ -382,10 +382,10 @@ export default function SingleReceiptReviewPage() {
       />
 
       <div
-        className="fixed inset-x-0 bottom-0 border-t border-border bg-white px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+        className="fixed inset-x-0 bottom-0 border-t border-border bg-card px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
         style={{ bottom: keyboardInset }}
       >
-        <Button size="lg" className="w-full bg-ink text-white hover:bg-ink/90" onClick={handleConfirm} disabled={confirming}>
+        <Button size="lg" className="w-full bg-ink-fill text-white hover:bg-ink-fill/90" onClick={handleConfirm} disabled={confirming}>
           {confirming ? <Icon name="spinner" size={16} className="animate-spin" /> : `Confirm — ${draft.suggestedAmountCents !== null ? formatCurrency(draft.suggestedAmountCents / 100) : ""}`}
         </Button>
         <button

@@ -98,7 +98,7 @@ export default function CaptureReviewPage() {
 
   if (detecting || detections === null) {
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-white">
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-card">
         <Icon name="spinner" size={28} className="animate-spin text-ink" />
         <p className="text-body text-muted-foreground">Looking at what you captured…</p>
       </div>
@@ -114,7 +114,7 @@ export default function CaptureReviewPage() {
   // anything) should show an empty state and a way forward, not crash.
   if (detections.length === 0) {
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-white px-8 text-center">
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-card px-8 text-center">
         <div className="flex size-14 items-center justify-center rounded-full bg-surface-muted">
           <Icon name="camera" size={26} className="text-muted-foreground" />
         </div>
@@ -281,7 +281,7 @@ export default function CaptureReviewPage() {
 
   return (
     <div className="min-h-dvh bg-surface-muted pb-28">
-      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-white px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-card px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <button
           type="button"
           onClick={() => router.replace("/capture")}
@@ -295,7 +295,7 @@ export default function CaptureReviewPage() {
       </header>
 
       <div className="mx-auto flex max-w-xl flex-col gap-4 px-4 py-4">
-        <div className={cn("flex items-center justify-between rounded-xl bg-white px-4 py-3 shadow-sm", missingDestination && "ring-1 ring-danger")}>
+        <div className={cn("flex items-center justify-between rounded-xl bg-card px-4 py-3 shadow-sm", missingDestination && "ring-1 ring-danger")}>
           <div className="min-w-0">
             <p className="text-caption text-muted-foreground">Saving to</p>
             {missingDestination ? (
@@ -309,7 +309,7 @@ export default function CaptureReviewPage() {
           </Button>
         </div>
 
-        <div className="rounded-xl bg-white px-4 py-3 shadow-sm">
+        <div className="rounded-xl bg-card px-4 py-3 shadow-sm">
           <p className="mb-1.5 text-caption text-muted-foreground">Belongs to</p>
           <Select
             value={ownerPersonId}
@@ -379,7 +379,7 @@ export default function CaptureReviewPage() {
         )}
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-border bg-white px-4 py-3" style={{ bottom: keyboardInset }}>
+      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-border bg-card px-4 py-3" style={{ bottom: keyboardInset }}>
         <div className="mx-auto flex max-w-xl flex-col gap-2">
           {missingDestination && (
             <p className="text-center text-caption text-danger">Choose a location above before saving — otherwise these items can&apos;t be found later.</p>
@@ -450,7 +450,7 @@ function SingleReviewForm({
   const blocked = needsCorrection(row);
 
   return (
-    <div className="flex flex-col gap-4 rounded-xl bg-white p-4 shadow-sm">
+    <div className="flex flex-col gap-4 rounded-xl bg-card p-4 shadow-sm">
       {photo ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={photo} alt="Captured item" className="h-48 w-full rounded-lg bg-surface-muted object-contain" />
@@ -574,7 +574,7 @@ function BulkRow({
   const blocked = needsCorrection(row) && !row.excluded;
 
   return (
-    <div className={cn("flex flex-col gap-2 rounded-xl bg-white p-3 shadow-sm", row.excluded && "opacity-40")}>
+    <div className={cn("flex flex-col gap-2 rounded-xl bg-card p-3 shadow-sm", row.excluded && "opacity-40")}>
       <div className="flex items-start gap-3">
         <PhotoThumb emoji={row.photoEmoji} className="size-14 shrink-0" emojiClassName="text-3xl" />
         <div className="min-w-0 flex-1 space-y-2">

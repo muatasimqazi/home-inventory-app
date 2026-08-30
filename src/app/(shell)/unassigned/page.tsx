@@ -28,7 +28,7 @@ export default function UnassignedItemsPage() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-2">
-        <Link href="/dashboard" className="tap-target flex size-9 shrink-0 items-center justify-center rounded-full bg-white shadow-sm">
+        <Link href="/dashboard" className="tap-target flex size-9 shrink-0 items-center justify-center rounded-full bg-card shadow-sm">
           <Icon name="arrowLeft" size={18} />
         </Link>
         <div>

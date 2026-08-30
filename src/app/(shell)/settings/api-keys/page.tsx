@@ -119,7 +119,7 @@ export default function ApiKeysPage() {
               <p className="text-caption text-muted-foreground">This is the only time the full key is shown. It isn&apos;t stored anywhere, including here — if you lose it, revoke it and generate a new one.</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 rounded-xl bg-white px-3 py-2.5">
+          <div className="flex items-center gap-2 rounded-xl bg-card px-3 py-2.5">
             <p className="min-w-0 flex-1 truncate font-mono text-caption text-ink">{revealed.secret}</p>
             <Button size="icon-sm" variant="outline" onClick={handleCopySecret} aria-label="Copy key">
               <Icon name={copied ? "check" : "copy"} size={14} />
@@ -143,7 +143,7 @@ export default function ApiKeysPage() {
         <EmptyState icon="key" title="No API keys yet" description="Generate one to connect Schuaz to Home Assistant or Shortcuts." />
       ) : (
         activeKeys.length > 0 && (
-          <div className="rounded-xl bg-white shadow-sm">
+          <div className="rounded-xl bg-card shadow-sm">
             {activeKeys.map((k, i) => (
               <div key={k.id} className={cn("flex items-center gap-3 px-4 py-3", i === activeKeys.length - 1 ? "" : "border-b border-border")}>
                 <Icon name="key" size={18} className="text-ink" />
@@ -179,7 +179,7 @@ export default function ApiKeysPage() {
         </div>
       )}
 
-      <div className="flex flex-col gap-3 rounded-2xl border border-border bg-white p-5 shadow-sm">
+      <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
         <p className="text-caption font-medium tracking-wide text-muted-foreground uppercase">Using a key</p>
         <div>
           <p className="text-caption text-muted-foreground">Base URL</p>

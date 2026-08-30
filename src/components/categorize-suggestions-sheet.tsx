@@ -90,7 +90,7 @@ export function CategorizeSuggestionsSheet({ open, onOpenChange, rows, categorie
           {rows.length === 0 ? (
             <p className="py-6 text-center text-caption text-muted-foreground">No suggestions to review.</p>
           ) : (
-            <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white">
+            <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-card">
               {rows.map((row) => {
                 const choice = choices[row.transaction.id];
                 const t = row.transaction;

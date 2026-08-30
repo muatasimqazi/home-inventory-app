@@ -38,14 +38,14 @@ export function ItemCard({ item, breadcrumbLabel, className, onToggleSelect, sel
           <div
             className={cn(
               "absolute right-1.5 top-1.5 flex size-6 items-center justify-center rounded-full border-2 border-white shadow-sm",
-              selected ? "bg-ink text-white" : "bg-white/70 text-transparent"
+              selected ? "bg-ink-fill text-white" : "bg-white/70 text-transparent"
             )}
           >
             <Icon name="check" size={13} />
           </div>
         ) : (
           item.needsReview && (
-            <div className="absolute right-1.5 top-1.5 flex size-6 items-center justify-center rounded-full bg-ink text-white">
+            <div className="absolute right-1.5 top-1.5 flex size-6 items-center justify-center rounded-full bg-ink-fill text-white">
               <Icon name="needsReview" size={13} />
             </div>
           )
@@ -58,8 +58,8 @@ export function ItemCard({ item, breadcrumbLabel, className, onToggleSelect, sel
   );
 
   const cardClassName = cn(
-    "flex flex-col overflow-hidden rounded-xl bg-white p-3 shadow-sm transition-shadow hover:shadow-lg",
-    selected && "ring-2 ring-ink",
+    "flex flex-col overflow-hidden rounded-xl bg-card p-3 shadow-sm transition-shadow hover:shadow-lg",
+    selected && "ring-2 ring-ink-fill",
     className
   );
 

@@ -50,7 +50,7 @@ export function FinanceAiCard({ householdId, categorySpend }: { householdId: str
   }
 
   return (
-    <div id="ask-ai" className="scroll-mt-6 rounded-2xl border border-border bg-white p-4 shadow-sm">
+    <div id="ask-ai" className="scroll-mt-6 rounded-2xl border border-border bg-card p-4 shadow-sm">
       <div className="flex items-center gap-1.5">
         <Icon name="ai" size={16} className="text-yellow" />
         <p className="text-caption font-medium tracking-wide text-muted-foreground uppercase">Ask about your money</p>

@@ -86,14 +86,14 @@ export default function RecurringBillsPage() {
           <Link
             href="/finance/recurring/detected"
             aria-label="Detect from transaction history"
-            className="tap-target flex size-11 items-center justify-center rounded-md border border-border bg-white text-ink"
+            className="tap-target flex size-11 items-center justify-center rounded-md border border-border bg-card text-ink"
           >
             <Icon name="ai" size={18} />
           </Link>
           <Link
             href="/finance/recurring/import"
             aria-label="Import from statement"
-            className="tap-target flex size-11 items-center justify-center rounded-md border border-border bg-white text-ink"
+            className="tap-target flex size-11 items-center justify-center rounded-md border border-border bg-card text-ink"
           >
             <Icon name="upload" size={18} />
           </Link>
@@ -115,7 +115,7 @@ export default function RecurringBillsPage() {
                   Marked as a credit card, loan, or mortgage payment — you&apos;ll get a push reminder the day each of these is due.
                 </p>
               </div>
-              <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
+              <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-card shadow-sm">
                 {debtBills.map((b) => (
                   <BillRow key={b.id} bill={b} icon="creditCard" tone="yellow" onEdit={() => setEditingId(b.id)} onMarkPaid={() => markPaid(b)} />
                 ))}
@@ -126,7 +126,7 @@ export default function RecurringBillsPage() {
           {otherBills.length > 0 && (
             <section className="flex flex-col gap-2">
               {debtBills.length > 0 && <h2 className="text-section-title font-medium text-ink">Other Bills</h2>}
-              <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
+              <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-card shadow-sm">
                 {otherBills.map((b) => (
                   <BillRow key={b.id} bill={b} icon="repeat" tone="muted" onEdit={() => setEditingId(b.id)} onMarkPaid={() => markPaid(b)} />
                 ))}

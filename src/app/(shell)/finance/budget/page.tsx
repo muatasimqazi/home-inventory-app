@@ -200,7 +200,7 @@ export default function BudgetPage() {
         )}
 
         <div className={cn("grid gap-2", savingsRate !== null ? "grid-cols-2" : "grid-cols-3")}>
-          <div className="rounded-2xl border border-border bg-white p-3 shadow-sm">
+          <div className="rounded-2xl border border-border bg-card p-3 shadow-sm">
             <p className="text-caption text-muted-foreground">Budget</p>
             <p className="mt-0.5 text-body font-semibold text-ink">{formatCurrency(totalBudgeted)}</p>
             {/* No sparkline here, unlike Spent/Savings Rate below — a
@@ -208,19 +208,19 @@ export default function BudgetPage() {
                 (same reason the trend chart's own Budget line is flat),
                 so this card stays number-only rather than faking one. */}
           </div>
-          <div className="rounded-2xl border border-border bg-white p-3 shadow-sm">
+          <div className="rounded-2xl border border-border bg-card p-3 shadow-sm">
             <p className="text-caption text-muted-foreground">Spent</p>
             <p className="mt-0.5 text-body font-semibold text-ink">{formatCurrency(totalActual)}</p>
             <Sparkline values={spendTrend.map((m) => m.spend)} colorVar="--color-money-negative-text" />
           </div>
-          <div className="rounded-2xl border border-border bg-white p-3 shadow-sm">
+          <div className="rounded-2xl border border-border bg-card p-3 shadow-sm">
             <p className="text-caption text-muted-foreground">{totalRemaining < 0 ? "Over by" : "Remaining"}</p>
             <p className={cn("mt-0.5 text-body font-semibold", totalRemaining < 0 ? "text-money-negative-text" : "text-badge-green-text")}>
               {formatCurrency(Math.abs(totalRemaining))}
             </p>
           </div>
           {savingsRate !== null && (
-            <div className="rounded-2xl border border-border bg-white p-3 shadow-sm">
+            <div className="rounded-2xl border border-border bg-card p-3 shadow-sm">
               <p className="text-caption text-muted-foreground">Savings Rate</p>
               <p className={cn("mt-0.5 text-body font-semibold", savingsRate >= 0 ? "text-badge-green-text" : "text-money-negative-text")}>
                 {Math.round(savingsRate)}%
@@ -231,7 +231,7 @@ export default function BudgetPage() {
         </div>
 
         {totalBudgeted > 0 && (
-          <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
+          <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
             <p className="mb-3 text-caption font-medium tracking-wide text-muted-foreground uppercase">Budget vs Actual</p>
             <BudgetVsActualChart months={spendTrend} budgetedAmount={totalBudgeted} highlightMonth={month} />
           </div>
@@ -253,13 +253,13 @@ export default function BudgetPage() {
               title="No budgets yet"
               description="Add a monthly $ target for a category to start tracking it here."
               action={
-                <Button size="sm" className="bg-ink text-white hover:bg-ink/90" onClick={openAdd}>
+                <Button size="sm" className="bg-ink-fill text-white hover:bg-ink-fill/90" onClick={openAdd}>
                   <Icon name="plus" size={14} /> Add a budget
                 </Button>
               }
             />
           ) : (
-            <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
+            <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-card shadow-sm">
               {progress.map((p) => {
                 const pct = p.budgeted > 0 ? (p.actual / p.budgeted) * 100 : 0;
                 const over = p.remaining < 0;

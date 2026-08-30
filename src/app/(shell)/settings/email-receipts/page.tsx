@@ -83,7 +83,7 @@ export default function EmailReceiptsSettingsPage() {
       </div>
 
       {gated ? (
-        <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-white p-6 text-center shadow-sm">
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-card p-6 text-center shadow-sm">
           <div className="flex size-11 items-center justify-center rounded-full bg-brand-100 text-yellow">
             <Icon name="lock" size={20} />
           </div>
@@ -103,7 +103,7 @@ export default function EmailReceiptsSettingsPage() {
         </div>
       ) : (
         <>
-          <div className="flex flex-col gap-3 rounded-2xl border border-border bg-white p-5 shadow-sm">
+          <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
             <p className="text-caption font-medium tracking-wide text-muted-foreground uppercase">Your household&apos;s address</p>
             <div className="flex items-center gap-2 rounded-xl bg-surface-muted px-3 py-2.5">
               <p className="min-w-0 flex-1 truncate text-body font-medium text-ink">{address}</p>

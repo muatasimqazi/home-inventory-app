@@ -136,7 +136,7 @@ export default function FinanceDashboardPage() {
           onClick={() => setView("mine")}
           className={cn(
             "flex-1 rounded-md py-2 text-caption font-semibold transition-colors",
-            view === "mine" ? "bg-white text-yellow shadow-sm" : "text-muted-foreground"
+            view === "mine" ? "bg-card text-yellow shadow-sm" : "text-muted-foreground"
           )}
         >
           My Dashboard
@@ -146,21 +146,21 @@ export default function FinanceDashboardPage() {
           onClick={() => setView("household")}
           className={cn(
             "flex-1 rounded-md py-2 text-caption font-semibold transition-colors",
-            view === "household" ? "bg-white text-yellow shadow-sm" : "text-muted-foreground"
+            view === "household" ? "bg-card text-yellow shadow-sm" : "text-muted-foreground"
           )}
         >
           Household
         </button>
       </div>
 
-      <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
         <p className="text-caption font-medium tracking-wide text-muted-foreground uppercase">Net Worth</p>
         <p className="mt-1 text-display font-semibold text-ink">{formatCurrency(worth)}</p>
         {/* Trend line needs AccountBalanceSnapshot history (Net Worth Trend screen, not built this pass) — not faked here. */}
         <p className="mt-0.5 text-caption text-muted-foreground">Trend needs a few weeks of history to show.</p>
       </div>
 
-      <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
         <div className="flex items-center justify-between gap-2">
           <p className="text-caption font-medium tracking-wide text-muted-foreground uppercase">Cash Flow</p>
           {/* Shared with the category breakdown card below — its own
@@ -198,7 +198,7 @@ export default function FinanceDashboardPage() {
                   // why a plain h-auto alone doesn't override the base
                   // SelectTrigger's fixed height.
                   "data-[size=default]:h-auto gap-1 rounded-full border px-3 py-1.5 text-caption font-medium",
-                  cashFlowCategoryId !== "all" ? "border-ink bg-ink text-white [&_svg]:text-white" : "border-border bg-white text-ink"
+                  cashFlowCategoryId !== "all" ? "border-ink-fill bg-ink-fill text-white [&_svg]:text-white" : "border-border bg-card text-ink"
                 )}
               >
                 <SelectValue>{cashFlowCategoryId === "all" ? "All categories" : activeFinanceCategories.find((c) => c.id === cashFlowCategoryId)?.name}</SelectValue>
@@ -242,7 +242,7 @@ export default function FinanceDashboardPage() {
       </div>
 
       {categorySpend.length > 0 && (
-        <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
           <p className="mb-3 text-caption font-medium tracking-wide text-muted-foreground uppercase">Spending by Category · {statsMonthLabel}</p>
           <div className="flex flex-col gap-2.5">
             {categorySpend.map((c) => {
@@ -277,11 +277,11 @@ export default function FinanceDashboardPage() {
           </Link>
         </div>
         {groups.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-border bg-white p-4 text-center text-caption text-muted-foreground">
+          <p className="rounded-2xl border border-dashed border-border bg-card p-4 text-center text-caption text-muted-foreground">
             No accounts yet — add one from the Accounts tab.
           </p>
         ) : (
-          <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
+          <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-card shadow-sm">
             {groups
               .flatMap((g) => g.accounts)
               .slice(0, 3)
@@ -317,9 +317,9 @@ export default function FinanceDashboardPage() {
           </Link>
         </div>
         {recent.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-border bg-white p-4 text-center text-caption text-muted-foreground">No transactions yet.</p>
+          <p className="rounded-2xl border border-dashed border-border bg-card p-4 text-center text-caption text-muted-foreground">No transactions yet.</p>
         ) : (
-          <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
+          <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-card shadow-sm">
             {recent.map((t) => (
               <Link key={t.id} href={`/finance/transactions?transactionId=${t.id}`} className="flex items-center gap-3 px-4 py-3">
                 <MerchantIcon logoUrl={t.merchantLogoUrl} merchantName={t.merchant ?? t.description} className="size-9" />
@@ -347,9 +347,9 @@ export default function FinanceDashboardPage() {
           </Link>
         </div>
         {bills.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-border bg-white p-4 text-center text-caption text-muted-foreground">Nothing due soon.</p>
+          <p className="rounded-2xl border border-dashed border-border bg-card p-4 text-center text-caption text-muted-foreground">Nothing due soon.</p>
         ) : (
-          <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
+          <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-card shadow-sm">
             {bills.map((b) => (
               <Link key={b.id} href={`/finance/recurring?billId=${b.id}`} className="flex items-center gap-3 px-4 py-3">
                 <IconChip icon="repeat" tone="muted" size="sm" />
@@ -366,7 +366,7 @@ export default function FinanceDashboardPage() {
 
       <Link
         href="/finance/pending-receipts"
-        className="flex items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-white py-3 text-caption font-medium text-muted-foreground"
+        className="flex items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-card py-3 text-caption font-medium text-muted-foreground"
       >
         <Icon name="receipt" size={16} />
         Pending Receipts
@@ -374,7 +374,7 @@ export default function FinanceDashboardPage() {
 
       <Link
         href="/finance"
-        className="flex items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-white py-3 text-caption font-medium text-muted-foreground"
+        className="flex items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-card py-3 text-caption font-medium text-muted-foreground"
       >
         <Icon name="grid" size={16} />
         Manage accounts, transactions & more

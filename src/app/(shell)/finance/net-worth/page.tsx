@@ -65,7 +65,7 @@ export default function NetWorthTrendPage() {
         </Button>
       </div>
 
-      <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
         <p className="text-caption font-medium tracking-wide text-muted-foreground uppercase">Current Net Worth</p>
         <p className="mt-1 text-display font-semibold text-ink">{formatCurrency(worth)}</p>
       </div>
@@ -79,7 +79,7 @@ export default function NetWorthTrendPage() {
             description="Record a snapshot to start tracking net worth over time. This normally happens automatically each night."
           />
         ) : (
-          <div className="flex flex-col gap-4 rounded-2xl border border-border bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
             <TrendLineChart points={trend.map(([date, value]) => ({ label: formatShortDate(new Date(date).toISOString()), value }))} />
             <div className="flex flex-col gap-2 border-t border-border pt-3">
               {trend.map(([date, value]) => (
@@ -101,7 +101,7 @@ export default function NetWorthTrendPage() {
 
       <div>
         <h2 className="mb-2 text-item-title font-semibold text-ink">Assets vs. Liabilities</h2>
-        <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
+        <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-card shadow-sm">
           <div className="flex items-center justify-between px-4 py-3">
             <span className="text-body text-ink">Assets</span>
             <span className="text-body font-semibold text-badge-green-text">{formatCurrency(assets)}</span>

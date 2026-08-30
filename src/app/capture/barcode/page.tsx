@@ -186,7 +186,7 @@ function BarcodeCaptureInner() {
   const dark = mode === "scanning";
 
   return (
-    <div className={cn("fixed inset-0 z-50 flex flex-col", dark ? "bg-ink text-white" : "bg-background text-ink")}>
+    <div className={cn("fixed inset-0 z-50 flex flex-col", dark ? "bg-ink-fill text-white" : "bg-background text-ink")}>
       <header className="flex items-center justify-between px-4 pt-[max(1rem,env(safe-area-inset-top))]">
         <button
           type="button"
@@ -197,7 +197,7 @@ function BarcodeCaptureInner() {
           aria-label="Close camera"
           className={cn(
             "tap-target flex size-10 items-center justify-center rounded-full",
-            dark ? "bg-white/10" : "bg-white shadow-sm"
+            dark ? "bg-white/10" : "bg-card shadow-sm"
           )}
         >
           <Icon name="close" size={20} />
@@ -216,7 +216,7 @@ function BarcodeCaptureInner() {
 
         {mode === "denied" && (
           <div className="flex h-full flex-col items-center justify-center gap-4 px-8 text-center">
-            <div className="flex w-full max-w-xs flex-col items-center gap-3 rounded-2xl border border-border bg-white p-8">
+            <div className="flex w-full max-w-xs flex-col items-center gap-3 rounded-2xl border border-border bg-card p-8">
               <div className="flex size-14 items-center justify-center rounded-full bg-brand-100">
                 <Icon name="camera" size={26} className="text-yellow" />
               </div>
@@ -234,7 +234,7 @@ function BarcodeCaptureInner() {
           <div className="flex h-full flex-col items-center justify-center gap-4 px-8 text-center">
             {lookupError ? (
               <>
-                <div className="flex w-full max-w-xs flex-col items-center gap-3 rounded-2xl border border-border bg-white p-8">
+                <div className="flex w-full max-w-xs flex-col items-center gap-3 rounded-2xl border border-border bg-card p-8">
                   <div className="flex size-14 items-center justify-center rounded-full bg-danger/10">
                     <Icon name="danger" size={26} className="text-danger" />
                   </div>
@@ -248,7 +248,7 @@ function BarcodeCaptureInner() {
                     <button
                       type="button"
                       onClick={handleRetryLookup}
-                      className="tap-target h-11 w-full rounded-full bg-ink text-body font-medium text-white"
+                      className="tap-target h-11 w-full rounded-full bg-ink-fill text-body font-medium text-white"
                     >
                       Try again
                     </button>
@@ -256,7 +256,7 @@ function BarcodeCaptureInner() {
                   <button
                     type="button"
                     onClick={handleRescan}
-                    className="tap-target h-11 w-full rounded-full border border-border bg-white text-body font-medium text-ink"
+                    className="tap-target h-11 w-full rounded-full border border-border bg-card text-body font-medium text-ink"
                   >
                     Rescan
                   </button>
@@ -281,7 +281,7 @@ function BarcodeCaptureInner() {
               <div className="h-24 w-64 rounded-2xl border-2 border-yellow" />
             </div>
             {detectionSupport === "unavailable" && (
-              <div className="absolute inset-x-0 bottom-0 bg-ink/90 px-6 py-4 text-center text-caption text-white/80">
+              <div className="absolute inset-x-0 bottom-0 bg-ink-fill/90 px-6 py-4 text-center text-caption text-white/80">
                 Automatic scanning isn&apos;t supported in this browser — enter the barcode below instead.
               </div>
             )}
@@ -296,7 +296,7 @@ function BarcodeCaptureInner() {
                 onChange={(e) => setManualCode(e.target.value)}
                 placeholder="Enter barcode number"
                 inputMode="numeric"
-                className={cn("h-11 flex-1", dark && "bg-white text-ink")}
+                className={cn("h-11 flex-1", dark && "bg-white text-ink-fill")}
               />
               <Button size="lg" onClick={() => handleResolve(manualCode)} disabled={!manualCode.trim()}>
                 Go

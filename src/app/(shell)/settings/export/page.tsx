@@ -78,7 +78,7 @@ export default function DataExportPage() {
 
   return (
     <div className="flex flex-col gap-5">
-      <button onClick={() => router.back()} className="tap-target flex size-9 items-center justify-center rounded-full bg-white shadow-sm">
+      <button onClick={() => router.back()} className="tap-target flex size-9 items-center justify-center rounded-full bg-card shadow-sm">
         <Icon name="arrowLeft" size={18} />
       </button>
       <div>
@@ -157,7 +157,7 @@ function ExportCard({
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-border bg-white p-4 shadow-sm">
+    <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
       <div className="flex items-start gap-3">
         <span className="flex size-10 shrink-0 items-center justify-center rounded-[10px] bg-brand-100 text-yellow">
           <Icon name={icon} size={18} />

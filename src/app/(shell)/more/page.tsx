@@ -42,7 +42,7 @@ export default function MorePage() {
 
       {household.inventoryEnabled && (
         <div className="flex flex-col gap-2">
-          <DomainCard href="/locations" icon="box" tone="bg-ink" title="Locations" description="Storage areas, containers & items" />
+          <DomainCard href="/locations" icon="box" tone="bg-ink-fill" title="Locations" description="Storage areas, containers & items" />
           <LinkList links={INVENTORY_LINKS} />
         </div>
       )}
@@ -59,7 +59,7 @@ export default function MorePage() {
 
 function DomainCard({ href, icon, tone, title, description }: { href: string; icon: IconName; tone: string; title: string; description: string }) {
   return (
-    <Link href={href} className="tap-target flex items-center gap-3 rounded-2xl border border-border bg-white p-4 shadow-sm">
+    <Link href={href} className="tap-target flex items-center gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
       <span className={`flex size-12 shrink-0 items-center justify-center rounded-[10px] ${tone} text-white`}>
         <Icon name={icon} size={22} />
       </span>
@@ -74,7 +74,7 @@ function DomainCard({ href, icon, tone, title, description }: { href: string; ic
 
 function LinkList({ links }: { links: NavLink[] }) {
   return (
-    <div className="flex flex-col divide-y divide-border overflow-hidden rounded-2xl border border-border bg-white shadow-sm">
+    <div className="flex flex-col divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
       {links.map((link) => (
         <Link key={link.href} href={link.href} className="tap-target flex items-center gap-3 px-4 py-3">
           <Icon name={link.icon} size={18} className="shrink-0 text-muted-foreground" />

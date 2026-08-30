@@ -28,7 +28,7 @@ function ChooserRow({
   onClick: () => void;
 }) {
   return (
-    <button type="button" onClick={onClick} className="tap-target flex items-center gap-3 rounded-2xl border border-border bg-white p-4 text-left">
+    <button type="button" onClick={onClick} className="tap-target flex items-center gap-3 rounded-2xl border border-border bg-card p-4 text-left">
       <span className={cn("flex size-12 shrink-0 items-center justify-center rounded-full", iconClassName)}>
         <Icon name={icon} size={22} />
       </span>

@@ -658,7 +658,7 @@ export default function TransactionsListPage() {
               <SelectTrigger
                 className={cn(
                   "tap-target data-[size=default]:h-auto max-w-[220px] shrink-0 gap-1 rounded-full border px-3 py-1.5 text-caption font-medium",
-                  accountFilterId !== "all" ? "border-ink bg-ink text-white [&_svg]:text-white" : "border-border bg-white text-ink"
+                  accountFilterId !== "all" ? "border-ink-fill bg-ink-fill text-white [&_svg]:text-white" : "border-border bg-card text-ink"
                 )}
               >
                 <SelectValue>{accountFilterId === "all" ? "Account" : selectedAccount ? accountLabel(selectedAccount) : "Unknown account"}</SelectValue>
@@ -693,7 +693,7 @@ export default function TransactionsListPage() {
                   // the smallest chip in the row instead of matching its
                   // siblings.
                   "tap-target data-[size=default]:h-auto shrink-0 gap-1 rounded-full border px-3 py-1.5 text-caption font-medium",
-                  categoryFilterId !== "all" ? "border-ink bg-ink text-white [&_svg]:text-white" : "border-border bg-white text-ink"
+                  categoryFilterId !== "all" ? "border-ink-fill bg-ink-fill text-white [&_svg]:text-white" : "border-border bg-card text-ink"
                 )}
               >
                 {/* Children override, not the `placeholder` prop — "all" is
@@ -793,7 +793,7 @@ export default function TransactionsListPage() {
               type="button"
               onClick={handleSuggestCategories}
               disabled={suggesting}
-              className="flex items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-white px-4 py-3 text-caption font-medium text-ink disabled:opacity-60"
+              className="flex items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-card px-4 py-3 text-caption font-medium text-ink disabled:opacity-60"
             >
               <Icon name="ai" size={15} className="text-yellow" />
               {suggesting
@@ -821,7 +821,7 @@ export default function TransactionsListPage() {
           {groups.map(([day, entries]) => (
             <div key={day}>
               <p className="mb-1.5 text-caption font-medium tracking-wide text-muted-foreground uppercase">{day}</p>
-              <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-white shadow-sm">
+              <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-card shadow-sm">
                 {entries.map((t) => {
                   const displayedCategories = categoriesForTransaction(t, categoryIdsByTransaction[t.id] ?? [], financeCategories);
                   const suggestion = displayedCategories.length === 0 ? suggestions[t.id] : undefined;
@@ -1136,7 +1136,7 @@ function FilterChip({ label, active, onClick }: { label: string; active: boolean
       onClick={onClick}
       className={cn(
         "tap-target shrink-0 rounded-full border px-3 py-1.5 text-caption font-medium",
-        active ? "border-ink bg-ink text-white" : "border-border bg-white text-ink"
+        active ? "border-ink-fill bg-ink-fill text-white" : "border-border bg-card text-ink"
       )}
     >
       {label}

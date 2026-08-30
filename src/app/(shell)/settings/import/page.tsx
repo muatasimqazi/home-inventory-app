@@ -150,7 +150,7 @@ export default function CsvImportPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4 rounded-2xl border border-border bg-white p-8 shadow-sm">
+    <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-8 shadow-sm">
       <div className="flex items-center gap-2">
         <BackButton />
         <div>
@@ -167,7 +167,7 @@ export default function CsvImportPage() {
             const file = e.dataTransfer.files?.[0];
             if (file) handleFile(file);
           }}
-          className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-white p-12 text-center"
+          className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-card p-12 text-center"
         >
           <Icon name="file" size={28} className="text-muted-foreground" />
           <p className="text-body font-semibold text-ink">Drop CSV file here</p>
@@ -186,7 +186,7 @@ export default function CsvImportPage() {
       )}
 
       {stage === "mapping" && (
-        <div className="flex flex-col gap-4 rounded-xl bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-4 rounded-xl bg-card p-5 shadow-sm">
           <p className="text-caption text-muted-foreground">{rows.length} rows found. Map your CSV columns to Schuaz fields.</p>
           <div className="grid grid-cols-2 gap-3">
             {SHOHAZ_FIELDS.map((field) => (
@@ -218,7 +218,7 @@ export default function CsvImportPage() {
       )}
 
       {stage === "preview" && (
-        <div className="flex flex-col gap-4 rounded-xl bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-4 rounded-xl bg-card p-5 shadow-sm">
           <p className="text-caption text-muted-foreground">Showing the first 5 of {rows.length} rows.</p>
           <div className="overflow-x-auto">
             <Table>
@@ -256,7 +256,7 @@ export default function CsvImportPage() {
       )}
 
       {stage === "importing" && (
-        <div className="flex flex-col items-center gap-3 rounded-xl bg-white p-12 shadow-sm">
+        <div className="flex flex-col items-center gap-3 rounded-xl bg-card p-12 shadow-sm">
           <Icon name="spinner" size={28} className="animate-spin text-ink" />
           <p className="text-body text-ink">Importing… {progress}%</p>
           <div className="h-2 w-64 overflow-hidden rounded-full bg-surface-muted">
@@ -266,7 +266,7 @@ export default function CsvImportPage() {
       )}
 
       {stage === "complete" && summary && (
-        <div className="flex flex-col gap-4 rounded-xl bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-4 rounded-xl bg-card p-5 shadow-sm">
           <div className="flex items-center gap-3">
             <div className="flex size-11 items-center justify-center rounded-full bg-yellow/20 text-ink">
               <Icon name="check" size={20} />

@@ -245,7 +245,7 @@ function HouseholdSetupInner() {
 
   return (
     <div className="min-h-dvh bg-background">
-      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-white px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-card px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
         {showBack ? (
           <button
             type="button"
@@ -276,7 +276,7 @@ function HouseholdSetupInner() {
                   setJoinNameError(null);
                 }}
                 placeholder="e.g. Alex"
-                className="h-11 bg-white"
+                className="h-11 bg-card"
                 ref={joinNameInputRef}
               />
               <p className="mt-1 text-caption text-muted-foreground">Shown to other members instead of a generic &ldquo;You&rdquo;.</p>
@@ -291,7 +291,7 @@ function HouseholdSetupInner() {
                   setJoinError(null);
                 }}
                 placeholder="you@example.com"
-                className="h-11 bg-white"
+                className="h-11 bg-card"
               />
               {joinError && <p className="mt-1 text-caption text-danger">{joinError}</p>}
             </Field>
@@ -320,7 +320,7 @@ function HouseholdSetupInner() {
             </div>
             <DomainToggle
               icon="box"
-              tone="bg-ink"
+              tone="bg-ink-fill"
               title="Inventory"
               description="Catalog what you own — items, locations, containers"
               checked={inventoryEnabled}
@@ -356,7 +356,7 @@ function HouseholdSetupInner() {
                   setErrorMessage(null);
                 }}
                 placeholder="e.g. Lake House"
-                className="h-11 bg-white"
+                className="h-11 bg-card"
                 ref={householdNameInputRef}
               />
               {errorMessage && <p className="mt-1 text-caption text-danger">{errorMessage}</p>}
@@ -366,7 +366,7 @@ function HouseholdSetupInner() {
               <div className="flex flex-col gap-2">
                 <DomainToggle
                   icon="box"
-                  tone="bg-ink"
+                  tone="bg-ink-fill"
                   title="Inventory"
                   description="Catalog what you own"
                   checked={inventoryEnabled}
@@ -417,7 +417,7 @@ function HouseholdSetupInner() {
             {addedPeople.length > 0 && (
               <div className="flex flex-col gap-2">
                 {addedPeople.map((p) => (
-                  <div key={p.id} className="flex items-center gap-3 rounded-lg border border-border bg-white p-3">
+                  <div key={p.id} className="flex items-center gap-3 rounded-lg border border-border bg-card p-3">
                     <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-100 text-caption font-semibold text-brand-700">
                       {p.displayName.slice(0, 1).toUpperCase()}
                     </div>
@@ -433,7 +433,7 @@ function HouseholdSetupInner() {
             <button
               type="button"
               onClick={() => setAddPersonOpen(true)}
-              className="tap-target flex items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-white py-3 text-body font-medium text-ink hover:bg-surface-muted"
+              className="tap-target flex items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-card py-3 text-body font-medium text-ink hover:bg-surface-muted"
             >
               <Icon name="plus" size={16} />
               Add someone
@@ -442,19 +442,19 @@ function HouseholdSetupInner() {
         )}
       </div>
 
-      <div className="sticky bottom-0 border-t border-border bg-white px-4 py-3" style={{ bottom: keyboardInset }}>
+      <div className="sticky bottom-0 border-t border-border bg-card px-4 py-3" style={{ bottom: keyboardInset }}>
         <div className="mx-auto flex max-w-lg flex-col gap-2">
           {mode === "join" ? (
-            <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={handleJoin} disabled={joining}>
+            <Button size="lg" className="bg-ink-fill text-white hover:bg-ink-fill/90" onClick={handleJoin} disabled={joining}>
               {joining ? "Redeeming…" : "Redeem invite"}
             </Button>
           ) : displayPhase === "choosing-domains" ? (
-            <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={handleContinueFromDomains}>
+            <Button size="lg" className="bg-ink-fill text-white hover:bg-ink-fill/90" onClick={handleContinueFromDomains}>
               Continue
             </Button>
           ) : displayPhase === "naming" ? (
             <>
-              <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={handleCreateNamed}>
+              <Button size="lg" className="bg-ink-fill text-white hover:bg-ink-fill/90" onClick={handleCreateNamed}>
                 Create household
               </Button>
               <Button size="lg" variant="outline" onClick={() => setMode("join")}>
@@ -463,7 +463,7 @@ function HouseholdSetupInner() {
             </>
           ) : displayPhase === "invited" ? (
             <>
-              <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={handleJoinFromInvite}>
+              <Button size="lg" className="bg-ink-fill text-white hover:bg-ink-fill/90" onClick={handleJoinFromInvite}>
                 Join {pendingInvite?.householdName}
               </Button>
               <Button size="lg" variant="outline" onClick={() => setPhase("choosing-domains")}>
@@ -472,7 +472,7 @@ function HouseholdSetupInner() {
             </>
           ) : displayPhase === "ready" ? (
             <>
-              <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={() => router.push("/capture")}>
+              <Button size="lg" className="bg-ink-fill text-white hover:bg-ink-fill/90" onClick={() => router.push("/capture")}>
                 Open Camera
               </Button>
               <Button size="lg" variant="outline" onClick={() => router.push("/dashboard")}>

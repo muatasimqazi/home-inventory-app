@@ -257,7 +257,7 @@ export function RecurringBillFormSheet({
                       onClick={() => toggleShare(m.userId)}
                       className={cn(
                         "flex items-center gap-2 rounded-full border py-1 pr-3 pl-1.5 text-caption font-medium",
-                        shared ? "border-yellow bg-brand-100 text-ink" : "border-border bg-white text-ink"
+                        shared ? "border-yellow bg-brand-100 text-ink" : "border-border bg-card text-ink"
                       )}
                     >
                       <Avatar size="sm">
@@ -274,7 +274,7 @@ export function RecurringBillFormSheet({
 
           {error && <p className="text-caption text-danger">{error}</p>}
 
-          <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={handleSubmit}>
+          <Button size="lg" className="bg-ink-fill text-white hover:bg-ink-fill/90" onClick={handleSubmit}>
             Save
           </Button>
 

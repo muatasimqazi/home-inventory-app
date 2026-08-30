@@ -32,7 +32,7 @@ export function ContainerCard({ container, itemCount, breadcrumbLabel, status, c
   return (
     <Link
       href={`/containers/${container.id}`}
-      className={cn("flex flex-col overflow-hidden rounded-2xl border border-border bg-white shadow-sm transition-shadow hover:shadow-lg", className)}
+      className={cn("flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-shadow hover:shadow-lg", className)}
     >
       <div className="relative aspect-4/3 w-full shrink-0 overflow-hidden">
         {/* absolute inset-0, not a normal-flow size-full child — a

@@ -156,7 +156,7 @@ export function WardrobeStudioSheet({
                     disabled={disabled}
                     className={cn(
                       "rounded-full border px-3 py-1.5 text-caption font-medium",
-                      checked ? "border-ink bg-ink text-white" : "border-border bg-white text-ink",
+                      checked ? "border-ink-fill bg-ink-fill text-white" : "border-border bg-card text-ink",
                       disabled && "opacity-40"
                     )}
                   >
@@ -177,7 +177,7 @@ export function WardrobeStudioSheet({
                   onClick={() => setAspectRatio(ratio)}
                   className={cn(
                     "rounded-md px-4 py-1.5 text-caption font-semibold transition-colors",
-                    aspectRatio === ratio ? "bg-white text-yellow shadow-sm" : "text-muted-foreground"
+                    aspectRatio === ratio ? "bg-card text-yellow shadow-sm" : "text-muted-foreground"
                   )}
                 >
                   {ratio === "1:1" ? "Square" : "Portrait"}
@@ -186,7 +186,7 @@ export function WardrobeStudioSheet({
             </div>
           </div>
 
-          <Button size="lg" className="w-full bg-ink text-white hover:bg-ink/90" onClick={handleGenerate} disabled={generating}>
+          <Button size="lg" className="w-full bg-ink-fill text-white hover:bg-ink-fill/90" onClick={handleGenerate} disabled={generating}>
             {generating ? (
               <>
                 <Icon name="spinner" size={16} className="animate-spin" /> Generating…
@@ -201,7 +201,7 @@ export function WardrobeStudioSheet({
           {results.length > 0 && (
             <div className="grid grid-cols-2 gap-3">
               {results.map((r) => (
-                <div key={r.id} className="flex flex-col gap-2 rounded-2xl border border-border bg-white p-2">
+                <div key={r.id} className="flex flex-col gap-2 rounded-2xl border border-border bg-card p-2">
                   <div className="flex aspect-square items-center justify-center overflow-hidden rounded-lg bg-surface-muted">
                     {r.status === "complete" && r.generatedPhotoPath ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -216,7 +216,7 @@ export function WardrobeStudioSheet({
                   <p className="text-center text-caption font-medium text-ink">{WARDROBE_STYLE_LABEL[r.style]}</p>
                   {r.status === "complete" && r.generatedPhotoPath ? (
                     <div className="flex flex-col gap-1.5">
-                      <Button className="h-11 w-full bg-ink text-white hover:bg-ink/90" onClick={() => handleSaveAsCover(r.generatedPhotoPath!)}>
+                      <Button className="h-11 w-full bg-ink-fill text-white hover:bg-ink-fill/90" onClick={() => handleSaveAsCover(r.generatedPhotoPath!)}>
                         Save as cover
                       </Button>
                       <a

@@ -30,7 +30,7 @@ export function EntityCard({ href, emoji, coverPhotoPath, title, subtitle, badge
         // radius with no border, most visible on Location/Container
         // detail's child-entity grid ("Browse") sitting right next to
         // rows that do use the standard combo.
-        "flex flex-col overflow-hidden rounded-2xl border border-border bg-white p-3 shadow-sm transition-shadow hover:shadow-lg",
+        "flex flex-col overflow-hidden rounded-2xl border border-border bg-card p-3 shadow-sm transition-shadow hover:shadow-lg",
         className
       )}
     >

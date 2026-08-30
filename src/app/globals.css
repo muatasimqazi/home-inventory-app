@@ -19,6 +19,7 @@
 @theme inline {
   /* Core palette (v3 sage/neutral) */
   --color-ink: #1a1d29; /* heading text — near-black neutral, not warm-toned like v2's #212121 */
+  --color-ink-fill: #1a1d29; /* same fill/text split as --color-yellow/--color-yellow-text below, just discovered on ink too: bg-ink/border-ink/ring-ink call sites (primary buttons, active pills, badges, FAB, the camera viewfinder's always-dark chrome) always pair this with white text/icons on top, a pairing whose contrast is independent of page theme — this token exists so those call sites can point at a value that, unlike --color-ink itself, deliberately does not lighten in dark mode */
   --color-yellow: #5c7a52; /* brand action color (sage) — fills only (buttons/FAB/active nav-tab); treat as "the brand accent" token, not literally yellow */
   --color-yellow-text: #3f5a38; /* darker sage for literal text links/CTA text sitting on white — v3's standing link-color rule: fills get --color-yellow, text-on-white gets this darker variant for contrast */
   --color-white: #ffffff; /* neutral-0 */
@@ -159,6 +160,112 @@
 
 :root {
   --radius: 16px;
+}
+
+/*
+ * Dark mode — overrides the same CSS custom properties @theme inline
+ * defines above (every one of those tokens generates its utility classes
+ * as `var(--color-x)`, never an inlined literal, specifically because of
+ * the `inline` keyword — so redefining the variable here, scoped under
+ * .dark, is all that's needed for every existing bg-ink/text-muted-
+ * foreground/etc. call site app-wide to repaint automatically; matches
+ * the @custom-variant dark declaration at the top of this file, which
+ * next-themes' `class` strategy is what actually applies/removes).
+ *
+ * --color-white is deliberately NOT overridden here — it's relied on for
+ * literal white text/icons sitting on a colored fill (button labels, FAB
+ * icons, badge text on a solid color), which already has correct
+ * contrast in both themes and must stay pure white regardless. Anything
+ * that instead needs to become a real dark *surface* reads --color-card
+ * (see globals below), a separate token that only aliased --color-white
+ * in light mode.
+ *
+ * shadcn's own semantic slots (--color-secondary, --color-muted,
+ * --color-card-foreground, --color-input, --color-ring, etc., defined a
+ * few lines up via var(--color-x)) need no re-declaration here — they
+ * already point at the tokens this block redefines, so they inherit
+ * automatically through that same indirection.
+ */
+.dark {
+  /* Structure — page is the darkest surface, card one step lighter. A
+     deliberate departure from light mode's page==card convention (where
+     the border+shadow recipe alone carries elevation): shadows barely
+     read against a dark ground, so a real background-color step becomes
+     the primary elevation cue instead. */
+  --color-background: #12141a;
+  --color-card: #1b1e26;
+  --color-popover: #1b1e26;
+  --color-surface-muted: #242832;
+  --color-border: #2e323c;
+
+  /* Text — ink flips to a softened near-white (not pure #fff, easier on
+     the eyes at this brightness), muted lightens to stay legible against
+     the new dark ground. */
+  --color-ink: #f0f1f4;
+  --color-text-muted: #9aa1ac;
+
+  /* --color-ink-fill is NOT overridden here either, for the identical
+     reason --color-yellow isn't — see its declaration up in @theme
+     inline. It stays #1a1d29 in both themes: a fixed near-black fill
+     reads correctly with white text/icons on top regardless of the
+     page's own theme, exactly like --color-yellow. */
+
+  /* Brand link/text-only sage (--color-yellow itself is unchanged below —
+     it's a button/FAB *fill* with white text on top, self-contained
+     contrast independent of page theme). This is the "text sitting
+     directly on the page" variant, which does need to lighten — same
+     relationship as light mode's own "fills get --color-yellow, text-on-
+     background gets this variant" rule, just solved for a dark
+     background instead of white. brand-700 keeps its light-mode
+     "identical value to yellow-text by design" relationship. */
+  --color-yellow-text: #a7c99a;
+  --color-brand-100: #24301f;
+  --color-brand-200: #3c4f34;
+  --color-brand-700: #a7c99a;
+
+  /* text-danger (91 call sites, on-background text) heavily outnumbers
+     bg-danger (18, a fill with white text on top) — biased toward
+     legible text on the new dark ground; still a real (if slightly
+     less punchy) red as a fill. Revisit if a destructive button reads
+     weak in dark mode during visual QA. */
+  --color-danger: #ef6b64;
+
+  /* Bin ID badge palette — dark mode inverts the light palette's pastel-
+     bg/deep-text pattern to deep-saturated-bg/light-text, the standard
+     dark-mode badge treatment. */
+  --color-badge-red-bg: #3a1f1f;
+  --color-badge-red-border: #5c2b2b;
+  --color-badge-red-text: #f2a8a8;
+  --color-badge-green-bg: #1c2e1e;
+  --color-badge-green-border: #2c4530;
+  --color-badge-green-text: #a8d6ae;
+  --color-badge-purple-bg: #2e2138;
+  --color-badge-purple-border: #453056;
+  --color-badge-purple-text: #d4b3ea;
+  --color-badge-orange-bg: #3a2812;
+  --color-badge-orange-border: #5c3f1d;
+  --color-badge-orange-text: #f0bb80;
+  --color-badge-blue-bg: #1c2836;
+  --color-badge-blue-border: #2a3d52;
+  --color-badge-blue-text: #a8c8ea;
+
+  /* Same bg/border/text inversion as the badge palette above. */
+  --color-money-negative-bg: #3a2418;
+  --color-money-negative-border: #5c3a26;
+  --color-money-negative-text: #e0a67e;
+
+  /* Shadows lose most of their job on a dark ground (a black shadow on an
+     already-dark page barely registers) — the border color above becomes
+     the primary separation cue instead; these just get a modest opacity
+     bump rather than a full redesign. */
+  --shadow-sm: 0px 0px 2px 0px rgba(0, 0, 0, 0.4), 0px 2px 8px 0px rgba(0, 0, 0, 0.25);
+  --shadow-lg: 0px 1px 4px rgba(0, 0, 0, 0.5), 0px 10px 22px rgba(0, 0, 0, 0.4);
+  --shadow-sheet: 0 -8px 24px -6px rgba(0, 0, 0, 0.6);
+
+  /* --color-fab-* (the 5-role FAB chooser wheel) and --color-accent-*
+     (the category-accent trio) are deliberately left unchanged — both are
+     small colored fills with their own self-contained contrast (a white
+     icon/text on a saturated color), independent of the page's theme. */
 }
 
 @layer base {

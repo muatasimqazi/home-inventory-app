@@ -382,7 +382,7 @@ export function TransactionFormSheet({
 
           {error && <p className="text-caption text-danger">{error}</p>}
 
-          <Button size="lg" className="bg-ink text-white hover:bg-ink/90" onClick={handleSubmit}>
+          <Button size="lg" className="bg-ink-fill text-white hover:bg-ink-fill/90" onClick={handleSubmit}>
             Save
           </Button>
         </div>
