@@ -455,6 +455,7 @@
   gap: 0.5em;
 }
 .tiptap ul[data-type="taskList"] li > label {
+  position: relative;
   flex: 0 0 auto;
   margin-top: 0.2em;
   user-select: none;
@@ -465,6 +466,20 @@
 }
 .tiptap ul[data-type="taskList"] input[type="checkbox"] {
   cursor: pointer;
+  width: 18px;
+  height: 18px;
+}
+/* The native checkbox alone was a ~13px hit target ("hard to click") —
+   same expanded-hit-area trick, same exact inset values, as
+   src/components/ui/checkbox.tsx's own `after:-inset-x-3 after:-inset-y-2`
+   (asymmetric on purpose: more horizontal room, less vertical, so one
+   checklist item's hit area doesn't bleed into the next row above/below)
+   — applied to the wrapping <label> (Tiptap's TaskItem renders
+   <label><input/></label>) so it doesn't distort list layout. */
+.tiptap ul[data-type="taskList"] li > label::after {
+  content: "";
+  position: absolute;
+  inset: -8px -12px;
 }
 .tiptap ul[data-type="taskList"] li[data-checked="true"] > div > p {
   color: var(--text-muted);
