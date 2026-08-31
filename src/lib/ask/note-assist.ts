@@ -32,21 +32,30 @@ export interface NoteAssistTurn {
 
 export type NoteAssistResult = { type: "answer"; message: string } | { type: "edit"; message: string; content: string };
 
-const resultSchema = z.discriminatedUnion("type", [
-  z.object({
-    type: z.literal("answer"),
-    message: z.string().describe("A direct answer to the user's question about this note. Plain prose, not Markdown — this renders in a chat bubble."),
-  }),
-  z.object({
-    type: z.literal("edit"),
-    message: z.string().describe("One short sentence describing what changed, e.g. 'Added a packing checklist.' Plain prose, not Markdown."),
-    content: z
-      .string()
-      .describe(
-        "The COMPLETE new note content, in Markdown, replacing the current content entirely. Preserve everything the user didn't ask to change. Use real Markdown syntax the note's renderer understands: '- ' for bullet lists, '1. ' for numbered lists, '- [ ] '/'- [x] ' for checklists, pipe tables, **bold**, *italic*."
-      ),
-  }),
-]);
+// Flat schema, not a discriminated union — a union of two object shapes
+// (differing keys per "type") reliably produced AI_NoObjectGeneratedError
+// on both the primary and fallback model here: the model would emit a
+// plausible-looking object (e.g. `{ type: "edit", newContent: "..." }`,
+// missing `message` entirely and inventing its own key name for the
+// content field) that didn't validate against whichever union branch it
+// was aiming for. Every other structured-output schema in this app
+// (lib/finance/categorize.ts, budget-recommendations.ts, match-
+// transaction.ts) is flat for the same underlying reason — a single set
+// of keys the model can't get creative with, `content` simply unused
+// (empty string) when type is "answer".
+const resultSchema = z.object({
+  type: z.enum(["answer", "edit"]).describe('"answer" for a question about the note, "edit" for any request to change it.'),
+  message: z
+    .string()
+    .describe(
+      "For type \"answer\": the direct answer. For type \"edit\": one short sentence describing what changed, e.g. 'Added a packing checklist.' Either way, plain prose, not Markdown — this renders in a chat bubble."
+    ),
+  content: z
+    .string()
+    .describe(
+      "For type \"edit\" ONLY: the COMPLETE new note content in Markdown, replacing the current content entirely — preserve everything the user didn't ask to change. Use real Markdown syntax the note's renderer understands: '- ' for bullet lists, '1. ' for numbered lists, '- [ ] '/'- [x] ' for checklists, pipe tables, **bold**, *italic*. For type \"answer\": always the empty string."
+    ),
+});
 
 function systemPrompt(title: string, content: string): string {
   return (
@@ -77,7 +86,13 @@ async function runAssist(model: LanguageModel, title: string, content: string, h
     timeout: CALL_TIMEOUT_MS,
     maxRetries: CALL_MAX_RETRIES,
   });
-  return output;
+  // Defensive: "edit" with no real content back would silently wipe the
+  // note (NoteAssistantBar applies `content` verbatim) — treat that
+  // malformed case as an answer instead of trusting it.
+  if (output.type === "edit" && output.content.trim()) {
+    return { type: "edit", message: output.message, content: output.content };
+  }
+  return { type: "answer", message: output.message || "Sorry, I couldn't do that." };
 }
 
 /**
