@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { HydrationGate } from "@/components/hydration-gate";
 import { DomainGate } from "@/components/domain-gate";
 import { PhotoLightbox } from "@/components/photo-lightbox";
+import { PointerEventsWatchdog } from "@/components/pointer-events-watchdog";
 
 export const metadata: Metadata = {
   title: "Schuaz",
@@ -88,6 +89,12 @@ export default function RootLayout({
           {/* One instance for the whole app — any component opens it via
               useLightboxStore().openLightbox(...), no per-page wiring. */}
           <PhotoLightbox />
+          {/* Outside HydrationGate/DomainGate on purpose — it needs to run
+              (and be able to unstick the page) even if one of those is
+              itself the thing showing, not just once the real app content
+              has mounted. See its own file for what bug this guards
+              against ("sometimes doesn't let you click stuff", app-wide). */}
+          <PointerEventsWatchdog />
         </ThemeProvider>
       </body>
     </html>
