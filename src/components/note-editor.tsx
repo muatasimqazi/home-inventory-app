@@ -56,7 +56,18 @@ export function NoteEditor({ content, editable, onChange, placeholder, autoFocus
     immediatelyRender: false,
     autofocus: autoFocus ? "end" : false,
     editorProps: {
-      attributes: { class: cn("tiptap text-body text-ink focus:outline-none", className) },
+      attributes: {
+        class: cn(
+          "tiptap text-body text-ink focus:outline-none",
+          // Editable mode gets its own visible box (border/background/
+          // padding/min-height) — a Textarea-sized writing surface, not a
+          // single line that grows from nothing. Read-only mode stays
+          // bare: the caller (notes/[id]/page.tsx) already wraps it in a
+          // card, and double-boxing it there looked wrong.
+          editable && "min-h-[40vh] rounded-lg border border-border bg-card p-3",
+          className
+        ),
+      },
     },
     onUpdate: ({ editor }) => {
       // tiptap-markdown ships no @tiptap/core Storage augmentation (no
