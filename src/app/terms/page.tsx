@@ -73,7 +73,13 @@ export default function TermsPage() {
 
         <section className="flex flex-col gap-3">
           <h2 className="text-section-title font-medium">Contact</h2>
-          <p className="text-body text-muted-foreground">For questions about these terms, contact the Schuaz operator through the support channel where you received access to the app.</p>
+          <p className="text-body text-muted-foreground">
+            For questions about these terms, email{" "}
+            <a href="mailto:info@schuaz.com" className="font-medium text-yellow-text underline">
+              info@schuaz.com
+            </a>
+            .
+          </p>
         </section>
       </div>
     </main>
