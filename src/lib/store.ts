@@ -24,6 +24,8 @@ import {
   itemToInsertRow,
   rowToTag,
   tagToInsertRow,
+  rowToNote,
+  noteToInsertRow,
   rowToFavorite,
   rowToActivityLogEntry,
   activityLogEntryToInsertRow,
@@ -82,6 +84,7 @@ import {
   type ContainerRow,
   type ItemRow,
   type TagRow,
+  type NoteRow,
   type FavoriteRow,
   type ActivityLogRow,
   type AttachmentRow,
@@ -135,6 +138,7 @@ import type {
   Location,
   Member,
   NormalizationRule,
+  Note,
   Person,
   PersonRelationship,
   PinnedLocation,
@@ -306,6 +310,8 @@ interface InventoryState {
   containers: Container[];
   items: Item[];
   tags: Tag[];
+  /** Personal-or-shared household notes (0050_notes.sql) — RLS already returns only what the caller can see (their own personal notes + every shared note), same "RLS is the complete filter" guarantee as `accounts`. */
+  notes: Note[];
   normalizationRules: NormalizationRule[];
   activity: ActivityLogEntry[];
   favorites: Favorite[];
@@ -461,6 +467,15 @@ interface InventoryState {
 
   // Tags
   getOrCreateTag: (name: string) => Tag;
+
+  // Notes (0050_notes.sql, personal-or-shared per-note toggle — see
+  // docs/Platform Foundation Addendum.md §6 on stating a new domain's
+  // privacy answer explicitly rather than assuming)
+  createNote: (input: { title: string; content: string; isShared?: boolean }) => Note;
+  updateNote: (noteId: string, patch: Partial<Pick<Note, "title" | "content" | "isShared" | "pinned">>) => void;
+  trashNote: (noteId: string) => void;
+  restoreNote: (noteId: string) => void;
+  permanentlyDeleteNote: (noteId: string) => void;
 
   // Normalization
   findNormalizationRule: (rawName: string) => NormalizationRule | undefined;
@@ -663,6 +678,7 @@ interface HouseholdBundle {
   containers: Container[];
   items: Item[];
   tags: Tag[];
+  notes: Note[];
   favorites: Favorite[];
   activity: ActivityLogEntry[];
   attachments: Attachment[];
@@ -700,6 +716,7 @@ function snapshotBundle(state: InventoryState): HouseholdBundle {
     containers: state.containers,
     items: state.items,
     tags: state.tags,
+    notes: state.notes,
     favorites: state.favorites,
     activity: state.activity,
     attachments: state.attachments,
@@ -743,6 +760,7 @@ async function fetchHouseholdBundle(
     containersRes,
     itemsRes,
     tagsRes,
+    notesRes,
     favoritesRes,
     activityRes,
     attachmentsRes,
@@ -780,6 +798,10 @@ async function fetchHouseholdBundle(
     supabase.from("containers").select("*").eq("household_id", householdId),
     supabase.from("items").select("*, item_tags(tag_id)").eq("household_id", householdId),
     supabase.from("tags").select("*").eq("household_id", householdId),
+    // RLS's can_view_note() already returns exactly what the caller should
+    // see (their own personal notes + every shared note in the household) —
+    // same "no further client-side filtering needed" guarantee as accounts.
+    supabase.from("notes").select("*").eq("household_id", householdId),
     supabase.from("favorites").select("*, items!inner(household_id)").eq("user_id", userId).eq("items.household_id", householdId),
     supabase.from("activity_log").select("*").eq("household_id", householdId).order("created_at", { ascending: false }).limit(500),
     supabase.from("attachments").select("*").eq("household_id", householdId),
@@ -821,7 +843,7 @@ async function fetchHouseholdBundle(
   ]);
 
   const firstError =
-    membersRes.error ?? invitesRes.error ?? apiKeysRes.error ?? peopleRes.error ?? locationsRes.error ?? containersRes.error ?? itemsRes.error ?? tagsRes.error ?? favoritesRes.error ?? activityRes.error ??
+    membersRes.error ?? invitesRes.error ?? apiKeysRes.error ?? peopleRes.error ?? locationsRes.error ?? containersRes.error ?? itemsRes.error ?? tagsRes.error ?? notesRes.error ?? favoritesRes.error ?? activityRes.error ??
     attachmentsRes.error ?? itemStudioPhotosRes.error ?? itemDocumentLinksRes.error ?? pinnedLocationsRes.error ?? labelBatchesRes.error ?? labelBatchEntriesRes.error ?? normalizationRulesRes.error ??
     accountsRes.error ?? financeAccountSharesRes.error ?? transactionsRes.error ?? financeCategoriesRes.error ?? categoryRulesRes.error ?? recurringBillsRes.error ?? financeBillSharesRes.error ??
     recurringCandidateDismissalsRes.error ??
@@ -868,6 +890,7 @@ async function fetchHouseholdBundle(
     containers: ((containersRes.data ?? []) as ContainerRow[]).map(rowToContainer),
     items: ((itemsRes.data ?? []) as ItemRowWithTags[]).map((row) => rowToItem(row, (row.item_tags ?? []).map((jt) => jt.tag_id))),
     tags: ((tagsRes.data ?? []) as TagRow[]).map(rowToTag),
+    notes: ((notesRes.data ?? []) as NoteRow[]).map(rowToNote),
     favorites: ((favoritesRes.data ?? []) as FavoriteRow[]).map(rowToFavorite),
     activity: ((activityRes.data ?? []) as ActivityLogRow[]).map(rowToActivityLogEntry),
     attachments: ((attachmentsRes.data ?? []) as AttachmentRow[]).map(rowToAttachment),
@@ -1120,6 +1143,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
   containers: [],
   items: [],
   tags: [],
+  notes: [],
   normalizationRules: [],
   activity: [],
   favorites: [],
@@ -1232,7 +1256,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       keyOf: (item: TDomain) => string,
       rowKeyOf: (row: Record<string, unknown>) => string,
       stateKey:
-        | "members" | "invites" | "people" | "locations" | "containers" | "tags" | "activity" | "attachments" | "itemStudioPhotos" | "itemDocumentLinks" | "pinnedLocations"
+        | "members" | "invites" | "people" | "locations" | "containers" | "tags" | "notes" | "activity" | "attachments" | "itemStudioPhotos" | "itemDocumentLinks" | "pinnedLocations"
         | "labelBatches" | "labelBatchEntries" | "normalizationRules"
         | "accounts" | "financeAccountShares" | "transactions" | "financeCategories" | "categoryRules" | "categoryBudgets"
         // financeSettings is NOT in this union — it's a single nullable
@@ -1264,6 +1288,10 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     bind<LocationRow, Location>("locations", householdFilter, rowToLocation, (l) => l.id, (r) => r.id as string, "locations");
     bind<ContainerRow, Container>("containers", householdFilter, rowToContainer, (c) => c.id, (r) => r.id as string, "containers");
     bind<TagRow, Tag>("tags", householdFilter, rowToTag, (t) => t.id, (r) => r.id as string, "tags");
+    // Same "RLS filters what a subscriber actually receives" guarantee as
+    // accounts above — a personal note belonging to another member never
+    // arrives here.
+    bind<NoteRow, Note>("notes", householdFilter, rowToNote, (n) => n.id, (r) => r.id as string, "notes");
     bind<ActivityLogRow, ActivityLogEntry>("activity_log", householdFilter, rowToActivityLogEntry, (a) => a.id, (r) => r.id as string, "activity");
     bind<AttachmentRow, Attachment>("attachments", householdFilter, rowToAttachment, (a) => a.id, (r) => r.id as string, "attachments");
     bind<ItemStudioPhotoRow, ItemStudioPhoto>("item_studio_photos", householdFilter, rowToItemStudioPhoto, (p) => p.id, (r) => r.id as string, "itemStudioPhotos");
@@ -2644,6 +2672,101 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     return created;
   },
 
+  createNote: (input) => {
+    const supabase = getSupabaseBrowserClient();
+    const now = nowIso();
+    const created: Note = {
+      id: newId(),
+      householdId: get().currentHouseholdId,
+      ownerUserId: get().currentUserId,
+      title: input.title,
+      content: input.content,
+      isShared: input.isShared ?? false,
+      pinned: false,
+      status: "active",
+      trashedAt: null,
+      permanentlyDeleteAfter: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    set((s) => ({ notes: [...s.notes, created] }));
+    persistOrRevert(
+      supabase.from("notes").insert(noteToInsertRow(created)),
+      () => set((s) => ({ notes: s.notes.filter((n) => n.id !== created.id) })),
+      "Couldn't create note"
+    );
+    get().logActivity({ entityType: "note", entityId: created.id, entityName: created.title || "Untitled note", action: "created" });
+    return created;
+  },
+
+  updateNote: (noteId, patch) => {
+    const supabase = getSupabaseBrowserClient();
+    const previous = get().notes.find((n) => n.id === noteId);
+    if (!previous) return;
+    const merged: Note = { ...previous, ...patch, updatedAt: nowIso() };
+    set((s) => ({ notes: s.notes.map((n) => (n.id === noteId ? merged : n)) }));
+    persistOrRevert(
+      supabase.from("notes").update(noteToInsertRow(merged)).eq("id", noteId),
+      () => set((s) => ({ notes: s.notes.map((n) => (n.id === noteId ? previous : n)) })),
+      "Couldn't update note"
+    );
+    // "edited" covers every field including the personal/shared toggle —
+    // no dedicated shared/unshared action exists in ActivityAction, so the
+    // visibility flip just gets a descriptive detail instead.
+    if (patch.isShared !== undefined && patch.isShared !== previous.isShared) {
+      get().logActivity({
+        entityType: "note",
+        entityId: merged.id,
+        entityName: merged.title || "Untitled note",
+        action: "edited",
+        detail: patch.isShared ? "Shared with household" : "Made personal",
+      });
+    } else if (patch.title !== undefined || patch.content !== undefined) {
+      get().logActivity({ entityType: "note", entityId: merged.id, entityName: merged.title || "Untitled note", action: "edited" });
+    }
+  },
+
+  trashNote: (noteId) => {
+    const supabase = getSupabaseBrowserClient();
+    const previous = get().notes.find((n) => n.id === noteId);
+    if (!previous) return;
+    const trashedAt = nowIso();
+    const merged: Note = { ...previous, status: "trashed", trashedAt, permanentlyDeleteAfter: purgeAfter(new Date(trashedAt)), updatedAt: trashedAt };
+    set((s) => ({ notes: s.notes.map((n) => (n.id === noteId ? merged : n)) }));
+    persistOrRevert(
+      supabase.from("notes").update(noteToInsertRow(merged)).eq("id", noteId),
+      () => set((s) => ({ notes: s.notes.map((n) => (n.id === noteId ? previous : n)) })),
+      "Couldn't move note to trash"
+    );
+    get().logActivity({ entityType: "note", entityId: merged.id, entityName: merged.title || "Untitled note", action: "trashed" });
+  },
+
+  restoreNote: (noteId) => {
+    const supabase = getSupabaseBrowserClient();
+    const previous = get().notes.find((n) => n.id === noteId);
+    if (!previous) return;
+    const merged: Note = { ...previous, status: "active", trashedAt: null, permanentlyDeleteAfter: null, updatedAt: nowIso() };
+    set((s) => ({ notes: s.notes.map((n) => (n.id === noteId ? merged : n)) }));
+    persistOrRevert(
+      supabase.from("notes").update(noteToInsertRow(merged)).eq("id", noteId),
+      () => set((s) => ({ notes: s.notes.map((n) => (n.id === noteId ? previous : n)) })),
+      "Couldn't restore note"
+    );
+    get().logActivity({ entityType: "note", entityId: merged.id, entityName: merged.title || "Untitled note", action: "restored" });
+  },
+
+  permanentlyDeleteNote: (noteId) => {
+    const supabase = getSupabaseBrowserClient();
+    const n = get().notes.find((x) => x.id === noteId);
+    set((s) => ({ notes: s.notes.filter((x) => x.id !== noteId) }));
+    persistOrRevert(
+      supabase.from("notes").delete().eq("id", noteId),
+      () => { if (n) set((s) => ({ notes: [...s.notes, n] })); },
+      "Couldn't permanently delete note"
+    );
+    if (n) get().logActivity({ entityType: "note", entityId: n.id, entityName: n.title || "Untitled note", action: "deleted_forever" });
+  },
+
   findNormalizationRule: (rawName) => {
     const normalized = rawName.trim().toLowerCase();
     return get().normalizationRules.find((r) => r.rawPattern.toLowerCase() === normalized);
@@ -3989,8 +4112,15 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       changed = true;
     }
 
+    let notes = state.notes;
+    const survivingNotes = notes.filter((n) => !isExpired(n.status, n.permanentlyDeleteAfter));
+    if (survivingNotes.length !== notes.length) {
+      notes = survivingNotes;
+      changed = true;
+    }
+
     if (!changed) return;
-    set({ items, containers, locations, accounts, financeCategories, transactions, recurringBills });
+    set({ items, containers, locations, accounts, financeCategories, transactions, recurringBills, notes });
   },
   };
 });

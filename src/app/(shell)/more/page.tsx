@@ -53,6 +53,11 @@ export default function MorePage() {
           <LinkList links={FINANCE_LINKS} />
         </div>
       )}
+
+      {/* Notes (0050_notes.sql) — always on, no household.xEnabled gate,
+          no sub-page list (it's a single list+detail page, not a domain
+          with its own sub-nav the way Inventory/Finance are). */}
+      <DomainCard href="/notes" icon="notebook" tone="bg-ink-fill" title="Notes" description="Personal & shared notes" />
     </div>
   );
 }

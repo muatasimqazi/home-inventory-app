@@ -15,6 +15,7 @@ import type {
   Container,
   Item,
   Tag,
+  Note,
   Favorite,
   ActivityLogEntry,
   Attachment,
@@ -495,6 +496,55 @@ export function rowToTag(row: TagRow): Tag {
 
 export function tagToInsertRow(tag: Tag): TagRow {
   return { id: tag.id, household_id: tag.householdId, name: tag.name };
+}
+
+export interface NoteRow {
+  id: string;
+  household_id: string;
+  owner_user_id: string;
+  title: string;
+  content: string;
+  is_shared: boolean;
+  pinned: boolean;
+  status: string;
+  trashed_at: string | null;
+  permanently_delete_after: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export function rowToNote(row: NoteRow): Note {
+  return {
+    id: row.id,
+    householdId: row.household_id,
+    ownerUserId: row.owner_user_id,
+    title: row.title,
+    content: row.content,
+    isShared: row.is_shared,
+    pinned: row.pinned,
+    status: row.status as Note["status"],
+    trashedAt: row.trashed_at,
+    permanentlyDeleteAfter: row.permanently_delete_after,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function noteToInsertRow(note: Note): NoteRow {
+  return {
+    id: note.id,
+    household_id: note.householdId,
+    owner_user_id: note.ownerUserId,
+    title: note.title,
+    content: note.content,
+    is_shared: note.isShared,
+    pinned: note.pinned,
+    status: note.status,
+    trashed_at: note.trashedAt,
+    permanently_delete_after: note.permanentlyDeleteAfter,
+    created_at: note.createdAt,
+    updated_at: note.updatedAt,
+  };
 }
 
 export interface FavoriteRow {

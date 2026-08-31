@@ -1,5 +1,5 @@
 import { buildBreadcrumb, breadcrumbLabel, activeItemCountForContainer } from "./selectors";
-import type { Account, Container, FinanceCategory, Item, Location, ScannedReceiptLineItem, Tag, Transaction } from "./types";
+import type { Account, Container, FinanceCategory, Item, Location, Note, ScannedReceiptLineItem, Tag, Transaction } from "./types";
 
 // Weighted, token-based ranking, in the spirit of PRD §11 (typo-tolerant-ish,
 // spans names/categories/tags/breadcrumbs, ranked). Adapted from the scoring
@@ -39,7 +39,13 @@ export interface ContainerSearchResult {
   itemCount: number;
 }
 
-export type SearchResult = ItemSearchResult | TransactionSearchResult | AccountSearchResult | ContainerSearchResult;
+export interface NoteSearchResult {
+  kind: "note";
+  score: number;
+  note: Note;
+}
+
+export type SearchResult = ItemSearchResult | TransactionSearchResult | AccountSearchResult | ContainerSearchResult | NoteSearchResult;
 
 function tokenize(value: string): string[] {
   return value
@@ -100,6 +106,41 @@ export function searchInventory(query: string, items: Item[], containers: Contai
     })
     .filter((r) => r.score > 0)
     .sort((a, b) => b.score - a.score || a.item.name.localeCompare(b.item.name));
+}
+
+/**
+ * Notes by title or content — folded only into the "all" domain tab on
+ * the Search page (v1 scope call, see 0050_notes.sql's planning doc: not
+ * a full-fledged domain with its own filter chip yet), matching title
+ * more heavily than a content-body hit.
+ */
+export function searchNotes(query: string, notes: Note[]): NoteSearchResult[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  const queryTokens = tokenize(q);
+
+  return notes
+    .filter((n) => n.status === "active")
+    .map((n) => {
+      const title = n.title.toLowerCase();
+      const content = n.content.toLowerCase();
+      const searchable = [title, content].join(" ");
+
+      let score = 0;
+      if (matchesAllTokens(searchable, queryTokens)) {
+        if (title === q) score += 100;
+        if (title.includes(q)) score += 60;
+        if (content.includes(q)) score += 20;
+        for (const token of queryTokens) {
+          if (title.includes(token)) score += 12;
+          if (searchable.includes(token)) score += 3;
+        }
+      }
+
+      return { kind: "note" as const, note: n, score };
+    })
+    .filter((r) => r.score > 0)
+    .sort((a, b) => b.score - a.score || a.note.title.localeCompare(b.note.title));
 }
 
 /**

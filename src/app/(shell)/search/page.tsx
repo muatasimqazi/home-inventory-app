@@ -17,7 +17,7 @@ import { categoryAccentClass } from "@/lib/category";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { rowToScannedReceiptLineItem, type ScannedReceiptLineItemRow } from "@/lib/supabase/mappers";
 import { useInventoryStore } from "@/lib/store";
-import { searchInventory, searchContainers, searchFinance, type SearchResult } from "@/lib/search";
+import { searchInventory, searchContainers, searchFinance, searchNotes, type SearchResult } from "@/lib/search";
 import { PhotoThumb } from "@/components/photo-thumb";
 import { accountTypeIcon, activeLocations } from "@/lib/selectors";
 import { formatCurrency, formatShortDate } from "@/lib/format";
@@ -55,6 +55,7 @@ function SearchPageInner() {
   const transactions = useInventoryStore((s) => s.transactions);
   const accounts = useInventoryStore((s) => s.accounts);
   const financeCategories = useInventoryStore((s) => s.financeCategories);
+  const notes = useInventoryStore((s) => s.notes);
   const householdId = useInventoryStore((s) => s.currentHouseholdId);
   // Same question -> answer -> references flow as the global Ask widget
   // (hooks/use-ask-conversation.ts) — "we want search to function same as
@@ -136,12 +137,16 @@ function SearchPageInner() {
     () => searchFinance(query, transactions, accounts, financeCategories, lineItemsByTransaction),
     [query, transactions, accounts, financeCategories, lineItemsByTransaction]
   );
+  // Notes isn't "inventory" or "finance" — only folded into the "all" tab
+  // (no dedicated Notes filter chip yet, see 0050_notes.sql's planning doc).
+  const noteResults = useMemo(() => searchNotes(query, notes), [query, notes]);
 
   const combined: SearchResult[] = useMemo(() => {
     const inventoryPool = [...inventoryResults, ...containerResults];
-    const pool: SearchResult[] = domain === "finance" ? financeResults : domain === "inventory" ? inventoryPool : [...inventoryPool, ...financeResults];
+    const pool: SearchResult[] =
+      domain === "finance" ? financeResults : domain === "inventory" ? inventoryPool : [...inventoryPool, ...financeResults, ...noteResults];
     return [...pool].sort((a, b) => b.score - a.score);
-  }, [domain, inventoryResults, containerResults, financeResults]);
+  }, [domain, inventoryResults, containerResults, financeResults, noteResults]);
 
   // Category chip filter only makes sense against item results — finance
   // results don't have an item category, and neither do containers. Hidden
@@ -151,7 +156,7 @@ function SearchPageInner() {
   const filteredResults =
     categoryFilter && domain !== "finance" ? combined.filter((r) => r.kind === "item" && r.item.category === categoryFilter) : combined;
 
-  const hasAnyResults = inventoryResults.length > 0 || containerResults.length > 0 || financeResults.length > 0;
+  const hasAnyResults = inventoryResults.length > 0 || containerResults.length > 0 || financeResults.length > 0 || noteResults.length > 0;
   const { visible: paginatedResults, hasMore, remaining, pageSize, loadMore } = usePaginated(filteredResults, `${domain}:${categoryFilter}:${query}`);
 
   // Names the household already has, active items only — exact
@@ -266,7 +271,7 @@ function SearchPageInner() {
           <div className="flex flex-col gap-2">
             {paginatedResults.map((r) => (
               <SearchResultRow
-                key={`${r.kind}-${r.kind === "item" ? r.item.id : r.kind === "container" ? r.container.id : r.kind === "transaction" ? r.transaction.id : r.account.id}`}
+                key={`${r.kind}-${r.kind === "item" ? r.item.id : r.kind === "container" ? r.container.id : r.kind === "transaction" ? r.transaction.id : r.kind === "note" ? r.note.id : r.account.id}`}
                 result={r}
               />
             ))}
@@ -384,6 +389,20 @@ function SearchResultRow({ result }: { result: SearchResult }) {
         <span className={cn("shrink-0 text-body font-semibold", t.amount < 0 ? "text-money-negative-text" : "text-badge-green-text")}>
           {formatCurrency(t.amount, { showPositiveSign: true })}
         </span>
+      </Link>
+    );
+  }
+
+  if (result.kind === "note") {
+    const { note } = result;
+    return (
+      <Link href={`/notes/${note.id}`} className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 shadow-sm">
+        <IconChip icon="notebook" tone="muted" />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-item-title font-medium text-ink">{note.title || "Untitled note"}</p>
+          <p className="truncate text-caption text-muted-foreground">{note.content.split("\n").find((l) => l.trim()) ?? "Note"}</p>
+        </div>
+        <Icon name={note.isShared ? "users" : "lock"} size={14} className="shrink-0 text-muted-foreground" />
       </Link>
     );
   }

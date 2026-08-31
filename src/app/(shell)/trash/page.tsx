@@ -37,7 +37,10 @@ export default function TrashPage() {
   // Finance hub, ...) lands on its own tab instead of always defaulting
   // to Inventory — read once via useState's initializer, not an effect,
   // since the param never changes without a full navigation.
-  const [tab, setTab] = useState(() => (searchParams.get("tab") === "finance" ? "finance" : "inventory"));
+  const [tab, setTab] = useState(() => {
+    const t = searchParams.get("tab");
+    return t === "finance" || t === "notes" ? t : "inventory";
+  });
 
   return (
     <Tabs value={tab} onValueChange={setTab} className="gap-4">
@@ -52,6 +55,7 @@ export default function TrashPage() {
       <TabsList>
         <TabsTrigger value="inventory">Inventory</TabsTrigger>
         <TabsTrigger value="finance">Finance</TabsTrigger>
+        <TabsTrigger value="notes">Notes</TabsTrigger>
       </TabsList>
 
       <TabsContent value="inventory">
@@ -60,7 +64,81 @@ export default function TrashPage() {
       <TabsContent value="finance">
         <FinanceTrashPanel />
       </TabsContent>
+      <TabsContent value="notes">
+        <NotesTrashPanel />
+      </TabsContent>
     </Tabs>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Notes panel — single entity type, so no filter row (Inventory's three
+// types and Finance's four both need one; one type doesn't).
+// ---------------------------------------------------------------------------
+
+function NotesTrashPanel() {
+  const notes = useInventoryStore((s) => s.notes);
+  const restoreNote = useInventoryStore((s) => s.restoreNote);
+  const permanentlyDeleteNote = useInventoryStore((s) => s.permanentlyDeleteNote);
+
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; title: string } | null>(null);
+
+  const rows = notes.filter((n) => n.status === "trashed").sort((a, b) => (b.trashedAt ?? "").localeCompare(a.trashedAt ?? ""));
+  const { visible: paginatedRows, hasMore, remaining, pageSize, loadMore } = usePaginated(rows, "notes");
+
+  function restore(note: (typeof rows)[number]) {
+    restoreNote(note.id);
+    toast.success(`Restored ${note.title || "Untitled note"}`);
+  }
+
+  function deleteForever(note: { id: string; title: string }) {
+    permanentlyDeleteNote(note.id);
+    toast.success(`Permanently deleted ${note.title || "Untitled note"}`);
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      {rows.length === 0 ? (
+        <EmptyState icon="notebook" title="Trash is empty" description="Trashed notes show up here for 30 days." />
+      ) : (
+        <div className="flex flex-col gap-2">
+          {paginatedRows.map((note) => (
+            <div key={note.id} className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 shadow-sm">
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-[10px] bg-surface-muted">
+                <Icon name="notebook" size={18} className="text-muted-foreground" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-body text-ink">{note.title || "Untitled note"}</p>
+                <p className="text-caption text-muted-foreground">{daysUntil(note.permanentlyDeleteAfter!)} days left</p>
+              </div>
+              <Button variant="secondary" size="icon-sm" aria-label="Restore" onClick={() => restore(note)} className="sm:hidden">
+                <Icon name="restore" size={14} />
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => restore(note)} className="hidden sm:inline-flex">
+                <Icon name="restore" size={14} /> Restore
+              </Button>
+              <Button variant="ghost" size="icon" aria-label="Delete forever" onClick={() => setPendingDelete({ id: note.id, title: note.title })}>
+                <Icon name="trash" size={16} className="text-danger" />
+              </Button>
+            </div>
+          ))}
+          {hasMore && <LoadMoreButton remaining={remaining} pageSize={pageSize} onClick={loadMore} />}
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+        tone="danger"
+        icon="danger"
+        title="Delete forever?"
+        description={`This permanently deletes "${pendingDelete?.title || "Untitled note"}". This cannot be undone.`}
+        confirmLabel="Delete Forever"
+        onConfirm={() => {
+          if (pendingDelete) deleteForever(pendingDelete);
+        }}
+      />
+    </div>
   );
 }
 

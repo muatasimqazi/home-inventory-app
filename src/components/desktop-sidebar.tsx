@@ -92,6 +92,11 @@ export function DesktopSidebar() {
           {!collapsed && <p className="px-3 pb-1 text-micro font-semibold tracking-wide text-muted-foreground uppercase">Overview</p>}
           <nav className="flex flex-col gap-1" aria-label="Overview">
             <SidebarLink href="/dashboard" icon="home" label="Overview" pathname={pathname} exact collapsed={collapsed} />
+            {/* Notes (0050_notes.sql) — a small always-on utility, not an
+                opt-in vertical like Inventory/Finance below, so it isn't
+                gated behind a household.xEnabled flag and sits up here
+                next to Overview instead of getting its own section. */}
+            <SidebarLink href="/notes" icon="notebook" label="Notes" pathname={pathname} collapsed={collapsed} />
           </nav>
         </div>
 

@@ -313,6 +313,23 @@ export interface Tag {
   name: string;
 }
 
+/** Personal-or-shared household note (docs — none yet, see 0050_notes.sql). Mirrors items' owner/is_shared binary toggle (0031_item_sharing.sql), not finance's per-member share-table model: a note has exactly one author and is either visible only to them (isShared false) or to the whole household (isShared true) — no selective per-recipient sharing. */
+export interface Note {
+  id: string;
+  householdId: string;
+  ownerUserId: string;
+  title: string;
+  /** Raw Markdown — rendered via react-markdown+remark-gfm in view mode, edited as plain text. */
+  content: string;
+  isShared: boolean;
+  pinned: boolean;
+  status: EntityLifecycleStatus;
+  trashedAt: string | null;
+  permanentlyDeleteAfter: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type NormalizationSource = "learned" | "manual";
 
 export interface NormalizationRule {
@@ -337,7 +354,8 @@ export type ActivityEntityType =
   | "account"
   | "transaction"
   | "category"
-  | "recurring_bill";
+  | "recurring_bill"
+  | "note";
 
 export type ActivityAction =
   | "created"
