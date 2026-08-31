@@ -6,10 +6,8 @@ import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icon";
 import { EmptyState } from "@/components/empty-state";
 import { SearchBar } from "@/components/search-bar";
-import { NoteFormSheet } from "@/components/note-form-sheet";
 import { Button } from "@/components/ui/button";
 import { useInventoryStore } from "@/lib/store";
-import { useRemountKey } from "@/hooks/use-remount-key";
 
 /** First non-blank line of the raw Markdown, with the most common syntax
  * markers stripped — good enough for a one-line list snippet without
@@ -27,16 +25,8 @@ function snippet(content: string): string {
 export default function NotesPage() {
   const router = useRouter();
   const notes = useInventoryStore((s) => s.notes);
-  const createNote = useInventoryStore((s) => s.createNote);
   const activeNotes = notes.filter((n) => n.status === "active");
   const [query, setQuery] = useState("");
-  const [createOpen, setCreateOpen] = useState(false);
-  const [createKey, bumpCreateKey] = useRemountKey();
-
-  function openCreate() {
-    bumpCreateKey();
-    setCreateOpen(true);
-  }
 
   const filtered = query.trim()
     ? activeNotes.filter((n) => n.title.toLowerCase().includes(query.trim().toLowerCase()) || n.content.toLowerCase().includes(query.trim().toLowerCase()))
@@ -59,7 +49,7 @@ export default function NotesPage() {
           <h1 className="text-screen-title font-semibold text-ink">Notes</h1>
           <p className="mt-0.5 text-caption text-muted-foreground">Personal or shared with the household.</p>
         </div>
-        <Button size="sm" onClick={openCreate}>
+        <Button size="sm" onClick={() => router.push("/notes/new")}>
           <Icon name="plus" size={16} /> New note
         </Button>
       </div>
@@ -72,7 +62,7 @@ export default function NotesPage() {
           title="No notes yet"
           description="Jot down a quick list, a household log, anything worth keeping — personal by default, shareable when it's for everyone."
           action={
-            <Button size="sm" onClick={openCreate}>
+            <Button size="sm" onClick={() => router.push("/notes/new")}>
               <Icon name="plus" size={16} /> New note
             </Button>
           }
@@ -101,17 +91,6 @@ export default function NotesPage() {
           ))}
         </div>
       )}
-
-      <NoteFormSheet
-        key={createKey}
-        open={createOpen}
-        onOpenChange={setCreateOpen}
-        title="New note"
-        onSubmit={({ title, content, isShared }) => {
-          const created = createNote({ title, content, isShared });
-          router.push(`/notes/${created.id}`);
-        }}
-      />
     </div>
   );
 }

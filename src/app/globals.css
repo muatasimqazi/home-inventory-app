@@ -403,10 +403,25 @@
 .tiptap p:last-child {
   margin-bottom: 0;
 }
-.tiptap ul,
-.tiptap ol {
+/* Tailwind's Preflight resets ol/ul to `list-style: none` globally
+   (node_modules/tailwindcss/preflight.css) — without restoring markers
+   here, a bullet/numbered list toggles correctly (real <ul>/<ol> nodes)
+   but renders with no visible bullet or number at all. */
+.tiptap ul {
+  list-style: disc;
   padding-left: 1.25em;
   margin: 0 0 0.5em;
+}
+.tiptap ol {
+  list-style: decimal;
+  padding-left: 1.25em;
+  margin: 0 0 0.5em;
+}
+.tiptap ul ul {
+  list-style: circle;
+}
+.tiptap ul ul ul {
+  list-style: square;
 }
 .tiptap li p {
   margin: 0;

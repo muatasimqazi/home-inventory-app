@@ -6,7 +6,6 @@ import { toast } from "sonner";
 import { Icon } from "@/components/icon";
 import { ActivityRow } from "@/components/activity-row";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { NoteFormSheet } from "@/components/note-form-sheet";
 import { NoteEditor } from "@/components/note-editor";
 import { Button } from "@/components/ui/button";
 import { useInventoryStore } from "@/lib/store";
@@ -24,7 +23,6 @@ export default function NoteDetailPage() {
   const restoreNote = useInventoryStore((s) => s.restoreNote);
   const permanentlyDeleteNote = useInventoryStore((s) => s.permanentlyDeleteNote);
 
-  const [editOpen, setEditOpen] = useState(false);
   const [trashConfirmOpen, setTrashConfirmOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
@@ -48,7 +46,10 @@ export default function NoteDetailPage() {
             >
               <Icon name="pinned" size={18} className={note.pinned ? "text-yellow-text" : "text-muted-foreground"} />
             </button>
-            <button onClick={() => setEditOpen(true)} className="tap-target flex size-9 items-center justify-center rounded-full bg-card shadow-sm">
+            <button
+              onClick={() => router.push(`/notes/${note.id}/edit`)}
+              className="tap-target flex size-9 items-center justify-center rounded-full bg-card shadow-sm"
+            >
               <Icon name="edit" size={18} />
             </button>
             <button onClick={() => setTrashConfirmOpen(true)} className="tap-target flex size-9 items-center justify-center rounded-full bg-card shadow-sm">
@@ -111,20 +112,6 @@ export default function NoteDetailPage() {
           </div>
         </div>
       )}
-
-      <NoteFormSheet
-        key={note.id}
-        open={editOpen}
-        onOpenChange={setEditOpen}
-        title="Edit note"
-        initialTitle={note.title}
-        initialContent={note.content}
-        initialIsShared={note.isShared}
-        onSubmit={({ title, content, isShared }) => {
-          updateNote(note.id, { title, content, isShared });
-          toast.success("Note updated");
-        }}
-      />
 
       <ConfirmDialog
         open={trashConfirmOpen}

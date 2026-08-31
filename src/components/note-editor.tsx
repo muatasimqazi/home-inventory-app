@@ -14,7 +14,7 @@ interface NoteEditorProps {
   /** Raw Markdown — only ever read once, on mount (Markdown extension
    * parses it into the initial doc). Callers that need to swap in a
    * different note's content must remount this component behind a `key`,
-   * same convention every other form in this app uses (NoteFormSheet). */
+   * same convention every other form in this app uses (e.g. notes/[id]/edit/page.tsx keying on note.id). */
   content: string;
   editable: boolean;
   /** Fires with the current Markdown serialization on every real change —
