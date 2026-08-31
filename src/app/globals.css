@@ -35,14 +35,18 @@
  * a real variable defined here rather than a literal.
  *
  * Tokens that never change between themes (--color-white, --color-yellow,
- * the FAB/category-accent fills, --color-ink-fill, ...) skip this and
- * stay direct literals inside @theme inline further down — inline's
- * literal-baking is exactly what's wanted for a theme-constant.
+ * the FAB/category-accent fills, ...) skip this and stay direct literals
+ * inside @theme inline further down — inline's literal-baking is exactly
+ * what's wanted for a theme-constant. --color-ink-fill used to be listed
+ * here too until it turned out *not* to be theme-constant after all (see
+ * the .dark block's own comment on --ink-fill) — it now routes through a
+ * raw variable like every other theme-varying token above.
  */
 :root {
   --radius: 16px;
 
   --ink: #1a1d29; /* heading text — near-black neutral, not warm-toned like v2's #212121 */
+  --ink-fill: #1a1d29; /* primary-button/FAB fill — same value as --ink in light mode by coincidence, not by rule; see the .dark block for why this one *does* need to move there, unlike the @theme inline comment below used to claim */
   --background: #ffffff; /* pure white in v3 — v2 used a tinted #faf8f6 so cards would read as elevated; v3's card border+shadow recipe carries that elevation instead */
   --card: #ffffff; /* a deliberate light-mode coincidence that this equals --background — v3's card border+shadow recipe carries elevation, not a background-color step; dark mode below does step card away from background, since shadows barely read there */
   --popover: #ffffff;
@@ -112,6 +116,25 @@
   --popover: #1b1e26;
   --surface-muted: #242832;
   --border: #2e323c;
+  /* Reported "Save note"/dialog-confirm buttons look messed up in dark
+     mode": --ink-fill staying #1a1d29 here (per the old @theme inline
+     comment's "deliberately does not lighten in dark mode" reasoning)
+     sits almost exactly on top of --card (#1b1e26) — the surface every
+     bg-ink-fill primary button/confirm button (72 call sites) actually
+     renders on (a card footer, a dialog). White text was still legible,
+     but the button itself had no visible fill/boundary at all, reading
+     as broken chrome rather than a button. That "unchanged across
+     themes" reasoning holds for the FAB and the camera viewfinder's
+     always-dark chrome (genuinely need to stay near-black regardless of
+     theme, since they sit over photos/arbitrary content, not a themed
+     surface) — but a plain Button always sits on a themed card/popover,
+     so it needs to actually track dark mode like every other surface
+     token here. Lightened just enough to read as a clearly distinct,
+     "filled" surface against --card/--border above, not to match --ink's
+     own near-white flip (white text needs to stay obviously readable on
+     top, which a near-white fill would break).
+  */
+  --ink-fill: #333a48;
 
   /* Text — ink flips to a softened near-white (not pure #fff, easier on
      the eyes at this brightness), muted lightens to stay legible against
@@ -128,10 +151,9 @@
      --color-yellow, text-on-background gets this variant" rule, just
      solved for a dark background instead of white. brand-700 keeps its
      light-mode "identical value to yellow-text by design" relationship.
-     --color-ink-fill is unchanged for the identical reason and, like
-     --color-yellow, was never given a raw variable above — it stays
-     #1a1d29 in both themes, a fixed near-black fill that reads correctly
-     with white text/icons on top regardless of the page's own theme. */
+     --ink-fill is declared further up in this block (with the other
+     structural surface tokens, --card/--border/etc.) rather than here —
+     it turned out not to belong in this "theme-constant" group after all. */
   --yellow-text: #a7c99a;
   --brand-100: #24301f;
   --brand-200: #3c4f34;
@@ -187,7 +209,7 @@
      above wherever the value needs to differ by theme (see the comment
      above :root); left as direct literals wherever it doesn't. */
   --color-ink: var(--ink);
-  --color-ink-fill: #1a1d29; /* same fill/text split as --color-yellow/--color-yellow-text below, just discovered on ink too: bg-ink/border-ink/ring-ink call sites (primary buttons, active pills, badges, FAB, the camera viewfinder's always-dark chrome) always pair this with white text/icons on top, a pairing whose contrast is independent of page theme — this token deliberately does not lighten in dark mode, unlike --color-ink itself */
+  --color-ink-fill: var(--ink-fill); /* bg-ink-fill/border-ink-fill/ring-ink-fill call sites (primary buttons, confirm-dialog buttons, active pills, badges, FAB, the camera viewfinder's always-dark chrome) always pair this with white text/icons on top. Routed through the raw --ink-fill var (see :root/.dark) so it actually tracks dark mode now — it used to stay a fixed #1a1d29 literal in both themes, which read fine for FAB/badges/viewfinder chrome (sit over photos/arbitrary content) but made every plain button using it nearly invisible against dark mode's --card, since the two were almost the same color. */
   --color-yellow: #5c7a52; /* brand action color (sage) — fills only (buttons/FAB/active nav-tab); treat as "the brand accent" token, not literally yellow */
   --color-yellow-text: var(--yellow-text);
   --color-white: #ffffff; /* neutral-0 — literal text/icons on a colored fill; never themed, see the .dark block's own note */
