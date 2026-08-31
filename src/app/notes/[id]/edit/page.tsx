@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { notFound, useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { NoteEditor } from "@/components/note-editor";
+import { NoteEditor, type NoteEditorHandle } from "@/components/note-editor";
+import { NoteAssistantBar } from "@/components/note-assistant-bar";
 import { useInventoryStore } from "@/lib/store";
 import { useKeyboardInset } from "@/hooks/use-keyboard-inset";
 
@@ -41,6 +42,7 @@ function EditNoteForm({
   const [content, setContent] = useState(note.content);
   const [isShared, setIsShared] = useState(note.isShared);
   const [error, setError] = useState<string | null>(null);
+  const editorRef = useRef<NoteEditorHandle>(null);
 
   function handleSave() {
     if (!title.trim() && !content.trim()) {
@@ -81,6 +83,7 @@ function EditNoteForm({
 
         <Field label="Content">
           <NoteEditor
+            ref={editorRef}
             content={content}
             editable
             onChange={(markdown) => {
@@ -91,6 +94,8 @@ function EditNoteForm({
           />
           {error && <p className="mt-1 text-caption text-danger">{error}</p>}
         </Field>
+
+        <NoteAssistantBar title={title} content={content} onApplyEdit={(markdown) => editorRef.current?.setContent(markdown)} />
 
         <label className="flex items-start gap-2 text-caption text-ink">
           <Checkbox checked={isShared} onCheckedChange={(v) => setIsShared(v === true)} className="mt-0.5" />

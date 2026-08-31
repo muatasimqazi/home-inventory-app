@@ -6,7 +6,8 @@ import { Icon } from "@/components/icon";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { NoteEditor } from "@/components/note-editor";
+import { NoteEditor, type NoteEditorHandle } from "@/components/note-editor";
+import { NoteAssistantBar } from "@/components/note-assistant-bar";
 import { useInventoryStore } from "@/lib/store";
 import { useKeyboardInset } from "@/hooks/use-keyboard-inset";
 import { useAutoFocusVisible } from "@/hooks/use-autofocus-visible";
@@ -30,6 +31,7 @@ export default function NewNotePage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const editorRef = useRef<NoteEditorHandle>(null);
   useAutoFocusVisible(titleInputRef, []);
 
   function handleSave() {
@@ -75,6 +77,7 @@ export default function NewNotePage() {
 
         <Field label="Content">
           <NoteEditor
+            ref={editorRef}
             content={content}
             editable
             onChange={(markdown) => {
@@ -86,6 +89,8 @@ export default function NewNotePage() {
           />
           {error && <p className="mt-1 text-caption text-danger">{error}</p>}
         </Field>
+
+        <NoteAssistantBar title={title} content={content} onApplyEdit={(markdown) => editorRef.current?.setContent(markdown)} />
 
         <label className="flex items-start gap-2 text-caption text-ink">
           <Checkbox checked={isShared} onCheckedChange={(v) => setIsShared(v === true)} className="mt-0.5" />

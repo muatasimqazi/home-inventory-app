@@ -1,5 +1,6 @@
 "use client";
 
+import { forwardRef, useImperativeHandle } from "react";
 import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { TableKit } from "@tiptap/extension-table";
@@ -28,7 +29,21 @@ interface NoteEditorProps {
   className?: string;
 }
 
-export function NoteEditor({ content, editable, onChange, placeholder, autoFocus, className }: NoteEditorProps) {
+/** Imperative handle so a caller (NoteAssistantBar, via an AI "request a
+ * change" response) can replace the document's content as one real,
+ * undoable ProseMirror transaction on the *already-mounted* editor — as
+ * opposed to remounting this component behind a new `content`/key, which
+ * would work but throws away Tiptap's own undo history. That history is
+ * the whole safety net for an AI-driven edit: no confirmation dialog, just
+ * a normal Ctrl+Z (or the toolbar's Undo button) if it got it wrong. */
+export interface NoteEditorHandle {
+  setContent: (markdown: string) => void;
+}
+
+export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function NoteEditor(
+  { content, editable, onChange, placeholder, autoFocus, className },
+  ref
+) {
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -78,13 +93,26 @@ export function NoteEditor({ content, editable, onChange, placeholder, autoFocus
     },
   });
 
+  useImperativeHandle(
+    ref,
+    () => ({
+      setContent: (markdown: string) => {
+        // A real transaction on the live editor (not a remount) — stays
+        // on the undo stack. Markdown extension parses the string the
+        // same way it does the initial `content` prop.
+        editor?.commands.setContent(markdown, { emitUpdate: true });
+      },
+    }),
+    [editor]
+  );
+
   return (
     <div className="flex flex-col gap-2">
       {editable && editor && <NoteEditorToolbar editor={editor} />}
       <EditorContent editor={editor} />
     </div>
   );
-}
+});
 
 function NoteEditorToolbar({ editor }: { editor: Editor }) {
   const chain = () => editor.chain().focus();
