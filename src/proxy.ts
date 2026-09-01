@@ -44,6 +44,7 @@ const PUBLIC_PATHS = [
   "/reset-password",
   "/privacy",
   "/terms",
+  "/contact",
   "/auth/callback",
   "/api/v1/webhooks",
   "/api/v1/plaid/sync-all",
