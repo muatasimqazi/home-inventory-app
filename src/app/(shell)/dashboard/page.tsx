@@ -6,7 +6,7 @@ import { useState } from "react";
 import { SearchBar } from "@/components/search-bar";
 import { ContainerCarousel } from "@/components/container-carousel";
 import { CreateChooserSheet } from "@/components/create-chooser-sheet";
-import { Icon } from "@/components/icon";
+import { Icon, type IconName } from "@/components/icon";
 import { IconChip } from "@/components/icon-chip";
 import { PhotoThumb } from "@/components/photo-thumb";
 import { MerchantIcon } from "@/components/merchant-icon";
@@ -167,6 +167,22 @@ export default function OverviewPage() {
     { label: "Tasks", count: tasksDueTodayOrOverdueCount, tone: "orange" as const, href: "/tasks" },
   ].filter((chip) => chip.count > 0);
 
+  // Same Tools cluster nav-links.ts's INVENTORY_LINKS/FINANCE_LINKS
+  // already group under "Tools" — Import CSV and Settings are the two
+  // cross-domain entries there (SHARED_LINKS), so they're ungated here too.
+  const quickActionTiles: { href: string; icon: IconName; label: string }[] = [
+    ...(household.inventoryEnabled
+      ? [
+          { href: "/desktop", icon: "activity" as const, label: "Activity Dashboard" },
+          { href: "/desktop/manage", icon: "box" as const, label: "Manage" },
+          { href: "/desktop/labels", icon: "tag" as const, label: "Label Printing" },
+        ]
+      : []),
+    ...(household.financeEnabled ? [{ href: "/finance/categories", icon: "pieChart" as const, label: "Categories & Rules" }] : []),
+    { href: "/import", icon: "upload" as const, label: "Import CSV" },
+    { href: "/settings", icon: "settings" as const, label: "Settings" },
+  ];
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between gap-3">
@@ -321,36 +337,22 @@ export default function OverviewPage() {
         </div>
       )}
 
-      {/* Ungated (no household.xEnabled check) — Tasks is always on, same
-          call as Notes, so this sits above the domain-gated sections below
-          rather than inside either of them. Mirrors "Upcoming bills"'
-          exact row shape further down, minus the dollar amount. */}
-      {upcomingTasksList.length > 0 && (
-        <div>
-          <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-item-title font-semibold text-ink">Upcoming tasks</h3>
-            <Link href="/tasks" className="text-caption font-medium text-yellow-text">
-              View all
-            </Link>
-          </div>
-          <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-card shadow-sm">
-            {upcomingTasksList.map((t) => {
-              const bucket = taskDueBucket(t.dueAt);
-              return (
-                <Link key={t.id} href={`/tasks/${t.id}`} className="flex items-center gap-3 px-4 py-3">
-                  <IconChip icon="tasks" tone={bucket === "overdue" ? "danger" : "muted"} size="sm" />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-body font-medium text-ink">{t.title}</p>
-                    <p className={cn("truncate text-caption", bucket === "overdue" ? "text-danger" : "text-muted-foreground")}>
-                      {bucket === "overdue" ? `${Math.abs(daysUntilTask(t.dueAt))}d overdue` : bucket === "today" ? "Due today" : formatShortDate(t.dueAt)}
-                    </p>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
+      {/* Quick actions — the inventory/finance "Tools" cluster (see
+          nav-links.ts's own Browse -> Views -> Reference -> Tools
+          grouping) surfaced as tappable tiles instead of buried in the
+          sidebar/More menu, same spirit as this page's own Notes/Tasks
+          cards above: put the thing people actually reach for where
+          they land, not just where the nav technically has room for it.
+          Import CSV/Settings are cross-domain so they always show;
+          the rest are gated the same way their own sidebar section is. */}
+      <div>
+        <p className="mb-2 text-micro font-semibold uppercase tracking-wide text-muted-foreground">Quick actions</p>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+          {quickActionTiles.map((tile) => (
+            <ToolTile key={tile.href} {...tile} />
+          ))}
         </div>
-      )}
+      </div>
 
       {household.inventoryEnabled && (
       <section aria-label="Home Inventory" className="flex flex-col gap-3">
@@ -688,4 +690,22 @@ function ActionChip({ label, count, tone, href }: { label: string; count: number
     );
   }
   return <span className={className}>{content}</span>;
+}
+
+/** Quick-actions tile — icon badge centered above a label, not a row.
+ * Distinct shape from every other card on this page on purpose: this is a
+ * grid of equal-weight shortcuts, not a list of records to scan top to
+ * bottom. */
+function ToolTile({ href, icon, label }: { href: string; icon: IconName; label: string }) {
+  return (
+    <Link
+      href={href}
+      className="tap-target flex flex-col items-center justify-center gap-2 rounded-2xl border border-border bg-card px-3 py-5 text-center shadow-sm transition-shadow hover:shadow-lg"
+    >
+      <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-ink-fill text-white">
+        <Icon name={icon} size={22} />
+      </span>
+      <span className="text-caption font-semibold text-ink">{label}</span>
+    </Link>
+  );
 }
