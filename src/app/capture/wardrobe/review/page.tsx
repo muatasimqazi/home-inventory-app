@@ -7,7 +7,6 @@ import { Icon } from "@/components/icon";
 import { PhotoThumb } from "@/components/photo-thumb";
 import { BreadcrumbTrail } from "@/components/breadcrumb-trail";
 import { MoveSheet } from "@/components/move-sheet";
-import { WardrobeStudioSheet } from "@/components/wardrobe-studio-sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -18,8 +17,8 @@ import { stopCameraStream } from "@/lib/camera-stream";
 import { dataUrlToFile } from "@/lib/crop-image";
 import { buildBreadcrumb } from "@/lib/selectors";
 import { REVIEW_THRESHOLD } from "@/lib/ai";
+import { generateAutoStudioPhoto } from "@/lib/auto-studio-photo";
 import { SORTED_CATEGORIES } from "@/lib/types";
-import type { Item } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 /**
@@ -27,8 +26,13 @@ import { cn } from "@/lib/utils";
  * Inventory.md) — the wardrobe-specific counterpart to /capture/
  * appliance/review, reading from useWardrobeCapture instead of
  * useApplianceCapture. Saves a real Item via the same createItem() every
- * other capture flow uses, then opens WardrobeStudioSheet right away —
- * the capture flow's natural continuation, not a second confirm step.
+ * other capture flow uses, then generates one automatic studio photo the
+ * same way every other AI-detection flow now does (lib/auto-studio-photo.ts)
+ * — this used to open the interactive, multi-style WardrobeStudioSheet
+ * right here instead; that picker is still available from any item's own
+ * "Create Studio Photo" button (item-studio-photos-section.tsx) for anyone
+ * who wants more/different styles afterward, it's just no longer this
+ * flow's own automatic next step.
  */
 export default function WardrobeReviewPage() {
   const router = useRouter();
@@ -46,10 +50,16 @@ export default function WardrobeReviewPage() {
   const containers = useInventoryStore((s) => s.containers);
   const currentHouseholdId = useInventoryStore((s) => s.currentHouseholdId);
   const createItem = useInventoryStore((s) => s.createItem);
+  const updateItem = useInventoryStore((s) => s.updateItem);
 
   const [moveOpen, setMoveOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [savedItem, setSavedItem] = useState<Item | null>(null);
+  // A separate phase from `saving` — the create itself is done by the time
+  // this starts, this is purely the one-photo studio-generation step (see
+  // lib/auto-studio-photo.ts) that now runs automatically before landing
+  // on the item page, same blocking shape as the "Cataloging item…" step
+  // above it.
+  const [generatingStudio, setGeneratingStudio] = useState(false);
 
   useEffect(() => {
     if (!detecting && !fields && !photo) {
@@ -63,6 +73,15 @@ export default function WardrobeReviewPage() {
       <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-card">
         <Icon name="spinner" size={28} className="animate-spin text-ink" />
         <p className="text-body text-muted-foreground">Cataloging item…</p>
+      </div>
+    );
+  }
+
+  if (generatingStudio) {
+    return (
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-card">
+        <Icon name="spinner" size={28} className="animate-spin text-ink" />
+        <p className="text-body text-muted-foreground">Generating studio photo…</p>
       </div>
     );
   }
@@ -108,16 +127,35 @@ export default function WardrobeReviewPage() {
     });
 
     setSaving(false);
-    if (coverPhotoPath) {
-      // Studio-photo generation needs a real uploaded photo to work from
-      // — skip straight to the item page when there isn't one (photo
-      // upload failed above) rather than opening a sheet with nothing to
-      // generate from.
-      setSavedItem(item);
-    } else {
-      toast.success(`Saved ${item.name}`);
-      router.replace(`/items/${item.id}`);
+    // One automatic studio photo, silently replacing the raw capture as
+    // the item's cover photo — only when there's actually a source photo
+    // to generate from (see lib/auto-studio-photo.ts). A generation
+    // failure never blocks landing on the item page — it just keeps the
+    // original photo, same "don't strand the user" posture the cover-photo
+    // upload above already uses.
+    if (coverPhotoPath && currentHouseholdId) {
+      setGeneratingStudio(true);
+      try {
+        const studioPhoto = await generateAutoStudioPhoto({
+          householdId: currentHouseholdId,
+          itemId: item.id,
+          originalPhotoPath: coverPhotoPath,
+          category: fields.category,
+        });
+        if (studioPhoto.status === "complete" && studioPhoto.generatedPhotoPath) {
+          updateItem(item.id, { coverPhotoPath: studioPhoto.generatedPhotoPath });
+        } else {
+          toast.error(studioPhoto.errorMessage ?? "Couldn't generate a studio photo — kept the original.");
+        }
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Couldn't generate a studio photo — kept the original.");
+      } finally {
+        setGeneratingStudio(false);
+      }
     }
+
+    toast.success(`Saved ${item.name}`);
+    router.replace(`/items/${item.id}`);
   }
 
   return (
@@ -207,7 +245,7 @@ export default function WardrobeReviewPage() {
             <Input value={fields.color} onChange={(e) => updateFields({ color: e.target.value })} placeholder="e.g. Navy Blue" className="h-11" />
           </div>
 
-          <p className="text-caption text-muted-foreground">Next, you&apos;ll be able to generate clean studio photos of this item for reselling or listing.</p>
+          <p className="text-caption text-muted-foreground">A clean studio photo is generated automatically after you save.</p>
         </div>
       </div>
 
@@ -229,17 +267,6 @@ export default function WardrobeReviewPage() {
         currentContainerId={destination?.containerId ?? null}
         onMove={setDestination}
       />
-
-      {savedItem && savedItem.coverPhotoPath && (
-        <WardrobeStudioSheet
-          open
-          onOpenChange={(open) => {
-            if (!open) router.replace(`/items/${savedItem.id}`);
-          }}
-          item={savedItem}
-          sourcePhotoPath={savedItem.coverPhotoPath}
-        />
-      )}
     </div>
   );
 }

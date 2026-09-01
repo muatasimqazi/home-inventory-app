@@ -19,6 +19,7 @@ import { useInventoryStore, uploadCoverPhotoFile, removeItemBackgroundViaAPI, ty
 import { stopCameraStream } from "@/lib/camera-stream";
 import { cropToItem, dataUrlToFile } from "@/lib/crop-image";
 import { buildBreadcrumb, sortByLabel } from "@/lib/selectors";
+import { generateAutoStudioPhoto } from "@/lib/auto-studio-photo";
 import { SORTED_CATEGORIES } from "@/lib/types";
 import { formatCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -59,6 +60,7 @@ export default function CaptureReviewPage() {
   const currentHouseholdId = useInventoryStore((s) => s.currentHouseholdId);
   const createItem = useInventoryStore((s) => s.createItem);
   const createItemsBatch = useInventoryStore((s) => s.createItemsBatch);
+  const updateItem = useInventoryStore((s) => s.updateItem);
   const getOrCreateTag = useInventoryStore((s) => s.getOrCreateTag);
   const saveNormalizationRule = useInventoryStore((s) => s.saveNormalizationRule);
   const linkItemPurchase = useInventoryStore((s) => s.linkItemPurchase);
@@ -71,6 +73,13 @@ export default function CaptureReviewPage() {
 
   const [moveOpen, setMoveOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Single-item saves only (see handleSave) — a separate phase from
+  // `saving`, purely the one-photo studio-generation step (lib/
+  // auto-studio-photo.ts) that now runs automatically before landing on
+  // the item page. A bulk save runs the same generation per item in the
+  // background instead of blocking on it here — see handleSave's own
+  // comment on why.
+  const [generatingStudio, setGeneratingStudio] = useState(false);
   const [rememberFlags, setRememberFlags] = useState<Record<string, boolean>>({});
   // One shared "Belongs to" for the whole session, same design as
   // `destination` above — a scan can produce several items at once (a
@@ -101,6 +110,15 @@ export default function CaptureReviewPage() {
       <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-card">
         <Icon name="spinner" size={28} className="animate-spin text-ink" />
         <p className="text-body text-muted-foreground">Looking at what you captured…</p>
+      </div>
+    );
+  }
+
+  if (generatingStudio) {
+    return (
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-card">
+        <Icon name="spinner" size={28} className="animate-spin text-ink" />
+        <p className="text-body text-muted-foreground">Generating studio photo…</p>
       </div>
     );
   }
@@ -247,6 +265,38 @@ export default function CaptureReviewPage() {
         const linkRes = await linkItemPurchase({ itemId: item.id, transactionId: linkTransaction.id, source: "finance_nudge" });
         if (!linkRes.ok) toast.error(linkRes.error ?? "Saved, but couldn't link the purchase — link it manually from the item page.");
       }
+
+      setSaving(false);
+      // One automatic studio photo, silently replacing the raw capture as
+      // the item's cover photo — only when there's actually a source photo
+      // to generate from (see lib/auto-studio-photo.ts). A generation
+      // failure never blocks landing on the item page — it just keeps the
+      // original photo, same "don't strand the user" posture the
+      // cover-photo-upload failure handling above already uses. Blocking,
+      // same as every other single-item AI-detection flow — a bulk save
+      // (below) runs this in the background instead, see that branch's
+      // own comment on why.
+      if (photoResults[0].coverPath && currentHouseholdId) {
+        setGeneratingStudio(true);
+        try {
+          const studioPhoto = await generateAutoStudioPhoto({
+            householdId: currentHouseholdId,
+            itemId: item.id,
+            originalPhotoPath: photoResults[0].coverPath,
+            category: item.category,
+          });
+          if (studioPhoto.status === "complete" && studioPhoto.generatedPhotoPath) {
+            updateItem(item.id, { coverPhotoPath: studioPhoto.generatedPhotoPath });
+          } else {
+            toast.error(studioPhoto.errorMessage ?? "Couldn't generate a studio photo — kept the original.");
+          }
+        } catch (error) {
+          toast.error(error instanceof Error ? error.message : "Couldn't generate a studio photo — kept the original.");
+        } finally {
+          setGeneratingStudio(false);
+        }
+      }
+
       toast.success(`Saved ${item.name}`);
       if (failedCovers > 0) toast.error("Couldn't upload the photo — add one from the item page.");
       // replace, not push — closes out the whole capture flow's single
@@ -254,28 +304,54 @@ export default function CaptureReviewPage() {
       // the item page's own back button returns straight to wherever the
       // flow was actually started from (a Container/Location page).
       router.replace(`/items/${item.id}`);
-    } else {
-      const created = createItemsBatch(included.map((row, i) => buildInput(row, photoResults[i].coverPath, photoResults[i].backgroundRemovedPath)));
-      persistNormalizationRules(included);
-      // A capture-nudge is keyed to one transaction, but the user may have
-      // photographed more than one thing from that same purchase (e.g. a
-      // multi-item Home Depot run) — link every item created in this batch
-      // to it rather than only the first, since item_purchases has no
-      // one-item-per-transaction constraint.
-      if (linkTransaction) {
-        const linkResults = await Promise.all(
-          created.map((it) => linkItemPurchase({ itemId: it.id, transactionId: linkTransaction.id, source: "finance_nudge" }))
-        );
-        if (linkResults.some((r) => !r.ok)) toast.error("Saved, but couldn't link one or more items to the purchase — link them manually from the item page.");
-      }
-      toast.success(`Saved ${included.length} items`);
-      if (failedCovers > 0) {
-        toast.error(
-          `${failedCovers} photo${failedCovers > 1 ? "s" : ""} couldn't be uploaded — add ${failedCovers > 1 ? "them" : "one"} from the item page${failedCovers > 1 ? "s" : ""}.`
-        );
-      }
-      router.replace(destination?.containerId ? `/containers/${destination.containerId}` : "/");
+      return;
     }
+
+    const created = createItemsBatch(included.map((row, i) => buildInput(row, photoResults[i].coverPath, photoResults[i].backgroundRemovedPath)));
+    persistNormalizationRules(included);
+    // A capture-nudge is keyed to one transaction, but the user may have
+    // photographed more than one thing from that same purchase (e.g. a
+    // multi-item Home Depot run) — link every item created in this batch
+    // to it rather than only the first, since item_purchases has no
+    // one-item-per-transaction constraint.
+    if (linkTransaction) {
+      const linkResults = await Promise.all(
+        created.map((it) => linkItemPurchase({ itemId: it.id, transactionId: linkTransaction.id, source: "finance_nudge" }))
+      );
+      if (linkResults.some((r) => !r.ok)) toast.error("Saved, but couldn't link one or more items to the purchase — link them manually from the item page.");
+    }
+
+    // Same one-photo-per-item studio generation as the single-item branch
+    // above, but fired in the background instead of blocking Save — a
+    // "Save All (N)" batch has no single item page to land on anyway (this
+    // navigates straight to the Container/Location list below), and
+    // blocking on N sequential AI image-generation calls before getting
+    // there would multiply an already multi-second wait by however many
+    // items were just captured. Same "never worth blocking or reporting
+    // on" posture buildItemPhotos already applies to background removal
+    // above — a failure here is silent, no toast, no retry; the item just
+    // keeps its raw capture as cover.
+    created.forEach((item, i) => {
+      const coverPath = photoResults[i].coverPath;
+      if (!coverPath || !currentHouseholdId) return;
+      generateAutoStudioPhoto({ householdId: currentHouseholdId, itemId: item.id, originalPhotoPath: coverPath, category: item.category })
+        .then((studioPhoto) => {
+          if (studioPhoto.status === "complete" && studioPhoto.generatedPhotoPath) {
+            updateItem(item.id, { coverPhotoPath: studioPhoto.generatedPhotoPath });
+          }
+        })
+        .catch((error) => {
+          console.error(`Background studio-photo generation failed for item ${item.id}:`, error);
+        });
+    });
+
+    toast.success(`Saved ${included.length} items`);
+    if (failedCovers > 0) {
+      toast.error(
+        `${failedCovers} photo${failedCovers > 1 ? "s" : ""} couldn't be uploaded — add ${failedCovers > 1 ? "them" : "one"} from the item page${failedCovers > 1 ? "s" : ""}.`
+      );
+    }
+    router.replace(destination?.containerId ? `/containers/${destination.containerId}` : "/");
     setSaving(false);
   }
 

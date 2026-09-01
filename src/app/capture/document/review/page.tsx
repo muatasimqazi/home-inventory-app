@@ -17,6 +17,7 @@ import { stopCameraStream } from "@/lib/camera-stream";
 import { dataUrlToFile } from "@/lib/crop-image";
 import { buildBreadcrumb } from "@/lib/selectors";
 import { REVIEW_THRESHOLD } from "@/lib/ai";
+import { generateAutoStudioPhoto } from "@/lib/auto-studio-photo";
 import { SORTED_CATEGORIES } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -53,9 +54,16 @@ export default function DocumentReviewPage() {
   const containers = useInventoryStore((s) => s.containers);
   const currentHouseholdId = useInventoryStore((s) => s.currentHouseholdId);
   const createItem = useInventoryStore((s) => s.createItem);
+  const updateItem = useInventoryStore((s) => s.updateItem);
 
   const [moveOpen, setMoveOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  // A separate phase from `saving` — the create itself is done by the time
+  // this starts, this is purely the one-photo studio-generation step (see
+  // lib/auto-studio-photo.ts) that now runs automatically before landing
+  // on the item page, same blocking shape as the "Reading the document…"
+  // step above it.
+  const [generatingStudio, setGeneratingStudio] = useState(false);
 
   useEffect(() => {
     if (!detecting && !fields && !photo) {
@@ -69,6 +77,15 @@ export default function DocumentReviewPage() {
       <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-card">
         <Icon name="spinner" size={28} className="animate-spin text-ink" />
         <p className="text-body text-muted-foreground">Reading the document…</p>
+      </div>
+    );
+  }
+
+  if (generatingStudio) {
+    return (
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-card">
+        <Icon name="spinner" size={28} className="animate-spin text-ink" />
+        <p className="text-body text-muted-foreground">Generating studio photo…</p>
       </div>
     );
   }
@@ -114,6 +131,34 @@ export default function DocumentReviewPage() {
       reviewReason: lowConfidence ? `Confidence ${detection.confidence.toFixed(2)} is below ${REVIEW_THRESHOLD}.` : undefined,
       extraDetails,
     });
+
+    setSaving(false);
+    // One automatic studio photo, silently replacing the raw capture as
+    // the item's cover photo — only when there's actually a source photo
+    // to generate from (see lib/auto-studio-photo.ts). A generation
+    // failure never blocks landing on the item page — it just keeps the
+    // original photo, same "don't strand the user" posture the cover-photo
+    // upload above already uses.
+    if (coverPhotoPath && currentHouseholdId) {
+      setGeneratingStudio(true);
+      try {
+        const studioPhoto = await generateAutoStudioPhoto({
+          householdId: currentHouseholdId,
+          itemId: item.id,
+          originalPhotoPath: coverPhotoPath,
+          category: fields.category,
+        });
+        if (studioPhoto.status === "complete" && studioPhoto.generatedPhotoPath) {
+          updateItem(item.id, { coverPhotoPath: studioPhoto.generatedPhotoPath });
+        } else {
+          toast.error(studioPhoto.errorMessage ?? "Couldn't generate a studio photo — kept the original.");
+        }
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Couldn't generate a studio photo — kept the original.");
+      } finally {
+        setGeneratingStudio(false);
+      }
+    }
 
     toast.success(`Saved ${item.name}`);
     router.replace(`/items/${item.id}`);
