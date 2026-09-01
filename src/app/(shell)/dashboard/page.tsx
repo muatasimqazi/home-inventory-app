@@ -11,6 +11,7 @@ import { IconChip } from "@/components/icon-chip";
 import { PhotoThumb } from "@/components/photo-thumb";
 import { MerchantIcon } from "@/components/merchant-icon";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { ReviewBadge } from "@/components/review-badge";
 import { EmptyState } from "@/components/empty-state";
 import { useInventoryStore, useCurrentHousehold } from "@/lib/store";
@@ -54,6 +55,23 @@ const TAGS_PREVIEW_LIMIT = 8;
 // below) which already caps itself. A household with a couple dozen
 // locations turned this into the single longest thing on the page.
 const LOCATIONS_PREVIEW_LIMIT = 6;
+// Notes/Tasks dedicated cards (below) — same cap reasoning as the two
+// constants above.
+const NOTES_PREVIEW_LIMIT = 4;
+
+/** First non-blank line of a note's raw Markdown, with the most common
+ * syntax markers stripped — same snippet notes/page.tsx's own list uses,
+ * duplicated here rather than imported since it's a small pure function
+ * and this page doesn't otherwise depend on notes/page.tsx. */
+function noteSnippet(content: string): string {
+  const line = content.split("\n").find((l) => l.trim().length > 0) ?? "";
+  return line
+    .replace(/^#{1,6}\s+/, "")
+    .replace(/^[-*+]\s+/, "")
+    .replace(/^\d+\.\s+/, "")
+    .replace(/[*_`]/g, "")
+    .trim();
+}
 
 /**
  * The former Home page was an inventory-only dashboard living at "/" —
@@ -81,6 +99,7 @@ export default function OverviewPage() {
   const transactions = useInventoryStore((s) => s.transactions);
   const recurringBills = useInventoryStore((s) => s.recurringBills);
   const tasks = useInventoryStore((s) => s.tasks);
+  const notes = useInventoryStore((s) => s.notes);
   const tags = useInventoryStore((s) => s.tags);
   const currentUserId = useInventoryStore((s) => s.currentUserId);
 
@@ -120,6 +139,16 @@ export default function OverviewPage() {
   // reasoning as Inventory above.
   const upcomingTasksList = upcomingTasks(tasks, 5);
   const tasksDueTodayOrOverdueCount = dueTodayOrOverdueTasksCount(tasks);
+
+  // Same pinned-first-then-most-recently-updated sort notes/page.tsx uses
+  // for its own full list — just capped to a preview here.
+  const recentNotesList = [...notes]
+    .filter((n) => n.status === "active")
+    .sort((a, b) => {
+      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+      return b.updatedAt.localeCompare(a.updatedAt);
+    })
+    .slice(0, NOTES_PREVIEW_LIMIT);
 
   // The one "what needs doing" list on the page (see the banner below) —
   // only chips with something to actually act on, so a clean household
@@ -162,6 +191,91 @@ export default function OverviewPage() {
       </div>
 
       <SearchBar value="" onChange={() => {}} onFocus={() => router.push("/search")} className="md:hidden" />
+
+      {/* Notes and Tasks are always-on, ungated domains (no
+          household.xEnabled toggle — same as Inventory/Finance being
+          gated below), so their own dedicated space sits here, at the
+          very top of the page, above even the Inventory summary tile —
+          rather than Tasks getting a conditional preview further down
+          the page (as before) and Notes getting nothing at all. Each
+          card always renders, even empty (an empty state line, not the
+          whole card disappearing) — a "dedicated space," not a
+          conditional preview. */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-item-title font-semibold text-ink">Notes</h3>
+            <div className="flex items-center gap-2">
+              {/* Straight to /notes/new — the generic "+" chooser up top
+                  still exists for the other 5 create targets, but Notes/
+                  Tasks now each get a one-tap shortcut right where their
+                  own preview already lives. */}
+              <Button asChild variant="outline" size="icon-sm" aria-label="New note">
+                <Link href="/notes/new">
+                  <Icon name="plus" size={14} />
+                </Link>
+              </Button>
+              <Link href="/notes" className="text-caption font-medium text-yellow-text">
+                View all
+              </Link>
+            </div>
+          </div>
+          {recentNotesList.length === 0 ? (
+            <p className="px-1 py-1 text-caption text-muted-foreground">No notes yet.</p>
+          ) : (
+            <div className="flex flex-col divide-y divide-border">
+              {recentNotesList.map((n) => (
+                <Link key={n.id} href={`/notes/${n.id}`} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
+                  <IconChip icon="notebook" tone="muted" size="sm" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      {n.pinned && <Icon name="pinned" size={12} className="shrink-0 text-muted-foreground" />}
+                      <p className="min-w-0 flex-1 truncate text-body font-medium text-ink">{n.title || "Untitled note"}</p>
+                    </div>
+                    {noteSnippet(n.content) && <p className="truncate text-caption text-muted-foreground">{noteSnippet(n.content)}</p>}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-item-title font-semibold text-ink">Tasks</h3>
+            <div className="flex items-center gap-2">
+              <Button asChild variant="outline" size="icon-sm" aria-label="New task">
+                <Link href="/tasks/new">
+                  <Icon name="plus" size={14} />
+                </Link>
+              </Button>
+              <Link href="/tasks" className="text-caption font-medium text-yellow-text">
+                View all
+              </Link>
+            </div>
+          </div>
+          {upcomingTasksList.length === 0 ? (
+            <p className="px-1 py-1 text-caption text-muted-foreground">Nothing due.</p>
+          ) : (
+            <div className="flex flex-col divide-y divide-border">
+              {upcomingTasksList.map((t) => {
+                const bucket = taskDueBucket(t.dueAt);
+                return (
+                  <Link key={t.id} href={`/tasks/${t.id}`} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
+                    <IconChip icon="tasks" tone={bucket === "overdue" ? "danger" : "muted"} size="sm" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-body font-medium text-ink">{t.title}</p>
+                      <p className={cn("truncate text-caption", bucket === "overdue" ? "text-danger" : "text-muted-foreground")}>
+                        {bucket === "overdue" ? `${Math.abs(daysUntilTask(t.dueAt))}d overdue` : bucket === "today" ? "Due today" : formatShortDate(t.dueAt)}
+                      </p>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Read-only number only — "what needs doing" lives in its own
           banner below, not mixed into this row. Finance's own headline

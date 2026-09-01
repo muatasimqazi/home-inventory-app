@@ -40,6 +40,16 @@ export default function MorePage() {
         <p className="mt-0.5 text-caption text-muted-foreground">Switch between household domains.</p>
       </div>
 
+      {/* Notes (0050_notes.sql) / Household Tasks (0051_household_tasks.sql)
+          — both always on, no household.xEnabled gate, and both lead
+          (same as the Overview page's own dedicated cards for them) —
+          listed first, above the gated Inventory/Finance domains below,
+          not after them. Neither gets a sub-page list (each is a single
+          list+detail page, not a domain with its own sub-nav the way
+          Inventory/Finance are). */}
+      <DomainCard href="/notes" icon="notebook" tone="bg-ink-fill" title="Notes" description="Personal & shared notes" />
+      <DomainCard href="/tasks" icon="tasks" tone="bg-yellow" title="Tasks" description="Reminders, chores & appointments" />
+
       {household.inventoryEnabled && (
         <div className="flex flex-col gap-2">
           <DomainCard href="/locations" icon="box" tone="bg-ink-fill" title="Locations" description="Storage areas, containers & items" />
@@ -53,13 +63,6 @@ export default function MorePage() {
           <LinkList links={FINANCE_LINKS} />
         </div>
       )}
-
-      {/* Notes (0050_notes.sql) — always on, no household.xEnabled gate,
-          no sub-page list (it's a single list+detail page, not a domain
-          with its own sub-nav the way Inventory/Finance are). */}
-      <DomainCard href="/notes" icon="notebook" tone="bg-ink-fill" title="Notes" description="Personal & shared notes" />
-      {/* Household Tasks (0051_household_tasks.sql) — always on, same ungated call as Notes. */}
-      <DomainCard href="/tasks" icon="tasks" tone="bg-yellow" title="Tasks" description="Reminders, chores & appointments" />
     </div>
   );
 }
