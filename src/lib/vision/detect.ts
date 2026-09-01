@@ -549,3 +549,96 @@ export async function suggestApplianceDocumentLinks(manufacturer: string, modelN
     }
   }
 }
+
+// ---------------------------------------------------------------------------
+// Document scan cataloging — a fifth detection task on the same
+// PRIMARY_MODEL/FALLBACK_MODEL pair and the same reliability engineering as
+// detectItems/detectApplianceLabel/detectWardrobeItem above. Reads a photo
+// of a physical paper document (passport, driver's license, insurance
+// policy, vehicle title/registration, birth certificate, warranty card,
+// etc.) for the "Document" item category — not to be confused with
+// DocumentLinkSuggestion above, which suggests *web links* for an Appliance
+// item from its model number, no photo involved.
+// ---------------------------------------------------------------------------
+
+const documentDetectionSchema = z.object({
+  suggestedName: z
+    .string()
+    .describe("A concise, human-readable title for the document, e.g. 'US Passport', 'Homeowners Insurance Policy', 'Vehicle Title', 'Birth Certificate'."),
+  photoEmoji: z.string().describe("A single emoji that best represents this document."),
+  issuer: z
+    .string()
+    .describe("The organization or authority that issued the document, e.g. 'U.S. Department of State', 'State Farm', 'DMV'. Empty string if not legible or not applicable."),
+  documentNumber: z
+    .string()
+    .describe("The document's own identifying number — a passport number, policy number, license number, VIN, etc. Empty string if not legible or the document doesn't have one."),
+  expirationDate: z
+    .string()
+    .describe(
+      "The expiration date printed on the document, as YYYY-MM-DD if a full date is legible (otherwise whatever precision is actually printed — a month/year, or just a year). Empty string if the document has no expiration date or it isn't legible. Never fabricate a date."
+    ),
+  confidence: z
+    .number()
+    .min(0)
+    .max(1)
+    .describe("How confident you are in the reading overall — lower if the document is blurry, glare-obscured, partially out of frame, or handwritten and hard to parse."),
+});
+
+export type DocumentDetection = z.infer<typeof documentDetectionSchema>;
+
+function buildDocumentDetectionMessages(photos: string[]): ModelMessage[] {
+  const labeledPhotos = photos.flatMap((photo, i) => [
+    { type: "text" as const, text: `Photo ${i}:` },
+    { type: "file" as const, mediaType: "image" as const, data: photo },
+  ]);
+
+  return [
+    {
+      role: "user",
+      content: [
+        {
+          type: "text",
+          text:
+            "You are reading a physical paper document (e.g. a passport, driver's license, insurance policy, " +
+            "vehicle title/registration, birth certificate, or warranty card) for a home inventory app, so it " +
+            "can be cataloged and its expiration tracked. Read exactly what's printed — do not guess a " +
+            "plausible-looking document number or date if it's too blurry, glare-obscured, or partially out of " +
+            "frame to actually read; leave that field empty instead. Give an honest overall confidence score, " +
+            "lower for anything hard to read.",
+        },
+        ...labeledPhotos,
+      ],
+    },
+  ];
+}
+
+async function runDocumentDetection(model: LanguageModel, photos: string[]): Promise<DocumentDetection> {
+  const { output } = await generateText({
+    model,
+    output: Output.object({ schema: documentDetectionSchema }),
+    messages: buildDocumentDetectionMessages(photos),
+    timeout: CALL_TIMEOUT_MS,
+    maxRetries: CALL_MAX_RETRIES,
+  });
+  return output;
+}
+
+/**
+ * Reads a physical document (passport, license, insurance policy, title,
+ * warranty card, etc.) from one or more photos of it, extracting a
+ * suggested title, issuer, document number, and expiration date. Same
+ * primary-then-fallback-model shape as detectItems/detectApplianceLabel.
+ */
+export async function detectDocument(photos: string[]): Promise<DocumentDetection> {
+  try {
+    return await runDocumentDetection(PRIMARY_MODEL, photos);
+  } catch (primaryError) {
+    console.error("Primary vision model failed (document scan), falling back to", FALLBACK_MODEL, primaryError);
+    try {
+      return await runDocumentDetection(FALLBACK_MODEL, photos);
+    } catch (fallbackError) {
+      console.error(`Fallback model ${FALLBACK_MODEL} also failed (document scan):`, fallbackError);
+      throw fallbackError;
+    }
+  }
+}

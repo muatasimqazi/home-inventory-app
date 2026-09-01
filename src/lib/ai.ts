@@ -109,6 +109,26 @@ export interface ApplianceLabelDetection {
 }
 
 // ---------------------------------------------------------------------------
+// Document scan (a physical passport, license, insurance policy, title,
+// warranty card, etc.) — extends VisionProvider with a fourth detection
+// method, same single-photo-in/structured-reading-out shape as
+// ApplianceLabelDetection above. Not to be confused with the item-detail
+// page's AI-suggested manual/warranty *links* for Appliance items (a
+// separate, text-only capability with no photo involved). See
+// lib/vision/detect.ts's detectDocument for the real implementation.
+// ---------------------------------------------------------------------------
+
+export interface DocumentDetection {
+  suggestedName: string;
+  photoEmoji: string;
+  issuer: string;
+  documentNumber: string;
+  /** Freeform — a year, a month/year, or a full date, whatever precision the document supports. Empty string if the document has none or it isn't legible. */
+  expirationDate: string;
+  confidence: number; // 0-1
+}
+
+// ---------------------------------------------------------------------------
 // Wardrobe item cataloging (docs/Wardrobe Inventory.md) — extends
 // VisionProvider with a fourth detection method, same shape as
 // ApplianceLabelDetection above: one clothing-item photo in, one
@@ -147,6 +167,8 @@ export interface VisionProvider {
   detectApplianceLabel(photos: string[]): Promise<ApplianceLabelDetection>;
   /** Catalogs one clothing/wardrobe item from a photo — name/category/color/material guesses. */
   detectWardrobeItem(photos: string[]): Promise<WardrobeItemDetection>;
+  /** Reads a physical document (passport, license, insurance policy, title, warranty card, etc.) from a photo of it. */
+  detectDocument(photos: string[]): Promise<DocumentDetection>;
 }
 
 /** Thrown by a VisionProvider on failure — `retryable` tells the UI whether "Try again" is a reasonable next step (true for anything transient, e.g. Gemini overload) vs. something that won't fix itself. */
@@ -280,6 +302,12 @@ export class MockVisionProvider implements VisionProvider {
     const shuffled = [...CANNED_WARDROBE_ITEMS].sort(() => Math.random() - 0.5);
     return shuffled[0];
   }
+
+  async detectDocument(): Promise<DocumentDetection> {
+    await new Promise((resolve) => setTimeout(resolve, 1100));
+    const shuffled = [...CANNED_DOCUMENTS].sort(() => Math.random() - 0.5);
+    return shuffled[0];
+  }
 }
 
 const CANNED_WARDROBE_ITEMS: WardrobeItemDetection[] = [
@@ -294,6 +322,13 @@ const CANNED_APPLIANCE_LABELS: ApplianceLabelDetection[] = [
   { suggestedName: "LG Front-Load Washer", photoEmoji: "🧺", manufacturer: "LG", modelNumber: "WM3400CW", serialNumber: "205KWXY01234", manufactureDate: "2022", confidence: 0.88 },
   { suggestedName: "Whirlpool Dishwasher", photoEmoji: "🍽️", manufacturer: "Whirlpool", modelNumber: "WDF520PADM", serialNumber: "F41234567", manufactureDate: "", confidence: 0.62 },
   { suggestedName: "unidentified appliance", photoEmoji: "🔌", manufacturer: "", modelNumber: "", serialNumber: "", manufactureDate: "", confidence: 0.35 },
+];
+
+const CANNED_DOCUMENTS: DocumentDetection[] = [
+  { suggestedName: "US Passport", photoEmoji: "🛂", issuer: "U.S. Department of State", documentNumber: "X1234567", expirationDate: "2032-06-14", confidence: 0.92 },
+  { suggestedName: "Homeowners Insurance Policy", photoEmoji: "🏠", issuer: "State Farm", documentNumber: "HO-9284471", expirationDate: "2027-01-01", confidence: 0.85 },
+  { suggestedName: "Vehicle Title", photoEmoji: "🚗", issuer: "Dept. of Motor Vehicles", documentNumber: "4KX9021884", expirationDate: "", confidence: 0.78 },
+  { suggestedName: "unidentified document", photoEmoji: "📄", issuer: "", documentNumber: "", expirationDate: "", confidence: 0.4 },
 ];
 
 const CANNED_STATEMENT_TRANSACTIONS: StatementTransactionExtraction[] = [
@@ -423,6 +458,24 @@ export class HttpVisionProvider implements VisionProvider {
       throw new VisionDetectionError(body?.error ?? `Wardrobe item detection failed (${res.status}).`, body?.retryable ?? true);
     }
     return (await res.json()) as WardrobeItemDetection;
+  }
+
+  async detectDocument(photos: string[]): Promise<DocumentDetection> {
+    let res: Response;
+    try {
+      res = await fetch("/api/v1/vision/detect-document", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ photos }),
+      });
+    } catch {
+      throw new VisionDetectionError("Couldn't reach the server. Check your connection and try again.", true);
+    }
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new VisionDetectionError(body?.error ?? `Document reading failed (${res.status}).`, body?.retryable ?? true);
+    }
+    return (await res.json()) as DocumentDetection;
   }
 }
 

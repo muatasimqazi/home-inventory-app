@@ -72,20 +72,28 @@ function wardrobeScanHref(itemHref: string): string {
   return queryIndex === -1 ? "/capture/wardrobe" : `/capture/wardrobe${itemHref.slice(queryIndex)}`;
 }
 
+// Document-scan capture (src/app/capture/document/) — same
+// path-prefix-swap pattern as the three helpers above.
+function documentScanHref(itemHref: string): string {
+  const queryIndex = itemHref.indexOf("?");
+  return queryIndex === -1 ? "/capture/document" : `/capture/document${itemHref.slice(queryIndex)}`;
+}
+
 /**
  * The bottom-nav camera FAB used to link straight to inventory capture —
  * with Finance now a real second domain, "scan" is ambiguous (an item for
  * inventory, or a receipt for Finance), so tapping it opens this chooser
  * instead of guessing which one the user meant.
  *
- * Four explicit, user-picked modes (Household Ledger PRD §17/§32), ordered
- * to group the three inventory-item modes — Scan Item, Scan Barcode, Scan
- * Appliance — together first, with Scan Receipt (the one Finance-domain
- * mode, not an inventory item at all) last. This is deliberately a chooser,
- * not a classifier — the user always taps a mode before the camera opens,
- * and each destination shows the AI's best guess with one-tap correction
- * before anything saves (src/app/capture/review/page.tsx's needsReview
- * gate; src/app/finance/scan/review/page.tsx's editable draft + explicit
+ * Five explicit, user-picked modes (Household Ledger PRD §17/§32), ordered
+ * to group the four inventory-item modes — Scan Item, Scan Barcode, Scan
+ * Appliance, Scan Document — together first, with Scan Receipt (the one
+ * Finance-domain mode, not an inventory item at all) last. This is
+ * deliberately a chooser, not a classifier — the user always taps a mode
+ * before the camera opens, and each destination shows the AI's best guess
+ * with one-tap correction before anything saves
+ * (src/app/capture/review/page.tsx's needsReview gate;
+ * src/app/finance/scan/review/page.tsx's editable draft + explicit
  * Confirm). No mode here is auto-detected from the photo.
  */
 export function ScanChooserSheet({ open, onOpenChange, itemScanHref }: ScanChooserSheetProps) {
@@ -148,6 +156,16 @@ export function ScanChooserSheet({ open, onOpenChange, itemScanHref }: ScanChoos
                 description="Catalog a clothing item + generate studio photos"
                 iconClassName="bg-fab-accent text-white"
                 onClick={() => go(wardrobeScanHref(itemScanHref))}
+              />
+              <ChooserRow
+                icon="file"
+                label="Scan Document"
+                description="Passport, policy, title, warranty card…"
+                // Reuses Item's role — last inventory row, furthest from
+                // Item's own (1st) and distinct from its immediate
+                // neighbor Wardrobe's (accent), no adjacent-row repeat.
+                iconClassName="bg-fab-primary text-white"
+                onClick={() => go(documentScanHref(itemScanHref))}
               />
             </>
           )}

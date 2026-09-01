@@ -39,9 +39,13 @@ export const CATEGORY_EXTRA_FIELDS: Record<string, CategoryExtraField[]> = {
     { key: "manufactureDate", label: "Manufacture date" },
     { key: "warrantyEnd", label: "Warranty end", placeholder: "YYYY-MM-DD" },
   ],
+  // documentNumber added alongside /capture/document (a passport/policy/
+  // license number the scan flow now extracts) — expirationDate/issuer
+  // predate that flow and already worked the same generic way.
   Document: [
     { key: "expirationDate", label: "Expiration date", placeholder: "YYYY-MM-DD" },
     { key: "issuer", label: "Issuer" },
+    { key: "documentNumber", label: "Document number" },
   ],
   Clothing: [{ key: "size", label: "Size" }],
 };
