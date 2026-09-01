@@ -17,6 +17,7 @@ export interface NavLink {
  * here once and both surfaces pick it up.
  */
 export const INVENTORY_LINKS: NavLink[] = [
+  { href: "/containers", icon: "archive", label: "Containers" },
   { href: "/favorites", icon: "heart", label: "Favorites" },
   { href: "/wardrobe", icon: "grid", label: "Wardrobe" },
   { href: "/home-map", icon: "pin", label: "Home Map" },
