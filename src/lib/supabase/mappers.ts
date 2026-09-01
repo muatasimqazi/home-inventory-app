@@ -18,10 +18,11 @@ import type {
   Note,
   HouseholdTask,
   TaskCompletion,
-  TaskCategory,
+  TaskCategoryRecord,
   TaskScheduleType,
   TaskLinkedEntityType,
   TaskRecurrenceRule,
+  TaskSubtask,
   Favorite,
   ActivityLogEntry,
   Attachment,
@@ -553,12 +554,43 @@ export function noteToInsertRow(note: Note): NoteRow {
   };
 }
 
+export interface TaskCategoryRow {
+  id: string;
+  household_id: string | null;
+  name: string;
+  is_default: boolean;
+  created_by_user_id: string | null;
+  created_at: string;
+}
+
+export function rowToTaskCategory(row: TaskCategoryRow): TaskCategoryRecord {
+  return {
+    id: row.id,
+    householdId: row.household_id,
+    name: row.name,
+    isDefault: row.is_default,
+    createdByUserId: row.created_by_user_id,
+    createdAt: row.created_at,
+  };
+}
+
+export function taskCategoryToInsertRow(category: TaskCategoryRecord): TaskCategoryRow {
+  return {
+    id: category.id,
+    household_id: category.householdId,
+    name: category.name,
+    is_default: category.isDefault,
+    created_by_user_id: category.createdByUserId,
+    created_at: category.createdAt,
+  };
+}
+
 export interface HouseholdTaskRow {
   id: string;
   household_id: string;
   title: string;
   description: string;
-  category: string;
+  category_id: string;
   linked_entity_type: string | null;
   linked_entity_id: string | null;
   assigned_to_person_id: string | null;
@@ -579,7 +611,7 @@ export function rowToHouseholdTask(row: HouseholdTaskRow): HouseholdTask {
     householdId: row.household_id,
     title: row.title,
     description: row.description,
-    category: row.category as TaskCategory,
+    categoryId: row.category_id,
     linkedEntityType: row.linked_entity_type as TaskLinkedEntityType | null,
     linkedEntityId: row.linked_entity_id,
     assignedToPersonId: row.assigned_to_person_id,
@@ -601,7 +633,7 @@ export function householdTaskToInsertRow(task: HouseholdTask): HouseholdTaskRow 
     household_id: task.householdId,
     title: task.title,
     description: task.description,
-    category: task.category,
+    category_id: task.categoryId,
     linked_entity_type: task.linkedEntityType,
     linked_entity_id: task.linkedEntityId,
     assigned_to_person_id: task.assignedToPersonId,
@@ -648,6 +680,40 @@ export function taskCompletionToInsertRow(completion: TaskCompletion): TaskCompl
     completed_at: completion.completedAt,
     completed_by_user_id: completion.completedByUserId,
     notes: completion.notes,
+  };
+}
+
+export interface TaskSubtaskRow {
+  id: string;
+  household_id: string;
+  task_id: string;
+  title: string;
+  is_completed: boolean;
+  position: number;
+  created_at: string;
+}
+
+export function rowToTaskSubtask(row: TaskSubtaskRow): TaskSubtask {
+  return {
+    id: row.id,
+    householdId: row.household_id,
+    taskId: row.task_id,
+    title: row.title,
+    isCompleted: row.is_completed,
+    position: row.position,
+    createdAt: row.created_at,
+  };
+}
+
+export function taskSubtaskToInsertRow(subtask: TaskSubtask): TaskSubtaskRow {
+  return {
+    id: subtask.id,
+    household_id: subtask.householdId,
+    task_id: subtask.taskId,
+    title: subtask.title,
+    is_completed: subtask.isCompleted,
+    position: subtask.position,
+    created_at: subtask.createdAt,
   };
 }
 

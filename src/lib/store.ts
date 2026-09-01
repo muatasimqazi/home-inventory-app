@@ -30,6 +30,10 @@ import {
   householdTaskToInsertRow,
   rowToTaskCompletion,
   taskCompletionToInsertRow,
+  rowToTaskCategory,
+  taskCategoryToInsertRow,
+  rowToTaskSubtask,
+  taskSubtaskToInsertRow,
   rowToFavorite,
   rowToActivityLogEntry,
   activityLogEntryToInsertRow,
@@ -91,6 +95,8 @@ import {
   type NoteRow,
   type HouseholdTaskRow,
   type TaskCompletionRow,
+  type TaskCategoryRow,
+  type TaskSubtaskRow,
   type FavoriteRow,
   type ActivityLogRow,
   type AttachmentRow,
@@ -147,7 +153,8 @@ import type {
   Note,
   HouseholdTask,
   TaskCompletion,
-  TaskCategory,
+  TaskCategoryRecord,
+  TaskSubtask,
   TaskLinkedEntityType,
   TaskScheduleType,
   TaskRecurrenceRule,
@@ -327,6 +334,9 @@ interface InventoryState {
   /** Household Tasks domain (0051_household_tasks.sql) — always-on, no household.xEnabled gate, same call as Notes. */
   tasks: HouseholdTask[];
   taskCompletions: TaskCompletion[];
+  /** household_id null rows are shared system defaults (Maintenance/Appointment/Chore/Grocery/Other), same "RLS is the complete filter" shape as financeCategories. */
+  taskCategories: TaskCategoryRecord[];
+  subtasks: TaskSubtask[];
   normalizationRules: NormalizationRule[];
   activity: ActivityLogEntry[];
   favorites: Favorite[];
@@ -496,7 +506,7 @@ interface InventoryState {
   createTask: (input: {
     title: string;
     description?: string;
-    category?: TaskCategory;
+    categoryId: string;
     linkedEntityType?: TaskLinkedEntityType | null;
     linkedEntityId?: string | null;
     assignedToPersonId?: string | null;
@@ -509,7 +519,7 @@ interface InventoryState {
     patch: Partial<
       Pick<
         HouseholdTask,
-        "title" | "description" | "category" | "linkedEntityType" | "linkedEntityId" | "assignedToPersonId" | "scheduleType" | "dueAt" | "recurrenceRule" | "isActive"
+        "title" | "description" | "categoryId" | "linkedEntityType" | "linkedEntityId" | "assignedToPersonId" | "scheduleType" | "dueAt" | "recurrenceRule" | "isActive"
       >
     >
   ) => void;
@@ -518,6 +528,16 @@ interface InventoryState {
   trashTask: (taskId: string) => void;
   restoreTask: (taskId: string) => void;
   permanentlyDeleteTask: (taskId: string) => void;
+
+  // Task Categories (0053_task_categories_and_subtasks.sql) — mirrors
+  // getOrCreateTag exactly, the "type it, it exists" creation UX.
+  getOrCreateTaskCategory: (name: string) => TaskCategoryRecord;
+
+  // Subtasks (0053_task_categories_and_subtasks.sql) — no trash lifecycle,
+  // see TaskSubtask's own doc comment in lib/types.ts.
+  createSubtask: (taskId: string, title: string) => TaskSubtask;
+  toggleSubtask: (subtaskId: string) => void;
+  deleteSubtask: (subtaskId: string) => void;
 
   // Normalization
   findNormalizationRule: (rawName: string) => NormalizationRule | undefined;
@@ -723,6 +743,8 @@ interface HouseholdBundle {
   notes: Note[];
   tasks: HouseholdTask[];
   taskCompletions: TaskCompletion[];
+  taskCategories: TaskCategoryRecord[];
+  subtasks: TaskSubtask[];
   favorites: Favorite[];
   activity: ActivityLogEntry[];
   attachments: Attachment[];
@@ -763,6 +785,8 @@ function snapshotBundle(state: InventoryState): HouseholdBundle {
     notes: state.notes,
     tasks: state.tasks,
     taskCompletions: state.taskCompletions,
+    taskCategories: state.taskCategories,
+    subtasks: state.subtasks,
     favorites: state.favorites,
     activity: state.activity,
     attachments: state.attachments,
@@ -809,6 +833,8 @@ async function fetchHouseholdBundle(
     notesRes,
     tasksRes,
     taskCompletionsRes,
+    taskCategoriesRes,
+    subtasksRes,
     favoritesRes,
     activityRes,
     attachmentsRes,
@@ -852,6 +878,12 @@ async function fetchHouseholdBundle(
     supabase.from("notes").select("*").eq("household_id", householdId),
     supabase.from("household_tasks").select("*").eq("household_id", householdId),
     supabase.from("task_completions").select("*").eq("household_id", householdId),
+    // System default categories (household_id null) are visible to every
+    // household — same reasoning/shape as the `categories` (Finance) fetch
+    // below: a plain .eq("household_id", householdId) can't match a NULL
+    // column, so this needs the same .or() as that one.
+    supabase.from("task_categories").select("*").or(`household_id.eq.${householdId},household_id.is.null`),
+    supabase.from("task_subtasks").select("*").eq("household_id", householdId),
     supabase.from("favorites").select("*, items!inner(household_id)").eq("user_id", userId).eq("items.household_id", householdId),
     supabase.from("activity_log").select("*").eq("household_id", householdId).order("created_at", { ascending: false }).limit(500),
     supabase.from("attachments").select("*").eq("household_id", householdId),
@@ -893,7 +925,7 @@ async function fetchHouseholdBundle(
   ]);
 
   const firstError =
-    membersRes.error ?? invitesRes.error ?? apiKeysRes.error ?? peopleRes.error ?? locationsRes.error ?? containersRes.error ?? itemsRes.error ?? tagsRes.error ?? notesRes.error ?? tasksRes.error ?? taskCompletionsRes.error ?? favoritesRes.error ?? activityRes.error ??
+    membersRes.error ?? invitesRes.error ?? apiKeysRes.error ?? peopleRes.error ?? locationsRes.error ?? containersRes.error ?? itemsRes.error ?? tagsRes.error ?? notesRes.error ?? tasksRes.error ?? taskCompletionsRes.error ?? taskCategoriesRes.error ?? subtasksRes.error ?? favoritesRes.error ?? activityRes.error ??
     attachmentsRes.error ?? itemStudioPhotosRes.error ?? itemDocumentLinksRes.error ?? pinnedLocationsRes.error ?? labelBatchesRes.error ?? labelBatchEntriesRes.error ?? normalizationRulesRes.error ??
     accountsRes.error ?? financeAccountSharesRes.error ?? transactionsRes.error ?? financeCategoriesRes.error ?? categoryRulesRes.error ?? recurringBillsRes.error ?? financeBillSharesRes.error ??
     recurringCandidateDismissalsRes.error ??
@@ -943,6 +975,8 @@ async function fetchHouseholdBundle(
     notes: ((notesRes.data ?? []) as NoteRow[]).map(rowToNote),
     tasks: ((tasksRes.data ?? []) as HouseholdTaskRow[]).map(rowToHouseholdTask),
     taskCompletions: ((taskCompletionsRes.data ?? []) as TaskCompletionRow[]).map(rowToTaskCompletion),
+    taskCategories: ((taskCategoriesRes.data ?? []) as TaskCategoryRow[]).map(rowToTaskCategory),
+    subtasks: ((subtasksRes.data ?? []) as TaskSubtaskRow[]).map(rowToTaskSubtask),
     favorites: ((favoritesRes.data ?? []) as FavoriteRow[]).map(rowToFavorite),
     activity: ((activityRes.data ?? []) as ActivityLogRow[]).map(rowToActivityLogEntry),
     attachments: ((attachmentsRes.data ?? []) as AttachmentRow[]).map(rowToAttachment),
@@ -1198,6 +1232,8 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
   notes: [],
   tasks: [],
   taskCompletions: [],
+  taskCategories: [],
+  subtasks: [],
   normalizationRules: [],
   activity: [],
   favorites: [],
@@ -1310,7 +1346,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       keyOf: (item: TDomain) => string,
       rowKeyOf: (row: Record<string, unknown>) => string,
       stateKey:
-        | "members" | "invites" | "people" | "locations" | "containers" | "tags" | "notes" | "tasks" | "taskCompletions" | "activity" | "attachments" | "itemStudioPhotos" | "itemDocumentLinks" | "pinnedLocations"
+        | "members" | "invites" | "people" | "locations" | "containers" | "tags" | "notes" | "tasks" | "taskCompletions" | "taskCategories" | "subtasks" | "activity" | "attachments" | "itemStudioPhotos" | "itemDocumentLinks" | "pinnedLocations"
         | "labelBatches" | "labelBatchEntries" | "normalizationRules"
         | "accounts" | "financeAccountShares" | "transactions" | "financeCategories" | "categoryRules" | "categoryBudgets"
         // financeSettings is NOT in this union — it's a single nullable
@@ -1355,6 +1391,14 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       (r) => r.id as string,
       "taskCompletions"
     );
+    // Same accepted limitation as the Finance `categories` bind just below
+    // this one — a default row (household_id null) never matches
+    // householdFilter, but defaults are seeded once and effectively
+    // static, so this only misses a realtime update for a household's
+    // *own* custom category edited from a second device, not the shared
+    // defaults.
+    bind<TaskCategoryRow, TaskCategoryRecord>("task_categories", householdFilter, rowToTaskCategory, (c) => c.id, (r) => r.id as string, "taskCategories");
+    bind<TaskSubtaskRow, TaskSubtask>("task_subtasks", householdFilter, rowToTaskSubtask, (s) => s.id, (r) => r.id as string, "subtasks");
     bind<ActivityLogRow, ActivityLogEntry>("activity_log", householdFilter, rowToActivityLogEntry, (a) => a.id, (r) => r.id as string, "activity");
     bind<AttachmentRow, Attachment>("attachments", householdFilter, rowToAttachment, (a) => a.id, (r) => r.id as string, "attachments");
     bind<ItemStudioPhotoRow, ItemStudioPhoto>("item_studio_photos", householdFilter, rowToItemStudioPhoto, (p) => p.id, (r) => r.id as string, "itemStudioPhotos");
@@ -2838,7 +2882,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       householdId: get().currentHouseholdId,
       title: input.title,
       description: input.description ?? "",
-      category: input.category ?? "other",
+      categoryId: input.categoryId,
       linkedEntityType: input.linkedEntityType ?? null,
       linkedEntityId: input.linkedEntityId ?? null,
       assignedToPersonId: input.assignedToPersonId ?? null,
@@ -2948,6 +2992,72 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       "Couldn't permanently delete task"
     );
     if (t) get().logActivity({ entityType: "household_task", entityId: t.id, entityName: t.title, action: "deleted_forever" });
+  },
+
+  getOrCreateTaskCategory: (name) => {
+    const existing = get().taskCategories.find((c) => c.name.toLowerCase() === name.toLowerCase());
+    if (existing) return existing;
+    const supabase = getSupabaseBrowserClient();
+    const created: TaskCategoryRecord = {
+      id: newId(),
+      householdId: get().currentHouseholdId,
+      name,
+      isDefault: false,
+      createdByUserId: get().currentUserId,
+      createdAt: nowIso(),
+    };
+    set((s) => ({ taskCategories: [...s.taskCategories, created] }));
+    persistOrRevert(
+      supabase.from("task_categories").insert(taskCategoryToInsertRow(created)),
+      () => set((s) => ({ taskCategories: s.taskCategories.filter((c) => c.id !== created.id) })),
+      "Couldn't create category"
+    );
+    return created;
+  },
+
+  createSubtask: (taskId, title) => {
+    const supabase = getSupabaseBrowserClient();
+    const existingForTask = get().subtasks.filter((s) => s.taskId === taskId);
+    const created: TaskSubtask = {
+      id: newId(),
+      householdId: get().currentHouseholdId,
+      taskId,
+      title,
+      isCompleted: false,
+      position: existingForTask.length,
+      createdAt: nowIso(),
+    };
+    set((s) => ({ subtasks: [...s.subtasks, created] }));
+    persistOrRevert(
+      supabase.from("task_subtasks").insert(taskSubtaskToInsertRow(created)),
+      () => set((s) => ({ subtasks: s.subtasks.filter((x) => x.id !== created.id) })),
+      "Couldn't add subtask"
+    );
+    return created;
+  },
+
+  toggleSubtask: (subtaskId) => {
+    const supabase = getSupabaseBrowserClient();
+    const previous = get().subtasks.find((s) => s.id === subtaskId);
+    if (!previous) return;
+    const merged: TaskSubtask = { ...previous, isCompleted: !previous.isCompleted };
+    set((s) => ({ subtasks: s.subtasks.map((x) => (x.id === subtaskId ? merged : x)) }));
+    persistOrRevert(
+      supabase.from("task_subtasks").update(taskSubtaskToInsertRow(merged)).eq("id", subtaskId),
+      () => set((s) => ({ subtasks: s.subtasks.map((x) => (x.id === subtaskId ? previous : x)) })),
+      "Couldn't update subtask"
+    );
+  },
+
+  deleteSubtask: (subtaskId) => {
+    const supabase = getSupabaseBrowserClient();
+    const previous = get().subtasks.find((s) => s.id === subtaskId);
+    set((s) => ({ subtasks: s.subtasks.filter((x) => x.id !== subtaskId) }));
+    persistOrRevert(
+      supabase.from("task_subtasks").delete().eq("id", subtaskId),
+      () => { if (previous) set((s) => ({ subtasks: [...s.subtasks, previous] })); },
+      "Couldn't delete subtask"
+    );
   },
 
   findNormalizationRule: (rawName) => {

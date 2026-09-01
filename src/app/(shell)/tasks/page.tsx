@@ -4,24 +4,17 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Icon, type IconName } from "@/components/icon";
+import { Icon } from "@/components/icon";
 import { IconChip } from "@/components/icon-chip";
 import { EmptyState } from "@/components/empty-state";
 import { SearchBar } from "@/components/search-bar";
 import { Button } from "@/components/ui/button";
 import { useInventoryStore } from "@/lib/store";
 import { taskDueBucket, type TaskDueBucket } from "@/lib/selectors";
+import { taskCategoryIcon } from "@/lib/task-category";
 import { formatShortDate } from "@/lib/format";
-import type { HouseholdTask, TaskCategory } from "@/lib/types";
+import type { HouseholdTask } from "@/lib/types";
 import { cn } from "@/lib/utils";
-
-const CATEGORY_META: Record<TaskCategory, { icon: IconName; label: string }> = {
-  maintenance: { icon: "hammer", label: "Maintenance" },
-  appointment: { icon: "calendar", label: "Appointment" },
-  chore: { icon: "checkSquare", label: "Chore" },
-  grocery: { icon: "grocery", label: "Grocery" },
-  other: { icon: "tasks", label: "Other" },
-};
 
 const BUCKET_LABEL: Record<TaskDueBucket, string> = { overdue: "Overdue", today: "Today", upcoming: "Upcoming" };
 
@@ -38,6 +31,8 @@ export default function TasksPage() {
   const router = useRouter();
   const tasks = useInventoryStore((s) => s.tasks);
   const people = useInventoryStore((s) => s.people);
+  const categories = useInventoryStore((s) => s.taskCategories);
+  const subtasks = useInventoryStore((s) => s.subtasks);
   const completeTask = useInventoryStore((s) => s.completeTask);
   const [query, setQuery] = useState("");
   const [showCompleted, setShowCompleted] = useState(false);
@@ -56,6 +51,16 @@ export default function TasksPage() {
   function personName(personId: string | null): string | null {
     if (!personId) return null;
     return people.find((p) => p.id === personId)?.displayName ?? null;
+  }
+
+  function categoryName(categoryId: string): string {
+    return categories.find((c) => c.id === categoryId)?.name ?? "Other";
+  }
+
+  function subtaskProgress(taskId: string): string | null {
+    const own = subtasks.filter((s) => s.taskId === taskId);
+    if (own.length === 0) return null;
+    return `${own.filter((s) => s.isCompleted).length}/${own.length}`;
   }
 
   return (
@@ -116,8 +121,8 @@ export default function TasksPage() {
               </h2>
               <div className="flex flex-col gap-2">
                 {groups[bucket].map((task) => {
-                  const meta = CATEGORY_META[task.category];
                   const assignee = personName(task.assignedToPersonId);
+                  const progress = subtaskProgress(task.id);
                   return (
                     <div key={task.id} className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 shadow-sm">
                       {!showCompleted && (
@@ -132,13 +137,14 @@ export default function TasksPage() {
                         />
                       )}
                       <Link href={`/tasks/${task.id}`} className="flex min-w-0 flex-1 items-center gap-3">
-                        <IconChip icon={meta.icon} tone={bucket === "overdue" ? "danger" : "muted"} size="sm" />
+                        <IconChip icon={taskCategoryIcon(categoryName(task.categoryId))} tone={bucket === "overdue" ? "danger" : "muted"} size="sm" />
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-body font-medium text-ink">{task.title}</p>
                           <p className={cn("truncate text-caption", bucket === "overdue" ? "text-danger" : "text-muted-foreground")}>
                             {formatShortDate(task.dueAt)}
                             {task.scheduleType === "recurring" && " · Repeats"}
                             {assignee && ` · ${assignee}`}
+                            {progress && ` · ${progress}`}
                           </p>
                         </div>
                         <Icon name="chevronRight" size={16} className="shrink-0 text-muted-foreground" />

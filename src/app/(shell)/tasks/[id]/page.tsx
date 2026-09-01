@@ -3,24 +3,17 @@
 import { useState } from "react";
 import { notFound, useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Icon, type IconName } from "@/components/icon";
+import { Icon } from "@/components/icon";
 import { IconChip } from "@/components/icon-chip";
 import { ActivityRow } from "@/components/activity-row";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useInventoryStore } from "@/lib/store";
 import { taskDueBucket, daysUntil } from "@/lib/selectors";
+import { taskCategoryIcon } from "@/lib/task-category";
 import { formatShortDate, relativeTime } from "@/lib/format";
-import type { TaskCategory } from "@/lib/types";
 import { cn } from "@/lib/utils";
-
-const CATEGORY_META: Record<TaskCategory, { icon: IconName; label: string }> = {
-  maintenance: { icon: "hammer", label: "Maintenance" },
-  appointment: { icon: "calendar", label: "Appointment" },
-  chore: { icon: "checkSquare", label: "Chore" },
-  grocery: { icon: "grocery", label: "Grocery" },
-  other: { icon: "tasks", label: "Other" },
-};
 
 export default function TaskDetailPage() {
   const params = useParams<{ id: string }>();
@@ -30,6 +23,7 @@ export default function TaskDetailPage() {
   const members = useInventoryStore((s) => s.members);
   const activity = useInventoryStore((s) => s.activity);
   const taskCompletions = useInventoryStore((s) => s.taskCompletions);
+  const categories = useInventoryStore((s) => s.taskCategories);
   const completeTask = useInventoryStore((s) => s.completeTask);
   const trashTask = useInventoryStore((s) => s.trashTask);
   const restoreTask = useInventoryStore((s) => s.restoreTask);
@@ -42,7 +36,7 @@ export default function TaskDetailPage() {
   if (!task) return notFound();
 
   const bucket = taskDueBucket(task.dueAt);
-  const meta = CATEGORY_META[task.category];
+  const categoryName = categories.find((c) => c.id === task.categoryId)?.name ?? "Other";
   const assignee = task.assignedToPersonId ? people.find((p) => p.id === task.assignedToPersonId) : null;
   const taskActivity = activity.filter((a) => a.entityId === task.id);
   const completions = taskCompletions.filter((c) => c.taskId === task.id).sort((a, b) => b.completedAt.localeCompare(a.completedAt));
@@ -76,11 +70,11 @@ export default function TaskDetailPage() {
       )}
 
       <div className="flex items-start gap-3">
-        <IconChip icon={meta.icon} tone={bucket === "overdue" && task.isActive ? "danger" : "yellow"} />
+        <IconChip icon={taskCategoryIcon(categoryName)} tone={bucket === "overdue" && task.isActive ? "danger" : "yellow"} />
         <div className="min-w-0 flex-1">
           <h1 className="text-screen-title font-semibold text-ink">{task.title}</h1>
           <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-caption text-muted-foreground">
-            <span>{meta.label}</span>
+            <span>{categoryName}</span>
             <span>·</span>
             <span className={cn(bucket === "overdue" && task.isActive && "font-medium text-danger")}>
               {task.isActive ? "Due" : "Was due"} {formatShortDate(task.dueAt)}
@@ -108,6 +102,8 @@ export default function TaskDetailPage() {
       </div>
 
       {task.description && <p className="text-body text-ink">{task.description}</p>}
+
+      {!isTrashed && <SubtasksSection taskId={task.id} />}
 
       {!isTrashed && task.isActive && (
         <Button
@@ -186,6 +182,77 @@ export default function TaskDetailPage() {
           router.push("/trash?tab=tasks");
         }}
       />
+    </div>
+  );
+}
+
+/** A real checklist inside the task — the "checklist" half of the
+ * original ask (0053_task_categories_and_subtasks.sql). No trash
+ * lifecycle: unchecking/deleting a subtask is a plain, immediate,
+ * low-stakes edit, same "just delete" precedent as Favorite. */
+function SubtasksSection({ taskId }: { taskId: string }) {
+  const subtasks = useInventoryStore((s) => s.subtasks);
+  const createSubtask = useInventoryStore((s) => s.createSubtask);
+  const toggleSubtask = useInventoryStore((s) => s.toggleSubtask);
+  const deleteSubtask = useInventoryStore((s) => s.deleteSubtask);
+  const [newTitle, setNewTitle] = useState("");
+
+  const own = subtasks.filter((s) => s.taskId === taskId).sort((a, b) => a.position - b.position);
+
+  function handleAdd() {
+    const title = newTitle.trim();
+    if (!title) return;
+    createSubtask(taskId, title);
+    setNewTitle("");
+  }
+
+  return (
+    <div className="flex flex-col gap-2 rounded-2xl border border-border bg-card p-4 shadow-sm">
+      <h2 className="text-section-title font-medium text-ink">
+        Subtasks{own.length > 0 && ` · ${own.filter((s) => s.isCompleted).length}/${own.length}`}
+      </h2>
+      {own.length > 0 && (
+        <div className="flex flex-col divide-y divide-border">
+          {own.map((s) => (
+            <div key={s.id} className="flex items-center gap-2 py-2">
+              <button
+                type="button"
+                onClick={() => toggleSubtask(s.id)}
+                aria-label={s.isCompleted ? "Mark not done" : "Mark done"}
+                className={cn(
+                  "tap-target flex size-6 shrink-0 items-center justify-center rounded-full border-2",
+                  s.isCompleted ? "border-ink-fill bg-ink-fill text-white" : "border-border"
+                )}
+              >
+                {s.isCompleted && <Icon name="check" size={12} />}
+              </button>
+              <p className={cn("min-w-0 flex-1 text-body", s.isCompleted ? "text-muted-foreground line-through" : "text-ink")}>{s.title}</p>
+              <button
+                type="button"
+                onClick={() => deleteSubtask(s.id)}
+                aria-label="Remove subtask"
+                className="tap-target flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-danger"
+              >
+                <Icon name="close" size={12} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="flex gap-2 pt-1">
+        <Input
+          value={newTitle}
+          onChange={(e) => setNewTitle(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleAdd();
+          }}
+          placeholder="Add a subtask…"
+          className="h-9 flex-1"
+        />
+        <Button size="sm" variant="secondary" onClick={handleAdd} disabled={!newTitle.trim()}>
+          <Icon name="plus" size={14} />
+        </Button>
+      </div>
     </div>
   );
 }

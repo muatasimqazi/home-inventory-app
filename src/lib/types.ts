@@ -330,7 +330,6 @@ export interface Note {
   updatedAt: string;
 }
 
-export type TaskCategory = "maintenance" | "appointment" | "chore" | "grocery" | "other";
 export type TaskScheduleType = "one_time" | "recurring";
 /** v1 scope per docs/Household Hub Addendum.md §8 — not full RRULE. */
 export interface TaskRecurrenceRule {
@@ -338,6 +337,22 @@ export interface TaskRecurrenceRule {
   interval: number;
 }
 export type TaskLinkedEntityType = "item" | "household_member";
+
+/** Real per-household data (0053_task_categories_and_subtasks.sql),
+ * mirroring FinanceCategory exactly: householdId null = system default
+ * (shared, undeletable by any household — RLS only grants insert/update/
+ * delete when household_id is set), householdId set = a household's own
+ * custom category ("meal prep," whatever). Replaced a fixed 5-value
+ * CHECK-constrained enum, which needed a real migration every time a
+ * household wanted a new category (0052's "grocery" was the last one). */
+export interface TaskCategoryRecord {
+  id: string;
+  householdId: string | null;
+  name: string;
+  isDefault: boolean;
+  createdByUserId: string | null;
+  createdAt: string;
+}
 
 /** Household Tasks domain (0051_household_tasks.sql, docs/Household Hub Addendum.md).
  * One deliberate deviation from that addendum's draft schema: assignment
@@ -350,7 +365,7 @@ export interface HouseholdTask {
   householdId: string;
   title: string;
   description: string;
-  category: TaskCategory;
+  categoryId: string;
   linkedEntityType: TaskLinkedEntityType | null;
   linkedEntityId: string | null;
   assignedToPersonId: string | null;
@@ -377,6 +392,20 @@ export interface TaskCompletion {
   completedAt: string;
   completedByUserId: string;
   notes: string | null;
+}
+
+/** A real checklist inside one task ("grocery shopping" -> milk, eggs,
+ * bread) — no Archive+Trash lifecycle, same "lightweight, just delete"
+ * precedent as Favorite/FinanceBillShare, not every table needs the full
+ * 30-day recovery window. */
+export interface TaskSubtask {
+  id: string;
+  householdId: string;
+  taskId: string;
+  title: string;
+  isCompleted: boolean;
+  position: number;
+  createdAt: string;
 }
 
 export type NormalizationSource = "learned" | "manual";

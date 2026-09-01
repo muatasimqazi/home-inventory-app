@@ -1,26 +1,19 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icon";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { TaskCategorySelect } from "@/components/task-category-select";
 import { useInventoryStore } from "@/lib/store";
 import { useKeyboardInset } from "@/hooks/use-keyboard-inset";
 import { useAutoFocusVisible } from "@/hooks/use-autofocus-visible";
-import type { TaskCategory, TaskScheduleType } from "@/lib/types";
+import type { TaskScheduleType } from "@/lib/types";
 
 const UNASSIGNED_VALUE = "unassigned";
-
-const CATEGORY_OPTIONS: { value: TaskCategory; label: string }[] = [
-  { value: "maintenance", label: "Maintenance" },
-  { value: "appointment", label: "Appointment" },
-  { value: "chore", label: "Chore" },
-  { value: "grocery", label: "Grocery" },
-  { value: "other", label: "Other" },
-];
 
 /** datetime-local wants local YYYY-MM-DDTHH:mm, not UTC ISO — a naive
  * .toISOString().slice(0,16) would show the wrong wall-clock time to
@@ -38,12 +31,13 @@ function defaultDueLocal(): string {
 export default function NewTaskPage() {
   const router = useRouter();
   const people = useInventoryStore((s) => s.people);
+  const categories = useInventoryStore((s) => s.taskCategories);
   const createTask = useInventoryStore((s) => s.createTask);
   const keyboardInset = useKeyboardInset();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState<TaskCategory>("other");
+  const [categoryId, setCategoryId] = useState("");
   const [scheduleType, setScheduleType] = useState<TaskScheduleType>("one_time");
   const [dueLocal, setDueLocal] = useState(defaultDueLocal);
   const [recurrenceInterval, setRecurrenceInterval] = useState("7");
@@ -52,6 +46,19 @@ export default function NewTaskPage() {
   const [saving, setSaving] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
   useAutoFocusVisible(titleInputRef, []);
+
+  // Categories load asynchronously (hydration) — default to the seeded
+  // "Other" once they're in, rather than blocking the form on them.
+  // queueMicrotask defers the setState out of the effect body itself —
+  // same "reconcile from an external source on mount" pattern
+  // desktop-sidebar.tsx's own collapsed-state effect already uses.
+  useEffect(() => {
+    if (categoryId || categories.length === 0) return;
+    queueMicrotask(() => {
+      const other = categories.find((c) => c.isDefault && c.name === "Other");
+      setCategoryId(other?.id ?? categories[0].id);
+    });
+  }, [categories, categoryId]);
 
   function handleSave() {
     if (!title.trim()) {
@@ -67,7 +74,7 @@ export default function NewTaskPage() {
     const created = createTask({
       title: title.trim(),
       description: description.trim(),
-      category,
+      categoryId,
       scheduleType,
       dueAt: new Date(dueLocal).toISOString(),
       recurrenceRule: scheduleType === "recurring" ? { freq: "days", interval } : null,
@@ -112,18 +119,7 @@ export default function NewTaskPage() {
         </Field>
 
         <Field label="Category">
-          <Select value={category} onValueChange={(v) => setCategory(v as TaskCategory)}>
-            <SelectTrigger className="h-11 w-full bg-card">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {CATEGORY_OPTIONS.map((c) => (
-                <SelectItem key={c.value} value={c.value}>
-                  {c.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <TaskCategorySelect value={categoryId} onChange={setCategoryId} />
         </Field>
 
         <Field label="Assign to (optional)">

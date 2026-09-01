@@ -8,19 +8,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { TaskCategorySelect } from "@/components/task-category-select";
 import { useInventoryStore } from "@/lib/store";
 import { useKeyboardInset } from "@/hooks/use-keyboard-inset";
-import type { HouseholdTask, Person, TaskCategory, TaskScheduleType } from "@/lib/types";
+import type { HouseholdTask, Person, TaskScheduleType } from "@/lib/types";
 
 const UNASSIGNED_VALUE = "unassigned";
-
-const CATEGORY_OPTIONS: { value: TaskCategory; label: string }[] = [
-  { value: "maintenance", label: "Maintenance" },
-  { value: "appointment", label: "Appointment" },
-  { value: "chore", label: "Chore" },
-  { value: "grocery", label: "Grocery" },
-  { value: "other", label: "Other" },
-];
 
 /** local YYYY-MM-DDTHH:mm for a datetime-local input's value — see
  * tasks/new/page.tsx's defaultDueLocal() for why a naive UTC slice would
@@ -71,7 +64,7 @@ function EditTaskForm({
 }) {
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description);
-  const [category, setCategory] = useState<TaskCategory>(task.category);
+  const [categoryId, setCategoryId] = useState(task.categoryId);
   const [scheduleType, setScheduleType] = useState<TaskScheduleType>(task.scheduleType);
   const [dueLocal, setDueLocal] = useState(() => toLocalInput(task.dueAt));
   const [recurrenceInterval, setRecurrenceInterval] = useState(String(task.recurrenceRule?.interval ?? 7));
@@ -91,7 +84,7 @@ function EditTaskForm({
     updateTask(task.id, {
       title: title.trim(),
       description: description.trim(),
-      category,
+      categoryId,
       scheduleType,
       dueAt: new Date(dueLocal).toISOString(),
       recurrenceRule: scheduleType === "recurring" ? { freq: "days", interval } : null,
@@ -133,18 +126,7 @@ function EditTaskForm({
         </Field>
 
         <Field label="Category">
-          <Select value={category} onValueChange={(v) => setCategory(v as TaskCategory)}>
-            <SelectTrigger className="h-11 w-full bg-card">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {CATEGORY_OPTIONS.map((c) => (
-                <SelectItem key={c.value} value={c.value}>
-                  {c.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <TaskCategorySelect value={categoryId} onChange={setCategoryId} />
         </Field>
 
         <Field label="Assign to (optional)">
