@@ -41,7 +41,12 @@ export default function NewNotePage() {
     }
     setSaving(true);
     const created = createNote({ title: title.trim(), content, isShared });
-    router.replace(`/notes/${created.id}`);
+    // ?new=1 — router.replace() swaps this page's own history entry for
+    // the detail page's, but the detail page's back button still needs to
+    // know it just replaced a create form rather than a normal browsing
+    // step, so it can send "back" to a clean list instead of wherever
+    // history.back() would otherwise resolve to. See notes/[id]/page.tsx.
+    router.replace(`/notes/${created.id}?new=1`);
   }
 
   return (

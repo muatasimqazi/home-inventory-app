@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { notFound, useParams, useRouter } from "next/navigation";
+import { notFound, useParams, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
 import { ActivityRow } from "@/components/activity-row";
@@ -15,6 +15,19 @@ import { relativeTime } from "@/lib/format";
 export default function NoteDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // Set only by notes/new/page.tsx's post-save router.replace() — that
+  // replace swaps /notes/new's own history entry for this page's, so in
+  // principle history.back() from here should already skip past the
+  // create form. In practice it doesn't always land somewhere clean (the
+  // reported bug: back re-showed the create form instead of returning to
+  // wherever the user actually came from), so this flag sidesteps
+  // trusting browser history for that one specific transition and sends
+  // back to the notes list — a real "closed the form" destination —
+  // instead of calling router.back() blind. Every other entry to this
+  // page (the notes list, a dashboard preview card, a tag, search, …)
+  // still uses router.back() unchanged.
+  const justCreated = searchParams.get("new") === "1";
   const notes = useInventoryStore((s) => s.notes);
   const members = useInventoryStore((s) => s.members);
   const activity = useInventoryStore((s) => s.activity);
@@ -34,7 +47,10 @@ export default function NoteDetailPage() {
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-5 pb-6">
       <div className="flex items-center justify-between">
-        <button onClick={() => router.back()} className="tap-target flex size-9 items-center justify-center rounded-full bg-card shadow-sm">
+        <button
+          onClick={() => (justCreated ? router.push("/notes") : router.back())}
+          className="tap-target flex size-9 items-center justify-center rounded-full bg-card shadow-sm"
+        >
           <Icon name="arrowLeft" size={18} />
         </button>
         {note.status === "active" && (
