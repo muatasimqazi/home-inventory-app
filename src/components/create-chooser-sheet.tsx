@@ -42,8 +42,8 @@ function ChooserRow({
 
 /**
  * The Overview page's top "+" used to link straight to /add (a new
- * inventory item) — with three real domains and six real "create" targets
- * now (item, note, location, container, transaction, account), that guess
+ * inventory item) — with three real domains and seven real "create" targets
+ * now (item, note, location, container, transaction, account, task), that guess
  * is wrong more often than it's right. Same "explicit chooser, not a
  * classifier" posture as ScanChooserSheet (the camera FAB's own equivalent
  * sheet): the user always taps what they mean before landing on a form.
@@ -129,6 +129,15 @@ export function CreateChooserSheet({ open, onOpenChange }: CreateChooserSheetPro
               description="A bank, card, or investment account"
               iconClassName="bg-fab-neutral-dark text-white"
               onClick={() => go("/finance/accounts?open=new")}
+            />
+            <ChooserRow
+              icon="tasks"
+              label="Task"
+              description="A reminder, chore, or appointment"
+              // Reuses Location's role — last row, furthest from Location's
+              // own (2nd), so no adjacent-row repeat.
+              iconClassName="bg-fab-neutral-light text-white"
+              onClick={() => go("/tasks/new")}
             />
           </div>
         </SheetContent>

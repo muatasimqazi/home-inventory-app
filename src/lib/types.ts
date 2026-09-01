@@ -330,6 +330,55 @@ export interface Note {
   updatedAt: string;
 }
 
+export type TaskCategory = "maintenance" | "appointment" | "chore" | "other";
+export type TaskScheduleType = "one_time" | "recurring";
+/** v1 scope per docs/Household Hub Addendum.md §8 — not full RRULE. */
+export interface TaskRecurrenceRule {
+  freq: "days";
+  interval: number;
+}
+export type TaskLinkedEntityType = "item" | "household_member";
+
+/** Household Tasks domain (0051_household_tasks.sql, docs/Household Hub Addendum.md).
+ * One deliberate deviation from that addendum's draft schema: assignment
+ * targets a Person (assignedToPersonId), not a User directly — matching
+ * items' owner_person_id, since a task should be assignable to a managed
+ * profile with no login (the addendum's own example, "Emma's dentist
+ * appointment" — a kid usually doesn't have their own account). */
+export interface HouseholdTask {
+  id: string;
+  householdId: string;
+  title: string;
+  description: string;
+  category: TaskCategory;
+  linkedEntityType: TaskLinkedEntityType | null;
+  linkedEntityId: string | null;
+  assignedToPersonId: string | null;
+  scheduleType: TaskScheduleType;
+  dueAt: string;
+  recurrenceRule: TaskRecurrenceRule | null;
+  /** one_time: false once completed. recurring: stays true until trashed — a recurring task is never "done," only its current occurrence is. */
+  isActive: boolean;
+  createdByUserId: string;
+  createdAt: string;
+  updatedAt: string;
+  trashedAt: string | null;
+  permanentlyDeleteAfter: string | null;
+}
+
+/** One row per completion, one_time or recurring — unlike RecurringBill's
+ * "mark as paid" (pure in-place mutation, no history; bill_payments was
+ * aspirational and never built), tasks get a real completion log. */
+export interface TaskCompletion {
+  id: string;
+  householdId: string;
+  taskId: string;
+  dueAt: string;
+  completedAt: string;
+  completedByUserId: string;
+  notes: string | null;
+}
+
 export type NormalizationSource = "learned" | "manual";
 
 export interface NormalizationRule {
@@ -355,7 +404,8 @@ export type ActivityEntityType =
   | "transaction"
   | "category"
   | "recurring_bill"
-  | "note";
+  | "note"
+  | "household_task";
 
 export type ActivityAction =
   | "created"
@@ -369,7 +419,8 @@ export type ActivityAction =
   | "joined"
   | "removed"
   | "left"
-  | "ownership_transferred";
+  | "ownership_transferred"
+  | "completed";
 
 export interface ActivityLogEntry {
   id: string;

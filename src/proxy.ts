@@ -29,7 +29,8 @@ import { NextResponse, type NextRequest } from "next/server";
 // introduced here.
 // /api/v1/push/send-low-stock-alerts is the same shape again — added
 // here up front alongside vercel.json's own cron entry this time, not
-// discovered after the fact.
+// discovered after the fact. /api/v1/push/send-task-reminders (Household
+// Tasks domain) is the same again, same reasoning.
 //
 // This list has bitten a new CRON_SECRET-bearer route often enough
 // (three separate times before this comment existed) that it's worth
@@ -52,6 +53,7 @@ const PUBLIC_PATHS = [
   "/api/v1/push/send-capture-nudges",
   "/api/v1/push/send-debt-payments-due-today",
   "/api/v1/push/send-low-stock-alerts",
+  "/api/v1/push/send-task-reminders",
   "/api/v1/public",
 ];
 

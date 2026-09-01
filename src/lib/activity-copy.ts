@@ -28,4 +28,5 @@ export const ACTION_LABEL: Record<ActivityAction, string> = {
   removed: "was removed",
   left: "left the household",
   ownership_transferred: "became the Owner",
+  completed: "completed",
 };

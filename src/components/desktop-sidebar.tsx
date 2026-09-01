@@ -97,6 +97,9 @@ export function DesktopSidebar() {
                 gated behind a household.xEnabled flag and sits up here
                 next to Overview instead of getting its own section. */}
             <SidebarLink href="/notes" icon="notebook" label="Notes" pathname={pathname} collapsed={collapsed} />
+            {/* Household Tasks (0051_household_tasks.sql) — same always-on,
+                ungated placement as Notes right above. */}
+            <SidebarLink href="/tasks" icon="tasks" label="Tasks" pathname={pathname} collapsed={collapsed} />
           </nav>
         </div>
 

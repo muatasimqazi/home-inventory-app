@@ -1,5 +1,5 @@
 import { buildBreadcrumb, breadcrumbLabel, activeItemCountForContainer } from "./selectors";
-import type { Account, Container, FinanceCategory, Item, Location, Note, ScannedReceiptLineItem, Tag, Transaction } from "./types";
+import type { Account, Container, FinanceCategory, HouseholdTask, Item, Location, Note, ScannedReceiptLineItem, Tag, Transaction } from "./types";
 
 // Weighted, token-based ranking, in the spirit of PRD §11 (typo-tolerant-ish,
 // spans names/categories/tags/breadcrumbs, ranked). Adapted from the scoring
@@ -45,7 +45,13 @@ export interface NoteSearchResult {
   note: Note;
 }
 
-export type SearchResult = ItemSearchResult | TransactionSearchResult | AccountSearchResult | ContainerSearchResult | NoteSearchResult;
+export interface TaskSearchResult {
+  kind: "task";
+  score: number;
+  task: HouseholdTask;
+}
+
+export type SearchResult = ItemSearchResult | TransactionSearchResult | AccountSearchResult | ContainerSearchResult | NoteSearchResult | TaskSearchResult;
 
 function tokenize(value: string): string[] {
   return value
@@ -141,6 +147,37 @@ export function searchNotes(query: string, notes: Note[]): NoteSearchResult[] {
     })
     .filter((r) => r.score > 0)
     .sort((a, b) => b.score - a.score || a.note.title.localeCompare(b.note.title));
+}
+
+/** Tasks by title or description — folded only into the "all" domain tab
+ * on the Search page, same v1 scope call as searchNotes above. */
+export function searchTasks(query: string, tasks: HouseholdTask[]): TaskSearchResult[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  const queryTokens = tokenize(q);
+
+  return tasks
+    .filter((t) => !t.trashedAt)
+    .map((t) => {
+      const title = t.title.toLowerCase();
+      const description = t.description.toLowerCase();
+      const searchable = [title, description].join(" ");
+
+      let score = 0;
+      if (matchesAllTokens(searchable, queryTokens)) {
+        if (title === q) score += 100;
+        if (title.includes(q)) score += 60;
+        if (description.includes(q)) score += 20;
+        for (const token of queryTokens) {
+          if (title.includes(token)) score += 12;
+          if (searchable.includes(token)) score += 3;
+        }
+      }
+
+      return { kind: "task" as const, task: t, score };
+    })
+    .filter((r) => r.score > 0)
+    .sort((a, b) => b.score - a.score || a.task.title.localeCompare(b.task.title));
 }
 
 /**

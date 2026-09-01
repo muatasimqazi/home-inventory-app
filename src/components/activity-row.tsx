@@ -17,6 +17,7 @@ const ACTION_ICON: Record<string, IconName> = {
   removed: "user",
   left: "user",
   ownership_transferred: "key",
+  completed: "check",
 };
 
 export function ActivityRow({ entry, members }: { entry: ActivityLogAppend; members: Member[] }) {

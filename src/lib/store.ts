@@ -7,7 +7,7 @@ import { newId, tagToken } from "./id";
 import { isDisplayCodeTaken, nextDisplayCode, normalizeDisplayCode } from "./display-code";
 import { ATTACHMENT_MAX_SIZE_BYTES, ATTACHMENT_MAX_SIZE_LABEL, isAttachmentTypeAllowed } from "./attachment-limits";
 import { normalizeUploadedPhoto } from "./crop-image";
-import { normalizeAccountBalance, buildBreadcrumb, breadcrumbLabel } from "./selectors";
+import { normalizeAccountBalance, buildBreadcrumb, breadcrumbLabel, advanceTaskDueDate } from "./selectors";
 import {
   rowToHousehold,
   rowToMember,
@@ -26,6 +26,10 @@ import {
   tagToInsertRow,
   rowToNote,
   noteToInsertRow,
+  rowToHouseholdTask,
+  householdTaskToInsertRow,
+  rowToTaskCompletion,
+  taskCompletionToInsertRow,
   rowToFavorite,
   rowToActivityLogEntry,
   activityLogEntryToInsertRow,
@@ -85,6 +89,8 @@ import {
   type ItemRow,
   type TagRow,
   type NoteRow,
+  type HouseholdTaskRow,
+  type TaskCompletionRow,
   type FavoriteRow,
   type ActivityLogRow,
   type AttachmentRow,
@@ -139,6 +145,12 @@ import type {
   Member,
   NormalizationRule,
   Note,
+  HouseholdTask,
+  TaskCompletion,
+  TaskCategory,
+  TaskLinkedEntityType,
+  TaskScheduleType,
+  TaskRecurrenceRule,
   Person,
   PersonRelationship,
   PinnedLocation,
@@ -312,6 +324,9 @@ interface InventoryState {
   tags: Tag[];
   /** Personal-or-shared household notes (0050_notes.sql) — RLS already returns only what the caller can see (their own personal notes + every shared note), same "RLS is the complete filter" guarantee as `accounts`. */
   notes: Note[];
+  /** Household Tasks domain (0051_household_tasks.sql) — always-on, no household.xEnabled gate, same call as Notes. */
+  tasks: HouseholdTask[];
+  taskCompletions: TaskCompletion[];
   normalizationRules: NormalizationRule[];
   activity: ActivityLogEntry[];
   favorites: Favorite[];
@@ -476,6 +491,33 @@ interface InventoryState {
   trashNote: (noteId: string) => void;
   restoreNote: (noteId: string) => void;
   permanentlyDeleteNote: (noteId: string) => void;
+
+  // Household Tasks (0051_household_tasks.sql, docs/Household Hub Addendum.md)
+  createTask: (input: {
+    title: string;
+    description?: string;
+    category?: TaskCategory;
+    linkedEntityType?: TaskLinkedEntityType | null;
+    linkedEntityId?: string | null;
+    assignedToPersonId?: string | null;
+    scheduleType: TaskScheduleType;
+    dueAt: string;
+    recurrenceRule?: TaskRecurrenceRule | null;
+  }) => HouseholdTask;
+  updateTask: (
+    taskId: string,
+    patch: Partial<
+      Pick<
+        HouseholdTask,
+        "title" | "description" | "category" | "linkedEntityType" | "linkedEntityId" | "assignedToPersonId" | "scheduleType" | "dueAt" | "recurrenceRule" | "isActive"
+      >
+    >
+  ) => void;
+  /** Inserts a real task_completions row, then either deactivates (one_time) or advances dueAt by recurrenceRule (recurring) — unlike RecurringBill's "mark as paid" (pure in-place mutation, no history), this keeps a real log. */
+  completeTask: (taskId: string, notes?: string) => void;
+  trashTask: (taskId: string) => void;
+  restoreTask: (taskId: string) => void;
+  permanentlyDeleteTask: (taskId: string) => void;
 
   // Normalization
   findNormalizationRule: (rawName: string) => NormalizationRule | undefined;
@@ -679,6 +721,8 @@ interface HouseholdBundle {
   items: Item[];
   tags: Tag[];
   notes: Note[];
+  tasks: HouseholdTask[];
+  taskCompletions: TaskCompletion[];
   favorites: Favorite[];
   activity: ActivityLogEntry[];
   attachments: Attachment[];
@@ -717,6 +761,8 @@ function snapshotBundle(state: InventoryState): HouseholdBundle {
     items: state.items,
     tags: state.tags,
     notes: state.notes,
+    tasks: state.tasks,
+    taskCompletions: state.taskCompletions,
     favorites: state.favorites,
     activity: state.activity,
     attachments: state.attachments,
@@ -761,6 +807,8 @@ async function fetchHouseholdBundle(
     itemsRes,
     tagsRes,
     notesRes,
+    tasksRes,
+    taskCompletionsRes,
     favoritesRes,
     activityRes,
     attachmentsRes,
@@ -802,6 +850,8 @@ async function fetchHouseholdBundle(
     // see (their own personal notes + every shared note in the household) —
     // same "no further client-side filtering needed" guarantee as accounts.
     supabase.from("notes").select("*").eq("household_id", householdId),
+    supabase.from("household_tasks").select("*").eq("household_id", householdId),
+    supabase.from("task_completions").select("*").eq("household_id", householdId),
     supabase.from("favorites").select("*, items!inner(household_id)").eq("user_id", userId).eq("items.household_id", householdId),
     supabase.from("activity_log").select("*").eq("household_id", householdId).order("created_at", { ascending: false }).limit(500),
     supabase.from("attachments").select("*").eq("household_id", householdId),
@@ -843,7 +893,7 @@ async function fetchHouseholdBundle(
   ]);
 
   const firstError =
-    membersRes.error ?? invitesRes.error ?? apiKeysRes.error ?? peopleRes.error ?? locationsRes.error ?? containersRes.error ?? itemsRes.error ?? tagsRes.error ?? notesRes.error ?? favoritesRes.error ?? activityRes.error ??
+    membersRes.error ?? invitesRes.error ?? apiKeysRes.error ?? peopleRes.error ?? locationsRes.error ?? containersRes.error ?? itemsRes.error ?? tagsRes.error ?? notesRes.error ?? tasksRes.error ?? taskCompletionsRes.error ?? favoritesRes.error ?? activityRes.error ??
     attachmentsRes.error ?? itemStudioPhotosRes.error ?? itemDocumentLinksRes.error ?? pinnedLocationsRes.error ?? labelBatchesRes.error ?? labelBatchEntriesRes.error ?? normalizationRulesRes.error ??
     accountsRes.error ?? financeAccountSharesRes.error ?? transactionsRes.error ?? financeCategoriesRes.error ?? categoryRulesRes.error ?? recurringBillsRes.error ?? financeBillSharesRes.error ??
     recurringCandidateDismissalsRes.error ??
@@ -891,6 +941,8 @@ async function fetchHouseholdBundle(
     items: ((itemsRes.data ?? []) as ItemRowWithTags[]).map((row) => rowToItem(row, (row.item_tags ?? []).map((jt) => jt.tag_id))),
     tags: ((tagsRes.data ?? []) as TagRow[]).map(rowToTag),
     notes: ((notesRes.data ?? []) as NoteRow[]).map(rowToNote),
+    tasks: ((tasksRes.data ?? []) as HouseholdTaskRow[]).map(rowToHouseholdTask),
+    taskCompletions: ((taskCompletionsRes.data ?? []) as TaskCompletionRow[]).map(rowToTaskCompletion),
     favorites: ((favoritesRes.data ?? []) as FavoriteRow[]).map(rowToFavorite),
     activity: ((activityRes.data ?? []) as ActivityLogRow[]).map(rowToActivityLogEntry),
     attachments: ((attachmentsRes.data ?? []) as AttachmentRow[]).map(rowToAttachment),
@@ -1144,6 +1196,8 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
   items: [],
   tags: [],
   notes: [],
+  tasks: [],
+  taskCompletions: [],
   normalizationRules: [],
   activity: [],
   favorites: [],
@@ -1256,7 +1310,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       keyOf: (item: TDomain) => string,
       rowKeyOf: (row: Record<string, unknown>) => string,
       stateKey:
-        | "members" | "invites" | "people" | "locations" | "containers" | "tags" | "notes" | "activity" | "attachments" | "itemStudioPhotos" | "itemDocumentLinks" | "pinnedLocations"
+        | "members" | "invites" | "people" | "locations" | "containers" | "tags" | "notes" | "tasks" | "taskCompletions" | "activity" | "attachments" | "itemStudioPhotos" | "itemDocumentLinks" | "pinnedLocations"
         | "labelBatches" | "labelBatchEntries" | "normalizationRules"
         | "accounts" | "financeAccountShares" | "transactions" | "financeCategories" | "categoryRules" | "categoryBudgets"
         // financeSettings is NOT in this union — it's a single nullable
@@ -1292,6 +1346,15 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     // accounts above — a personal note belonging to another member never
     // arrives here.
     bind<NoteRow, Note>("notes", householdFilter, rowToNote, (n) => n.id, (r) => r.id as string, "notes");
+    bind<HouseholdTaskRow, HouseholdTask>("household_tasks", householdFilter, rowToHouseholdTask, (t) => t.id, (r) => r.id as string, "tasks");
+    bind<TaskCompletionRow, TaskCompletion>(
+      "task_completions",
+      householdFilter,
+      rowToTaskCompletion,
+      (c) => c.id,
+      (r) => r.id as string,
+      "taskCompletions"
+    );
     bind<ActivityLogRow, ActivityLogEntry>("activity_log", householdFilter, rowToActivityLogEntry, (a) => a.id, (r) => r.id as string, "activity");
     bind<AttachmentRow, Attachment>("attachments", householdFilter, rowToAttachment, (a) => a.id, (r) => r.id as string, "attachments");
     bind<ItemStudioPhotoRow, ItemStudioPhoto>("item_studio_photos", householdFilter, rowToItemStudioPhoto, (p) => p.id, (r) => r.id as string, "itemStudioPhotos");
@@ -2767,6 +2830,126 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     if (n) get().logActivity({ entityType: "note", entityId: n.id, entityName: n.title || "Untitled note", action: "deleted_forever" });
   },
 
+  createTask: (input) => {
+    const supabase = getSupabaseBrowserClient();
+    const now = nowIso();
+    const created: HouseholdTask = {
+      id: newId(),
+      householdId: get().currentHouseholdId,
+      title: input.title,
+      description: input.description ?? "",
+      category: input.category ?? "other",
+      linkedEntityType: input.linkedEntityType ?? null,
+      linkedEntityId: input.linkedEntityId ?? null,
+      assignedToPersonId: input.assignedToPersonId ?? null,
+      scheduleType: input.scheduleType,
+      dueAt: input.dueAt,
+      recurrenceRule: input.scheduleType === "recurring" ? (input.recurrenceRule ?? { freq: "days", interval: 1 }) : null,
+      isActive: true,
+      createdByUserId: get().currentUserId,
+      createdAt: now,
+      updatedAt: now,
+      trashedAt: null,
+      permanentlyDeleteAfter: null,
+    };
+    set((s) => ({ tasks: [...s.tasks, created] }));
+    persistOrRevert(
+      supabase.from("household_tasks").insert(householdTaskToInsertRow(created)),
+      () => set((s) => ({ tasks: s.tasks.filter((t) => t.id !== created.id) })),
+      "Couldn't create task"
+    );
+    get().logActivity({ entityType: "household_task", entityId: created.id, entityName: created.title, action: "created" });
+    return created;
+  },
+
+  updateTask: (taskId, patch) => {
+    const supabase = getSupabaseBrowserClient();
+    const previous = get().tasks.find((t) => t.id === taskId);
+    if (!previous) return;
+    const merged: HouseholdTask = { ...previous, ...patch, updatedAt: nowIso() };
+    set((s) => ({ tasks: s.tasks.map((t) => (t.id === taskId ? merged : t)) }));
+    persistOrRevert(
+      supabase.from("household_tasks").update(householdTaskToInsertRow(merged)).eq("id", taskId),
+      () => set((s) => ({ tasks: s.tasks.map((t) => (t.id === taskId ? previous : t)) })),
+      "Couldn't update task"
+    );
+    get().logActivity({ entityType: "household_task", entityId: merged.id, entityName: merged.title, action: "edited" });
+  },
+
+  completeTask: (taskId, notes) => {
+    const supabase = getSupabaseBrowserClient();
+    const task = get().tasks.find((t) => t.id === taskId);
+    if (!task) return;
+    const completion: TaskCompletion = {
+      id: newId(),
+      householdId: task.householdId,
+      taskId: task.id,
+      dueAt: task.dueAt,
+      completedAt: nowIso(),
+      completedByUserId: get().currentUserId,
+      notes: notes ?? null,
+    };
+    set((s) => ({ taskCompletions: [...s.taskCompletions, completion] }));
+    persistOrRevert(
+      supabase.from("task_completions").insert(taskCompletionToInsertRow(completion)),
+      () => set((s) => ({ taskCompletions: s.taskCompletions.filter((c) => c.id !== completion.id) })),
+      "Couldn't record completion"
+    );
+
+    // one_time: done for good (isActive false, stays in history via the
+    // completion row above). recurring: never "done," just advances to
+    // its next occurrence — same "the task IS the series" model
+    // RecurringBill uses, just with a real completion log RecurringBill
+    // never got.
+    if (task.scheduleType === "one_time") {
+      get().updateTask(taskId, { isActive: false });
+    } else if (task.recurrenceRule) {
+      get().updateTask(taskId, { dueAt: advanceTaskDueDate(task.dueAt, task.recurrenceRule) });
+    }
+    get().logActivity({ entityType: "household_task", entityId: task.id, entityName: task.title, action: "completed" });
+  },
+
+  trashTask: (taskId) => {
+    const supabase = getSupabaseBrowserClient();
+    const previous = get().tasks.find((t) => t.id === taskId);
+    if (!previous) return;
+    const trashedAt = nowIso();
+    const merged: HouseholdTask = { ...previous, trashedAt, permanentlyDeleteAfter: purgeAfter(new Date(trashedAt)), updatedAt: trashedAt };
+    set((s) => ({ tasks: s.tasks.map((t) => (t.id === taskId ? merged : t)) }));
+    persistOrRevert(
+      supabase.from("household_tasks").update(householdTaskToInsertRow(merged)).eq("id", taskId),
+      () => set((s) => ({ tasks: s.tasks.map((t) => (t.id === taskId ? previous : t)) })),
+      "Couldn't move task to trash"
+    );
+    get().logActivity({ entityType: "household_task", entityId: merged.id, entityName: merged.title, action: "trashed" });
+  },
+
+  restoreTask: (taskId) => {
+    const supabase = getSupabaseBrowserClient();
+    const previous = get().tasks.find((t) => t.id === taskId);
+    if (!previous) return;
+    const merged: HouseholdTask = { ...previous, trashedAt: null, permanentlyDeleteAfter: null, updatedAt: nowIso() };
+    set((s) => ({ tasks: s.tasks.map((t) => (t.id === taskId ? merged : t)) }));
+    persistOrRevert(
+      supabase.from("household_tasks").update(householdTaskToInsertRow(merged)).eq("id", taskId),
+      () => set((s) => ({ tasks: s.tasks.map((t) => (t.id === taskId ? previous : t)) })),
+      "Couldn't restore task"
+    );
+    get().logActivity({ entityType: "household_task", entityId: merged.id, entityName: merged.title, action: "restored" });
+  },
+
+  permanentlyDeleteTask: (taskId) => {
+    const supabase = getSupabaseBrowserClient();
+    const t = get().tasks.find((x) => x.id === taskId);
+    set((s) => ({ tasks: s.tasks.filter((x) => x.id !== taskId) }));
+    persistOrRevert(
+      supabase.from("household_tasks").delete().eq("id", taskId),
+      () => { if (t) set((s) => ({ tasks: [...s.tasks, t] })); },
+      "Couldn't permanently delete task"
+    );
+    if (t) get().logActivity({ entityType: "household_task", entityId: t.id, entityName: t.title, action: "deleted_forever" });
+  },
+
   findNormalizationRule: (rawName) => {
     const normalized = rawName.trim().toLowerCase();
     return get().normalizationRules.find((r) => r.rawPattern.toLowerCase() === normalized);
@@ -4119,8 +4302,15 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       changed = true;
     }
 
+    let tasks = state.tasks;
+    const survivingTasks = tasks.filter((t) => !isExpiredByTrashedAt(t.trashedAt, t.permanentlyDeleteAfter));
+    if (survivingTasks.length !== tasks.length) {
+      tasks = survivingTasks;
+      changed = true;
+    }
+
     if (!changed) return;
-    set({ items, containers, locations, accounts, financeCategories, transactions, recurringBills, notes });
+    set({ items, containers, locations, accounts, financeCategories, transactions, recurringBills, notes, tasks });
   },
   };
 });

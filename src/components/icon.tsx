@@ -7,6 +7,7 @@ import {
   Bell,
   Bold,
   Box,
+  Calendar,
   Camera,
   Check,
   CheckSquare,
@@ -33,6 +34,7 @@ import {
   Link2,
   List,
   ListOrdered,
+  ListTodo,
   Loader2,
   Lock,
   LogOut,
@@ -180,6 +182,9 @@ const ICONS = {
   table: Table2,
   undo: Undo2,
   redo: Redo2,
+  // Household Tasks domain (0051_household_tasks.sql)
+  tasks: ListTodo,
+  calendar: Calendar,
 } as const;
 
 export type IconName = keyof typeof ICONS;

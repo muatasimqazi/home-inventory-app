@@ -58,6 +58,8 @@ export default function MorePage() {
           no sub-page list (it's a single list+detail page, not a domain
           with its own sub-nav the way Inventory/Finance are). */}
       <DomainCard href="/notes" icon="notebook" tone="bg-ink-fill" title="Notes" description="Personal & shared notes" />
+      {/* Household Tasks (0051_household_tasks.sql) — always on, same ungated call as Notes. */}
+      <DomainCard href="/tasks" icon="tasks" tone="bg-yellow" title="Tasks" description="Reminders, chores & appointments" />
     </div>
   );
 }

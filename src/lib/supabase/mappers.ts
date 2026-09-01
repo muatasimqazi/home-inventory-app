@@ -16,6 +16,12 @@ import type {
   Item,
   Tag,
   Note,
+  HouseholdTask,
+  TaskCompletion,
+  TaskCategory,
+  TaskScheduleType,
+  TaskLinkedEntityType,
+  TaskRecurrenceRule,
   Favorite,
   ActivityLogEntry,
   Attachment,
@@ -544,6 +550,104 @@ export function noteToInsertRow(note: Note): NoteRow {
     permanently_delete_after: note.permanentlyDeleteAfter,
     created_at: note.createdAt,
     updated_at: note.updatedAt,
+  };
+}
+
+export interface HouseholdTaskRow {
+  id: string;
+  household_id: string;
+  title: string;
+  description: string;
+  category: string;
+  linked_entity_type: string | null;
+  linked_entity_id: string | null;
+  assigned_to_person_id: string | null;
+  schedule_type: string;
+  due_at: string;
+  recurrence_rule: TaskRecurrenceRule | null;
+  is_active: boolean;
+  created_by_user_id: string;
+  created_at: string;
+  updated_at: string;
+  trashed_at: string | null;
+  permanently_delete_after: string | null;
+}
+
+export function rowToHouseholdTask(row: HouseholdTaskRow): HouseholdTask {
+  return {
+    id: row.id,
+    householdId: row.household_id,
+    title: row.title,
+    description: row.description,
+    category: row.category as TaskCategory,
+    linkedEntityType: row.linked_entity_type as TaskLinkedEntityType | null,
+    linkedEntityId: row.linked_entity_id,
+    assignedToPersonId: row.assigned_to_person_id,
+    scheduleType: row.schedule_type as TaskScheduleType,
+    dueAt: row.due_at,
+    recurrenceRule: row.recurrence_rule,
+    isActive: row.is_active,
+    createdByUserId: row.created_by_user_id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    trashedAt: row.trashed_at,
+    permanentlyDeleteAfter: row.permanently_delete_after,
+  };
+}
+
+export function householdTaskToInsertRow(task: HouseholdTask): HouseholdTaskRow {
+  return {
+    id: task.id,
+    household_id: task.householdId,
+    title: task.title,
+    description: task.description,
+    category: task.category,
+    linked_entity_type: task.linkedEntityType,
+    linked_entity_id: task.linkedEntityId,
+    assigned_to_person_id: task.assignedToPersonId,
+    schedule_type: task.scheduleType,
+    due_at: task.dueAt,
+    recurrence_rule: task.recurrenceRule,
+    is_active: task.isActive,
+    created_by_user_id: task.createdByUserId,
+    created_at: task.createdAt,
+    updated_at: task.updatedAt,
+    trashed_at: task.trashedAt,
+    permanently_delete_after: task.permanentlyDeleteAfter,
+  };
+}
+
+export interface TaskCompletionRow {
+  id: string;
+  household_id: string;
+  task_id: string;
+  due_at: string;
+  completed_at: string;
+  completed_by_user_id: string;
+  notes: string | null;
+}
+
+export function rowToTaskCompletion(row: TaskCompletionRow): TaskCompletion {
+  return {
+    id: row.id,
+    householdId: row.household_id,
+    taskId: row.task_id,
+    dueAt: row.due_at,
+    completedAt: row.completed_at,
+    completedByUserId: row.completed_by_user_id,
+    notes: row.notes,
+  };
+}
+
+export function taskCompletionToInsertRow(completion: TaskCompletion): TaskCompletionRow {
+  return {
+    id: completion.id,
+    household_id: completion.householdId,
+    task_id: completion.taskId,
+    due_at: completion.dueAt,
+    completed_at: completion.completedAt,
+    completed_by_user_id: completion.completedByUserId,
+    notes: completion.notes,
   };
 }
 

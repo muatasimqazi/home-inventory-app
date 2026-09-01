@@ -33,6 +33,12 @@ const EVENT_TYPES: { domainKey: string; eventType: string; label: string; descri
     description: "An item with a minimum quantity set drops to or below it",
   },
   {
+    domainKey: "tasks",
+    eventType: "task.due",
+    label: "Task reminders",
+    description: "A household task, chore, or appointment is due or overdue",
+  },
+  {
     domainKey: "activity",
     eventType: "household.activity",
     label: "Household activity",

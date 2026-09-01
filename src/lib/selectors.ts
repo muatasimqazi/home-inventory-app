@@ -1,4 +1,20 @@
-import type { Account, AccountType, ActivityLogEntry, CategoryBudget, Container, FinanceCategory, Item, Location, RecurringBill, RecurringBillFrequency, Tag, Transaction, TransactionCategory } from "./types";
+import type {
+  Account,
+  AccountType,
+  ActivityLogEntry,
+  CategoryBudget,
+  Container,
+  FinanceCategory,
+  HouseholdTask,
+  Item,
+  Location,
+  RecurringBill,
+  RecurringBillFrequency,
+  Tag,
+  TaskRecurrenceRule,
+  Transaction,
+  TransactionCategory,
+} from "./types";
 import { formatCurrency, parseCalendarDate } from "./format";
 import { normalizeMerchant } from "./recurring-detection";
 
@@ -360,6 +376,54 @@ export function advanceDueDate(dateIso: string, frequency: RecurringBillFrequenc
   const lastDayOfTargetMonth = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
   const clampedDay = Math.min(day, lastDayOfTargetMonth);
   return new Date(Date.UTC(targetYear, targetMonth, clampedDay)).toISOString().slice(0, 10);
+}
+
+/** Household Tasks' own recurrence advance — much simpler than advanceDueDate
+ * above since v1 recurrence is deliberately just {"freq":"days","interval":N}
+ * (docs/Household Hub Addendum.md §8, no RRULE), and dueAt is a full
+ * timestamptz (not a bare date), so this just adds N days while preserving
+ * the original time-of-day rather than needing calendar-month clamping. */
+export function advanceTaskDueDate(dueAtIso: string, rule: TaskRecurrenceRule): string {
+  const d = new Date(dueAtIso);
+  d.setDate(d.getDate() + rule.interval);
+  return d.toISOString();
+}
+
+/** Unlike daysUntil() above (clamped at 0 for RecurringBills, which has no
+ * overdue state at all — confirmed no bill ever reads as overdue in this
+ * app today), Household Tasks needs a real overdue bucket per
+ * docs/Household Hub Addendum.md §5's explicit call for a prominent
+ * "Due Today / Overdue" surface. Signed: negative = overdue by that many
+ * days, 0 = due today, positive = due in that many days. */
+export function daysUntilTask(dueAtIso: string): number {
+  const diff = new Date(dueAtIso).getTime() - Date.now();
+  return Math.floor(diff / (1000 * 60 * 60 * 24));
+}
+
+export type TaskDueBucket = "overdue" | "today" | "upcoming";
+
+export function taskDueBucket(dueAtIso: string): TaskDueBucket {
+  const days = daysUntilTask(dueAtIso);
+  if (days < 0) return "overdue";
+  if (days === 0) return "today";
+  return "upcoming";
+}
+
+/** Active, not-trashed tasks sorted soonest-due-first — same shape as
+ * upcomingRecurringBills() below, generalized to also surface overdue
+ * ones first (RecurringBills has no overdue concept to sort ahead of
+ * "soonest upcoming"; Tasks does, and overdue should always lead). */
+export function upcomingTasks(tasks: HouseholdTask[], limit?: number): HouseholdTask[] {
+  const active = tasks.filter((t) => t.isActive && !t.trashedAt).sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime());
+  return limit ? active.slice(0, limit) : active;
+}
+
+export function overdueTasksCount(tasks: HouseholdTask[]): number {
+  return tasks.filter((t) => t.isActive && !t.trashedAt && taskDueBucket(t.dueAt) === "overdue").length;
+}
+
+export function dueTodayOrOverdueTasksCount(tasks: HouseholdTask[]): number {
+  return tasks.filter((t) => t.isActive && !t.trashedAt && taskDueBucket(t.dueAt) !== "upcoming").length;
 }
 
 // ---------------------------------------------------------------------------

@@ -39,7 +39,7 @@ export default function TrashPage() {
   // since the param never changes without a full navigation.
   const [tab, setTab] = useState(() => {
     const t = searchParams.get("tab");
-    return t === "finance" || t === "notes" ? t : "inventory";
+    return t === "finance" || t === "notes" || t === "tasks" ? t : "inventory";
   });
 
   return (
@@ -56,6 +56,7 @@ export default function TrashPage() {
         <TabsTrigger value="inventory">Inventory</TabsTrigger>
         <TabsTrigger value="finance">Finance</TabsTrigger>
         <TabsTrigger value="notes">Notes</TabsTrigger>
+        <TabsTrigger value="tasks">Tasks</TabsTrigger>
       </TabsList>
 
       <TabsContent value="inventory">
@@ -67,7 +68,80 @@ export default function TrashPage() {
       <TabsContent value="notes">
         <NotesTrashPanel />
       </TabsContent>
+      <TabsContent value="tasks">
+        <TasksTrashPanel />
+      </TabsContent>
     </Tabs>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Tasks panel — single entity type, same shape as Notes' own panel.
+// ---------------------------------------------------------------------------
+
+function TasksTrashPanel() {
+  const tasks = useInventoryStore((s) => s.tasks);
+  const restoreTask = useInventoryStore((s) => s.restoreTask);
+  const permanentlyDeleteTask = useInventoryStore((s) => s.permanentlyDeleteTask);
+
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; title: string } | null>(null);
+
+  const rows = tasks.filter((t) => t.trashedAt).sort((a, b) => (b.trashedAt ?? "").localeCompare(a.trashedAt ?? ""));
+  const { visible: paginatedRows, hasMore, remaining, pageSize, loadMore } = usePaginated(rows, "tasks");
+
+  function restore(task: (typeof rows)[number]) {
+    restoreTask(task.id);
+    toast.success(`Restored ${task.title}`);
+  }
+
+  function deleteForever(task: { id: string; title: string }) {
+    permanentlyDeleteTask(task.id);
+    toast.success(`Permanently deleted ${task.title}`);
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      {rows.length === 0 ? (
+        <EmptyState icon="tasks" title="Trash is empty" description="Trashed tasks show up here for 30 days." />
+      ) : (
+        <div className="flex flex-col gap-2">
+          {paginatedRows.map((task) => (
+            <div key={task.id} className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 shadow-sm">
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-[10px] bg-surface-muted">
+                <Icon name="tasks" size={18} className="text-muted-foreground" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-body text-ink">{task.title}</p>
+                <p className="text-caption text-muted-foreground">{daysUntil(task.permanentlyDeleteAfter!)} days left</p>
+              </div>
+              <Button variant="secondary" size="icon-sm" aria-label="Restore" onClick={() => restore(task)} className="sm:hidden">
+                <Icon name="restore" size={14} />
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => restore(task)} className="hidden sm:inline-flex">
+                <Icon name="restore" size={14} /> Restore
+              </Button>
+              <Button variant="ghost" size="icon" aria-label="Delete forever" onClick={() => setPendingDelete({ id: task.id, title: task.title })}>
+                <Icon name="trash" size={16} className="text-danger" />
+              </Button>
+            </div>
+          ))}
+          {hasMore && <LoadMoreButton remaining={remaining} pageSize={pageSize} onClick={loadMore} />}
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+        tone="danger"
+        icon="danger"
+        title="Delete forever?"
+        description={`This permanently deletes "${pendingDelete?.title}". This cannot be undone.`}
+        confirmLabel="Delete Forever"
+        onConfirm={() => {
+          if (pendingDelete) deleteForever(pendingDelete);
+        }}
+      />
+    </div>
   );
 }
 

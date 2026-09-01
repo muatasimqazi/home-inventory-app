@@ -24,13 +24,17 @@ import {
   computeHouseholdSummary,
   containerStatusFlags,
   daysUntil,
+  daysUntilTask,
+  dueTodayOrOverdueTasksCount,
   genericPhotoItemCount,
   groupAccountsByType,
   looseItemCount,
   netWorth,
   recentTransactions,
+  taskDueBucket,
   unreadActivityCount,
   upcomingRecurringBills,
+  upcomingTasks,
 } from "@/lib/selectors";
 import { formatCurrency, formatShortDate } from "@/lib/format";
 import { stockLocationPhotoUrl } from "@/lib/stock-location-photos";
@@ -76,6 +80,7 @@ export default function OverviewPage() {
   const accounts = useInventoryStore((s) => s.accounts);
   const transactions = useInventoryStore((s) => s.transactions);
   const recurringBills = useInventoryStore((s) => s.recurringBills);
+  const tasks = useInventoryStore((s) => s.tasks);
   const tags = useInventoryStore((s) => s.tags);
   const currentUserId = useInventoryStore((s) => s.currentUserId);
 
@@ -110,6 +115,11 @@ export default function OverviewPage() {
   const recentTransactionsList = recentTransactions(scopedTransactions, 5);
   const upcomingBills = upcomingRecurringBills(scopedBills, 5);
   const billsDueSoonCount = upcomingRecurringBills(scopedBills).filter((b) => daysUntil(b.nextDueDate) <= BILLS_DUE_SOON_DAYS).length;
+  // No household/personal view scoping — Tasks has no per-record privacy
+  // model (docs/Household Hub Addendum.md §9, "leaning fully open"), same
+  // reasoning as Inventory above.
+  const upcomingTasksList = upcomingTasks(tasks, 5);
+  const tasksDueTodayOrOverdueCount = dueTodayOrOverdueTasksCount(tasks);
 
   // The one "what needs doing" list on the page (see the banner below) —
   // only chips with something to actually act on, so a clean household
@@ -123,6 +133,9 @@ export default function OverviewPage() {
         ]
       : []),
     ...(household.financeEnabled ? [{ label: "Bills", count: billsDueSoonCount, tone: "orange" as const, href: "/finance/recurring" }] : []),
+    // Ungated — Tasks is always on, no household.xEnabled toggle (same
+    // call as Notes).
+    { label: "Tasks", count: tasksDueTodayOrOverdueCount, tone: "orange" as const, href: "/tasks" },
   ].filter((chip) => chip.count > 0);
 
   return (
@@ -191,6 +204,37 @@ export default function OverviewPage() {
         <div className="flex items-center gap-2 rounded-2xl border border-border bg-card px-4 py-3 shadow-sm">
           <Icon name="check" size={16} className="shrink-0 text-badge-green-text" />
           <p className="text-caption text-muted-foreground">All caught up — nothing needs attention right now.</p>
+        </div>
+      )}
+
+      {/* Ungated (no household.xEnabled check) — Tasks is always on, same
+          call as Notes, so this sits above the domain-gated sections below
+          rather than inside either of them. Mirrors "Upcoming bills"'
+          exact row shape further down, minus the dollar amount. */}
+      {upcomingTasksList.length > 0 && (
+        <div>
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-item-title font-semibold text-ink">Upcoming tasks</h3>
+            <Link href="/tasks" className="text-caption font-medium text-yellow-text">
+              View all
+            </Link>
+          </div>
+          <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-card shadow-sm">
+            {upcomingTasksList.map((t) => {
+              const bucket = taskDueBucket(t.dueAt);
+              return (
+                <Link key={t.id} href={`/tasks/${t.id}`} className="flex items-center gap-3 px-4 py-3">
+                  <IconChip icon="tasks" tone={bucket === "overdue" ? "danger" : "muted"} size="sm" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-body font-medium text-ink">{t.title}</p>
+                    <p className={cn("truncate text-caption", bucket === "overdue" ? "text-danger" : "text-muted-foreground")}>
+                      {bucket === "overdue" ? `${Math.abs(daysUntilTask(t.dueAt))}d overdue` : bucket === "today" ? "Due today" : formatShortDate(t.dueAt)}
+                    </p>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
         </div>
       )}
 
