@@ -13,6 +13,17 @@ import { cn } from "@/lib/utils";
 
 const COLLAPSED_STORAGE_KEY = "shohaz:sidebar-collapsed";
 
+// The three INVENTORY_LINKS entries this sidebar renders out of order (see
+// the "Home inventory" section below) — filtered out of the trailing flat
+// map so they don't also render a second time in their array position.
+const PINNED_INVENTORY_HREFS = new Set(["/containers", "/wardrobe", "/unassigned"]);
+
+function pinnedInventoryLink(href: string) {
+  const link = INVENTORY_LINKS.find((l) => l.href === href);
+  if (!link) throw new Error(`pinnedInventoryLink: no INVENTORY_LINKS entry for ${href}`);
+  return link;
+}
+
 export function DesktopSidebar() {
   const pathname = usePathname();
   const household = useCurrentHousehold();
@@ -111,6 +122,16 @@ export function DesktopSidebar() {
             {!collapsed && <p className="px-3 pb-1 text-micro font-semibold tracking-wide text-muted-foreground uppercase">Home inventory</p>}
             <nav className="flex flex-col gap-1" aria-label="Home inventory">
               <SidebarLink href="/locations" icon="box" label="Locations" pathname={pathname} collapsed={collapsed} />
+              {/* Containers/Wardrobe pulled out of the flat INVENTORY_LINKS
+                  map below and rendered here instead — right under
+                  Locations reads as the natural drill-down (Location ->
+                  Container), same physical-browse axis Locations itself
+                  is on. Still defined once in nav-links.ts (spread from
+                  there, not re-typed) so href/icon/label can't drift; only
+                  the *position* is special-cased, same as this section's
+                  pre-existing Needs Review/Tags carve-out below. */}
+              <SidebarLink {...pinnedInventoryLink("/containers")} pathname={pathname} collapsed={collapsed} />
+              <SidebarLink {...pinnedInventoryLink("/wardrobe")} pathname={pathname} collapsed={collapsed} />
               <Link
                 href="/review"
                 title={collapsed ? "Needs Review" : undefined}
@@ -130,8 +151,11 @@ export function DesktopSidebar() {
                   </>
                 )}
               </Link>
+              {/* Unassigned right after Needs Review — both are "this
+                  needs your attention" queues, not browsing surfaces. */}
+              <SidebarLink {...pinnedInventoryLink("/unassigned")} pathname={pathname} collapsed={collapsed} />
               <SidebarLink href="/tags" icon="tag" label="Tags" pathname={pathname} collapsed={collapsed} />
-              {INVENTORY_LINKS.map((link) => (
+              {INVENTORY_LINKS.filter((link) => !PINNED_INVENTORY_HREFS.has(link.href)).map((link) => (
                 <SidebarLink key={link.href} {...link} pathname={pathname} collapsed={collapsed} />
               ))}
             </nav>

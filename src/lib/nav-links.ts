@@ -28,22 +28,30 @@ export interface NavLink {
  * Review/Tags aren't in this array (see DesktopSidebar: Locations is the
  * domain's flagship — already the /more domain-card link, adding it here
  * too would duplicate that same card's own link on the very page it sits
- * on; Needs Review carries a live badge count LinkList can't render) —
- * they're that domain's fixed Browse-cluster head, unchanged by this
- * reordering.
+ * on; Needs Review carries a live badge count LinkList can't render) — but
+ * DesktopSidebar does pull three of these entries (Containers, Wardrobe,
+ * Unassigned) out of their place in the flat map below and renders them
+ * inline at specific points among that hardcoded trio (Containers/
+ * Wardrobe right after Locations, Unassigned right after Needs Review) —
+ * see its own comment. /more's flat LinkList still renders every entry
+ * here in this array's order, Containers/Wardrobe/Unassigned included, so
+ * this order is what mobile actually sees top to bottom.
  */
 export const INVENTORY_LINKS: NavLink[] = [
-  // Browse (continues past Locations/Needs Review/Tags above this array)
+  // Browse — pulled up next to Locations on desktop (see DesktopSidebar)
   { href: "/containers", icon: "archive", label: "Containers" },
-  { href: "/home-map", icon: "pin", label: "Home Map" },
-  // Views — curated/filtered slices of items already in the household
-  { href: "/favorites", icon: "heart", label: "Favorites" },
   { href: "/wardrobe", icon: "grid", label: "Wardrobe" },
   // Unassigned (items with neither a Location nor a Container — genuinely
   // unfiled) had no nav entry anywhere in the app before this reorg, on
   // desktop or mobile — the same "real page, no path to it" gap this
-  // array's own header comment describes fixing once already.
+  // array's own header comment describes fixing once already. Paired with
+  // Needs Review on desktop (see DesktopSidebar) — both are "this needs
+  // your attention" queues, not browsing or curated-view surfaces.
   { href: "/unassigned", icon: "mapPinOff", label: "Unassigned" },
+  // Browse, continued
+  { href: "/home-map", icon: "pin", label: "Home Map" },
+  // Views — curated slices of items already in the household
+  { href: "/favorites", icon: "heart", label: "Favorites" },
   // Reference — the starter-inventory catalog, not the household's own items
   { href: "/reference", icon: "list", label: "Common Items" },
   // Tools
