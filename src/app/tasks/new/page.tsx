@@ -18,6 +18,7 @@ const CATEGORY_OPTIONS: { value: TaskCategory; label: string }[] = [
   { value: "maintenance", label: "Maintenance" },
   { value: "appointment", label: "Appointment" },
   { value: "chore", label: "Chore" },
+  { value: "grocery", label: "Grocery" },
   { value: "other", label: "Other" },
 ];
 

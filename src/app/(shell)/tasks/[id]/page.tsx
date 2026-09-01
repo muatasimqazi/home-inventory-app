@@ -18,6 +18,7 @@ const CATEGORY_META: Record<TaskCategory, { icon: IconName; label: string }> = {
   maintenance: { icon: "hammer", label: "Maintenance" },
   appointment: { icon: "calendar", label: "Appointment" },
   chore: { icon: "checkSquare", label: "Chore" },
+  grocery: { icon: "grocery", label: "Grocery" },
   other: { icon: "tasks", label: "Other" },
 };
 

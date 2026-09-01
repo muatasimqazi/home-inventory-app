@@ -70,6 +70,7 @@ import {
   Settings,
   ShieldAlert,
   ShieldCheck,
+  ShoppingCart,
   Smartphone,
   Sparkles,
   Sun,
@@ -185,6 +186,7 @@ const ICONS = {
   // Household Tasks domain (0051_household_tasks.sql)
   tasks: ListTodo,
   calendar: Calendar,
+  grocery: ShoppingCart,
 } as const;
 
 export type IconName = keyof typeof ICONS;

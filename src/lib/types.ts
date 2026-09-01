@@ -330,7 +330,7 @@ export interface Note {
   updatedAt: string;
 }
 
-export type TaskCategory = "maintenance" | "appointment" | "chore" | "other";
+export type TaskCategory = "maintenance" | "appointment" | "chore" | "grocery" | "other";
 export type TaskScheduleType = "one_time" | "recurring";
 /** v1 scope per docs/Household Hub Addendum.md §8 — not full RRULE. */
 export interface TaskRecurrenceRule {
