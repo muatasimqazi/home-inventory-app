@@ -189,10 +189,15 @@ function DocumentCaptureInner() {
         // handleRetryDetection's failure path uses below.
         return;
       }
-      // Only stop the shared stream once we're actually leaving for
-      // /capture/document/review, not before knowing detection succeeded —
-      // same reasoning as capture/appliance/page.tsx's handleUsePhoto.
-      stopCameraStream();
+      // Deliberately NOT stopping the shared stream here — same fix as
+      // capture/appliance/page.tsx's own handleUsePhoto: stopping right
+      // before leaving for /capture/document/review meant the review
+      // page's "Back to camera" arrow (or scanning a second document right
+      // after) always forced a fresh getUserMedia() call, visibly
+      // re-prompting for camera permission. The stream now stays live all
+      // the way through the review page and is only actually stopped by
+      // this page's own "Close camera" button above or by the review
+      // page's Save succeeding.
       router.replace("/capture/document/review");
     } finally {
       setCropping(false);
@@ -203,7 +208,6 @@ function DocumentCaptureInner() {
     setMode("analyzing");
     runDetection().then(() => {
       if (!useDocumentCapture.getState().detectError) {
-        stopCameraStream();
         router.replace("/capture/document/review");
       }
       // else: stay on "analyzing" — its detectError branch re-renders the

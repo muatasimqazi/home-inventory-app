@@ -183,7 +183,15 @@ function WardrobeCaptureInner() {
       if (useWardrobeCapture.getState().detectError) {
         return;
       }
-      stopCameraStream();
+      // Deliberately NOT stopping the shared stream here — same fix as
+      // capture/appliance/page.tsx's own handleUsePhoto: stopping right
+      // before leaving for /capture/wardrobe/review meant the review
+      // page's "Back to camera" arrow (or cataloging a second item right
+      // after) always forced a fresh getUserMedia() call, visibly
+      // re-prompting for camera permission. The stream now stays live all
+      // the way through the review page and is only actually stopped by
+      // this page's own "Close camera" button above or by the review
+      // page's Save succeeding.
       router.replace("/capture/wardrobe/review");
     } finally {
       setCropping(false);
@@ -194,7 +202,6 @@ function WardrobeCaptureInner() {
     setMode("analyzing");
     runDetection().then(() => {
       if (!useWardrobeCapture.getState().detectError) {
-        stopCameraStream();
         router.replace("/capture/wardrobe/review");
       }
     });

@@ -200,15 +200,17 @@ function ApplianceCaptureInner() {
         // of why "Use Photo" didn't proceed.
         return;
       }
-      // Only stop the shared stream once we're actually leaving for
-      // /capture/appliance/review, not before knowing detection succeeded
-      // — same reasoning as capture/page.tsx's handleSave: an earlier stop
-      // here meant any detection failure forced a fresh getUserMedia() call
-      // on the next Retake (returnToLive() only reuses the stream if
-      // hasLiveTracks() is still true), which can visibly re-prompt for
+      // Deliberately NOT stopping the shared stream here — same reasoning
+      // as capture/page.tsx's own handleReviewAndSave: this used to call
+      // stopCameraStream() right before leaving for
+      // /capture/appliance/review, which meant the review page's "Back to
+      // camera" arrow (or scanning a second appliance right after) always
+      // forced a fresh getUserMedia() call, visibly re-prompting for
       // camera permission on the very browsers the shared-stream mechanism
-      // exists to protect against.
-      stopCameraStream();
+      // exists to protect against. The stream now stays live all the way
+      // through the review page (unused there, but not released) and is
+      // only actually stopped by this page's own "Close camera" button
+      // above or by the review page's Save succeeding.
       router.replace("/capture/appliance/review");
     } finally {
       setCropping(false);
@@ -219,7 +221,6 @@ function ApplianceCaptureInner() {
     setMode("analyzing");
     runDetection().then(() => {
       if (!useApplianceCapture.getState().detectError) {
-        stopCameraStream();
         router.replace("/capture/appliance/review");
       }
       // else: stay on "analyzing" — its detectError branch re-renders the

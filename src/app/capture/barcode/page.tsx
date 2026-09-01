@@ -165,7 +165,14 @@ function BarcodeCaptureInner() {
       // no explanation.
       return;
     }
-    stopCameraStream();
+    // Deliberately NOT stopping the shared stream here — same fix as
+    // capture/appliance/page.tsx's own handleUsePhoto: stopping right
+    // before leaving for /capture/barcode/review meant the review page's
+    // "Back to camera" arrow (or scanning a second barcode right after)
+    // always forced a fresh getUserMedia() call, visibly re-prompting for
+    // camera permission. The stream now stays live all the way through
+    // the review page and is only actually stopped by this page's own
+    // "Close camera" button above or by the review page's Save succeeding.
     router.replace("/capture/barcode/review");
   }
 
@@ -173,7 +180,6 @@ function BarcodeCaptureInner() {
     setMode("looking");
     runLookup().then(() => {
       if (!useBarcodeCapture.getState().lookupError) {
-        stopCameraStream();
         router.replace("/capture/barcode/review");
       }
     });
