@@ -245,9 +245,23 @@ export function looseItemCount(items: Item[]): number {
   return items.filter((it) => it.status === "active" && it.locationId === null && it.containerId === null).length;
 }
 
-/** Active items still on the generic placeholder photo emoji — the Dashboard "Action queue" Photos count. */
+/**
+ * Whether an item has no real photo of its own — coverPhotoPath is the
+ * only thing that means that; photoEmoji is purely the icon PhotoThumb
+ * falls back to when coverPhotoPath is null (see Item.photoEmoji's own
+ * doc comment in lib/types.ts), not a signal about a real photo one way
+ * or the other. In particular, CATEGORY_EMOJI maps "Miscellaneous" to
+ * "📦" itself (lib/category.ts) — so photoEmoji === "📦" alone used to
+ * also catch every Miscellaneous item that *does* have a real uploaded
+ * cover photo, a false positive this fixes.
+ */
+export function hasNoRealPhoto(item: Item): boolean {
+  return item.coverPhotoPath === null;
+}
+
+/** Active items with no real photo of their own — the Dashboard "Needs attention" Photos count. */
 export function genericPhotoItemCount(items: Item[]): number {
-  return items.filter((it) => it.status === "active" && it.photoEmoji === "📦").length;
+  return items.filter((it) => it.status === "active" && hasNoRealPhoto(it)).length;
 }
 
 export interface ContainerStatusFlags {
@@ -255,13 +269,13 @@ export interface ContainerStatusFlags {
   genericPhoto: boolean;
 }
 
-/** Rolls up whether any item within a container (including sub-containers) needs review or still has a generic photo. */
+/** Rolls up whether any item within a container (including sub-containers) needs review or still has no real photo. */
 export function containerStatusFlags(items: Item[], containers: Container[], containerId: string): ContainerStatusFlags {
   const ids = new Set([containerId, ...collectDescendantIds(containers, containerId)]);
   const inContainer = items.filter((it) => it.status === "active" && it.containerId && ids.has(it.containerId));
   return {
     needsReview: inContainer.some((it) => it.needsReview),
-    genericPhoto: inContainer.some((it) => it.photoEmoji === "📦"),
+    genericPhoto: inContainer.some((it) => hasNoRealPhoto(it)),
   };
 }
 
