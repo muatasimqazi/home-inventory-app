@@ -13,6 +13,7 @@ import { MerchantIcon } from "@/components/merchant-icon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ReviewBadge } from "@/components/review-badge";
+import { WeatherWidget } from "@/components/weather-widget";
 import { EmptyState } from "@/components/empty-state";
 import { useInventoryStore, useCurrentHousehold } from "@/lib/store";
 import {
@@ -186,9 +187,10 @@ export default function OverviewPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">Overview</p>
           <h1 className="mt-0.5 text-screen-title font-semibold text-ink">{household.name}</h1>
+          <WeatherWidget household={household} />
         </div>
         <div className="flex items-center gap-2">
           <button

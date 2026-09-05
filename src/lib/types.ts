@@ -26,6 +26,11 @@ export interface Household {
   stripePriceId: string | null;
   subscriptionCurrentPeriodEnd: string | null;
   subscriptionUpdatedAt: string;
+  /** Household's home location (Overview weather widget, 0054_household_location.sql) — null until a household member sets one via "Use my location" or a city search. Editable by the owner only, same as name/domain toggles. */
+  latitude: number | null;
+  longitude: number | null;
+  /** Human-readable label for latitude/longitude, e.g. "Austin, TX" — display only. */
+  locationLabel: string | null;
 }
 
 export interface Member {

@@ -97,6 +97,9 @@ export interface HouseholdRow {
   stripe_price_id: string | null;
   subscription_current_period_end: string | null;
   subscription_updated_at: string;
+  latitude: number | null;
+  longitude: number | null;
+  location_label: string | null;
 }
 
 export function rowToHousehold(row: HouseholdRow): Household {
@@ -114,6 +117,9 @@ export function rowToHousehold(row: HouseholdRow): Household {
     stripePriceId: row.stripe_price_id,
     subscriptionCurrentPeriodEnd: row.subscription_current_period_end,
     subscriptionUpdatedAt: row.subscription_updated_at,
+    latitude: row.latitude,
+    longitude: row.longitude,
+    locationLabel: row.location_label,
   };
 }
 
