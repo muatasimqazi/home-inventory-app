@@ -34,6 +34,7 @@ export default function TaskDetailPage() {
   const taskCompletions = useInventoryStore((s) => s.taskCompletions);
   const categories = useInventoryStore((s) => s.taskCategories);
   const completeTask = useInventoryStore((s) => s.completeTask);
+  const uncompleteTask = useInventoryStore((s) => s.uncompleteTask);
   const trashTask = useInventoryStore((s) => s.trashTask);
   const restoreTask = useInventoryStore((s) => s.restoreTask);
   const permanentlyDeleteTask = useInventoryStore((s) => s.permanentlyDeleteTask);
@@ -126,6 +127,16 @@ export default function TaskDetailPage() {
         </Button>
       )}
 
+      {/* One-time only — a recurring task's own "undo" lives next to its
+          most recent entry in Completion History below instead (marking
+          it "not done" here would be ambiguous about *which* occurrence,
+          since isActive stays true for a recurring task regardless). */}
+      {!isTrashed && !task.isActive && task.scheduleType === "one_time" && (
+        <Button size="lg" variant="outline" onClick={() => uncompleteTask(task.id)}>
+          <Icon name="restore" size={16} /> Mark as not done
+        </Button>
+      )}
+
       {isTrashed && (
         <div className="grid grid-cols-2 gap-2">
           <Button variant="secondary" size="lg" onClick={() => restoreTask(task.id)}>
@@ -150,15 +161,32 @@ export default function TaskDetailPage() {
               distinguishes one finished occurrence from the next
               (completedAt alone doesn't say which cycle it closed out). */}
           <div className="flex flex-col divide-y divide-border">
-            {completions.map((c) => (
-              <div key={c.id} className="flex flex-col gap-0.5 py-2">
-                <p className="text-caption text-ink">
-                  Done {relativeTime(c.completedAt)} by {members.find((m) => m.userId === c.completedByUserId)?.displayName ?? "someone"}
-                </p>
-                <p className="text-micro text-muted-foreground">
-                  Was due {formatShortDate(c.dueAt)}
-                  {c.notes && ` · ${c.notes}`}
-                </p>
+            {completions.map((c, i) => (
+              <div key={c.id} className="flex items-start justify-between gap-2 py-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-caption text-ink">
+                    Done {relativeTime(c.completedAt)} by {members.find((m) => m.userId === c.completedByUserId)?.displayName ?? "someone"}
+                  </p>
+                  <p className="text-micro text-muted-foreground">
+                    Was due {formatShortDate(c.dueAt)}
+                    {c.notes && ` · ${c.notes}`}
+                  </p>
+                </div>
+                {/* Recurring only, and only the most recent entry (i === 0,
+                    completions are sorted newest-first above) — a one-time
+                    task's equivalent undo is the "Mark as not done" button
+                    up top; undoing an older recurring entry while newer
+                    ones exist would leave dueAt pointing somewhere that no
+                    longer matches the actual completion log. */}
+                {!isTrashed && i === 0 && task.scheduleType === "recurring" && (
+                  <button
+                    type="button"
+                    onClick={() => uncompleteTask(task.id)}
+                    className="shrink-0 text-caption font-semibold text-ink underline underline-offset-2"
+                  >
+                    Undo
+                  </button>
+                )}
               </div>
             ))}
           </div>

@@ -525,6 +525,8 @@ interface InventoryState {
   ) => void;
   /** Inserts a real task_completions row, then either deactivates (one_time) or advances dueAt by recurrenceRule (recurring) — unlike RecurringBill's "mark as paid" (pure in-place mutation, no history), this keeps a real log. */
   completeTask: (taskId: string, notes?: string) => void;
+  /** Undoes the most recent completeTask call — deletes that one task_completions row and reverts the task to the state it was in before it (isActive: true for one_time; dueAt back to that completion's own dueAt for recurring, since completing a recurring task is really "this occurrence is done, advance to the next one"). A no-op if there's no completion to undo. */
+  uncompleteTask: (taskId: string) => void;
   trashTask: (taskId: string) => void;
   restoreTask: (taskId: string) => void;
   permanentlyDeleteTask: (taskId: string) => void;
@@ -2951,6 +2953,40 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       get().updateTask(taskId, { dueAt: advanceTaskDueDate(task.dueAt, task.recurrenceRule) });
     }
     get().logActivity({ entityType: "household_task", entityId: task.id, entityName: task.title, action: "completed" });
+  },
+
+  uncompleteTask: (taskId) => {
+    const supabase = getSupabaseBrowserClient();
+    const task = get().tasks.find((t) => t.id === taskId);
+    if (!task) return;
+    // Same most-recent-first ordering the task detail page's own
+    // Completion History list uses — "undo" only ever targets the single
+    // most recent completion, never an arbitrary older one (undoing one
+    // in the middle of the log while newer ones still exist would leave
+    // the task's own state — isActive/dueAt — inconsistent with its
+    // completion history).
+    const lastCompletion = get()
+      .taskCompletions.filter((c) => c.taskId === taskId)
+      .sort((a, b) => b.completedAt.localeCompare(a.completedAt))[0];
+    if (!lastCompletion) return;
+
+    set((s) => ({ taskCompletions: s.taskCompletions.filter((c) => c.id !== lastCompletion.id) }));
+    persistOrRevert(
+      supabase.from("task_completions").delete().eq("id", lastCompletion.id),
+      () => set((s) => ({ taskCompletions: [...s.taskCompletions, lastCompletion] })),
+      "Couldn't undo completion"
+    );
+
+    // Mirrors completeTask's own branch exactly, in reverse: one_time
+    // reactivates; recurring rewinds dueAt back to the occurrence that
+    // completion had just advanced past (recurring tasks never touch
+    // isActive on complete, so there's nothing to revert there).
+    if (task.scheduleType === "one_time") {
+      get().updateTask(taskId, { isActive: true });
+    } else {
+      get().updateTask(taskId, { dueAt: lastCompletion.dueAt });
+    }
+    get().logActivity({ entityType: "household_task", entityId: task.id, entityName: task.title, action: "edited", detail: "Marked not done" });
   },
 
   trashTask: (taskId) => {
