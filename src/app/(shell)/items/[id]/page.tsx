@@ -89,6 +89,11 @@ export default function ItemDetailPage() {
 
       <ItemPhotoGallery item={item} studioPhotos={itemStudioPhotos.filter((p) => p.itemId === item.id)} />
 
+      {/* Right under the gallery, not down with the item's other detail
+          cards — a caption for the photo above it (see this component's
+          own doc comment), not a separate section of page content. */}
+      {item.status === "active" && <ItemStudioPhotosSection item={item} />}
+
       <div className="flex flex-col gap-1">
         <div className="flex items-start justify-between gap-2">
           <h1 className="text-screen-title font-semibold text-ink">{item.name}</h1>
@@ -186,8 +191,6 @@ export default function ItemDetailPage() {
       <ItemPurchaseSection itemId={item.id} />
 
       <ItemAttachments itemId={item.id} />
-
-      {item.status === "active" && <ItemStudioPhotosSection item={item} />}
 
       {item.status === "active" && (
         <>

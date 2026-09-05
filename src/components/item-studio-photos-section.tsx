@@ -12,13 +12,19 @@ import type { Item, ItemStudioPhotoStyle } from "@/lib/types";
 /**
  * Wardrobe Photo Studio's generate/retry controls for one item (docs/
  * Wardrobe Inventory.md). Every *completed* photo already shows up in
- * ItemPhotoGallery above (the item page's hero + thumbnail strip) — this
- * section stays focused on what that gallery can't show: the "Create
- * Studio Photo" trigger itself, and any failed attempt still needing a
- * retry (nothing to put in a photo gallery for a generation that has no
- * image). Omits itself entirely when the item has no cover photo yet —
- * there's nothing to generate from, same "omit, don't show an empty
- * dash" posture LinkedBanksCard already established elsewhere.
+ * ItemPhotoGallery above (the item page's hero + thumbnail strip, each
+ * one's style already captioned right on the image itself) — this stays
+ * focused on what that gallery can't show: the "Create Studio Photo"
+ * trigger, and any failed attempt still needing a retry (nothing to put
+ * in a photo gallery for a generation that has no image).
+ *
+ * Rendered directly under ItemPhotoGallery (not down with the item's
+ * other detail cards, where this used to live in its own bordered
+ * section) and sized to the gallery's own md:max-w-md — a caption for the
+ * photo above it, not a separate block of page content. Omits itself
+ * entirely when the item has no cover photo yet — there's nothing to
+ * generate from, same "omit, don't show an empty dash" posture
+ * LinkedBanksCard already established elsewhere.
  */
 export function ItemStudioPhotosSection({ item }: { item: Item }) {
   const itemStudioPhotos = useInventoryStore((s) => s.itemStudioPhotos);
@@ -29,6 +35,7 @@ export function ItemStudioPhotosSection({ item }: { item: Item }) {
 
   const photos = itemStudioPhotos.filter((p) => p.itemId === item.id);
   const failed = photos.filter((p) => p.status === "failed").sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const hasCompleted = photos.some((p) => p.status === "complete");
 
   if (!item.coverPhotoPath) return null;
   const sourcePhotoPath = item.coverPhotoPath;
@@ -54,23 +61,30 @@ export function ItemStudioPhotosSection({ item }: { item: Item }) {
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
-      <div className="flex items-center justify-between">
-        <h2 className="text-body font-semibold text-ink">Studio Photos</h2>
-        <Button size="sm" variant="outline" onClick={() => setSheetOpen(true)}>
-          <Icon name="ai" size={14} /> Create Studio Photo
-        </Button>
+    <div className="flex flex-col gap-1.5 md:max-w-md">
+      {/* No card chrome (border/shadow/padding) — this reads as a caption
+          under the gallery's own photo, not another content section on
+          the page, so it's a plain text-sized row like the breadcrumb
+          under the title below it. */}
+      <div className="flex items-center justify-between gap-2">
+        <p className="flex items-center gap-1.5 text-caption text-muted-foreground">
+          <Icon name="ai" size={13} className="shrink-0 text-yellow" />
+          {hasCompleted ? "Studio photos" : "No studio photo yet"}
+        </p>
+        <button
+          type="button"
+          onClick={() => setSheetOpen(true)}
+          className="shrink-0 text-caption font-semibold text-yellow-text"
+        >
+          {hasCompleted ? "Create another" : "Create Studio Photo"}
+        </button>
       </div>
 
-      {photos.length === 0 && (
-        <p className="text-caption text-muted-foreground">Generate clean, ecommerce-style photos of this item for reselling or listing.</p>
-      )}
-
       {failed.length > 0 && (
-        <div className="flex flex-col divide-y divide-border">
+        <div className="flex flex-col divide-y divide-border rounded-xl border border-border bg-card">
           {failed.map((p) => (
-            <div key={p.id} className="flex items-center gap-3 py-2 first:pt-0 last:pb-0">
-              <Icon name="danger" size={16} className="shrink-0 text-danger" />
+            <div key={p.id} className="flex items-center gap-3 px-3 py-2">
+              <Icon name="danger" size={14} className="shrink-0 text-danger" />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-caption font-medium text-ink">{WARDROBE_STYLE_LABEL[p.style]}</p>
                 <p className="truncate text-micro text-muted-foreground">{p.errorMessage ?? "Generation failed"}</p>
