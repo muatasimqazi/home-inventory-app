@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { fetchWeatherSnapshot } from "@/lib/weather-server";
 import type { WeatherSnapshot } from "@/lib/weather";
 
 export const runtime = "nodejs";
@@ -18,18 +19,10 @@ export const runtime = "nodejs";
 // same "direct external API, no marketplace integration exists, no
 // credential setup required" path already established in this codebase
 // for UPCitemdb (/api/v1/barcode/lookup) and RESEND_API_KEY.
-const OPEN_METEO_FORECAST_URL = "https://api.open-meteo.com/v1/forecast";
-
-interface OpenMeteoResponse {
-  current?: { temperature_2m?: number; weather_code?: number; is_day?: number };
-  daily?: {
-    weather_code?: number[];
-    temperature_2m_max?: number[];
-    temperature_2m_min?: number[];
-    precipitation_probability_max?: number[];
-  };
-}
-
+//
+// The actual fetch lives in lib/weather-server.ts, shared with
+// send-weather-alerts' cron job (which has no user session to pass this
+// route's own auth check below).
 export async function GET(request: Request) {
   const supabase = await getSupabaseServerClient();
   const {
@@ -46,53 +39,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "`lat` and `lon` must be valid coordinates." }, { status: 400 });
   }
 
-  const url =
-    `${OPEN_METEO_FORECAST_URL}?latitude=${lat}&longitude=${lon}` +
-    "&current=temperature_2m,weather_code,is_day" +
-    "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max" +
-    "&temperature_unit=fahrenheit&timezone=auto&forecast_days=1";
-
-  // Bounded the same way /api/v1/barcode/lookup's own upstream call is —
-  // this blocks the Overview page's widget render, and a hanging upstream
-  // response shouldn't leave that stuck indefinitely.
-  let upstream: Response;
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
-    try {
-      upstream = await fetch(url, { headers: { Accept: "application/json" }, signal: controller.signal });
-    } finally {
-      clearTimeout(timeout);
-    }
-  } catch {
-    return NextResponse.json({ error: "Couldn't reach the weather service. Check your connection and try again.", retryable: true }, { status: 502 });
-  }
-
-  if (!upstream.ok) {
+  const snapshot = await fetchWeatherSnapshot(lat, lon);
+  if (!snapshot) {
     return NextResponse.json({ error: "Weather is temporarily unavailable.", retryable: true }, { status: 502 });
   }
 
-  let payload: OpenMeteoResponse;
-  try {
-    payload = (await upstream.json()) as OpenMeteoResponse;
-  } catch {
-    return NextResponse.json({ error: "Weather is temporarily unavailable.", retryable: true }, { status: 502 });
-  }
-
-  const temperatureF = payload.current?.temperature_2m;
-  const weatherCode = payload.current?.weather_code;
-  const todayHighF = payload.daily?.temperature_2m_max?.[0];
-  const todayLowF = payload.daily?.temperature_2m_min?.[0];
-  if (temperatureF === undefined || weatherCode === undefined || todayHighF === undefined || todayLowF === undefined) {
-    return NextResponse.json({ error: "Weather is temporarily unavailable.", retryable: true }, { status: 502 });
-  }
-
-  return NextResponse.json<WeatherSnapshot>({
-    temperatureF: Math.round(temperatureF),
-    weatherCode,
-    isDay: payload.current?.is_day !== 0,
-    todayHighF: Math.round(todayHighF),
-    todayLowF: Math.round(todayLowF),
-    precipitationChancePercent: payload.daily?.precipitation_probability_max?.[0] ?? 0,
-  });
+  return NextResponse.json<WeatherSnapshot>(snapshot);
 }

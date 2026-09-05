@@ -11,7 +11,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { rowToNotificationPreference } from "@/lib/supabase/mappers";
 import type { NotificationPreferenceRow } from "@/lib/supabase/mappers";
 
-/** Event types wired to a real send job (Household Hub Addendum §5's generalized push infrastructure) — bill.due (Finance's recurring bills), debt_payment.due_today (the same recurring bills, but only credit card/loan/mortgage ones, and only exactly on the due date — see send-debt-payments-due-today/route.ts for why this needs its own event key rather than reusing bill.due's), capture.nudge (Household Ledger PRD §26 — the finance-triggered inventory capture nudge, src/app/api/v1/push/send-capture-nudges/), item.low_stock (0032_low_stock_alerts.sql, src/app/api/v1/push/send-low-stock-alerts/), and household.activity (real-time, src/app/api/v1/webhooks/activity-log/ — a database trigger on activity_log, not a cron poll like the others). More rows get added here as future domains plug into the same pipeline. */
+/** Event types wired to a real send job (Household Hub Addendum §5's generalized push infrastructure) — bill.due (Finance's recurring bills), debt_payment.due_today (the same recurring bills, but only credit card/loan/mortgage ones, and only exactly on the due date — see send-debt-payments-due-today/route.ts for why this needs its own event key rather than reusing bill.due's), capture.nudge (Household Ledger PRD §26 — the finance-triggered inventory capture nudge, src/app/api/v1/push/send-capture-nudges/), item.low_stock (0032_low_stock_alerts.sql, src/app/api/v1/push/send-low-stock-alerts/), task.due (household_tasks' reminders/chores/appointments, src/app/api/v1/push/send-task-reminders/), weather.daily_summary (one push a day once a household sets a location, 0054_household_location.sql, src/app/api/v1/push/send-weather-alerts/), and household.activity (real-time, src/app/api/v1/webhooks/activity-log/ — a database trigger on activity_log, not a cron poll like the others). More rows get added here as future domains plug into the same pipeline. */
 const EVENT_TYPES: { domainKey: string; eventType: string; label: string; description: string }[] = [
   { domainKey: "finance", eventType: "bill.due", label: "Bill reminders", description: "A recurring bill is due within a few days" },
   {
@@ -43,6 +43,12 @@ const EVENT_TYPES: { domainKey: string; eventType: string; label: string; descri
     eventType: "household.activity",
     label: "Household activity",
     description: "Every change anyone makes in Schuaz — including your own",
+  },
+  {
+    domainKey: "weather",
+    eventType: "daily_summary",
+    label: "Daily weather",
+    description: "One weather summary each morning, based on your household's location",
   },
 ];
 

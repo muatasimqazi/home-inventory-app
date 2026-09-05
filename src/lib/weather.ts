@@ -50,3 +50,29 @@ export interface WeatherSnapshot {
   todayLowF: number;
   precipitationChancePercent: number;
 }
+
+/**
+ * The daily weather push's copy (send-weather-alerts/route.ts) — one
+ * notification a day, every day a household has a location set, same
+ * "always-on, opt out if you don't want it" posture as Household activity's
+ * push. Body always leads with today's outlook; a notable condition (real
+ * rain/snow chance or an extreme high/low) gets an extra call-out line —
+ * the seed for the "wear your jacket" suggestions the household-location
+ * work was explicitly building toward, kept to plain text for now.
+ */
+export function weatherAlertCopy(snapshot: WeatherSnapshot, locationLabel: string | null): { title: string; body: string } {
+  const condition = weatherCondition(snapshot.weatherCode);
+  const title = locationLabel ? `Today's weather in ${locationLabel}` : "Today's weather";
+  const lines = [`${condition.emoji} ${condition.label}, H${snapshot.todayHighF}° L${snapshot.todayLowF}°`];
+
+  if (snapshot.precipitationChancePercent >= 40) {
+    lines.push(`${snapshot.precipitationChancePercent}% chance of precipitation — bring an umbrella.`);
+  }
+  if (snapshot.todayLowF <= 32) {
+    lines.push("Below freezing today — bundle up.");
+  } else if (snapshot.todayHighF >= 95) {
+    lines.push("Heat's on today — stay hydrated.");
+  }
+
+  return { title, body: lines.join(" ") };
+}
