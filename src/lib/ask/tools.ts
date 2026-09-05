@@ -925,6 +925,58 @@ export function createAskTools(supabase: SupabaseClient, householdId: string) {
         };
       },
     }),
+
+    // "Remind me what to wear every day" and its relatives — not a new
+    // content type, just a chat-native on/off switch for the daily weather
+    // push (send-weather-alerts/route.ts, weatherAlertCopy()) that already
+    // exists for exactly this, same event key Settings > Notifications
+    // exposes (domain_key "weather", event_type "daily_summary"). Unlike
+    // createNote/createTask/addSubtaskToTask above, this executes right
+    // away instead of returning a pendingAction — flipping a personal
+    // notification preference is the same low-friction, instantly-
+    // reversible action the Settings page itself performs with no
+    // confirmation step, not a new piece of content that needs a
+    // Confirm/Cancel gate.
+    setWeatherReminder: tool({
+      description:
+        "Turns the household's daily weather push notification on or off for the asking user — the same " +
+        "preference exposed in Settings > Notifications, and the only real 'what to wear' reminder this app " +
+        "has (it summarizes today's condition and high/low, and calls out real rain chance or an extreme high/" +
+        "low). Use for 'remind me what to wear every day', 'send me a daily weather update', 'turn off the " +
+        "weather notifications', 'stop reminding me about the weather'. Executes immediately — never phrase " +
+        "this as a draft or say 'tap Confirm'; say what actually happened (e.g. 'Turned on your daily weather " +
+        "reminder'). If `locationSet` comes back false, the preference is on but the household hasn't set a " +
+        "home location yet, so there's nothing yet to report — tell the user to tap the weather line under " +
+        "the household name on the Overview page to set one.",
+      inputSchema: z.object({
+        enabled: z.boolean().describe("true to turn the daily weather/what-to-wear reminder on, false to turn it off."),
+      }),
+      execute: async ({ enabled }) => {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) return { error: "Not signed in." };
+
+        const { error } = await supabase.from("notification_preferences").upsert(
+          {
+            user_id: user.id,
+            household_id: householdId,
+            domain_key: "weather",
+            event_type: "daily_summary",
+            channel: "push",
+            enabled,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id,domain_key,event_type" }
+        );
+        if (error) return { error: error.message };
+
+        const { data: household } = await supabase.from("households").select("latitude, longitude").eq("id", householdId).maybeSingle();
+        const locationSet = !!household && household.latitude !== null && household.longitude !== null;
+
+        return { enabled, locationSet };
+      },
+    }),
   };
 }
 

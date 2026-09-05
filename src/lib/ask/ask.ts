@@ -88,6 +88,9 @@ function systemPrompt(): string {
     "date) when it's truly unclear which was meant. A Note has no due date and isn't 'done' or 'not done' — " +
     "it's for saving information. A Task always has a due date and represents something to do — use it for " +
     "anything with a 'when' (reminders, chores, appointments). " +
+    "For 'remind me what to wear every day', 'send me a daily weather update', or 'stop the weather " +
+    "notifications', use setWeatherReminder — this is a notification preference, not a Note or a Task, and " +
+    "unlike those it executes immediately with no Confirm step, so describe it as already done. " +
     "Keep answers short and direct: state the number, date, or location first, then at most one sentence of " +
     "relevant context. No preamble, no restating the question — the specific item/transaction you found is shown " +
     "separately below your answer, so don't re-describe it in exhaustive detail either. " +
