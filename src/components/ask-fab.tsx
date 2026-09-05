@@ -15,7 +15,7 @@ const EXAMPLE_QUESTIONS = [
   "Where did I keep my measuring tape?",
   "How much did I spend at Costco last month?",
   "When did I last buy milk?",
-  "How much have I spent this month?",
+  "Remind me to take out the trash tomorrow",
 ];
 
 /**
@@ -47,7 +47,7 @@ export function AskFab() {
   const householdId = useInventoryStore((s) => s.currentHouseholdId);
   const open = useAskConversationStore((s) => s.panelOpen);
   const togglePanel = useAskConversationStore((s) => s.togglePanel);
-  const { entries, ask } = useAskConversation(householdId);
+  const { entries, ask, confirmPendingAction, cancelPendingAction } = useAskConversation(householdId);
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   // This panel is a hand-rolled `fixed`-position element, not the shared
@@ -124,7 +124,9 @@ export function AskFab() {
                 ))}
               </div>
             ) : (
-              entries.map((entry) => <AskConversationEntry key={entry.id} entry={entry} onRetry={ask} />)
+              entries.map((entry) => (
+                <AskConversationEntry key={entry.id} entry={entry} onRetry={ask} onConfirm={confirmPendingAction} onCancel={cancelPendingAction} />
+              ))
             )}
             <div ref={scrollRef} />
           </div>

@@ -63,7 +63,7 @@ function SearchPageInner() {
   // ask" — rather than Search staying pure keyword-filter-only. Keyword
   // results (below) stay instant and free; asking is opt-in per query via
   // the "Ask AI" row so most searches never pay for a model call.
-  const { entries: askEntries, ask } = useAskConversation(householdId);
+  const { entries: askEntries, ask, confirmPendingAction, cancelPendingAction } = useAskConversation(householdId);
 
   const [lineItemsByTransaction, setLineItemsByTransaction] = useState<Record<string, ScannedReceiptLineItem[]>>({});
 
@@ -244,7 +244,7 @@ function SearchPageInner() {
       {askEntries.length > 0 && (
         <div className="flex flex-col gap-3">
           {askEntries.map((entry) => (
-            <AskConversationEntry key={entry.id} entry={entry} onRetry={ask} />
+            <AskConversationEntry key={entry.id} entry={entry} onRetry={ask} onConfirm={confirmPendingAction} onCancel={cancelPendingAction} />
           ))}
         </div>
       )}

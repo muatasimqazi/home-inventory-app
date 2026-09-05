@@ -25,7 +25,7 @@ import type { CategorySpend } from "@/lib/selectors";
  * duplicating this UI there.
  */
 export function FinanceAiCard({ householdId, categorySpend }: { householdId: string; categorySpend: CategorySpend[] }) {
-  const { entries, ask } = useAskConversation(householdId);
+  const { entries, ask, confirmPendingAction, cancelPendingAction } = useAskConversation(householdId);
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -75,7 +75,7 @@ export function FinanceAiCard({ householdId, categorySpend }: { householdId: str
         ) : (
           <div className="flex max-h-96 flex-col gap-3 overflow-y-auto">
             {entries.map((entry) => (
-              <AskConversationEntry key={entry.id} entry={entry} onRetry={ask} />
+              <AskConversationEntry key={entry.id} entry={entry} onRetry={ask} onConfirm={confirmPendingAction} onCancel={cancelPendingAction} />
             ))}
             <div ref={scrollRef} />
           </div>

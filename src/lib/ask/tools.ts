@@ -4,6 +4,10 @@ import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { warrantyStatus } from "@/lib/selectors";
 import { loadReferenceItems, matchByName, matchReferenceLocation } from "@/lib/reference/starter-inventory";
+import { newId } from "@/lib/id";
+import { formatShortDate } from "@/lib/format";
+import type { ActivityAction, ActivityEntityType, ActivityLogEntry, HouseholdTask, Note, TaskCategoryRecord, TaskSubtask } from "@/lib/types";
+import { activityLogEntryToInsertRow, householdTaskToInsertRow, noteToInsertRow, taskCategoryToInsertRow, taskSubtaskToInsertRow } from "@/lib/supabase/mappers";
 
 /**
  * Strips characters that would otherwise change what a raw user string
@@ -18,6 +22,140 @@ import { loadReferenceItems, matchByName, matchReferenceLocation } from "@/lib/r
  */
 function escapeSearchInput(raw: string): string {
   return raw.replace(/[%_,()]/g, "");
+}
+
+/** Same fire-and-forget shape logActivity() (lib/store.ts) uses client-side — a household's Activity feed should show what the Ask assistant did on the asking user's behalf exactly the same way it shows anything done through the UI, so this never silently skips it. Logged, never thrown — losing one log entry to a transient error isn't worth failing the create it's documenting. */
+async function logAiActivity(
+  supabase: SupabaseClient,
+  entry: { householdId: string; actorUserId: string; entityType: ActivityEntityType; entityId: string; entityName: string; action: ActivityAction }
+) {
+  const row: ActivityLogEntry = { id: newId(), createdAt: new Date().toISOString(), ...entry };
+  const { error } = await supabase.from("activity_log").insert(activityLogEntryToInsertRow(row));
+  if (error) console.error("Ask tool: failed to log activity:", error.message);
+}
+
+/**
+ * Resolves a freeform task-category name (as the model/user said it, e.g.
+ * "grocery" or "meal prep") to a real task_categories row id — matching
+ * one of the household's own categories (the 5 seeded system defaults
+ * plus any custom ones) case-insensitively, or creating a new
+ * household-scoped one when nothing matches. Mirrors
+ * getOrCreateTaskCategory() in lib/store.ts exactly, just server-side
+ * against the caller's own session-bound client instead of local state.
+ */
+async function resolveTaskCategoryId(
+  supabase: SupabaseClient,
+  householdId: string,
+  userId: string,
+  categoryName: string
+): Promise<{ id: string } | { error: string }> {
+  const name = categoryName.trim() || "Other";
+  const { data, error } = await supabase.from("task_categories").select("id, name").or(`household_id.eq.${householdId},household_id.is.null`);
+  if (error) return { error: error.message };
+  const existing = (data ?? []).find((c) => (c.name as string).toLowerCase() === name.toLowerCase());
+  if (existing) return { id: existing.id as string };
+
+  const created: TaskCategoryRecord = {
+    id: newId(),
+    householdId,
+    name,
+    isDefault: false,
+    createdByUserId: userId,
+    createdAt: new Date().toISOString(),
+  };
+  const { error: insertError } = await supabase.from("task_categories").insert(taskCategoryToInsertRow(created));
+  if (insertError) return { error: insertError.message };
+  return { id: created.id };
+}
+
+/**
+ * The real writes behind createNote/createTask/addSubtaskToTask below —
+ * pulled out into standalone functions so /api/v1/ask/confirm can run the
+ * exact same insert once a user actually taps Confirm on a pending-action
+ * card, instead of duplicating this logic. Nothing in this file calls
+ * these at *propose* time — see each tool's own comment on why.
+ */
+export async function performCreateNote(
+  supabase: SupabaseClient,
+  householdId: string,
+  userId: string,
+  payload: { title: string; content: string; isShared: boolean }
+): Promise<{ id: string; title: string } | { error: string }> {
+  const now = new Date().toISOString();
+  const note: Note = {
+    id: newId(),
+    householdId,
+    ownerUserId: userId,
+    title: payload.title,
+    content: payload.content,
+    isShared: payload.isShared,
+    pinned: false,
+    status: "active",
+    trashedAt: null,
+    permanentlyDeleteAfter: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+  const { error } = await supabase.from("notes").insert(noteToInsertRow(note));
+  if (error) return { error: error.message };
+  await logAiActivity(supabase, { householdId, actorUserId: userId, entityType: "note", entityId: note.id, entityName: note.title || "Untitled note", action: "created" });
+  return { id: note.id, title: note.title || "Untitled note" };
+}
+
+export async function performCreateTask(
+  supabase: SupabaseClient,
+  householdId: string,
+  userId: string,
+  payload: { title: string; description: string; dueAt: string; category: string }
+): Promise<{ id: string; title: string; dueAt: string } | { error: string }> {
+  const categoryResult = await resolveTaskCategoryId(supabase, householdId, userId, payload.category);
+  if ("error" in categoryResult) return { error: categoryResult.error };
+
+  const now = new Date().toISOString();
+  const task: HouseholdTask = {
+    id: newId(),
+    householdId,
+    title: payload.title,
+    description: payload.description,
+    categoryId: categoryResult.id,
+    linkedEntityType: null,
+    linkedEntityId: null,
+    assignedToPersonId: null,
+    scheduleType: "one_time",
+    dueAt: payload.dueAt,
+    recurrenceRule: null,
+    isActive: true,
+    createdByUserId: userId,
+    createdAt: now,
+    updatedAt: now,
+    trashedAt: null,
+    permanentlyDeleteAfter: null,
+  };
+  const { error } = await supabase.from("household_tasks").insert(householdTaskToInsertRow(task));
+  if (error) return { error: error.message };
+  await logAiActivity(supabase, { householdId, actorUserId: userId, entityType: "household_task", entityId: task.id, entityName: task.title, action: "created" });
+  return { id: task.id, title: task.title, dueAt: task.dueAt };
+}
+
+export async function performAddSubtaskToTask(
+  supabase: SupabaseClient,
+  payload: { householdId: string; taskId: string; subtaskTitle: string }
+): Promise<{ taskId: string; subtaskTitle: string } | { error: string }> {
+  const { count, error: countError } = await supabase.from("task_subtasks").select("id", { count: "exact", head: true }).eq("task_id", payload.taskId);
+  if (countError) return { error: countError.message };
+
+  const subtask: TaskSubtask = {
+    id: newId(),
+    householdId: payload.householdId,
+    taskId: payload.taskId,
+    title: payload.subtaskTitle,
+    isCompleted: false,
+    position: count ?? 0,
+    createdAt: new Date().toISOString(),
+  };
+  const { error } = await supabase.from("task_subtasks").insert(taskSubtaskToInsertRow(subtask));
+  if (error) return { error: error.message };
+  return { taskId: payload.taskId, subtaskTitle: payload.subtaskTitle };
 }
 
 /**
@@ -36,6 +174,23 @@ function escapeSearchInput(raw: string): string {
  * merchant/itemName/dateFrom/dateTo compose on the Finance side, and the
  * model can already answer "when did I last buy X" from a date-descending
  * list's first row without a separate tool for it.
+ *
+ * Notes/Tasks tools below (search + create + add-subtask) are the one
+ * exception to "every tool here is read-only" — createNote/createTask/
+ * addSubtaskToTask never write anything themselves. Each just returns a
+ * `pendingAction` describing the write it would make; the actual insert
+ * only happens in performCreateNote/performCreateTask/
+ * performAddSubtaskToTask above, called from /api/v1/ask/confirm once a
+ * user taps Confirm on the resulting card in the chat (lib/ask/ask.ts's
+ * extractPendingActions, rendered by ask-conversation-entry.tsx) — a real
+ * Verification gate (explicit go/no-go before anything saves), not just a
+ * post-hoc "here's what happened" card. Every confirmed write is still
+ * logged to the household's real Activity feed (logAiActivity above)
+ * exactly like a manual create would be. Note none of the tools *in this
+ * factory* need the asking user's id — that only matters once a write is
+ * actually confirmed (performCreateNote/performCreateTask's
+ * ownerUserId/createdByUserId, logAiActivity's actorUserId), which happens
+ * in /api/v1/ask/confirm, not here.
  */
 export function createAskTools(supabase: SupabaseClient, householdId: string) {
   const publicStorageBase = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public`;
@@ -561,6 +716,212 @@ export function createAskTools(supabase: SupabaseClient, householdId: string) {
           missingCount: missing.length,
           missingItems: missing.slice(0, MISSING_ITEMS_LIMIT).map((it) => it.name),
           missingItemsTruncated: missing.length > MISSING_ITEMS_LIMIT,
+        };
+      },
+    }),
+
+    searchNotes: tool({
+      description:
+        "Search the household's Notes by title/content — use for 'find my note about X', 'what does my note " +
+        "say about Y', or to check whether a note already exists before creating a new one. RLS already scopes " +
+        "results to what the asking user can see (their own personal notes plus every shared note), so a " +
+        "private note someone else owns simply won't appear — never mention privacy/permissions in your answer.",
+      inputSchema: z.object({
+        query: z.string().optional().describe("Freeform search against the note's title/content. Omit to list the most recently updated notes."),
+        limit: z.number().int().min(1).max(20).optional().describe("Max notes to return (default 10)."),
+      }),
+      execute: async ({ query, limit }) => {
+        let dbQuery = supabase.from("notes").select("id, title, content, is_shared, pinned, updated_at").eq("household_id", householdId).eq("status", "active");
+        if (query) {
+          const escaped = escapeSearchInput(query);
+          dbQuery = dbQuery.or(`title.ilike.%${escaped}%,content.ilike.%${escaped}%`);
+        }
+        const { data, error } = await dbQuery.order("updated_at", { ascending: false }).limit(limit ?? 10);
+        if (error) return { error: error.message };
+
+        const notes = (data ?? []).map((n) => ({
+          id: n.id as string,
+          title: (n.title as string) || "Untitled note",
+          snippet: ((n.content as string) || "").slice(0, 200),
+          isShared: n.is_shared as boolean,
+          pinned: n.pinned as boolean,
+          updatedAt: n.updated_at as string,
+        }));
+        return { notes, count: notes.length };
+      },
+    }),
+
+    searchTasks: tool({
+      description:
+        "Search the household's Tasks (reminders, chores, appointments) by title/description and/or status — " +
+        "use for 'what tasks do I have', 'is there already a task for X', 'what's overdue', 'what's due this " +
+        "week', and to check for an existing task before creating a duplicate. Tasks have no per-record " +
+        "privacy — every household member's tasks are visible to everyone.",
+      inputSchema: z.object({
+        query: z.string().optional().describe("Freeform search against the task's title/description. Omit to list by due date."),
+        status: z
+          .enum(["active", "overdue", "completed", "all"])
+          .optional()
+          .describe("'active' = not yet done (default) — includes recurring tasks, which are never permanently 'done'. 'overdue' = active and past due. 'completed' = one-time tasks already marked done. 'all' = every status."),
+        dueFrom: z.string().optional().describe("Inclusive lower bound on due date, YYYY-MM-DD."),
+        dueTo: z.string().optional().describe("Inclusive upper bound on due date, YYYY-MM-DD."),
+        limit: z.number().int().min(1).max(30).optional().describe("Max tasks to return (default 15)."),
+      }),
+      execute: async ({ query, status, dueFrom, dueTo, limit }) => {
+        let dbQuery = supabase
+          .from("household_tasks")
+          .select("id, title, description, category_id, due_at, is_active, schedule_type")
+          .eq("household_id", householdId)
+          .is("trashed_at", null);
+        if (query) {
+          const escaped = escapeSearchInput(query);
+          dbQuery = dbQuery.or(`title.ilike.%${escaped}%,description.ilike.%${escaped}%`);
+        }
+        if (status === "completed") dbQuery = dbQuery.eq("is_active", false);
+        else if (status !== "all") dbQuery = dbQuery.eq("is_active", true);
+        if (dueFrom) dbQuery = dbQuery.gte("due_at", dueFrom);
+        if (dueTo) dbQuery = dbQuery.lte("due_at", dueTo);
+
+        const { data, error } = await dbQuery.order("due_at", { ascending: true }).limit(limit ?? 15);
+        if (error) return { error: error.message };
+
+        // Filtered in JS, not SQL — "overdue" is relative to the moment
+        // this runs, not a stored column.
+        const nowIso = new Date().toISOString();
+        const rows = (status === "overdue" ? (data ?? []).filter((t) => (t.due_at as string) < nowIso) : (data ?? [])) as {
+          id: string;
+          title: string;
+          description: string | null;
+          category_id: string;
+          due_at: string;
+          is_active: boolean;
+          schedule_type: string;
+        }[];
+
+        const categoryIds = Array.from(new Set(rows.map((t) => t.category_id)));
+        const { data: categoryRows, error: categoryError } =
+          categoryIds.length > 0
+            ? await supabase.from("task_categories").select("id, name").in("id", categoryIds)
+            : { data: [] as { id: string; name: string }[], error: null };
+        if (categoryError) return { error: categoryError.message };
+        const categoryNameById = new Map((categoryRows ?? []).map((c) => [c.id as string, c.name as string]));
+
+        const tasks = rows.map((t) => ({
+          id: t.id,
+          title: t.title,
+          description: t.description || null,
+          dueAt: t.due_at,
+          category: categoryNameById.get(t.category_id) ?? "Other",
+          isActive: t.is_active,
+          recurring: t.schedule_type === "recurring",
+        }));
+        return { tasks, count: tasks.length };
+      },
+    }),
+
+    // createNote/createTask/addSubtaskToTask below PROPOSE a write instead
+    // of performing it — see this file's own top comment for why real
+    // confirmation (not just a post-hoc reference card) is worth the
+    // friction here. Each returns a `pendingAction` (lib/ask/ask.ts's
+    // extractPendingActions pulls it out into a real Confirm/Cancel card
+    // in the chat) carrying everything /api/v1/ask/confirm needs to
+    // actually run performCreateNote/performCreateTask/
+    // performAddSubtaskToTask above once the user taps Confirm. Nothing in
+    // this file inserts a note, a task, or a subtask directly anymore —
+    // only those three exported perform* functions do, and only when
+    // called from that confirm route.
+    createNote: tool({
+      description:
+        "Drafts a Note for this household — use when the user explicitly asks to jot something down, save/" +
+        "write a note, or remember something in note form (not for anything with a due date or that needs " +
+        "doing — use createTask for that instead). This does NOT save anything by itself: it shows the user a " +
+        "Confirm/Cancel card and nothing is written until they tap Confirm. Say so in your answer (e.g. " +
+        "'I've drafted that note — tap Confirm to save it'), never 'saved'/'created'/'added' as if it already " +
+        "happened. Personal by default; only set isShared true when the user says to share it with the household.",
+      inputSchema: z.object({
+        title: z.string().describe("A short title. Empty string is fine if the user gave no title — the content still saves."),
+        content: z.string().describe("The note's body, in Markdown."),
+        isShared: z.boolean().optional().describe("True to make it visible to the whole household; omit/false keeps it personal to the asking user (the default)."),
+      }),
+      execute: async ({ title, content, isShared }) => ({
+        pendingAction: {
+          kind: "createNote",
+          summary: `Save a note titled "${title.trim() || "Untitled note"}"${isShared ? " — shared with the household" : ""}`,
+          payload: { title, content, isShared: isShared ?? false },
+        },
+      }),
+    }),
+
+    createTask: tool({
+      description:
+        "Drafts a Task (reminder, chore, or appointment) for this household — use when the user asks to add a " +
+        "task, set a reminder, or schedule something to do. This does NOT save anything by itself: it shows " +
+        "the user a Confirm/Cancel card and nothing is written until they tap Confirm. Say so in your answer " +
+        "(e.g. 'I've drafted that task, due tomorrow at 9am — tap Confirm to save it'), never 'scheduled'/" +
+        "'added'/'created' as if it already happened. Always compute `dueAt` yourself as a full ISO 8601 " +
+        "datetime relative to today's date given above — default to 9:00 AM if no time was mentioned " +
+        "('tomorrow' means tomorrow at 9am, not this exact moment). `category` is freeform (e.g. 'chore', " +
+        "'grocery', 'maintenance', 'appointment') — matched against the household's real categories at " +
+        "confirm time, or a new one created then if nothing matches; omit it for a generic 'Other' bucket.",
+      inputSchema: z.object({
+        title: z.string().describe("A short, clear task title, e.g. 'Take out the trash' or 'Dentist appointment'."),
+        description: z.string().optional().describe("Optional extra detail."),
+        dueAt: z.string().describe("Full ISO 8601 datetime, e.g. '2026-09-05T09:00:00.000Z' — compute this yourself from what the user said, relative to today's date."),
+        category: z.string().optional().describe("Freeform category, e.g. 'chore', 'grocery', 'maintenance', 'appointment'. Omit for 'Other'."),
+      }),
+      execute: async ({ title, description, dueAt, category }) => ({
+        pendingAction: {
+          kind: "createTask",
+          summary: `Create task "${title}", due ${formatShortDate(dueAt)}`,
+          payload: { title, description: description ?? "", dueAt, category: category ?? "Other" },
+        },
+      }),
+    }),
+
+    addSubtaskToTask: tool({
+      description:
+        "Proposes adding one checklist item (a subtask) to an EXISTING Task — use for 'add X to my grocery " +
+        "list', 'add a step to the Y task'. `taskTitle` is matched against the household's real active task " +
+        "titles freeform (this lookup itself is read-only and runs immediately). If `taskAmbiguous` comes " +
+        "back, more than one task could match — list the candidates and ask which was meant rather than " +
+        "picking one yourself. If `taskNotFound` comes back, say so rather than silently proposing a brand-new " +
+        "task instead — that's what createTask is for, and only if the user actually wants a new one. On a " +
+        "real match, this does NOT save the subtask by itself: it shows the user a Confirm/Cancel card and " +
+        "nothing is written until they tap Confirm — say so in your answer (e.g. 'I've drafted adding \"milk\" " +
+        "to your grocery list — tap Confirm to save it'), never 'added' as if it already happened.",
+      inputSchema: z.object({
+        taskTitle: z.string().describe("The existing task to add to, as the user described it, e.g. 'grocery list' or 'move out'."),
+        subtaskTitle: z.string().describe("The checklist item to add, e.g. 'milk' or 'call the movers'."),
+      }),
+      execute: async ({ taskTitle, subtaskTitle }) => {
+        const { data, error } = await supabase
+          .from("household_tasks")
+          .select("id, title")
+          .eq("household_id", householdId)
+          .eq("is_active", true)
+          .is("trashed_at", null);
+        if (error) return { error: error.message };
+
+        const candidates = (data ?? []) as { id: string; title: string }[];
+        const matches = matchByName(candidates, (t) => t.title, taskTitle);
+        if (matches.length === 0) {
+          return { taskNotFound: true, message: `No active task matching "${taskTitle}" found.` };
+        }
+        if (matches.length > 1) {
+          return {
+            taskAmbiguous: true,
+            candidates: matches.map((t) => t.title),
+            message: `More than one task could match "${taskTitle}" — ask which one was meant.`,
+          };
+        }
+        const task = matches[0];
+
+        return {
+          pendingAction: {
+            kind: "addSubtaskToTask",
+            summary: `Add "${subtaskTitle}" to "${task.title}"`,
+            payload: { taskId: task.id, taskTitle: task.title, subtaskTitle },
+          },
         };
       },
     }),
