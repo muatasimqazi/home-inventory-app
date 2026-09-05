@@ -206,17 +206,44 @@ export default function OverviewPage() {
         </div>
       </div>
 
+      {/* The one, consolidated "what needs doing" surface — moved to the
+          very top of the page, above even Search/Notes/Tasks, so anything
+          time-sensitive is the first thing seen, not something scrolled
+          past first. Used to be shown twice (a "Needs Attention" stat
+          tile up here, and an almost-identical "Action queue" card
+          repeated a few hundred pixels later in Home Inventory) with no
+          two of the three chips ever quite matching between them.
+          Zero-state collapses to a single calm line instead of three
+          chips all reading "0" — that's not information worth making
+          someone parse. */}
+      {needsAttentionChips.length > 0 ? (
+        <div className="flex items-center justify-between gap-3 rounded-2xl border border-badge-orange-border bg-badge-orange-bg/40 p-4 shadow-sm">
+          <div className="min-w-0">
+            <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">Needs attention</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {needsAttentionChips.map((chip) => (
+                <ActionChip key={chip.label} {...chip} />
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 rounded-2xl border border-border bg-card px-4 py-3 shadow-sm">
+          <Icon name="check" size={16} className="shrink-0 text-badge-green-text" />
+          <p className="text-caption text-muted-foreground">All caught up — nothing needs attention right now.</p>
+        </div>
+      )}
+
       <SearchBar value="" onChange={() => {}} onFocus={() => router.push("/search")} className="md:hidden" />
 
       {/* Notes and Tasks are always-on, ungated domains (no
           household.xEnabled toggle — same as Inventory/Finance being
-          gated below), so their own dedicated space sits here, at the
-          very top of the page, above even the Inventory summary tile —
-          rather than Tasks getting a conditional preview further down
-          the page (as before) and Notes getting nothing at all. Each
-          card always renders, even empty (an empty state line, not the
-          whole card disappearing) — a "dedicated space," not a
-          conditional preview. */}
+          gated below), so their own dedicated space sits near the top of
+          the page (below only the Needs attention banner) — rather than
+          Tasks getting a conditional preview further down the page (as
+          before) and Notes getting nothing at all. Each card always
+          renders, even empty (an empty state line, not the whole card
+          disappearing) — a "dedicated space," not a conditional preview. */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
           <div className="mb-2 flex items-center justify-between">
@@ -293,50 +320,6 @@ export default function OverviewPage() {
         </div>
       </div>
 
-      {/* Read-only number only — "what needs doing" lives in its own
-          banner below, not mixed into this row. Finance's own headline
-          numbers (Net Worth, Cash Flow) used to sit here too, ungrouped
-          from every other Finance card below; they've moved into the
-          Finance section itself, next to the My Dashboard/Household
-          toggle that actually affects them. A plain card, not a grid, now
-          that it's never more than this one tile. */}
-      {household.inventoryEnabled && (
-        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-          <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">Inventory</p>
-          <p className="mt-1 text-item-title font-semibold text-ink">
-            {summary.totalActiveItems} item{summary.totalActiveItems === 1 ? "" : "s"}
-          </p>
-          <p className="mt-0.5 text-caption text-muted-foreground">
-            {activeContainerList.length} container{activeContainerList.length === 1 ? "" : "s"}
-          </p>
-        </div>
-      )}
-
-      {/* The one, consolidated "what needs doing" surface — used to be
-          shown twice (a "Needs Attention" stat tile up here, and an
-          almost-identical "Action queue" card repeated a few hundred
-          pixels later in Home Inventory) with no two of the three chips
-          ever quite matching between them. Zero-state collapses to a
-          single calm line instead of three chips all reading "0" — that's
-          not information worth making someone parse. */}
-      {needsAttentionChips.length > 0 ? (
-        <div className="flex items-center justify-between gap-3 rounded-2xl border border-badge-orange-border bg-badge-orange-bg/40 p-4 shadow-sm">
-          <div className="min-w-0">
-            <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">Needs attention</p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {needsAttentionChips.map((chip) => (
-                <ActionChip key={chip.label} {...chip} />
-              ))}
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="flex items-center gap-2 rounded-2xl border border-border bg-card px-4 py-3 shadow-sm">
-          <Icon name="check" size={16} className="shrink-0 text-badge-green-text" />
-          <p className="text-caption text-muted-foreground">All caught up — nothing needs attention right now.</p>
-        </div>
-      )}
-
       {/* Quick actions — the inventory/finance "Tools" cluster (see
           nav-links.ts's own Browse -> Views -> Reference -> Tools
           grouping) surfaced as tappable tiles instead of buried in the
@@ -361,6 +344,21 @@ export default function OverviewPage() {
           <Link href="/desktop" className="text-caption font-semibold text-ink">
             Open full dashboard
           </Link>
+        </div>
+
+        {/* Read-only headline numbers for this section — used to sit up at
+            the very top of the page, ungrouped from the rest of Home
+            Inventory's own content; moved in here, right under the
+            section's own heading, so it reads as part of Home Inventory
+            rather than a separate top-level tile. */}
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+          <p className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">Inventory</p>
+          <p className="mt-1 text-item-title font-semibold text-ink">
+            {summary.totalActiveItems} item{summary.totalActiveItems === 1 ? "" : "s"}
+          </p>
+          <p className="mt-0.5 text-caption text-muted-foreground">
+            {activeContainerList.length} container{activeContainerList.length === 1 ? "" : "s"}
+          </p>
         </div>
 
         {locations.length > 0 && (
