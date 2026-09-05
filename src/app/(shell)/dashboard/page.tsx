@@ -157,7 +157,7 @@ export default function OverviewPage() {
     ...(household.inventoryEnabled
       ? [
           { label: "Review", count: summary.needsReviewCount, tone: "purple" as const, href: "/review" },
-          { label: "Photos", count: genericPhotos, tone: "green" as const },
+          { label: "Photos", count: genericPhotos, tone: "green" as const, href: "/needs-photos" },
           { label: "Loose", count: loose, tone: "orange" as const, href: "/unassigned" },
         ]
       : []),
