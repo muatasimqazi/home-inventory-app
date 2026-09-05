@@ -47,8 +47,19 @@ export async function POST(request: Request) {
       }
       const result = await performCreateNote(supabase, householdId, user.id, { title: p.title, content: p.content, isShared: p.isShared === true });
       if ("error" in result) return NextResponse.json({ error: result.error }, { status: 502 });
+      const { note } = result;
       return NextResponse.json({
-        reference: { kind: "note", id: result.id, title: result.title, subtitle: "Just created", imageUrl: null, href: `/notes/${result.id}` },
+        reference: { kind: "note", id: note.id, title: note.title || "Untitled note", subtitle: "Just created", imageUrl: null, href: `/notes/${note.id}` },
+        // The full row, not just the reference card's summary fields —
+        // this is a server-side insert the confirming browser's own
+        // zustand store never made itself (unlike every direct
+        // client-side create, which updates local state optimistically
+        // before the insert even lands), so realtime is otherwise the
+        // *only* thing that would ever show it there. See
+        // ask-conversation-store.ts's confirmPendingAction, which merges
+        // this straight into local state the moment this response comes
+        // back instead of waiting on that round trip.
+        record: { kind: "note", record: note },
       });
     }
 
@@ -63,8 +74,10 @@ export async function POST(request: Request) {
         category: typeof p.category === "string" ? p.category : "Other",
       });
       if ("error" in result) return NextResponse.json({ error: result.error }, { status: 502 });
+      const { task } = result;
       return NextResponse.json({
-        reference: { kind: "task", id: result.id, title: result.title, subtitle: `Due ${result.dueAt.slice(0, 10)}`, imageUrl: null, href: `/tasks/${result.id}` },
+        reference: { kind: "task", id: task.id, title: task.title, subtitle: `Due ${task.dueAt.slice(0, 10)}`, imageUrl: null, href: `/tasks/${task.id}` },
+        record: { kind: "task", record: task },
       });
     }
 
@@ -74,13 +87,15 @@ export async function POST(request: Request) {
     }
     const result = await performAddSubtaskToTask(supabase, { householdId, taskId: p.taskId, subtaskTitle: p.subtaskTitle });
     if ("error" in result) return NextResponse.json({ error: result.error }, { status: 502 });
-    // taskTitle isn't returned by performAddSubtaskToTask (task_subtasks
-    // has no title column to look it back up from) — the client already
-    // has it from the pendingAction it's confirming, so it's echoed
-    // straight back from the request payload instead of a second query.
+    const { subtask } = result;
+    // taskTitle isn't on the subtask row itself (task_subtasks has no
+    // title column to look it back up from) — the client already has it
+    // from the pendingAction it's confirming, so it's echoed straight
+    // back from the request payload instead of a second query.
     const taskTitle = typeof p.taskTitle === "string" ? p.taskTitle : "Task";
     return NextResponse.json({
-      reference: { kind: "task", id: result.taskId, title: taskTitle, subtitle: `Added "${result.subtaskTitle}"`, imageUrl: null, href: `/tasks/${result.taskId}` },
+      reference: { kind: "task", id: subtask.taskId, title: taskTitle, subtitle: `Added "${subtask.title}"`, imageUrl: null, href: `/tasks/${subtask.taskId}` },
+      record: { kind: "subtask", record: subtask },
     });
   } catch (error) {
     console.error("Ask confirm failed:", error);

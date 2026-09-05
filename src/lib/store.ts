@@ -717,6 +717,27 @@ interface InventoryState {
 
   /** Hides items/containers/locations whose permanentlyDeleteAfter has passed from local state. The real purge_expired_trash() + pg_cron job (see the migration) does the actual server-side deletion; this just keeps the UI in sync between reloads without re-fetching. */
   purgeExpiredTrash: () => void;
+
+  /**
+   * Splices a record into local state that a server-side action already
+   * persisted outside this browser's own optimistic create flow — so far,
+   * only the Ask assistant's /api/v1/ask/confirm route (lib/ask/tools.ts's
+   * performCreateNote/performCreateTask/performAddSubtaskToTask), which
+   * runs the insert through a Next.js API route this store never touches.
+   * Every direct client-side create (createNote, createTask,
+   * createSubtask, ...) updates local state itself before its insert even
+   * lands; this browser's own realtime subscription (subscribeRealtime)
+   * would *eventually* pick up a server-side insert the same way it
+   * mirrors another household member's change, but there's no reason the
+   * confirming user should have to wait on that round trip just to see
+   * their own just-confirmed task. Upserts by id (same replace-if-present-
+   * else-append logic arrayMergeHandler's realtime merge already uses), so
+   * it's a harmless no-op if realtime's own copy of the same row also
+   * arrives moments later.
+   */
+  receiveExternalCreate: (
+    entity: { kind: "note"; record: Note } | { kind: "task"; record: HouseholdTask } | { kind: "subtask"; record: TaskSubtask }
+  ) => void;
 }
 
 /** Re-exported for src/components/activity-row.tsx and friends, which import this name from the store rather than src/lib/types. */
@@ -4457,6 +4478,37 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
 
     if (!changed) return;
     set({ items, containers, locations, accounts, financeCategories, transactions, recurringBills, notes, tasks });
+  },
+
+  receiveExternalCreate: (entity) => {
+    if (entity.kind === "note") {
+      const { record } = entity;
+      set((s) => {
+        const idx = s.notes.findIndex((n) => n.id === record.id);
+        if (idx === -1) return { notes: [...s.notes, record] };
+        const next = s.notes.slice();
+        next[idx] = record;
+        return { notes: next };
+      });
+    } else if (entity.kind === "task") {
+      const { record } = entity;
+      set((s) => {
+        const idx = s.tasks.findIndex((t) => t.id === record.id);
+        if (idx === -1) return { tasks: [...s.tasks, record] };
+        const next = s.tasks.slice();
+        next[idx] = record;
+        return { tasks: next };
+      });
+    } else {
+      const { record } = entity;
+      set((s) => {
+        const idx = s.subtasks.findIndex((x) => x.id === record.id);
+        if (idx === -1) return { subtasks: [...s.subtasks, record] };
+        const next = s.subtasks.slice();
+        next[idx] = record;
+        return { subtasks: next };
+      });
+    }
   },
   };
 });

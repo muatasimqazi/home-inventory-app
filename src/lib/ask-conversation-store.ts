@@ -1,6 +1,7 @@
 "use client";
 
 import { create } from "zustand";
+import { useInventoryStore } from "@/lib/store";
 
 /** Mirrors lib/ask/ask.ts's AskReference shape — redefined locally rather than imported so client components never have any import graph touching a "server-only"-guarded module, even a type-only one. Keep `kind` in sync with that file's own union by hand. */
 export interface AskReference {
@@ -142,6 +143,15 @@ export const useAskConversationStore = create<AskConversationState>()((set, get)
         set((s) => ({ entries: updateAction(s.entries, entryId, actionId, { status: "error", error: data.error ?? "Couldn't complete that." }) }));
         return;
       }
+      // This was a server-side insert (POST /api/v1/ask/confirm, via a
+      // Next.js API route, not this browser's own createNote/createTask/
+      // createSubtask) — the confirming user's own Tasks/Notes pages would
+      // otherwise only pick it up once this browser's realtime
+      // subscription happens to mirror it back, same as it would for
+      // another household member's change. Merging the full record into
+      // useInventoryStore directly means it shows up immediately, same as
+      // every other create in this app already does for its own browser.
+      if (data.record) useInventoryStore.getState().receiveExternalCreate(data.record);
       set((s) => ({ entries: updateAction(s.entries, entryId, actionId, { status: "done", resultReference: data.reference }) }));
     } catch {
       set((s) => ({ entries: updateAction(s.entries, entryId, actionId, { status: "error", error: "Couldn't reach the server. Check your connection." }) }));

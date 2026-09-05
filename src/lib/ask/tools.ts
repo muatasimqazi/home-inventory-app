@@ -80,7 +80,7 @@ export async function performCreateNote(
   householdId: string,
   userId: string,
   payload: { title: string; content: string; isShared: boolean }
-): Promise<{ id: string; title: string } | { error: string }> {
+): Promise<{ note: Note } | { error: string }> {
   const now = new Date().toISOString();
   const note: Note = {
     id: newId(),
@@ -99,7 +99,7 @@ export async function performCreateNote(
   const { error } = await supabase.from("notes").insert(noteToInsertRow(note));
   if (error) return { error: error.message };
   await logAiActivity(supabase, { householdId, actorUserId: userId, entityType: "note", entityId: note.id, entityName: note.title || "Untitled note", action: "created" });
-  return { id: note.id, title: note.title || "Untitled note" };
+  return { note };
 }
 
 export async function performCreateTask(
@@ -107,7 +107,7 @@ export async function performCreateTask(
   householdId: string,
   userId: string,
   payload: { title: string; description: string; dueAt: string; category: string }
-): Promise<{ id: string; title: string; dueAt: string } | { error: string }> {
+): Promise<{ task: HouseholdTask } | { error: string }> {
   const categoryResult = await resolveTaskCategoryId(supabase, householdId, userId, payload.category);
   if ("error" in categoryResult) return { error: categoryResult.error };
 
@@ -134,13 +134,13 @@ export async function performCreateTask(
   const { error } = await supabase.from("household_tasks").insert(householdTaskToInsertRow(task));
   if (error) return { error: error.message };
   await logAiActivity(supabase, { householdId, actorUserId: userId, entityType: "household_task", entityId: task.id, entityName: task.title, action: "created" });
-  return { id: task.id, title: task.title, dueAt: task.dueAt };
+  return { task };
 }
 
 export async function performAddSubtaskToTask(
   supabase: SupabaseClient,
   payload: { householdId: string; taskId: string; subtaskTitle: string }
-): Promise<{ taskId: string; subtaskTitle: string } | { error: string }> {
+): Promise<{ subtask: TaskSubtask } | { error: string }> {
   const { count, error: countError } = await supabase.from("task_subtasks").select("id", { count: "exact", head: true }).eq("task_id", payload.taskId);
   if (countError) return { error: countError.message };
 
@@ -155,7 +155,7 @@ export async function performAddSubtaskToTask(
   };
   const { error } = await supabase.from("task_subtasks").insert(taskSubtaskToInsertRow(subtask));
   if (error) return { error: error.message };
-  return { taskId: payload.taskId, subtaskTitle: payload.subtaskTitle };
+  return { subtask };
 }
 
 /**
