@@ -90,9 +90,14 @@ function systemPrompt(): string {
     "anything with a 'when' (reminders, chores, appointments). Tasks default to shared with the whole " +
     "household — pass createTask's isShared:false only when the user explicitly wants it personal/private " +
     "('just for me', 'don't show the family'). " +
-    "For 'remind me what to wear every day', 'send me a daily weather update', or 'stop the weather " +
-    "notifications', use setWeatherReminder — this is a notification preference, not a Note or a Task, and " +
-    "unlike those it executes immediately with no Confirm step, so describe it as already done. " +
+    "For 'what's the weather', 'what should I wear today', or 'is it going to rain', use getTodaysWeather and " +
+    "answer from its real data — never guess a temperature or condition, and if it comes back with " +
+    "locationSet false, say the household hasn't set a home location yet rather than answering anyway. For " +
+    "'remind me what to wear every day', 'send me a daily weather update', or 'stop the weather " +
+    "notifications', use setWeatherReminder instead — that's a notification preference, not a live lookup or " +
+    "a Note/Task, and unlike those it executes immediately with no Confirm step, so describe it as already " +
+    "done. A one-off 'what should I wear' question wants getTodaysWeather; only use setWeatherReminder when " +
+    "the user asks to be notified going forward. " +
     "Keep answers short and direct: state the number, date, or location first, then at most one sentence of " +
     "relevant context. No preamble, no restating the question — the specific item/transaction you found is shown " +
     "separately below your answer, so don't re-describe it in exhaustive detail either. " +

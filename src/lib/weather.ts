@@ -52,6 +52,34 @@ export interface WeatherSnapshot {
 }
 
 /**
+ * Plain-language outfit/prep suggestions computed from a snapshot's real
+ * numbers — for the Ask AI's getTodaysWeather tool ("what should I wear
+ * today"), so it has ready-made, consistent thresholds to hand back
+ * instead of the model inventing its own cutoffs each time. Deliberately
+ * separate from weatherAlertCopy below (which has its own, narrower
+ * "notable" thresholds tuned for a once-a-day push) rather than shared —
+ * a conversational answer wants a always-applicable recommendation
+ * (something to wear, even on an unremarkable day), where the push only
+ * speaks up when there's something worth interrupting for.
+ */
+export function weatherOutfitHints(snapshot: WeatherSnapshot): string[] {
+  const hints: string[] = [];
+  if (snapshot.precipitationChancePercent >= 40) {
+    hints.push(`${snapshot.precipitationChancePercent}% chance of rain/snow — bring an umbrella or rain jacket`);
+  }
+  if (snapshot.todayLowF <= 32) {
+    hints.push("below freezing — a heavy coat, hat, and gloves");
+  } else if (snapshot.todayLowF <= 50) {
+    hints.push("chilly, especially in the morning — a jacket or sweater");
+  } else if (snapshot.todayHighF >= 95) {
+    hints.push("hot — light, breathable clothing, and stay hydrated");
+  } else if (snapshot.todayHighF >= 85) {
+    hints.push("warm — light clothing");
+  }
+  return hints;
+}
+
+/**
  * The daily weather push's copy (send-weather-alerts/route.ts) — one
  * notification a day, every day a household has a location set, same
  * "always-on, opt out if you don't want it" posture as Household activity's

@@ -6,6 +6,8 @@ import { warrantyStatus } from "@/lib/selectors";
 import { loadReferenceItems, matchByName, matchReferenceLocation } from "@/lib/reference/starter-inventory";
 import { newId } from "@/lib/id";
 import { formatShortDate } from "@/lib/format";
+import { fetchWeatherSnapshot } from "@/lib/weather-server";
+import { weatherCondition, weatherOutfitHints } from "@/lib/weather";
 import type { ActivityAction, ActivityEntityType, ActivityLogEntry, HouseholdTask, Note, TaskCategoryRecord, TaskSubtask } from "@/lib/types";
 import { activityLogEntryToInsertRow, householdTaskToInsertRow, noteToInsertRow, taskCategoryToInsertRow, taskSubtaskToInsertRow } from "@/lib/supabase/mappers";
 
@@ -929,6 +931,48 @@ export function createAskTools(supabase: SupabaseClient, householdId: string) {
             summary: `Add "${subtaskTitle}" to "${task.title}"`,
             payload: { taskId: task.id, taskTitle: task.title, subtaskTitle },
           },
+        };
+      },
+    }),
+
+    // "What should I wear today", "is it going to rain" — the read-only
+    // counterpart to setWeatherReminder below: that one only ever turns a
+    // push subscription on/off, it never actually answers a question in
+    // the moment the user asks it, which was the gap that first surfaced
+    // this tool's need. Reuses fetchWeatherSnapshot (lib/weather-server.ts)
+    // exactly like /api/v1/weather and send-weather-alerts already do,
+    // against the household's own stored location — no live GPS prompt
+    // from inside a chat turn.
+    getTodaysWeather: tool({
+      description:
+        "Look up today's real weather for this household's home location — use for 'what's the weather like', " +
+        "'what should I wear today', 'is it going to rain', 'how hot/cold is it'. Returns the current " +
+        "condition, today's high/low, and precipitation chance. `outfitHints` are ready-made suggestions " +
+        "(umbrella, layers, etc.) already computed from that data — weave them into your answer rather than " +
+        "inventing your own temperature/rain thresholds; an empty list just means nothing notable, dress " +
+        "normally. If `locationSet` is false, the household hasn't set a home location yet — say so plainly " +
+        "and suggest tapping the weather line under the household name on the Overview page to set one; never " +
+        "guess a temperature or condition.",
+      inputSchema: z.object({}),
+      execute: async () => {
+        const { data: household, error } = await supabase.from("households").select("latitude, longitude, location_label").eq("id", householdId).maybeSingle();
+        if (error) return { error: error.message };
+        if (!household || household.latitude === null || household.longitude === null) {
+          return { locationSet: false };
+        }
+
+        const snapshot = await fetchWeatherSnapshot(household.latitude as number, household.longitude as number);
+        if (!snapshot) return { error: "Weather is temporarily unavailable right now." };
+
+        return {
+          locationSet: true,
+          locationLabel: household.location_label as string | null,
+          condition: weatherCondition(snapshot.weatherCode).label,
+          temperatureF: snapshot.temperatureF,
+          todayHighF: snapshot.todayHighF,
+          todayLowF: snapshot.todayLowF,
+          precipitationChancePercent: snapshot.precipitationChancePercent,
+          outfitHints: weatherOutfitHints(snapshot),
         };
       },
     }),
