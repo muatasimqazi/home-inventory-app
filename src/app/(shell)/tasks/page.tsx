@@ -19,13 +19,19 @@ import { cn } from "@/lib/utils";
 const BUCKET_LABEL: Record<TaskDueBucket, string> = { overdue: "Overdue", today: "Today", upcoming: "Upcoming" };
 
 /**
- * List page — grouped Overdue / Today / Upcoming rather than a flat
- * sorted list, per docs/Household Hub Addendum.md §5's explicit call for
- * "a genuinely prominent Due Today/Overdue surface, not a buried list."
- * No existing visual precedent for "overdue" in this app to copy
- * (RecurringBills' daysUntil() clamps at 0 — bills never read as overdue
- * today) — this introduces that language for the first time, scoped to
- * Tasks.
+ * List page — the Pending tab is grouped Overdue / Today / Upcoming
+ * rather than a flat sorted list, per docs/Household Hub Addendum.md
+ * §5's explicit call for "a genuinely prominent Due Today/Overdue
+ * surface, not a buried list." No existing visual precedent for
+ * "overdue" in this app to copy (RecurringBills' daysUntil() clamps at
+ * 0 — bills never read as overdue today) — this introduces that
+ * language for the first time, scoped to Tasks.
+ *
+ * The Completed tab deliberately does NOT reuse that grouping — a
+ * completed one-time task's dueAt is almost always in the past by the
+ * time it's marked done, so bucketing it the same way put it in a red
+ * "Overdue" group as if it still needed attention. It gets a flat list
+ * instead, most-recently-completed first.
  */
 export default function TasksPage() {
   const router = useRouter();
@@ -41,6 +47,17 @@ export default function TasksPage() {
   const filtered = query.trim()
     ? visibleTasks.filter((t) => t.title.toLowerCase().includes(query.trim().toLowerCase()) || t.description.toLowerCase().includes(query.trim().toLowerCase()))
     : visibleTasks;
+
+  // Overdue/Today/Upcoming only makes sense for tasks still pending —
+  // taskDueBucket() just compares dueAt to now with no notion of
+  // isActive, so a completed one-time task (whose dueAt is almost always
+  // in the past by the time it's marked done) was landing in a red
+  // "Overdue" group here, reading as if it still needed attention. The
+  // Completed tab (only ever one-time tasks — recurring never sets
+  // isActive false, see HouseholdTask.isActive's own doc comment) gets a
+  // separate, flat rendering path below instead — most-recently-completed
+  // first, no bucket headers or danger styling.
+  const completedTasks = [...filtered].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 
   const groups: Record<TaskDueBucket, HouseholdTask[]> = { overdue: [], today: [], upcoming: [] };
   for (const t of filtered) groups[taskDueBucket(t.dueAt)].push(t);
@@ -112,6 +129,24 @@ export default function TasksPage() {
         />
       ) : filtered.length === 0 ? (
         <EmptyState icon="search" title={`No tasks match "${query.trim()}"`} description="Check the spelling or try a different word." />
+      ) : showCompleted ? (
+        // Flat, no bucket headers — Overdue/Today/Upcoming is a "this still
+        // needs doing" surface, meaningless for tasks that are done. See
+        // the comment on completedTasks above.
+        <div className="flex flex-col gap-2">
+          {completedTasks.map((task) => (
+            <TaskRow
+              key={task.id}
+              task={task}
+              overdue={false}
+              showCompleted={showCompleted}
+              assignee={personName(task.assignedToPersonId)}
+              progress={subtaskProgress(task.id)}
+              categoryName={categoryName(task.categoryId)}
+              onComplete={completeTask}
+            />
+          ))}
+        </div>
       ) : (
         (["overdue", "today", "upcoming"] as TaskDueBucket[]).map((bucket) =>
           groups[bucket].length === 0 ? null : (
@@ -120,43 +155,70 @@ export default function TasksPage() {
                 {BUCKET_LABEL[bucket]} · {groups[bucket].length}
               </h2>
               <div className="flex flex-col gap-2">
-                {groups[bucket].map((task) => {
-                  const assignee = personName(task.assignedToPersonId);
-                  const progress = subtaskProgress(task.id);
-                  return (
-                    <div key={task.id} className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 shadow-sm">
-                      {!showCompleted && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            completeTask(task.id);
-                            toast.success(`Completed "${task.title}"`);
-                          }}
-                          aria-label="Mark complete"
-                          className="tap-target flex size-8 shrink-0 items-center justify-center rounded-full border-2 border-border hover:border-ink-fill"
-                        />
-                      )}
-                      <Link href={`/tasks/${task.id}`} className="flex min-w-0 flex-1 items-center gap-3">
-                        <IconChip icon={taskCategoryIcon(categoryName(task.categoryId))} tone={bucket === "overdue" ? "danger" : "muted"} size="sm" />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-body font-medium text-ink">{task.title}</p>
-                          <p className={cn("truncate text-caption", bucket === "overdue" ? "text-danger" : "text-muted-foreground")}>
-                            {formatShortDate(task.dueAt)}
-                            {task.scheduleType === "recurring" && " · Repeats"}
-                            {assignee && ` · ${assignee}`}
-                            {progress && ` · ${progress}`}
-                          </p>
-                        </div>
-                        <Icon name="chevronRight" size={16} className="shrink-0 text-muted-foreground" />
-                      </Link>
-                    </div>
-                  );
-                })}
+                {groups[bucket].map((task) => (
+                  <TaskRow
+                    key={task.id}
+                    task={task}
+                    overdue={bucket === "overdue"}
+                    showCompleted={showCompleted}
+                    assignee={personName(task.assignedToPersonId)}
+                    progress={subtaskProgress(task.id)}
+                    categoryName={categoryName(task.categoryId)}
+                    onComplete={completeTask}
+                  />
+                ))}
               </div>
             </div>
           )
         )
       )}
+    </div>
+  );
+}
+
+function TaskRow({
+  task,
+  overdue,
+  showCompleted,
+  assignee,
+  progress,
+  categoryName,
+  onComplete,
+}: {
+  task: HouseholdTask;
+  overdue: boolean;
+  showCompleted: boolean;
+  assignee: string | null;
+  progress: string | null;
+  categoryName: string;
+  onComplete: (taskId: string) => void;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 shadow-sm">
+      {!showCompleted && (
+        <button
+          type="button"
+          onClick={() => {
+            onComplete(task.id);
+            toast.success(`Completed "${task.title}"`);
+          }}
+          aria-label="Mark complete"
+          className="tap-target flex size-8 shrink-0 items-center justify-center rounded-full border-2 border-border hover:border-ink-fill"
+        />
+      )}
+      <Link href={`/tasks/${task.id}`} className="flex min-w-0 flex-1 items-center gap-3">
+        <IconChip icon={taskCategoryIcon(categoryName)} tone={overdue ? "danger" : "muted"} size="sm" />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-body font-medium text-ink">{task.title}</p>
+          <p className={cn("truncate text-caption", overdue ? "text-danger" : "text-muted-foreground")}>
+            {formatShortDate(task.dueAt)}
+            {task.scheduleType === "recurring" && " · Repeats"}
+            {assignee && ` · ${assignee}`}
+            {progress && ` · ${progress}`}
+          </p>
+        </div>
+        <Icon name="chevronRight" size={16} className="shrink-0 text-muted-foreground" />
+      </Link>
     </div>
   );
 }
