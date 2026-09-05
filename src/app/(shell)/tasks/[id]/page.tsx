@@ -10,10 +10,19 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useInventoryStore } from "@/lib/store";
-import { taskDueBucket, daysUntil } from "@/lib/selectors";
+import { taskDueBucket, daysUntil, type TaskDueBucket } from "@/lib/selectors";
 import { taskCategoryIcon } from "@/lib/task-category";
 import { formatShortDate, relativeTime } from "@/lib/format";
+import type { HouseholdTask } from "@/lib/types";
 import { cn } from "@/lib/utils";
+
+/** The task's own current lifecycle state, surfaced as one prominent pill next to its title — previously just an easy-to-miss "· Completed" tacked onto the meta line, with no equivalent treatment at all for overdue/due-today/upcoming. Same tone tokens the Tasks list page (bucket headers) and Overview's ActionChip already use for these exact states, so "Overdue" reads the same color everywhere it appears. */
+function taskStatus(task: HouseholdTask, bucket: TaskDueBucket): { label: string; className: string } {
+  if (!task.isActive) return { label: "Completed", className: "bg-badge-green-bg text-badge-green-text" };
+  if (bucket === "overdue") return { label: "Overdue", className: "bg-danger/10 text-danger" };
+  if (bucket === "today") return { label: "Due today", className: "bg-badge-orange-bg text-badge-orange-text" };
+  return { label: "Upcoming", className: "bg-surface-muted text-ink" };
+}
 
 export default function TaskDetailPage() {
   const params = useParams<{ id: string }>();
@@ -36,6 +45,7 @@ export default function TaskDetailPage() {
   if (!task) return notFound();
 
   const bucket = taskDueBucket(task.dueAt);
+  const status = taskStatus(task, bucket);
   const categoryName = categories.find((c) => c.id === task.categoryId)?.name ?? "Other";
   const assignee = task.assignedToPersonId ? people.find((p) => p.id === task.assignedToPersonId) : null;
   const taskActivity = activity.filter((a) => a.entityId === task.id);
@@ -72,7 +82,10 @@ export default function TaskDetailPage() {
       <div className="flex items-start gap-3">
         <IconChip icon={taskCategoryIcon(categoryName)} tone={bucket === "overdue" && task.isActive ? "danger" : "yellow"} />
         <div className="min-w-0 flex-1">
-          <h1 className="text-screen-title font-semibold text-ink">{task.title}</h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-screen-title font-semibold text-ink">{task.title}</h1>
+            <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-micro font-semibold", status.className)}>{status.label}</span>
+          </div>
           <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-caption text-muted-foreground">
             <span>{categoryName}</span>
             <span>·</span>
@@ -89,12 +102,6 @@ export default function TaskDetailPage() {
               <>
                 <span>·</span>
                 <span>{assignee.displayName}</span>
-              </>
-            )}
-            {!task.isActive && (
-              <>
-                <span>·</span>
-                <span className="font-medium text-badge-green-text">Completed</span>
               </>
             )}
           </div>
@@ -132,12 +139,27 @@ export default function TaskDetailPage() {
 
       {completions.length > 0 && (
         <div className="flex flex-col gap-2 rounded-2xl border border-border bg-card p-4 shadow-sm">
-          <h2 className="text-section-title font-medium text-ink">Completion history</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-section-title font-medium text-ink">Completion history</h2>
+            <span className="text-caption text-muted-foreground">
+              {completions.length} time{completions.length === 1 ? "" : "s"}
+            </span>
+          </div>
+          {/* Each occurrence's own due date, not just when it was actually
+              completed — for a recurring task this is what actually
+              distinguishes one finished occurrence from the next
+              (completedAt alone doesn't say which cycle it closed out). */}
           <div className="flex flex-col divide-y divide-border">
             {completions.map((c) => (
-              <p key={c.id} className="py-2 text-caption text-muted-foreground">
-                Completed {relativeTime(c.completedAt)} by {members.find((m) => m.userId === c.completedByUserId)?.displayName ?? "someone"}
-              </p>
+              <div key={c.id} className="flex flex-col gap-0.5 py-2">
+                <p className="text-caption text-ink">
+                  Done {relativeTime(c.completedAt)} by {members.find((m) => m.userId === c.completedByUserId)?.displayName ?? "someone"}
+                </p>
+                <p className="text-micro text-muted-foreground">
+                  Was due {formatShortDate(c.dueAt)}
+                  {c.notes && ` · ${c.notes}`}
+                </p>
+              </div>
             ))}
           </div>
         </div>
@@ -186,16 +208,29 @@ export default function TaskDetailPage() {
   );
 }
 
-/** A real checklist inside the task — the "checklist" half of the
+/**
+ * A real checklist inside the task — the "checklist" half of the
  * original ask (0053_task_categories_and_subtasks.sql). No trash
  * lifecycle: unchecking/deleting a subtask is a plain, immediate,
- * low-stakes edit, same "just delete" precedent as Favorite. */
+ * low-stakes edit, same "just delete" precedent as Favorite.
+ *
+ * Collapsible (same hand-rolled chevron-toggle pattern location-tree.tsx's
+ * LocationAccordionRow already uses — no dedicated Accordion primitive
+ * exists in this app) so a task with a long checklist doesn't force
+ * everything below it (completion history, activity) further down the
+ * page than necessary once the list has already been worked through.
+ * Starts open — unlike LocationAccordionRow's many-siblings list (where
+ * collapsed-by-default keeps a long list of locations scannable), this is
+ * the one subtask section on this one task's own page, so there's no
+ * "too many open at once" problem to default around.
+ */
 function SubtasksSection({ taskId }: { taskId: string }) {
   const subtasks = useInventoryStore((s) => s.subtasks);
   const createSubtask = useInventoryStore((s) => s.createSubtask);
   const toggleSubtask = useInventoryStore((s) => s.toggleSubtask);
   const deleteSubtask = useInventoryStore((s) => s.deleteSubtask);
   const [newTitle, setNewTitle] = useState("");
+  const [open, setOpen] = useState(true);
 
   const own = subtasks.filter((s) => s.taskId === taskId).sort((a, b) => a.position - b.position);
 
@@ -208,51 +243,58 @@ function SubtasksSection({ taskId }: { taskId: string }) {
 
   return (
     <div className="flex flex-col gap-2 rounded-2xl border border-border bg-card p-4 shadow-sm">
-      <h2 className="text-section-title font-medium text-ink">
-        Subtasks{own.length > 0 && ` · ${own.filter((s) => s.isCompleted).length}/${own.length}`}
-      </h2>
-      {own.length > 0 && (
-        <div className="flex flex-col divide-y divide-border">
-          {own.map((s) => (
-            <div key={s.id} className="flex items-center gap-2 py-2">
-              <button
-                type="button"
-                onClick={() => toggleSubtask(s.id)}
-                aria-label={s.isCompleted ? "Mark not done" : "Mark done"}
-                className={cn(
-                  "tap-target flex size-6 shrink-0 items-center justify-center rounded-full border-2",
-                  s.isCompleted ? "border-ink-fill bg-ink-fill text-white" : "border-border"
-                )}
-              >
-                {s.isCompleted && <Icon name="check" size={12} />}
-              </button>
-              <p className={cn("min-w-0 flex-1 text-body", s.isCompleted ? "text-muted-foreground line-through" : "text-ink")}>{s.title}</p>
-              <button
-                type="button"
-                onClick={() => deleteSubtask(s.id)}
-                aria-label="Remove subtask"
-                className="tap-target flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-danger"
-              >
-                <Icon name="close" size={12} />
-              </button>
+      <button type="button" onClick={() => setOpen((o) => !o)} className="tap-target flex items-center justify-between gap-2 text-left">
+        <h2 className="text-section-title font-medium text-ink">
+          Subtasks{own.length > 0 && ` · ${own.filter((s) => s.isCompleted).length}/${own.length}`}
+        </h2>
+        <Icon name={open ? "chevronDown" : "chevronRight"} size={16} className="shrink-0 text-muted-foreground" />
+      </button>
+      {open && (
+        <>
+          {own.length > 0 && (
+            <div className="flex flex-col divide-y divide-border">
+              {own.map((s) => (
+                <div key={s.id} className="flex items-center gap-2 py-2">
+                  <button
+                    type="button"
+                    onClick={() => toggleSubtask(s.id)}
+                    aria-label={s.isCompleted ? "Mark not done" : "Mark done"}
+                    className={cn(
+                      "tap-target flex size-6 shrink-0 items-center justify-center rounded-full border-2",
+                      s.isCompleted ? "border-ink-fill bg-ink-fill text-white" : "border-border"
+                    )}
+                  >
+                    {s.isCompleted && <Icon name="check" size={12} />}
+                  </button>
+                  <p className={cn("min-w-0 flex-1 text-body", s.isCompleted ? "text-muted-foreground line-through" : "text-ink")}>{s.title}</p>
+                  <button
+                    type="button"
+                    onClick={() => deleteSubtask(s.id)}
+                    aria-label="Remove subtask"
+                    className="tap-target flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-danger"
+                  >
+                    <Icon name="close" size={12} />
+                  </button>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          )}
+          <div className="flex gap-2 pt-1">
+            <Input
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleAdd();
+              }}
+              placeholder="Add a subtask…"
+              className="h-9 flex-1"
+            />
+            <Button size="sm" variant="secondary" onClick={handleAdd} disabled={!newTitle.trim()}>
+              <Icon name="plus" size={14} />
+            </Button>
+          </div>
+        </>
       )}
-      <div className="flex gap-2 pt-1">
-        <Input
-          value={newTitle}
-          onChange={(e) => setNewTitle(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") handleAdd();
-          }}
-          placeholder="Add a subtask…"
-          className="h-9 flex-1"
-        />
-        <Button size="sm" variant="secondary" onClick={handleAdd} disabled={!newTitle.trim()}>
-          <Icon name="plus" size={14} />
-        </Button>
-      </div>
     </div>
   );
 }
