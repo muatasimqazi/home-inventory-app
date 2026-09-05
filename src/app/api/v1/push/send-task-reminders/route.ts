@@ -16,6 +16,8 @@ interface HouseholdTaskRow {
   assigned_to_person_id: string | null;
   is_active: boolean;
   trashed_at: string | null;
+  owner_user_id: string;
+  is_shared: boolean;
 }
 
 interface PersonRow {
@@ -36,6 +38,13 @@ interface PersonRow {
  * lower bound on the due-date query (an overdue task should keep
  * reminding, unlike a bill, which has no overdue concept at all — see
  * lib/selectors.ts's daysUntilTask() comment).
+ *
+ * Runs on the admin client, which bypasses RLS entirely — so a personal
+ * task's own privacy (0055_task_privacy.sql's is_shared/owner_user_id)
+ * has to be enforced by hand here, the same way it would otherwise be
+ * enforced automatically for any request going through the session-bound
+ * client. A personal task only ever notifies its owner, regardless of
+ * assignment.
  */
 export async function POST(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
@@ -55,7 +64,7 @@ export async function POST(request: Request) {
 
   const { data: tasks, error } = await admin
     .from("household_tasks")
-    .select("id, household_id, title, due_at, assigned_to_person_id, is_active, trashed_at")
+    .select("id, household_id, title, due_at, assigned_to_person_id, is_active, trashed_at, owner_user_id, is_shared")
     .eq("is_active", true)
     .is("trashed_at", null)
     .lte("due_at", windowEnd);
@@ -94,12 +103,17 @@ export async function POST(request: Request) {
       continue;
     }
 
-    // Assigned to a managed profile with no login (linked_user_id null) ->
-    // no recipient, skip silently — a kid without an account can't
+    // Personal task -> only its owner, full stop, regardless of
+    // assignment (see this route's own header comment — RLS isn't in
+    // play here, so this has to be checked explicitly). Otherwise:
+    // assigned to a managed profile with no login (linked_user_id null)
+    // -> no recipient, skip silently — a kid without an account can't
     // receive a push. Unassigned -> every household member, same "joint"
     // shape as send-due-bills' owner_user_id-null case.
     let recipientUserIds: string[];
-    if (task.assigned_to_person_id) {
+    if (!task.is_shared) {
+      recipientUserIds = [task.owner_user_id];
+    } else if (task.assigned_to_person_id) {
       const person = peopleById.get(task.assigned_to_person_id);
       recipientUserIds = person?.linked_user_id ? [person.linked_user_id] : [];
     } else {

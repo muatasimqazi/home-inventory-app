@@ -105,6 +105,14 @@ export default function TaskDetailPage() {
                 <span>{assignee.displayName}</span>
               </>
             )}
+            {!task.isShared && (
+              <>
+                <span>·</span>
+                <span className="flex items-center gap-1">
+                  <Icon name="lock" size={12} /> Personal
+                </span>
+              </>
+            )}
           </div>
         </div>
       </div>

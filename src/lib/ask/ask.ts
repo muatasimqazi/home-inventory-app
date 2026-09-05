@@ -87,7 +87,9 @@ function systemPrompt(): string {
     "'remember to feed the fish' should be a Note (something to keep) or a Task (something to do, needs a due " +
     "date) when it's truly unclear which was meant. A Note has no due date and isn't 'done' or 'not done' — " +
     "it's for saving information. A Task always has a due date and represents something to do — use it for " +
-    "anything with a 'when' (reminders, chores, appointments). " +
+    "anything with a 'when' (reminders, chores, appointments). Tasks default to shared with the whole " +
+    "household — pass createTask's isShared:false only when the user explicitly wants it personal/private " +
+    "('just for me', 'don't show the family'). " +
     "For 'remind me what to wear every day', 'send me a daily weather update', or 'stop the weather " +
     "notifications', use setWeatherReminder — this is a notification preference, not a Note or a Task, and " +
     "unlike those it executes immediately with no Confirm step, so describe it as already done. " +

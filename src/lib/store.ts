@@ -513,13 +513,15 @@ interface InventoryState {
     scheduleType: TaskScheduleType;
     dueAt: string;
     recurrenceRule?: TaskRecurrenceRule | null;
+    /** 0055_task_privacy.sql — defaults true (shared), the opposite default from createNote's isShared (personal by default there; shared by default here, matching every task created before this option existed). */
+    isShared?: boolean;
   }) => HouseholdTask;
   updateTask: (
     taskId: string,
     patch: Partial<
       Pick<
         HouseholdTask,
-        "title" | "description" | "categoryId" | "linkedEntityType" | "linkedEntityId" | "assignedToPersonId" | "scheduleType" | "dueAt" | "recurrenceRule" | "isActive"
+        "title" | "description" | "categoryId" | "linkedEntityType" | "linkedEntityId" | "assignedToPersonId" | "scheduleType" | "dueAt" | "recurrenceRule" | "isActive" | "isShared"
       >
     >
   ) => void;
@@ -2939,6 +2941,8 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       recurrenceRule: input.scheduleType === "recurring" ? (input.recurrenceRule ?? { freq: "days", interval: 1 }) : null,
       isActive: true,
       createdByUserId: get().currentUserId,
+      ownerUserId: get().currentUserId,
+      isShared: input.isShared ?? true,
       createdAt: now,
       updatedAt: now,
       trashedAt: null,

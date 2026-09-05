@@ -106,7 +106,7 @@ export async function performCreateTask(
   supabase: SupabaseClient,
   householdId: string,
   userId: string,
-  payload: { title: string; description: string; dueAt: string; category: string }
+  payload: { title: string; description: string; dueAt: string; category: string; isShared: boolean }
 ): Promise<{ task: HouseholdTask } | { error: string }> {
   const categoryResult = await resolveTaskCategoryId(supabase, householdId, userId, payload.category);
   if ("error" in categoryResult) return { error: categoryResult.error };
@@ -126,6 +126,8 @@ export async function performCreateTask(
     recurrenceRule: null,
     isActive: true,
     createdByUserId: userId,
+    ownerUserId: userId,
+    isShared: payload.isShared,
     createdAt: now,
     updatedAt: now,
     trashedAt: null,
@@ -755,8 +757,10 @@ export function createAskTools(supabase: SupabaseClient, householdId: string) {
       description:
         "Search the household's Tasks (reminders, chores, appointments) by title/description and/or status — " +
         "use for 'what tasks do I have', 'is there already a task for X', 'what's overdue', 'what's due this " +
-        "week', and to check for an existing task before creating a duplicate. Tasks have no per-record " +
-        "privacy — every household member's tasks are visible to everyone.",
+        "week', and to check for an existing task before creating a duplicate. Most tasks are shared and " +
+        "visible to every household member; RLS already scopes results to what the asking user can see (every " +
+        "shared task plus their own personal ones), so a personal task someone else owns simply won't appear " +
+        "— never mention privacy/permissions in your answer.",
       inputSchema: z.object({
         query: z.string().optional().describe("Freeform search against the task's title/description. Omit to list by due date."),
         status: z
@@ -862,18 +866,21 @@ export function createAskTools(supabase: SupabaseClient, householdId: string) {
         "datetime relative to today's date given above — default to 9:00 AM if no time was mentioned " +
         "('tomorrow' means tomorrow at 9am, not this exact moment). `category` is freeform (e.g. 'chore', " +
         "'grocery', 'maintenance', 'appointment') — matched against the household's real categories at " +
-        "confirm time, or a new one created then if nothing matches; omit it for a generic 'Other' bucket.",
+        "confirm time, or a new one created then if nothing matches; omit it for a generic 'Other' bucket. " +
+        "`isShared` defaults to true (visible to the whole household, same as every task before this option " +
+        "existed) — set it false only when the user explicitly says the task is personal/private/just for them.",
       inputSchema: z.object({
         title: z.string().describe("A short, clear task title, e.g. 'Take out the trash' or 'Dentist appointment'."),
         description: z.string().optional().describe("Optional extra detail."),
         dueAt: z.string().describe("Full ISO 8601 datetime, e.g. '2026-09-05T09:00:00.000Z' — compute this yourself from what the user said, relative to today's date."),
         category: z.string().optional().describe("Freeform category, e.g. 'chore', 'grocery', 'maintenance', 'appointment'. Omit for 'Other'."),
+        isShared: z.boolean().optional().describe("False to keep the task personal/private to the asking user; omit/true keeps it visible to the whole household (the default)."),
       }),
-      execute: async ({ title, description, dueAt, category }) => ({
+      execute: async ({ title, description, dueAt, category, isShared }) => ({
         pendingAction: {
           kind: "createTask",
-          summary: `Create task "${title}", due ${formatShortDate(dueAt)}`,
-          payload: { title, description: description ?? "", dueAt, category: category ?? "Other" },
+          summary: `Create task "${title}", due ${formatShortDate(dueAt)}${isShared === false ? " — personal" : ""}`,
+          payload: { title, description: description ?? "", dueAt, category: category ?? "Other", isShared: isShared ?? true },
         },
       }),
     }),

@@ -217,6 +217,11 @@ function TaskRow({
             {progress && ` · ${progress}`}
           </p>
         </div>
+        {!task.isShared && (
+          <span title="Personal — only visible to you" className="shrink-0 text-muted-foreground">
+            <Icon name="lock" size={14} />
+          </span>
+        )}
         <Icon name="chevronRight" size={16} className="shrink-0 text-muted-foreground" />
       </Link>
     </div>

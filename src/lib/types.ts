@@ -380,6 +380,10 @@ export interface HouseholdTask {
   /** one_time: false once completed. recurring: stays true until trashed — a recurring task is never "done," only its current occurrence is. */
   isActive: boolean;
   createdByUserId: string;
+  /** Same personal-or-shared toggle Notes has (0055_task_privacy.sql) — who owns a personal task, distinct from createdByUserId in principle (createdByUserId never changes hands; ownership doesn't currently have a transfer UI either, but the columns are separate on purpose, same as Notes). Only meaningful when isShared is false. */
+  ownerUserId: string;
+  /** true (the default) = every household member can see and edit this task, same as every task before this column existed. false = visible only to ownerUserId — RLS (can_view_task()) enforces this, not just the UI. */
+  isShared: boolean;
   createdAt: string;
   updatedAt: string;
   trashedAt: string | null;

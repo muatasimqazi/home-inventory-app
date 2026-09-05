@@ -72,6 +72,7 @@ export async function POST(request: Request) {
         description: typeof p.description === "string" ? p.description : "",
         dueAt: p.dueAt,
         category: typeof p.category === "string" ? p.category : "Other",
+        isShared: p.isShared !== false,
       });
       if ("error" in result) return NextResponse.json({ error: result.error }, { status: 502 });
       const { task } = result;

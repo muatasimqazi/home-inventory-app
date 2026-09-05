@@ -605,6 +605,8 @@ export interface HouseholdTaskRow {
   recurrence_rule: TaskRecurrenceRule | null;
   is_active: boolean;
   created_by_user_id: string;
+  owner_user_id: string;
+  is_shared: boolean;
   created_at: string;
   updated_at: string;
   trashed_at: string | null;
@@ -626,6 +628,8 @@ export function rowToHouseholdTask(row: HouseholdTaskRow): HouseholdTask {
     recurrenceRule: row.recurrence_rule,
     isActive: row.is_active,
     createdByUserId: row.created_by_user_id,
+    ownerUserId: row.owner_user_id,
+    isShared: row.is_shared,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     trashedAt: row.trashed_at,
@@ -648,6 +652,8 @@ export function householdTaskToInsertRow(task: HouseholdTask): HouseholdTaskRow 
     recurrence_rule: task.recurrenceRule,
     is_active: task.isActive,
     created_by_user_id: task.createdByUserId,
+    owner_user_id: task.ownerUserId,
+    is_shared: task.isShared,
     created_at: task.createdAt,
     updated_at: task.updatedAt,
     trashed_at: task.trashedAt,

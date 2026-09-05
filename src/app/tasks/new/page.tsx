@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icon";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TaskCategorySelect } from "@/components/task-category-select";
@@ -42,6 +43,7 @@ export default function NewTaskPage() {
   const [dueLocal, setDueLocal] = useState(defaultDueLocal);
   const [recurrenceInterval, setRecurrenceInterval] = useState("7");
   const [assignedToPersonId, setAssignedToPersonId] = useState(UNASSIGNED_VALUE);
+  const [isPersonal, setIsPersonal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -79,6 +81,7 @@ export default function NewTaskPage() {
       dueAt: new Date(dueLocal).toISOString(),
       recurrenceRule: scheduleType === "recurring" ? { freq: "days", interval } : null,
       assignedToPersonId: assignedToPersonId === UNASSIGNED_VALUE ? null : assignedToPersonId,
+      isShared: !isPersonal,
     });
     router.replace(`/tasks/${created.id}`);
   }
@@ -167,6 +170,14 @@ export default function NewTaskPage() {
             />
           </Field>
         )}
+
+        <label className="flex items-start gap-2 text-caption text-ink">
+          <Checkbox checked={isPersonal} onCheckedChange={(v) => setIsPersonal(v === true)} className="mt-0.5" />
+          <span>
+            Keep this personal
+            <span className="block text-micro text-muted-foreground">Only visible to you. Off by default — a task is shared with the whole household unless you check this.</span>
+          </span>
+        </label>
 
         {error && <p className="text-caption text-danger">{error}</p>}
       </div>
