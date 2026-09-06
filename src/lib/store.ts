@@ -1238,6 +1238,33 @@ function arrayMergeHandler<TRow, TDomain>(
   };
 }
 
+// Remembers which household this browser last had active — real bug
+// otherwise: hydrate() had nothing to go on besides always landing on
+// the oldest membership, so anyone in more than one household got
+// silently switched back to the "wrong" one on every reload/app
+// relaunch, no matter what they'd actually been looking at. Same
+// localStorage-with-try/catch shape desktop-sidebar.tsx's own collapsed-
+// state persistence already uses (private-browsing/storage-disabled
+// contexts can throw on write — the app still works, it just won't
+// remember across reloads there).
+const LAST_HOUSEHOLD_STORAGE_KEY = "schuaz:last-household-id";
+
+function getStoredHouseholdId(): string | null {
+  try {
+    return typeof window !== "undefined" ? window.localStorage.getItem(LAST_HOUSEHOLD_STORAGE_KEY) : null;
+  } catch {
+    return null;
+  }
+}
+
+function storeHouseholdId(householdId: string): void {
+  try {
+    if (typeof window !== "undefined") window.localStorage.setItem(LAST_HOUSEHOLD_STORAGE_KEY, householdId);
+  } catch {
+    // ignore — see getStoredHouseholdId's own comment
+  }
+}
+
 export const useInventoryStore = create<InventoryState>()((set, get) => {
   // Households the user belongs to besides the active one, keyed by id —
   // an in-memory cache of already-fetched bundles so switching back and
@@ -1340,9 +1367,13 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       }
 
       const households = ((householdRows ?? []) as HouseholdRow[]).map(rowToHousehold);
-      // myMemberships is sorted by joined_at ascending — land on the
-      // oldest membership's household after a fresh sign-in.
-      const currentHouseholdId = myMemberships[0].householdId;
+      // Prefer whichever household this browser last had active
+      // (storeHouseholdId, written by switchHousehold below) — falls
+      // back to the oldest membership (myMemberships is sorted by
+      // joined_at ascending) for a fresh sign-in, a different device, or
+      // a stored id for a household this user isn't a member of anymore.
+      const storedHouseholdId = getStoredHouseholdId();
+      const currentHouseholdId = storedHouseholdId && householdIds.includes(storedHouseholdId) ? storedHouseholdId : myMemberships[0].householdId;
       const bundle = await fetchHouseholdBundle(supabase, currentHouseholdId, user.id);
 
       set({
@@ -1623,6 +1654,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       otherHouseholdCache[state.currentHouseholdId] = snapshotBundle(state);
     }
     const bundle = await fetchHouseholdBundle(supabase, household.id, state.currentUserId);
+    storeHouseholdId(household.id);
     set((s) => ({
       households: [...s.households, household],
       currentHouseholdId: household.id,
@@ -1703,6 +1735,11 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     const supabase = getSupabaseBrowserClient();
     const cached = otherHouseholdCache[householdId];
     otherHouseholdCache[state.currentHouseholdId] = snapshotBundle(get());
+    // So the next hydrate() (a reload, a relaunch) lands back here
+    // instead of resetting to the oldest membership — see
+    // getStoredHouseholdId's own comment above the store for the bug
+    // this fixes.
+    storeHouseholdId(householdId);
 
     if (cached) {
       // Real bug this used to have: a cached household was trusted
@@ -1750,6 +1787,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       otherHouseholdCache[state.currentHouseholdId] = snapshotBundle(state);
     }
     const bundle = await fetchHouseholdBundle(supabase, household.id, state.currentUserId);
+    storeHouseholdId(household.id);
     set((s) => ({
       households: [...s.households, household],
       currentHouseholdId: household.id,
@@ -1792,6 +1830,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     const bundle = otherHouseholdCache[nextHousehold.id] ?? (await fetchHouseholdBundle(supabase, nextHousehold.id, state.currentUserId));
     delete otherHouseholdCache[leavingHouseholdId];
     delete otherHouseholdCache[nextHousehold.id];
+    storeHouseholdId(nextHousehold.id);
 
     set({
       households: state.households.filter((h) => h.id !== leavingHouseholdId),

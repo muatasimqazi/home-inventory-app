@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Icon, type IconName } from "@/components/icon";
 import { ReviewBadge } from "@/components/review-badge";
 import { ScanChooserSheet } from "@/components/scan-chooser-sheet";
+import { HouseholdSwitcher } from "@/components/household-switcher";
 import { useInventoryStore, useCurrentHousehold } from "@/lib/store";
 import { computeHouseholdSummary, contextualCaptureHref } from "@/lib/selectors";
 import { INVENTORY_LINKS, FINANCE_LINKS, SHARED_LINKS } from "@/lib/nav-links";
@@ -80,7 +81,7 @@ export function DesktopSidebar() {
         {!collapsed && (
           <div className="min-w-0 flex-1">
             <p className="text-body font-semibold text-ink">Schuaz</p>
-            <p className="truncate text-caption text-muted-foreground">{household.name}</p>
+            <HouseholdSwitcher textClassName="text-caption text-muted-foreground" />
           </div>
         )}
         <button
