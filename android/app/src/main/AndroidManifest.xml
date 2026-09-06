@@ -22,6 +22,19 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- Google sign-in's own callback (components/native-auth-
+                 deep-link-listener.tsx) — routes com.schuaz.app://... back
+                 into this same activity instead of leaving the user in
+                 the Custom Tab that ran the OAuth flow. custom_url_scheme
+                 (strings.xml) is the same value Capacitor set to this
+                 app's own appId by default. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="@string/custom_url_scheme" />
+            </intent-filter>
+
         </activity>
 
         <provider

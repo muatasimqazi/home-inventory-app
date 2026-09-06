@@ -3,12 +3,18 @@
 import { Suspense, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Capacitor } from "@capacitor/core";
+import { Browser } from "@capacitor/browser";
 import { Icon } from "@/components/icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { appOrigin } from "@/lib/urls";
 import { useAutoFocusVisible } from "@/hooks/use-autofocus-visible";
+
+// Must match native-auth-deep-link-listener.tsx's own copy of this same
+// constant (see that file's comment on why it isn't shared via import).
+const NATIVE_AUTH_CALLBACK_URL = "com.schuaz.app://auth/callback";
 
 type Mode = "default" | "email" | "authenticating" | "checkEmail";
 type AuthAction = "signin" | "signup";
@@ -42,6 +48,29 @@ function SignInInner() {
     // (or any other deep link) would land wherever /auth/callback's own
     // fallback points instead of back where the user actually came from.
     const next = searchParams.get("next") ?? "/dashboard";
+
+    // Native app: Google's OAuth pages refuse to render inside an
+    // embedded WebView at all (a Google-side anti-phishing policy, see
+    // native-auth-deep-link-listener.tsx's own comment) — skipBrowserRedirect
+    // gets the authorize URL back instead of Supabase auto-navigating the
+    // WebView itself, then Browser.open() shows it in a real Custom Tab
+    // Google's check accepts. redirectTo is this app's own custom scheme,
+    // not a real https:// URL — that listener component is what actually
+    // completes the sign-in once Google redirects back to it.
+    if (Capacitor.isNativePlatform()) {
+      const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: `${NATIVE_AUTH_CALLBACK_URL}?next=${encodeURIComponent(next)}`, skipBrowserRedirect: true },
+      });
+      if (oauthError || !data.url) {
+        setError(oauthError?.message ?? "Couldn't start sign-in.");
+        setMode("default");
+        return;
+      }
+      await Browser.open({ url: data.url });
+      return;
+    }
+
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: `${appOrigin()}/auth/callback?next=${encodeURIComponent(next)}` },

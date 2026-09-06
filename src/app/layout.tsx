@@ -6,6 +6,7 @@ import { HydrationGate } from "@/components/hydration-gate";
 import { DomainGate } from "@/components/domain-gate";
 import { PhotoLightbox } from "@/components/photo-lightbox";
 import { PointerEventsWatchdog } from "@/components/pointer-events-watchdog";
+import { NativeAuthDeepLinkListener } from "@/components/native-auth-deep-link-listener";
 
 export const metadata: Metadata = {
   title: "Schuaz",
@@ -95,6 +96,11 @@ export default function RootLayout({
               has mounted. See its own file for what bug this guards
               against ("sometimes doesn't let you click stuff", app-wide). */}
           <PointerEventsWatchdog />
+          {/* Native-app-only (no-op in a browser/PWA) — completes Google
+              sign-in's round trip through the in-app browser tab. See
+              its own file for the "login opens Chrome and stays there"
+              bug this fixes. */}
+          <NativeAuthDeepLinkListener />
         </ThemeProvider>
       </body>
     </html>
