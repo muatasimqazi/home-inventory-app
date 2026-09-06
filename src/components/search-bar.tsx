@@ -2,6 +2,7 @@
 
 import { forwardRef } from "react";
 import { Icon } from "@/components/icon";
+import { VoiceInputButton } from "@/components/voice-input-button";
 import { cn } from "@/lib/utils";
 
 interface SearchBarProps {
@@ -53,8 +54,12 @@ export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(function S
         // still shrinks it back to the intended size on desktop, where
         // this browser behavior doesn't apply anyway (same pattern as
         // ui/input.tsx's own text-base md:text-sm).
-        className="tap-target h-full w-full rounded-2xl bg-transparent pr-4 pl-11 text-base text-ink outline-none placeholder:text-muted-foreground md:text-body"
+        className="tap-target h-full w-full rounded-2xl bg-transparent pr-11 pl-11 text-base text-ink outline-none placeholder:text-muted-foreground md:pr-20 md:text-body"
       />
+      {/* Voice input (docs/Voice Input Addendum.md §2) — every screen this
+          shared bar appears on gets it in one change. Populates the
+          field via onChange, same as typing; never auto-submits. */}
+      <VoiceInputButton onTranscript={onChange} className="absolute right-1 md:right-13" />
       {/* Keyboard shortcut hint — desktop only, per design (never shown on mobile). */}
       <span className="pointer-events-none absolute right-3 hidden items-center justify-center rounded-md bg-surface-muted px-1.5 py-0.5 text-micro text-muted-foreground md:flex">
         ⌘K

@@ -43,6 +43,7 @@ import {
   MapPin,
   MapPinOff,
   Maximize2,
+  Mic,
   MoreVertical,
   Moon,
   Move,
@@ -119,6 +120,7 @@ const ICONS = {
   panelLeftClose: PanelLeftClose,
   panelLeftOpen: PanelLeftOpen,
   needsReview: AlertCircle,
+  alertCircle: AlertCircle,
   check: Check,
   imageOff: ImageOff,
   gallery: Images,
@@ -151,6 +153,7 @@ const ICONS = {
   list: List,
   mapPinOff: MapPinOff,
   maximize: Maximize2,
+  mic: Mic,
   link: Link2,
   shieldCheck: ShieldCheck,
   // Finance domain (docs/Personal Finance PRD.md §35 "Major components")

@@ -5,8 +5,10 @@ import { Icon } from "@/components/icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AskConversationEntry } from "@/components/ask-conversation-entry";
+import { VoiceInputButton } from "@/components/voice-input-button";
 import { useAskConversation } from "@/hooks/use-ask-conversation";
 import { useAskConversationStore } from "@/lib/ask-conversation-store";
+import { speakAnswer } from "@/lib/speak-answer";
 import { useInventoryStore } from "@/lib/store";
 import { useKeyboardInset } from "@/hooks/use-keyboard-inset";
 import { cn } from "@/lib/utils";
@@ -49,6 +51,10 @@ export function AskFab() {
   const togglePanel = useAskConversationStore((s) => s.togglePanel);
   const { entries, ask, confirmPendingAction, cancelPendingAction } = useAskConversation(householdId);
   const [input, setInput] = useState("");
+  // Set only by the mic (VoiceInputButton's onTranscript below), cleared
+  // on any manual edit — see submit()'s own comment on why this decides
+  // whether the answer gets spoken back (docs/Voice Input Addendum.md §3).
+  const askedByVoiceRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   // This panel is a hand-rolled `fixed`-position element, not the shared
   // Sheet component — sheet.tsx already applies this same fix for every
@@ -65,7 +71,21 @@ export function AskFab() {
 
   function submit(question: string) {
     setInput("");
-    ask(question);
+    // Only a voice-originated question gets its answer spoken back — a
+    // typed question stays purely text-in-text-out (docs/Voice Input
+    // Addendum.md §3's own reasoning: Ask shouldn't start talking
+    // unprompted just because someone typed a quick question). entries
+    // only ever grows by one per ask() call in this single-tab session,
+    // so the entry right after whatever was last before this call is
+    // reliably the one this question produced.
+    const viaVoice = askedByVoiceRef.current;
+    askedByVoiceRef.current = false;
+    const beforeCount = useAskConversationStore.getState().entries.length;
+    void ask(question).then(() => {
+      if (!viaVoice) return;
+      const answer = useAskConversationStore.getState().entries[beforeCount]?.answer;
+      if (answer) speakAnswer(answer);
+    });
   }
 
   // No household context yet (e.g. mid household-setup) — nothing to ask about.
@@ -138,7 +158,21 @@ export function AskFab() {
             }}
             className="flex shrink-0 gap-2 border-t border-border bg-card p-3"
           >
-            <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask anything…" className="h-10 flex-1 text-caption" />
+            <Input
+              value={input}
+              onChange={(e) => {
+                askedByVoiceRef.current = false;
+                setInput(e.target.value);
+              }}
+              placeholder="Ask anything…"
+              className="h-10 flex-1 text-caption"
+            />
+            <VoiceInputButton
+              onTranscript={(text) => {
+                askedByVoiceRef.current = true;
+                setInput(text);
+              }}
+            />
             <Button type="submit" size="icon" className={cn(!input.trim() && "opacity-50")} disabled={!input.trim()} aria-label="Send">
               <Icon name="arrowLeft" size={16} className="rotate-180" />
             </Button>

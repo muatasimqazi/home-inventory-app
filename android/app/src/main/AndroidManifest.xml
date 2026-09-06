@@ -64,4 +64,9 @@
          plugin's own checkPermissions() already reports "granted" there
          regardless. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Voice input (docs/Voice Input Addendum.md) uses getUserMedia()/
+         MediaRecorder directly in the WebView, same "no native plugin
+         needed" reasoning as camera/location above. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 </manifest>

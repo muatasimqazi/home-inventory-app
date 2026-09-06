@@ -5,7 +5,10 @@ import { Icon } from "@/components/icon";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { AskConversationEntry } from "@/components/ask-conversation-entry";
+import { VoiceInputButton } from "@/components/voice-input-button";
 import { useAskConversation } from "@/hooks/use-ask-conversation";
+import { useAskConversationStore } from "@/lib/ask-conversation-store";
+import { speakAnswer } from "@/lib/speak-answer";
 import type { CategorySpend } from "@/lib/selectors";
 
 /**
@@ -27,6 +30,9 @@ import type { CategorySpend } from "@/lib/selectors";
 export function FinanceAiCard({ householdId, categorySpend }: { householdId: string; categorySpend: CategorySpend[] }) {
   const { entries, ask, confirmPendingAction, cancelPendingAction } = useAskConversation(householdId);
   const [input, setInput] = useState("");
+  // See ask-fab.tsx's identical field for what this is/does — same
+  // voice-in-voice-out reasoning (docs/Voice Input Addendum.md §3).
+  const askedByVoiceRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -46,7 +52,14 @@ export function FinanceAiCard({ householdId, categorySpend }: { householdId: str
 
   function submit(question: string) {
     setInput("");
-    ask(question);
+    const viaVoice = askedByVoiceRef.current;
+    askedByVoiceRef.current = false;
+    const beforeCount = useAskConversationStore.getState().entries.length;
+    void ask(question).then(() => {
+      if (!viaVoice) return;
+      const answer = useAskConversationStore.getState().entries[beforeCount]?.answer;
+      if (answer) speakAnswer(answer);
+    });
   }
 
   return (
@@ -88,7 +101,21 @@ export function FinanceAiCard({ householdId, categorySpend }: { householdId: str
           }}
           className="flex gap-2"
         >
-          <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask anything about your finances…" className="h-10 flex-1 text-caption" />
+          <Input
+            value={input}
+            onChange={(e) => {
+              askedByVoiceRef.current = false;
+              setInput(e.target.value);
+            }}
+            placeholder="Ask anything about your finances…"
+            className="h-10 flex-1 text-caption"
+          />
+          <VoiceInputButton
+            onTranscript={(text) => {
+              askedByVoiceRef.current = true;
+              setInput(text);
+            }}
+          />
           <Button type="submit" size="icon" className={!input.trim() ? "opacity-50" : undefined} disabled={!input.trim()} aria-label="Send">
             <Icon name="arrowLeft" size={16} className="rotate-180" />
           </Button>
