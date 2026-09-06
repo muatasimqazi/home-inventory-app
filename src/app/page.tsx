@@ -10,11 +10,11 @@ import { BILLING_PLAN_LABEL, BILLING_PLAN_DESCRIPTION, BILLING_PLAN_FEATURES } f
 const PLAN_PRICE_CENTS: Record<"plus" | "pro", number> = { plus: 799, pro: 1499 };
 
 export const metadata: Metadata = {
-  title: "Schuaz — Know your home. Run your household.",
+  title: "Schuaz — Just ask your home.",
   description:
-    "Photograph what you own, connect your bank, keep notes and tasks in one place — then just ask, and Schuaz tells you where it is, what it cost, or what's due today.",
+    "Where's the drill? How much did we spend at Costco? Is the TV still under warranty? Schuaz already knows — because it's the one place everything about your household actually lives.",
   openGraph: {
-    title: "Schuaz — Know your home. Run your household.",
+    title: "Schuaz — Just ask your home.",
     description: "One place for your household's belongings, money, wardrobe, notes, and tasks — with AI doing the heavy lifting.",
     type: "website",
   },
@@ -67,10 +67,10 @@ export default function HomePage() {
         <section className="grid gap-10 py-10 md:grid-cols-2 md:items-center md:py-20">
           <div className="flex flex-col gap-6">
             <p className="w-fit rounded-full bg-brand-100 px-3 py-1 text-caption font-medium text-yellow-text">One place for household life</p>
-            <h1 className="text-[clamp(2.25rem,6vw,3.75rem)] leading-[1.02] font-semibold tracking-tight text-ink">Know your home. Run your household.</h1>
+            <h1 className="text-[clamp(2.25rem,6vw,3.75rem)] leading-[1.02] font-semibold tracking-tight text-ink">Just ask your home.</h1>
             <p className="max-w-lg text-body text-muted-foreground">
-              Photograph what you own, connect your bank, keep notes and tasks in one place — then just ask, and Schuaz tells you where it is, what it
-              cost, or what&apos;s due today.
+              Where&apos;s the drill? How much did we spend at Costco? Is the TV still under warranty? Schuaz already knows — because it&apos;s the one
+              place everything about your household actually lives.
             </p>
             <div className="flex flex-col gap-3 sm:flex-row">
               <Link
@@ -89,29 +89,33 @@ export default function HomePage() {
             <p className="text-micro text-muted-foreground">No credit card required to start.</p>
           </div>
 
-          {/* Composition: one household dashboard, surrounded by real
-              connected capabilities — not a generic screenshot. Every
-              card below reflects something the product actually does
-              today. */}
+          {/* Composition leads with the real Ask interaction (the hero's
+              own headline is now "Just ask your home"), with the same
+              connected-capability cards as satellite proof underneath —
+              not a generic dashboard screenshot. Every card here reflects
+              something the product actually does today. */}
           <div className="relative">
             <div className="rounded-3xl border border-border bg-card p-5 shadow-lg">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-micro font-semibold tracking-wide text-muted-foreground uppercase">Overview</p>
-                  <p className="text-section-title font-semibold text-ink">The Miller Household</p>
-                </div>
-                <span className="flex size-10 items-center justify-center rounded-full bg-brand-100">
-                  <Icon name="home" size={18} className="text-yellow-text" />
+              <div className="flex items-center gap-2">
+                <span className="flex size-8 items-center justify-center rounded-full bg-brand-100">
+                  <Icon name="ai" size={16} className="text-yellow-text" />
                 </span>
+                <p className="text-caption font-medium text-muted-foreground">Ask</p>
               </div>
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                <MiniCard icon="box" label="Where's my drill?" value="Garage → Shelf 2 → Blue Bin" />
-                <MiniCard icon="sun" label="What should I wear?" value="62° · bring a light jacket" />
-                <MiniCard icon="cash" label="Spending this month" value="$2,340" />
-                <MiniCard icon="tasks" label="Today's tasks" value="3 remaining" />
+              <div className="mt-4 flex justify-end">
+                <p className="rounded-2xl rounded-br-sm bg-ink-fill px-4 py-2.5 text-caption text-white">Where&apos;s my drill?</p>
+              </div>
+              <div className="mt-2 flex items-start gap-2 rounded-2xl rounded-tl-sm bg-brand-100 p-3">
+                <Icon name="ai" size={14} className="mt-0.5 shrink-0 text-yellow-text" />
+                <p className="text-caption text-ink">Garage → Shelf 2 → Blue Bin.</p>
+              </div>
+              <div className="mt-4 grid grid-cols-3 gap-2 border-t border-border pt-4">
+                <MiniCard icon="cash" label="Spending" value="$2,340" />
+                <MiniCard icon="tasks" label="Tasks" value="3 due" />
+                <MiniCard icon="sun" label="Weather" value="Bring a jacket" />
               </div>
             </div>
-            <div className="absolute -right-4 -bottom-6 hidden rotate-3 rounded-2xl border border-border bg-card p-3 shadow-lg sm:block">
+            <div className="absolute -top-6 -right-4 hidden rotate-3 rounded-2xl border border-border bg-card p-3 shadow-lg sm:block">
               <div className="flex items-center gap-2">
                 <Icon name="ai" size={14} className="text-yellow-text" />
                 <p className="text-caption font-medium text-ink">Is the TV still under warranty?</p>
