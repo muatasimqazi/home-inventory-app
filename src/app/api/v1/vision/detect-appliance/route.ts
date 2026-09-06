@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { detectApplianceLabel } from "@/lib/vision/detect";
 import { upstreamStatusCode } from "@/lib/upstream-error";
+import { rateLimitGate } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -8,8 +9,12 @@ export const runtime = "nodejs";
 // Plan Workstream 7). Mirrors /api/v1/vision/detect/route.ts's shape exactly
 // — same Gateway-routed primary+fallback model pair, same transient-overload
 // handling — just a different underlying detection task (one label reading,
-// not a list of scene items).
+// not a list of scene items). Same rate-limiting reasoning too — see that
+// route's own comment (docs/Rate Limiting Addendum.md).
 export async function POST(request: Request) {
+  const gate = await rateLimitGate("vision");
+  if (!gate.ok) return gate.response;
+
   let photos: unknown;
   try {
     ({ photos } = await request.json());

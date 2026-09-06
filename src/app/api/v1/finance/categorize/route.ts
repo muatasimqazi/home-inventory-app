@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { suggestTransactionCategories, type CategorizeTransactionInput, type CategorizeCategoryOption } from "@/lib/finance/categorize";
 import { upstreamStatusCode } from "@/lib/upstream-error";
+import { rateLimitGate } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -35,8 +36,13 @@ const MAX_TRANSACTIONS = 60;
 // this household's own real, active category list, never invented) back
 // out. Same Gateway-routed primary+fallback reliability engineering as
 // /api/v1/vision/detect, via lib/finance/categorize.ts's separate
-// (non-vision) model-calling code.
+// (non-vision) model-calling code. Same rate-limiting reasoning as the
+// vision routes (docs/Rate Limiting Addendum.md) — this had no
+// auth-derivation code of its own before this either.
 export async function POST(request: Request) {
+  const gate = await rateLimitGate("finance-ai");
+  if (!gate.ok) return gate.response;
+
   let body: unknown;
   try {
     body = await request.json();

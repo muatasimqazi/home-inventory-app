@@ -1,13 +1,19 @@
 import { NextResponse } from "next/server";
 import { suggestApplianceDocumentLinks } from "@/lib/vision/detect";
 import { upstreamStatusCode } from "@/lib/upstream-error";
+import { rateLimitGate } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
 // Same shape as /api/v1/vision/detect — this route exists so the client
 // never touches a model provider directly, only this server-side call,
-// which routes through Vercel AI Gateway (see lib/vision/detect.ts).
+// which routes through Vercel AI Gateway (see lib/vision/detect.ts),
+// including that route's own rate-limiting reasoning (docs/Rate Limiting
+// Addendum.md).
 export async function POST(request: Request) {
+  const gate = await rateLimitGate("vision");
+  if (!gate.ok) return gate.response;
+
   let manufacturer: unknown;
   let modelNumber: unknown;
   try {

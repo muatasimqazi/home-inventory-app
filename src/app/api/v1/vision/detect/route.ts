@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { detectItems } from "@/lib/vision/detect";
 import { withReview, type DetectedItem } from "@/lib/ai";
 import { upstreamStatusCode } from "@/lib/upstream-error";
+import { rateLimitGate } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -12,6 +13,14 @@ export const runtime = "nodejs";
 // Gateway (see lib/vision/detect.ts), so there's no provider API key to
 // guard server-side here anymore — just the Gateway's own credentials.
 export async function POST(request: Request) {
+  // docs/Rate Limiting Addendum.md — this route had no auth-derivation
+  // code of its own before this (proxy.ts's middleware already confirmed
+  // *a* session exists, but never told this route *who*), which also
+  // meant no way to key a per-user cost limit on a route that calls a
+  // real, billed model on every request.
+  const gate = await rateLimitGate("vision");
+  if (!gate.ok) return gate.response;
+
   let photos: unknown;
   let locationName: unknown;
   try {

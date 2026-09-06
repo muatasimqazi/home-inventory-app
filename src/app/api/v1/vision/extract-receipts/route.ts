@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { extractReceipts } from "@/lib/vision/extract-receipts";
 import type { ReceiptExtraction } from "@/lib/ai";
 import { upstreamStatusCode } from "@/lib/upstream-error";
+import { rateLimitGate } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -9,8 +10,12 @@ export const runtime = "nodejs";
 // lib/ai.ts's HttpVisionProvider.extractReceipts() calls this rather than
 // the browser touching a model provider directly. Both models route
 // through Vercel AI Gateway (lib/vision/extract-receipts.ts), same as
-// /api/v1/vision/detect.
+// /api/v1/vision/detect — including that route's own rate-limiting
+// reasoning (docs/Rate Limiting Addendum.md).
 export async function POST(request: Request) {
+  const gate = await rateLimitGate("vision");
+  if (!gate.ok) return gate.response;
+
   let photos: unknown;
   try {
     ({ photos } = await request.json());

@@ -6,6 +6,7 @@ import { itemStudioPhotoToInsertRow } from "@/lib/supabase/mappers";
 import { newId } from "@/lib/id";
 import { WARDROBE_STYLES } from "@/lib/wardrobe-styles";
 import type { ItemStudioPhoto, ItemStudioPhotoAspectRatio, ItemStudioPhotoStyle } from "@/lib/types";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -62,6 +63,19 @@ export async function POST(request: Request) {
 
   const auth = await requireHouseholdMember(householdId);
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
+  // docs/Rate Limiting Addendum.md — up to MAX_STYLES real, billed image
+  // generations per call; counted as one request against the limiter
+  // (not one per style) for the same "simple starting point" reasoning
+  // the addendum's own §4 states — worth revisiting if this specific
+  // route turns out to need its own tighter accounting.
+  const limit = await checkRateLimit("vision", auth.userId);
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: "You're doing that a lot right now — try again in a moment.", retryable: true },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } }
+    );
+  }
 
   const supabase = await getSupabaseServerClient();
 

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { transcribe } from "ai";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { upstreamStatusCode } from "@/lib/upstream-error";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -27,6 +28,16 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });
+  }
+
+  // docs/Rate Limiting Addendum.md — shares Ask's own limiter tier;
+  // voice is just a different way in to the same feature.
+  const limit = await checkRateLimit("ask", user.id);
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: "You're doing that a lot right now — try again in a moment.", retryable: true },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } }
+    );
   }
 
   const arrayBuffer = await request.arrayBuffer();

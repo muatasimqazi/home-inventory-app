@@ -24,6 +24,8 @@
     "@tiptap/pm": "^3.30.5",
     "@tiptap/react": "^3.30.5",
     "@tiptap/starter-kit": "^3.30.5",
+    "@upstash/ratelimit": "^2.0.8",
+    "@upstash/redis": "^1.38.4",
     "ai": "^7.0.37",
     "barcode-detector": "^3.2.2",
     "class-variance-authority": "^0.7.1",

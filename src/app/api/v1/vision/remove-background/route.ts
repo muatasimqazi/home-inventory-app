@@ -3,6 +3,7 @@ import { requireHouseholdMember } from "@/lib/authorize";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { removeItemBackground } from "@/lib/vision/remove-background";
 import { newId } from "@/lib/id";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -35,6 +36,16 @@ export async function POST(request: Request) {
 
   const auth = await requireHouseholdMember(householdId);
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
+  // docs/Rate Limiting Addendum.md — a real, billed model call on every
+  // request.
+  const limit = await checkRateLimit("vision", auth.userId);
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: "You're doing that a lot right now — try again in a moment.", retryable: true },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } }
+    );
+  }
 
   let resultPng: Buffer;
   try {

@@ -1,15 +1,20 @@
 import { NextResponse } from "next/server";
 import { detectWardrobeItem } from "@/lib/vision/detect";
 import { upstreamStatusCode } from "@/lib/upstream-error";
+import { rateLimitGate } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
 // Wardrobe item cataloging endpoint (docs/Wardrobe Inventory.md). Mirrors
 // /api/v1/vision/detect-appliance/route.ts's shape exactly — same
 // Gateway-routed primary+fallback model pair, same transient-overload
-// handling — just a different underlying detection task (one clothing
-// item, not a label reading).
+// handling, same rate-limiting reasoning (docs/Rate Limiting Addendum.md)
+// — just a different underlying detection task (one clothing item, not a
+// label reading).
 export async function POST(request: Request) {
+  const gate = await rateLimitGate("vision");
+  if (!gate.ok) return gate.response;
+
   let photos: unknown;
   try {
     ({ photos } = await request.json());

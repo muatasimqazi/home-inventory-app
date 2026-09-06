@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { extractStatement } from "@/lib/vision/extract-statement";
 import type { StatementTransactionExtraction } from "@/lib/ai";
 import { upstreamStatusCode } from "@/lib/upstream-error";
+import { rateLimitGate } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -9,9 +10,14 @@ export const runtime = "nodejs";
 // extractStatement() calls this rather than the browser touching a model
 // provider directly. Both models route through Vercel AI Gateway
 // (lib/vision/extract-statement.ts), same as the other /api/v1/vision/*
-// routes. Single `file` (one PDF), not an array — a statement upload is
-// always exactly one document, unlike receipts' "a stack of photos" case.
+// routes, including their shared rate-limiting reasoning (docs/Rate
+// Limiting Addendum.md). Single `file` (one PDF), not an array — a
+// statement upload is always exactly one document, unlike receipts' "a
+// stack of photos" case.
 export async function POST(request: Request) {
+  const gate = await rateLimitGate("vision");
+  if (!gate.ok) return gate.response;
+
   let file: unknown;
   try {
     ({ file } = await request.json());

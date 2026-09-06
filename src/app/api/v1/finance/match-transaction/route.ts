@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { matchTransactionCandidate, type MatchCandidateTransaction, type MatchTransactionInput } from "@/lib/finance/match-transaction";
 import { upstreamStatusCode } from "@/lib/upstream-error";
+import { rateLimitGate } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -26,8 +27,12 @@ const MAX_OPTIONS = 10;
 // prevention plan, part B) — see lib/finance/match-transaction.ts's own
 // doc comment for when/why this fires. Pure text/numbers reasoning, not
 // vision — candidates come from the client, already RLS-scoped in the
-// store, same as /api/v1/finance/categorize.
+// store, same as /api/v1/finance/categorize — including its
+// rate-limiting reasoning (docs/Rate Limiting Addendum.md).
 export async function POST(request: Request) {
+  const gate = await rateLimitGate("finance-ai");
+  if (!gate.ok) return gate.response;
+
   let body: unknown;
   try {
     body = await request.json();

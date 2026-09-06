@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { suggestBudgetAmounts, type BudgetRecommendationInput } from "@/lib/finance/budget-recommendations";
 import { upstreamStatusCode } from "@/lib/upstream-error";
+import { rateLimitGate } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -23,8 +24,13 @@ const MAX_CATEGORIES = 30;
 // (already computed client-side by trailingCategorySpend(), which is
 // already RLS-scoped since it runs over the caller's own store data), a
 // suggested $ target + one-line reasoning back out. Same Gateway-routed
-// primary+fallback reliability engineering as /api/v1/finance/categorize.
+// primary+fallback reliability engineering as /api/v1/finance/categorize
+// — including its rate-limiting reasoning (docs/Rate Limiting
+// Addendum.md).
 export async function POST(request: Request) {
+  const gate = await rateLimitGate("finance-ai");
+  if (!gate.ok) return gate.response;
+
   let body: unknown;
   try {
     body = await request.json();
