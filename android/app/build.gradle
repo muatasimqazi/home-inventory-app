@@ -1,5 +1,19 @@
 apply plugin: 'com.android.application'
 
+// Release signing (docs/Mobile App Addendum.md §5 Phase 3) — the real
+// upload key .jks lives outside this repo entirely
+// (~/.android-signing/schuaz/), and this properties file pointing at it
+// is itself gitignored (real machine-local secrets, never committed). A
+// debug build (what every earlier phase of this project has used) needs
+// neither — this only wires up releaseTypes.release below, gated on the
+// file actually existing so a fresh clone without it still builds fine
+// (just without a signed release variant).
+def keystorePropertiesFile = rootProject.file('keystore.properties')
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
 android {
     namespace = "com.schuaz.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -16,8 +30,21 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (keystorePropertiesFile.exists()) {
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
+        }
+    }
     buildTypes {
         release {
+            if (keystorePropertiesFile.exists()) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
