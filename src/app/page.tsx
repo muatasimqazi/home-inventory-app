@@ -98,7 +98,7 @@ export default function HomePage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-micro font-semibold tracking-wide text-muted-foreground uppercase">Overview</p>
-                  <p className="text-section-title font-semibold text-ink">The Qazi Household</p>
+                  <p className="text-section-title font-semibold text-ink">The Miller Household</p>
                 </div>
                 <span className="flex size-10 items-center justify-center rounded-full bg-brand-100">
                   <Icon name="home" size={18} className="text-yellow-text" />
