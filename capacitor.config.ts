@@ -14,7 +14,7 @@ import type { CapacitorConfig } from "@capacitor/cli";
 // real mobile browser, and for the WebView's own cookie jar to treat this
 // as a normal HTTPS origin.
 const config: CapacitorConfig = {
-  appId: "com.muatasim.schuaz",
+  appId: "com.schuaz.app",
   appName: "Schuaz",
   webDir: "www",
   server: {

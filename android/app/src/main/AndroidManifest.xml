@@ -49,4 +49,12 @@
          sheet.tsx) uses navigator.geolocation directly, same reasoning. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
+    <!-- Android 13+ requires this to actually display a notification —
+         @capacitor/push-notifications' requestPermissions() prompts for
+         it (docs/Mobile App Addendum.md §2.1, hooks/use-native-push-
+         notifications.ts). On Android 12 and below it's a no-op; the
+         plugin's own checkPermissions() already reports "granted" there
+         regardless. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 </manifest>

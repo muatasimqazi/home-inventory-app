@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { Capacitor } from "@capacitor/core";
 import { Icon } from "@/components/icon";
 import { BackButton } from "@/components/back-button";
 import { Button } from "@/components/ui/button";
 import { usePushNotifications } from "@/hooks/use-push-notifications";
+import { useNativePushNotifications } from "@/hooks/use-native-push-notifications";
 import { useInventoryStore } from "@/lib/store";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { rowToNotificationPreference } from "@/lib/supabase/mappers";
@@ -53,7 +55,17 @@ const EVENT_TYPES: { domainKey: string; eventType: string; label: string; descri
 ];
 
 export default function NotificationSettingsPage() {
-  const { state, subscribe, unsubscribe } = usePushNotifications();
+  // Both hooks are always called (rules of hooks) — each one no-ops in
+  // the context it doesn't apply to (usePushNotifications' service-
+  // worker path is meaningless inside the Capacitor WebView; the native
+  // hook below is meaningless in a regular browser tab), so only one
+  // ever actually does anything. isNativePlatform() is a static fact of
+  // the current runtime — never changes without a full app relaunch — so
+  // reading it directly to choose which hook's result to use is safe.
+  const webPush = usePushNotifications();
+  const nativePush = useNativePushNotifications();
+  const isNative = Capacitor.isNativePlatform();
+  const { state, subscribe, unsubscribe } = isNative ? nativePush : webPush;
   const currentUserId = useInventoryStore((s) => s.currentUserId);
   const [busy, setBusy] = useState(false);
   const [prefs, setPrefs] = useState<Record<string, boolean>>({});
@@ -134,8 +146,11 @@ export default function NotificationSettingsPage() {
             <p className="text-body font-medium text-ink">This device</p>
             <p className="text-caption text-muted-foreground">
               {state === "checking" && "Checking…"}
-              {state === "unsupported" && "Notifications aren't supported in this browser."}
-              {state === "denied" && "Blocked — enable notifications for Schuaz in your browser or OS settings, then try again."}
+              {state === "unsupported" && (isNative ? "Notifications aren't available in this build." : "Notifications aren't supported in this browser.")}
+              {state === "denied" &&
+                (isNative
+                  ? "Blocked — enable notifications for Schuaz in your device's Settings app, then try again."
+                  : "Blocked — enable notifications for Schuaz in your browser or OS settings, then try again.")}
               {state === "subscribed" && "Notifications are on for this device."}
               {state === "not-subscribed" && "Off. Turn on to get reminders (like bills due soon) even when Schuaz isn't open."}
             </p>

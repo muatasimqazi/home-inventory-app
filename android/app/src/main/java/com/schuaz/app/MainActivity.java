@@ -1,4 +1,4 @@
-package com.muatasim.schuaz;
+package com.schuaz.app;
 
 import com.getcapacitor.BridgeActivity;
 

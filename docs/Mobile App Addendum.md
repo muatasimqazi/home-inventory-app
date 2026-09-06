@@ -48,7 +48,7 @@ Every server component, API route (`/api/v1/*`), Supabase Auth session (cookie-b
 
 - **Google Play Console** ($25 one-time) — already set up, no blocker on the Android leg.
 - **Apple Developer Program** ($99/yr) — not yet enrolled; not needed for the Android-first work in §5, but is a real lead-time item (enrollment can take a day or two to process) to start before the iOS phase actually begins, since it gates a real device build, the APNs Auth Key push depends on, TestFlight, and App Store submission itself.
-- **Bundle/package identifiers** (e.g. `com.muatasim.schuaz`) — need deciding before the first `cap add android`, since changing them later means a new app listing, not a rename.
+- **Bundle/package identifier**: `com.schuaz.app` — reverse-DNS of the app's own domain (schuaz.com), decided after an initial `com.muatasim.schuaz` was caught and corrected before any store submission (changing it after one means a new app listing, not a rename).
 - **Privacy policy**: already exists at `/privacy` — both stores require a reachable URL for it; worth a review pass for mobile-specific disclosures (camera, location, push) before submission, but no new page needed.
 
 ## 5. Phased plan
@@ -63,4 +63,4 @@ Every server component, API route (`/api/v1/*`), Supabase Auth session (cookie-b
 
 ## 6. Open questions
 
-- Bundle identifier naming (e.g. `com.muatasim.schuaz`) — needs deciding before the first `cap add android`, since changing it later means a new Play Store listing, not a rename.
+None currently — bundle identifier is resolved (§4).
