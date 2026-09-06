@@ -18,7 +18,7 @@ const config: CapacitorConfig = {
   appName: "Schuaz",
   webDir: "www",
   server: {
-    url: "https://shohaz.muatasim.com",
+    url: "https://schuaz.com",
     androidScheme: "https",
   },
 };

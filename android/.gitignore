@@ -38,7 +38,10 @@ proguard/
 # Android Studio captures folder
 captures/
 
-# IntelliJ
+# IntelliJ (Capacitor's own template only excludes specific files below,
+# but for a solo project there's no reason to track any local IDE state —
+# excluding the whole directory instead of picking through it file by file)
+.idea/
 *.iml
 .idea/workspace.xml
 .idea/tasks.xml
