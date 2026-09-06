@@ -7,6 +7,7 @@ import { DomainGate } from "@/components/domain-gate";
 import { PhotoLightbox } from "@/components/photo-lightbox";
 import { PointerEventsWatchdog } from "@/components/pointer-events-watchdog";
 import { NativeAuthDeepLinkListener } from "@/components/native-auth-deep-link-listener";
+import { NativePushNotificationListener } from "@/components/native-push-notification-listener";
 
 export const metadata: Metadata = {
   title: "Schuaz",
@@ -101,6 +102,11 @@ export default function RootLayout({
               its own file for the "login opens Chrome and stays there"
               bug this fixes. */}
           <NativeAuthDeepLinkListener />
+          {/* Native-app-only — registration, notification taps, and
+              foreground receipt, kept working no matter what page the
+              app is on (see its own file for why this has to be global
+              rather than living in Settings > Notifications' hook). */}
+          <NativePushNotificationListener />
         </ThemeProvider>
       </body>
     </html>
