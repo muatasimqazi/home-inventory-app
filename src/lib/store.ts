@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { toast } from "sonner";
+import posthog from "posthog-js";
 import { getSupabaseBrowserClient } from "./supabase/client";
 import { newId, tagToken } from "./id";
 import { isDisplayCodeTaken, nextDisplayCode, normalizeDisplayCode } from "./display-code";
@@ -1364,6 +1365,15 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
         set({ isHydrated: true, hydrationError: userError?.message ?? "Not signed in." });
         return;
       }
+
+      // A real, signed-in user is now known regardless of which branch
+      // below this falls into (fresh account with no households yet,
+      // households.select() failure, etc.) — identify once here rather
+      // than duplicating the call at every branch's own set(). Distinct
+      // id is the stable Supabase user id, not email (PostHog's own
+      // guidance: emails can change, the id can't) — email is attached as
+      // a property instead.
+      posthog.identify(user.id, { email: user.email });
 
       const { data: memberRows, error: memberError } = await supabase
         .from("members")

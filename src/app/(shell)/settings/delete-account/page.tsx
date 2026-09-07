@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
+import posthog from "posthog-js";
 import { Icon } from "@/components/icon";
 import { BackButton } from "@/components/back-button";
 import { Button } from "@/components/ui/button";
@@ -94,6 +95,10 @@ export default function DeleteAccountPage() {
       }
       useInventoryStore.getState().unsubscribeRealtime();
       await getSupabaseBrowserClient().auth.signOut();
+      // Same reasoning as settings/page.tsx's own sign-out — disconnects
+      // future events from this now-deleted identity before the
+      // client-side nav below.
+      posthog.reset();
       router.push("/sign-in");
     } catch {
       toast.error("Couldn't delete your account.");

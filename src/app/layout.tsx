@@ -8,6 +8,7 @@ import { PhotoLightbox } from "@/components/photo-lightbox";
 import { PointerEventsWatchdog } from "@/components/pointer-events-watchdog";
 import { NativeAuthDeepLinkListener } from "@/components/native-auth-deep-link-listener";
 import { NativePushNotificationListener } from "@/components/native-push-notification-listener";
+import { PHProvider } from "@/components/posthog-provider";
 
 export const metadata: Metadata = {
   title: "Schuaz",
@@ -65,49 +66,58 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full antialiased" suppressHydrationWarning>
       <body className="min-h-full flex flex-col">
-        {/* attribute="class" toggles the .dark class this app's own
-            @custom-variant dark selector (globals.css) reads; "system"
-            resolves prefers-color-scheme into a real class for us, so no
-            separate media-query branch is needed anywhere else. Persists
-            the user's choice to localStorage itself — see the Settings
-            page's Light/Dark/System control for the write side.
-            suppressHydrationWarning above is next-themes' own documented
-            requirement: it sets the class on <html> before React hydrates,
-            which would otherwise mismatch the server-rendered markup. */}
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <HydrationGate>
-            <DomainGate>{children}</DomainGate>
-          </HydrationGate>
-          {/* Default 16px top offset lands inside the app's back-button/header
-              row (~56-64px tall); push toasts below it instead. Sonner uses a
-              *separate* mobileOffset (not offset) below a 600px viewport, so
-              both must be set identically or phones silently fall back to the
-              unoffset default — this app is viewed almost exclusively on phones. */}
-          <Toaster
-            position="top-center"
-            offset={{ top: "calc(env(safe-area-inset-top) + 72px)" }}
-            mobileOffset={{ top: "calc(env(safe-area-inset-top) + 72px)" }}
-          />
-          {/* One instance for the whole app — any component opens it via
-              useLightboxStore().openLightbox(...), no per-page wiring. */}
-          <PhotoLightbox />
-          {/* Outside HydrationGate/DomainGate on purpose — it needs to run
-              (and be able to unstick the page) even if one of those is
-              itself the thing showing, not just once the real app content
-              has mounted. See its own file for what bug this guards
-              against ("sometimes doesn't let you click stuff", app-wide). */}
-          <PointerEventsWatchdog />
-          {/* Native-app-only (no-op in a browser/PWA) — completes Google
-              sign-in's round trip through the in-app browser tab. See
-              its own file for the "login opens Chrome and stays there"
-              bug this fixes. */}
-          <NativeAuthDeepLinkListener />
-          {/* Native-app-only — registration, notification taps, and
-              foreground receipt, kept working no matter what page the
-              app is on (see its own file for why this has to be global
-              rather than living in Settings > Notifications' hook). */}
-          <NativePushNotificationListener />
-        </ThemeProvider>
+        {/* Wraps everything — a plain context provider (no DOM output of
+            its own), so usePostHog() and the module-level posthog.init()
+            in posthog-provider.tsx are available to every descendant,
+            including lib/store.ts's hydrate() (real user known -> identify)
+            and the sign-out handlers (reset()). See that file's own
+            comment for why init happens at module load, not a useEffect
+            here. */}
+        <PHProvider>
+          {/* attribute="class" toggles the .dark class this app's own
+              @custom-variant dark selector (globals.css) reads; "system"
+              resolves prefers-color-scheme into a real class for us, so no
+              separate media-query branch is needed anywhere else. Persists
+              the user's choice to localStorage itself — see the Settings
+              page's Light/Dark/System control for the write side.
+              suppressHydrationWarning above is next-themes' own documented
+              requirement: it sets the class on <html> before React hydrates,
+              which would otherwise mismatch the server-rendered markup. */}
+          <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+            <HydrationGate>
+              <DomainGate>{children}</DomainGate>
+            </HydrationGate>
+            {/* Default 16px top offset lands inside the app's back-button/header
+                row (~56-64px tall); push toasts below it instead. Sonner uses a
+                *separate* mobileOffset (not offset) below a 600px viewport, so
+                both must be set identically or phones silently fall back to the
+                unoffset default — this app is viewed almost exclusively on phones. */}
+            <Toaster
+              position="top-center"
+              offset={{ top: "calc(env(safe-area-inset-top) + 72px)" }}
+              mobileOffset={{ top: "calc(env(safe-area-inset-top) + 72px)" }}
+            />
+            {/* One instance for the whole app — any component opens it via
+                useLightboxStore().openLightbox(...), no per-page wiring. */}
+            <PhotoLightbox />
+            {/* Outside HydrationGate/DomainGate on purpose — it needs to run
+                (and be able to unstick the page) even if one of those is
+                itself the thing showing, not just once the real app content
+                has mounted. See its own file for what bug this guards
+                against ("sometimes doesn't let you click stuff", app-wide). */}
+            <PointerEventsWatchdog />
+            {/* Native-app-only (no-op in a browser/PWA) — completes Google
+                sign-in's round trip through the in-app browser tab. See
+                its own file for the "login opens Chrome and stays there"
+                bug this fixes. */}
+            <NativeAuthDeepLinkListener />
+            {/* Native-app-only — registration, notification taps, and
+                foreground receipt, kept working no matter what page the
+                app is on (see its own file for why this has to be global
+                rather than living in Settings > Notifications' hook). */}
+            <NativePushNotificationListener />
+          </ThemeProvider>
+        </PHProvider>
       </body>
     </html>
   );

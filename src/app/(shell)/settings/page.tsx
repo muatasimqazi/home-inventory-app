@@ -6,6 +6,7 @@ import { useAutoFocusVisible } from "@/hooks/use-autofocus-visible";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
+import posthog from "posthog-js";
 import { Icon, type IconName } from "@/components/icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -130,6 +131,13 @@ export default function SettingsPage() {
         onClick={async () => {
           useInventoryStore.getState().unsubscribeRealtime();
           await getSupabaseBrowserClient().auth.signOut();
+          // Disconnects future events from this now-signed-out identity —
+          // a client-side nav (router.push, not a full reload) below, so
+          // posthog's persisted identity would otherwise survive into
+          // whoever signs in next on this device. Only ever called here
+          // and in delete-account's own sign-out — never on every render,
+          // which would mint a fresh anonymous user on each page load.
+          posthog.reset();
           router.push("/sign-in");
         }}
         className="tap-target flex items-center justify-center gap-2 rounded-2xl border border-border bg-card py-3 text-body font-medium text-danger"
