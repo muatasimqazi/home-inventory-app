@@ -185,6 +185,10 @@ function ManualAddItemInner() {
       isShared: ownerPerson ? isShared : false,
       minQuantity: minQuantity.trim() === "" ? null : Math.max(0, Math.min(9999, Number(minQuantity.trim()) || 0)),
     });
+    if (!item) {
+      setSaving(false);
+      return;
+    }
     toast.success(`Added ${item.name}`);
     // replace, not push — this page can be reached one hop deep (capture's
     // camera-denied fallback), and either way the item page's back button

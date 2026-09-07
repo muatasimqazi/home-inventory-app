@@ -33,6 +33,18 @@ export function isPaidSubscriptionTier(value: string): value is PaidSubscription
   return (PAID_SUBSCRIPTION_TIERS as readonly string[]).includes(value);
 }
 
+// Free-tier resource caps (docs/Free Tier Limits Addendum.md). The real
+// enforcement is database-level — supabase/migrations/0057_free_tier_
+// resource_limits.sql's triggers/RPC duplicate these same numbers in SQL,
+// since a migration can't import this module — these exports exist so the
+// client-side pre-check (lib/store.ts) and any UI copy stay in sync with
+// each other, not with the database. Keep both sides in sync by hand if
+// these ever change. Paid tiers (Plus, Pro) are unconditionally unlimited
+// on all three.
+export const FREE_TIER_LOCATION_LIMIT = 3;
+export const FREE_TIER_ITEM_LIMIT = 100;
+export const FREE_TIER_STUDIO_GENERATIONS_PER_MONTH = 10;
+
 export function subscriptionIsActive(status: string | null | undefined): boolean {
   return status === "active" || status === "trialing";
 }

@@ -121,6 +121,10 @@ export default function BarcodeReviewPage() {
       reviewReason: result.found ? undefined : "No barcode match found — details entered manually, worth a second look.",
       extraDetails,
     });
+    if (!item) {
+      setSaving(false);
+      return;
+    }
 
     toast.success(`Saved ${item.name}`);
     router.replace(`/items/${item.id}`);

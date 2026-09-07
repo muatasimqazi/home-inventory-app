@@ -8,6 +8,7 @@ import { isDisplayCodeTaken, nextDisplayCode, normalizeDisplayCode } from "./dis
 import { ATTACHMENT_MAX_SIZE_BYTES, ATTACHMENT_MAX_SIZE_LABEL, isAttachmentTypeAllowed } from "./attachment-limits";
 import { normalizeUploadedPhoto } from "./crop-image";
 import { normalizeAccountBalance, buildBreadcrumb, breadcrumbLabel, advanceTaskDueDate } from "./selectors";
+import { FREE_TIER_LOCATION_LIMIT, FREE_TIER_ITEM_LIMIT } from "./billing";
 import {
   rowToHousehold,
   rowToMember,
@@ -391,7 +392,9 @@ interface InventoryState {
   unsubscribeRealtime: () => void;
 
   // Items
-  createItem: (input: NewItemInput) => Item;
+  /** Returns null (and toasts an upgrade prompt) instead of creating when a Free household is already at FREE_TIER_ITEM_LIMIT — see freeTierLimitMessage(). */
+  createItem: (input: NewItemInput) => Item | null;
+  /** Returns [] (and toasts an upgrade prompt) instead of creating any of the batch when a Free household doesn't have room for all of `inputs` — see freeTierLimitMessage(). All-or-nothing rather than filling remaining room, so capture flows don't have to reconcile "some of what I scanned got saved." */
   createItemsBatch: (inputs: NewItemInput[]) => Item[];
   updateItem: (itemId: string, patch: Partial<Item>) => void;
   moveItem: (itemId: string, dest: { locationId: string | null; containerId: string | null }) => void;
@@ -402,7 +405,8 @@ interface InventoryState {
   permanentlyDeleteItem: (itemId: string) => void;
 
   // Locations
-  createLocation: (input: { name: string; description?: string; coverPhotoEmoji?: string }) => Location;
+  /** Returns null (and toasts an upgrade prompt) instead of creating when a Free household is already at FREE_TIER_LOCATION_LIMIT — see freeTierLimitMessage(). */
+  createLocation: (input: { name: string; description?: string; coverPhotoEmoji?: string }) => Location | null;
   updateLocation: (locationId: string, patch: Partial<Location>) => void;
   trashLocation: (locationId: string) => void;
   restoreLocation: (locationId: string) => void;
@@ -1045,6 +1049,31 @@ function persistOrRevert(op: PromiseLike<{ error: { message: string } | null }>,
       toast.error(`${label}: ${error.message}`);
     }
   });
+}
+
+/**
+ * Free-tier pre-check for locations/items (docs/Free Tier Limits
+ * Addendum.md). Real enforcement is the database trigger in
+ * supabase/migrations/0057_free_tier_resource_limits.sql —
+ * createItem()/createItemsBatch()/createLocation() write straight from
+ * the browser to Supabase, this app's usual "RLS/DB is the actual gate"
+ * posture — this check exists so a Free household finds out *before*
+ * the optimistic create goes out, and, for items specifically, before a
+ * downstream auto studio-photo generation (a real billed call, see
+ * lib/auto-studio-photo.ts) runs against an item that was always going
+ * to be rejected anyway. Returns a user-facing message when blocked, or
+ * null when the create can proceed.
+ */
+function freeTierLimitMessage(household: Household | undefined, currentCount: number, additional: number, kind: "location" | "item"): string | null {
+  if (!household || household.subscriptionTier !== "free") return null;
+  const limit = kind === "location" ? FREE_TIER_LOCATION_LIMIT : FREE_TIER_ITEM_LIMIT;
+  if (currentCount + additional <= limit) return null;
+  return `Free plan includes up to ${limit} ${kind}s per household. Upgrade to Plus to add more.`;
+}
+
+/** Toasts a freeTierLimitMessage() result with a one-click way to actually upgrade, rather than making every call site duplicate the "how do I get to billing" step. */
+function toastFreeTierLimit(message: string) {
+  toast.error(message, { action: { label: "Upgrade", onClick: () => window.location.assign("/settings/billing") } });
 }
 
 /** Shared upload step for item/location/container cover photos — all three
@@ -1842,6 +1871,19 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
   },
 
   createItem: (input) => {
+    const state = get();
+    const household = state.households.find((h) => h.id === state.currentHouseholdId);
+    const limitMessage = freeTierLimitMessage(
+      household,
+      state.items.filter((it) => it.status !== "trashed").length,
+      1,
+      "item"
+    );
+    if (limitMessage) {
+      toastFreeTierLimit(limitMessage);
+      return null;
+    }
+
     const supabase = getSupabaseBrowserClient();
     const created = buildItem(get().currentHouseholdId, get().currentUserId, input);
     set((s) => ({
@@ -1866,6 +1908,19 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
   },
 
   createItemsBatch: (inputs) => {
+    const state = get();
+    const household = state.households.find((h) => h.id === state.currentHouseholdId);
+    const limitMessage = freeTierLimitMessage(
+      household,
+      state.items.filter((it) => it.status !== "trashed").length,
+      inputs.length,
+      "item"
+    );
+    if (limitMessage) {
+      toastFreeTierLimit(limitMessage);
+      return [];
+    }
+
     const supabase = getSupabaseBrowserClient();
     const created = inputs.map((i) => buildItem(get().currentHouseholdId, get().currentUserId, i));
     const last = inputs[inputs.length - 1];
@@ -2013,6 +2068,19 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
   },
 
   createLocation: (input) => {
+    const state = get();
+    const household = state.households.find((h) => h.id === state.currentHouseholdId);
+    const limitMessage = freeTierLimitMessage(
+      household,
+      state.locations.filter((l) => l.status === "active").length,
+      1,
+      "location"
+    );
+    if (limitMessage) {
+      toastFreeTierLimit(limitMessage);
+      return null;
+    }
+
     const supabase = getSupabaseBrowserClient();
     const created: Location = {
       id: newId(),

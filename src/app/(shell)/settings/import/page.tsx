@@ -102,6 +102,13 @@ export default function CsvImportPage() {
           locationId = locationCache.get(key)!;
         } else {
           const loc = createLocation({ name: locationName });
+          if (!loc) {
+            // Free plan's location cap is household-wide and won't free
+            // up mid-import — every remaining row would hit the same
+            // wall, so stop here instead of toasting once per row.
+            flagged.push(`Row ${i + 2}: stopped — free plan location limit reached.`);
+            break;
+          }
           locationCache.set(key, loc.id);
           locationId = loc.id;
           locationsCreated++;
@@ -129,7 +136,7 @@ export default function CsvImportPage() {
       const quantityRaw = rowValue(row, "quantity");
       const quantity = Number(quantityRaw) > 0 ? Number(quantityRaw) : 1;
 
-      createItem({
+      const item = createItem({
         name,
         category: rowValue(row, "category") || "Miscellaneous",
         quantity,
@@ -139,6 +146,12 @@ export default function CsvImportPage() {
         containerId,
         tagIds,
       });
+      if (!item) {
+        // Same reasoning as the location cap above — the item cap is
+        // household-wide, so every remaining row would fail the same way.
+        flagged.push(`Row ${i + 2}: stopped — free plan item limit reached.`);
+        break;
+      }
       itemsCreated++;
 
       setProgress(Math.round(((i + 1) / rows.length) * 100));

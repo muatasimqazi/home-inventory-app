@@ -133,6 +133,7 @@ export default function DocumentReviewPage() {
     });
 
     setSaving(false);
+    if (!item) return;
     // One automatic studio photo, silently replacing the raw capture as
     // the item's cover photo — only when there's actually a source photo
     // to generate from (see lib/auto-studio-photo.ts). A generation

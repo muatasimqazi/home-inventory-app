@@ -4,6 +4,7 @@ import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { generateLocationPhoto } from "@/lib/vision/generate-location-photo";
 import { newId } from "@/lib/id";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { checkAndConsumeStudioGenerationQuota } from "@/lib/studio-generation-quota";
 
 export const runtime = "nodejs";
 
@@ -69,6 +70,12 @@ export async function POST(request: Request) {
   if (!locationRow || locationRow.household_id !== householdId) {
     return NextResponse.json({ error: "Location not found." }, { status: 404 });
   }
+
+  // docs/Free Tier Limits Addendum.md — a real, billed generation counted
+  // against the household's monthly quota on Free (unlimited on paid
+  // tiers).
+  const quota = await checkAndConsumeStudioGenerationQuota(householdId);
+  if (!quota.ok) return NextResponse.json({ error: quota.error }, { status: quota.status });
 
   let generatedBase64: string;
   try {

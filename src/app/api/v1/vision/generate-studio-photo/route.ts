@@ -7,6 +7,7 @@ import { newId } from "@/lib/id";
 import { WARDROBE_STYLES } from "@/lib/wardrobe-styles";
 import type { ItemStudioPhoto, ItemStudioPhotoAspectRatio, ItemStudioPhotoStyle } from "@/lib/types";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { checkAndConsumeStudioGenerationQuota } from "@/lib/studio-generation-quota";
 
 export const runtime = "nodejs";
 
@@ -123,6 +124,19 @@ export async function POST(request: Request) {
       createdByUserId: auth.userId,
       createdAt: requestedAt,
     };
+
+    // docs/Free Tier Limits Addendum.md — checked per style, not once for
+    // the whole request: a Free household part-way through its monthly
+    // quota gets exactly as many generations as it has left, rather than
+    // an all-or-nothing reject on a 3-style batch. Recorded as a normal
+    // "failed" row (not an HTTP error) so it fits the existing "every
+    // attempt gets a row" contract this loop already follows.
+    const quota = await checkAndConsumeStudioGenerationQuota(householdId);
+    if (!quota.ok) {
+      results.push({ ...base, status: "failed", generatedPhotoPath: null, errorMessage: quota.error, completedAt: new Date().toISOString() });
+      continue;
+    }
+
     try {
       const generatedBase64 = await generateStudioPhoto(photoDataUrl, style, aspectRatio as ItemStudioPhotoAspectRatio);
       const path = `${householdId}/${newId()}`;

@@ -111,6 +111,7 @@ export function MoveSheet({ open, onOpenChange, currentLocationId, currentContai
 
   function handleCreateLocation({ name, description }: { name: string; description: string }) {
     const loc = createLocation({ name, description: description || undefined });
+    if (!loc) return;
     pick(loc.id, null);
   }
 

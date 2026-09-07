@@ -84,6 +84,7 @@ export function ContainerWizardSheet({ open, onOpenChange }: ContainerWizardShee
 
   async function handleCreateLocation({ name, description, photoFile }: { name: string; description: string; photoFile?: File | null }) {
     const loc = createLocation({ name, description: description || undefined });
+    if (!loc) return;
     // Advance to step 2 before awaiting the photo upload, not after —
     // EntityFormSheet's own handleSubmit calls onOpenChange(false)
     // (addLocationOpen -> false) right after this function is *called*,

@@ -260,6 +260,10 @@ export default function CaptureReviewPage() {
     stopCameraStream();
     if (included.length === 1) {
       const item = createItem(buildInput(included[0], photoResults[0].coverPath, photoResults[0].backgroundRemovedPath));
+      if (!item) {
+        setSaving(false);
+        return;
+      }
       persistNormalizationRules(included);
       if (linkTransaction) {
         const linkRes = await linkItemPurchase({ itemId: item.id, transactionId: linkTransaction.id, source: "finance_nudge" });
@@ -308,6 +312,10 @@ export default function CaptureReviewPage() {
     }
 
     const created = createItemsBatch(included.map((row, i) => buildInput(row, photoResults[i].coverPath, photoResults[i].backgroundRemovedPath)));
+    if (created.length === 0) {
+      setSaving(false);
+      return;
+    }
     persistNormalizationRules(included);
     // A capture-nudge is keyed to one transaction, but the user may have
     // photographed more than one thing from that same purchase (e.g. a

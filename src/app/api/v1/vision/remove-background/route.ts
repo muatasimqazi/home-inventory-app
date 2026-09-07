@@ -4,6 +4,7 @@ import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { removeItemBackground } from "@/lib/vision/remove-background";
 import { newId } from "@/lib/id";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { checkAndConsumeStudioGenerationQuota } from "@/lib/studio-generation-quota";
 
 export const runtime = "nodejs";
 
@@ -46,6 +47,12 @@ export async function POST(request: Request) {
       { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } }
     );
   }
+
+  // docs/Free Tier Limits Addendum.md — a real, billed generation counted
+  // against the household's monthly quota on Free (unlimited on paid
+  // tiers).
+  const quota = await checkAndConsumeStudioGenerationQuota(householdId);
+  if (!quota.ok) return NextResponse.json({ error: quota.error }, { status: quota.status });
 
   let resultPng: Buffer;
   try {

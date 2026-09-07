@@ -181,6 +181,7 @@ export default function LocationsListPage() {
         nameSuggestions={locationSuggestions}
         onSubmit={async ({ name, description, photoFile }) => {
           const loc = createLocation({ name, description });
+          if (!loc) return;
           if (photoFile) {
             const result = await setLocationCoverPhoto(loc.id, photoFile);
             if (!result.ok) toast.error(result.error ?? "Location saved, but the photo couldn't be uploaded.");
