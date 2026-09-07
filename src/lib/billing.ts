@@ -23,27 +23,27 @@ export const BILLING_PLAN_DESCRIPTION: Record<SubscriptionTier, string> = {
   pro: "For larger households with heavier finance and automation needs.",
 };
 
+// Free-tier resource caps (docs/Free Tier Limits Addendum.md). The real
+// enforcement is database-level — supabase/migrations/0057_free_tier_
+// resource_limits.sql's triggers/RPC duplicate these same numbers in SQL,
+// since a migration can't import this module — these exports exist so the
+// client-side pre-check (lib/store.ts) and this file's own copy (below)
+// stay in sync with each other, not with the database. Keep both sides in
+// sync by hand if these ever change. Paid tiers (Plus, Pro) are
+// unconditionally unlimited on all three.
+export const FREE_TIER_LOCATION_LIMIT = 3;
+export const FREE_TIER_ITEM_LIMIT = 100;
+export const FREE_TIER_STUDIO_GENERATIONS_PER_MONTH = 10;
+
 export const BILLING_PLAN_FEATURES: Record<SubscriptionTier, string[]> = {
-  free: ["Household inventory", "Manual receipts and transactions", "Basic reminders"],
-  plus: ["Everything in Free", "Bank transaction imports", "AI-assisted capture workflows", "Email receipt forwarding"],
-  pro: ["Everything in Plus", "Larger storage and automation usage", "Priority support", "Advanced household workflows"],
+  free: [`Up to ${FREE_TIER_LOCATION_LIMIT} locations and ${FREE_TIER_ITEM_LIMIT} items`, `${FREE_TIER_STUDIO_GENERATIONS_PER_MONTH} AI studio photo generations a month`, "Manual receipts and transactions", "Basic reminders"],
+  plus: ["Everything in Free", "Unlimited locations, items, and AI photo generations", "Bank transaction imports", "AI-assisted capture workflows", "Email receipt forwarding"],
+  pro: ["Everything in Plus", "Priority support", "Advanced household workflows"],
 };
 
 export function isPaidSubscriptionTier(value: string): value is PaidSubscriptionTier {
   return (PAID_SUBSCRIPTION_TIERS as readonly string[]).includes(value);
 }
-
-// Free-tier resource caps (docs/Free Tier Limits Addendum.md). The real
-// enforcement is database-level — supabase/migrations/0057_free_tier_
-// resource_limits.sql's triggers/RPC duplicate these same numbers in SQL,
-// since a migration can't import this module — these exports exist so the
-// client-side pre-check (lib/store.ts) and any UI copy stay in sync with
-// each other, not with the database. Keep both sides in sync by hand if
-// these ever change. Paid tiers (Plus, Pro) are unconditionally unlimited
-// on all three.
-export const FREE_TIER_LOCATION_LIMIT = 3;
-export const FREE_TIER_ITEM_LIMIT = 100;
-export const FREE_TIER_STUDIO_GENERATIONS_PER_MONTH = 10;
 
 export function subscriptionIsActive(status: string | null | undefined): boolean {
   return status === "active" || status === "trialing";
