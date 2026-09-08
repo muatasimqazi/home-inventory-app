@@ -3,10 +3,13 @@
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
+import { Capacitor } from "@capacitor/core";
+import { Browser } from "@capacitor/browser";
 import { Icon } from "@/components/icon";
 import { Button } from "@/components/ui/button";
 import { isPaidSubscriptionTier } from "@/lib/billing";
 import { useCurrentHousehold, useInventoryStore } from "@/lib/store";
+import { appOrigin } from "@/lib/urls";
 
 // Matches the domain the inbound webhook route (api/v1/webhooks/resend-
 // inbound) checks incoming mail against — kept in sync manually, same
@@ -44,6 +47,13 @@ export default function EmailReceiptsSettingsPage() {
   }
 
   async function handleUpgrade() {
+    // Same Google Play Billing policy reasoning as settings/billing/
+    // page.tsx's own startCheckout().
+    if (Capacitor.isNativePlatform()) {
+      await Browser.open({ url: `${appOrigin()}/settings/billing` });
+      return;
+    }
+
     setUpgrading(true);
     try {
       const response = await fetch("/api/v1/billing/checkout", {
@@ -97,7 +107,7 @@ export default function EmailReceiptsSettingsPage() {
           </div>
           {isOwner && (
             <Button className="mt-1 bg-yellow text-white hover:bg-yellow/90" onClick={handleUpgrade} disabled={upgrading}>
-              {upgrading ? <Icon name="spinner" size={16} className="animate-spin" /> : "Upgrade to Plus"}
+              {upgrading ? <Icon name="spinner" size={16} className="animate-spin" /> : Capacitor.isNativePlatform() ? "Continue on schuaz.com" : "Upgrade to Plus"}
             </Button>
           )}
         </div>

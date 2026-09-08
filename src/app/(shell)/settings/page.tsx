@@ -121,6 +121,7 @@ export default function SettingsPage() {
         <SettingsRow icon="needsReview" label="Needs-Review Queue" href="/review" />
         <SettingsRow icon="activity" label="Activity Feed" href="/activity" />
         <SettingsRow icon="key" label="API Keys" href="/settings/api-keys" />
+        <SettingsRow icon="lock" label="Password" sublabel="Change or add a password" href="/settings/change-password" />
       </div>
 
       <Link href="/trash" className="text-center text-caption font-medium text-muted-foreground">

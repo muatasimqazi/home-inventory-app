@@ -2,10 +2,13 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
+import { Capacitor } from "@capacitor/core";
+import { Browser } from "@capacitor/browser";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/icon";
 import { useCurrentHousehold, useInventoryStore } from "@/lib/store";
+import { appOrigin } from "@/lib/urls";
 
 interface UpgradeDialogProps {
   open: boolean;
@@ -36,6 +39,16 @@ export function UpgradeDialog({ open, onOpenChange, feature }: UpgradeDialogProp
   const [loading, setLoading] = useState(false);
 
   async function handleUpgrade() {
+    // Same Google Play Billing policy reasoning as settings/billing/
+    // page.tsx's own startCheckout() — native hands off to a real Custom
+    // Tab pointed at the website instead of redirecting the app's own
+    // WebView to Stripe Checkout.
+    if (Capacitor.isNativePlatform()) {
+      await Browser.open({ url: `${appOrigin()}/settings/billing` });
+      onOpenChange(false);
+      return;
+    }
+
     setLoading(true);
     try {
       const response = await fetch("/api/v1/billing/checkout", {
@@ -72,7 +85,7 @@ export function UpgradeDialog({ open, onOpenChange, feature }: UpgradeDialogProp
           </Button>
           {isOwner && (
             <Button size="lg" className="flex-auto bg-yellow text-white hover:bg-yellow/90" onClick={handleUpgrade} disabled={loading}>
-              {loading ? <Icon name="spinner" size={16} className="animate-spin" /> : "Upgrade to Plus"}
+              {loading ? <Icon name="spinner" size={16} className="animate-spin" /> : Capacitor.isNativePlatform() ? "Continue on schuaz.com" : "Upgrade to Plus"}
             </Button>
           )}
         </DialogFooter>

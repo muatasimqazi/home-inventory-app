@@ -4,12 +4,15 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import { Capacitor } from "@capacitor/core";
+import { Browser } from "@capacitor/browser";
 import { Icon } from "@/components/icon";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { BILLING_PLAN_DESCRIPTION, BILLING_PLAN_FEATURES, BILLING_PLAN_LABEL, PAID_SUBSCRIPTION_TIERS, subscriptionIsActive, type PaidSubscriptionTier, type SubscriptionTier } from "@/lib/billing";
 import { formatShortDate } from "@/lib/format";
 import { useCurrentHousehold, useInventoryStore } from "@/lib/store";
+import { appOrigin } from "@/lib/urls";
 import { cn } from "@/lib/utils";
 
 export default function BillingSettingsPage() {
@@ -27,8 +30,26 @@ export default function BillingSettingsPage() {
   const periodEnd = household.subscriptionCurrentPeriodEnd ? formatShortDate(household.subscriptionCurrentPeriodEnd) : null;
 
   const plans = useMemo(() => ["free", ...PAID_SUBSCRIPTION_TIERS] as SubscriptionTier[], []);
+  const isNative = Capacitor.isNativePlatform();
 
   async function startCheckout(tier: PaidSubscriptionTier) {
+    // Google Play policy requires Google Play Billing for a digital
+    // subscription purchased and consumed from inside the app — a
+    // Stripe Checkout redirect inside the app's own WebView is exactly
+    // what that policy targets. Rather than build out real Play Billing
+    // (a whole separate entitlement system, plus Google's revenue share)
+    // for an initial submission, native just hands off to a real Custom
+    // Tab pointed at the website's own upgrade flow — same "escape the
+    // WebView for anything payment/OAuth-related" pattern sign-in/page.tsx
+    // already uses for Google sign-in. Existing subscribers keep full app
+    // access either way; only *starting* a new paid plan moves to the
+    // browser. openPortal() below (managing/cancelling an existing
+    // subscription) isn't a new purchase, so it's left working natively.
+    if (Capacitor.isNativePlatform()) {
+      await Browser.open({ url: `${appOrigin()}/settings/billing` });
+      return;
+    }
+
     setLoadingTier(tier);
     try {
       const response = await fetch("/api/v1/billing/checkout", {
@@ -126,7 +147,15 @@ export default function BillingSettingsPage() {
               </ul>
               {paidTier ? (
                 <Button className="bg-yellow text-white hover:bg-yellow/90" onClick={() => startCheckout(paidTier)} disabled={!isOwner || selected || loadingTier !== null}>
-                  {loadingTier === paidTier ? <Icon name="spinner" size={16} className="animate-spin" /> : selected ? "Current plan" : `Choose ${BILLING_PLAN_LABEL[tier]}`}
+                  {loadingTier === paidTier ? (
+                    <Icon name="spinner" size={16} className="animate-spin" />
+                  ) : selected ? (
+                    "Current plan"
+                  ) : isNative ? (
+                    "Continue on schuaz.com"
+                  ) : (
+                    `Choose ${BILLING_PLAN_LABEL[tier]}`
+                  )}
                 </Button>
               ) : (
                 <Button variant="outline" disabled>
@@ -137,6 +166,7 @@ export default function BillingSettingsPage() {
           );
         })}
       </div>
+      {isNative && <p className="text-center text-caption text-muted-foreground">Upgrading opens schuaz.com in your browser — everything else about your plan works the same in the app.</p>}
     </div>
   );
 }
