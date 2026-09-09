@@ -168,94 +168,103 @@ export default function LocationDetailPage() {
         </div>
       </div>
 
-      <div className="relative md:max-w-md">
-        {/* Was a fixed h-48 (192px) — too small/cropped-looking to read as
-            an actual photo. aspect-square matches the same ecommerce-style
-            hero treatment ItemPhotoGallery uses for items; md:max-w-md
-            caps it on wide desktop viewports for the same reason that cap
-            was added there (the shell's <main> has no global max-width). */}
-        <PhotoThumb
-          emoji={location.coverPhotoEmoji ?? "📦"}
-          coverPhotoPath={displayPhotoPath}
-          className="aspect-square w-full"
-          emojiClassName="text-8xl"
-          fit="cover"
-        />
-        <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChosen} />
-        {displayPhotoPath && <PhotoExpandButton photos={[displayPhotoPath]} className="absolute top-2 right-2" />}
-        <div className="absolute bottom-2 right-2 flex gap-2">
-          {location.coverPhotoPath && (
+      {/* Two columns at md+ — photo on the left, name/description/actions
+          beside it on the right. Used to be a single column with the
+          photo alone capped at md:max-w-md, which just left a wide empty
+          gap next to it on desktop (real user report, nothing filled the
+          freed-up space). minmax(0,28rem) keeps the photo column the same
+          size that cap used to give the photo itself; 1fr lets the
+          details column take whatever's left. */}
+      <div className="flex flex-col gap-5 md:grid md:grid-cols-[minmax(0,28rem)_1fr] md:items-start md:gap-8">
+        <div className="relative">
+          {/* Was a fixed h-48 (192px) — too small/cropped-looking to read as
+              an actual photo. aspect-square matches the same ecommerce-style
+              hero treatment ItemPhotoGallery uses for items. */}
+          <PhotoThumb
+            emoji={location.coverPhotoEmoji ?? "📦"}
+            coverPhotoPath={displayPhotoPath}
+            className="aspect-square w-full"
+            emojiClassName="text-8xl"
+            fit="cover"
+          />
+          <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChosen} />
+          {displayPhotoPath && <PhotoExpandButton photos={[displayPhotoPath]} className="absolute top-2 right-2" />}
+          <div className="absolute bottom-2 right-2 flex gap-2">
+            {location.coverPhotoPath && (
+              <button
+                type="button"
+                onClick={handleRotatePhoto}
+                disabled={rotatingPhoto}
+                aria-label="Rotate photo"
+                className="tap-target flex size-9 items-center justify-center rounded-full bg-white/90 text-ink-fill shadow-sm disabled:opacity-60"
+              >
+                {rotatingPhoto ? <Icon name="spinner" size={16} className="animate-spin" /> : <Icon name="rotate" size={16} />}
+              </button>
+            )}
+            {location.coverPhotoPath && (
+              <button
+                type="button"
+                onClick={() => removeLocationCoverPhoto(location.id)}
+                aria-label="Remove photo"
+                className="tap-target flex size-9 items-center justify-center rounded-full bg-white/90 text-ink-fill shadow-sm"
+              >
+                <Icon name="close" size={16} />
+              </button>
+            )}
             <button
               type="button"
-              onClick={handleRotatePhoto}
-              disabled={rotatingPhoto}
-              aria-label="Rotate photo"
+              onClick={() => photoInputRef.current?.click()}
+              disabled={uploadingPhoto}
+              aria-label={location.coverPhotoPath ? "Change photo" : "Add photo"}
               className="tap-target flex size-9 items-center justify-center rounded-full bg-white/90 text-ink-fill shadow-sm disabled:opacity-60"
             >
-              {rotatingPhoto ? <Icon name="spinner" size={16} className="animate-spin" /> : <Icon name="rotate" size={16} />}
+              {uploadingPhoto ? <Icon name="spinner" size={16} className="animate-spin" /> : <Icon name="camera" size={16} />}
             </button>
-          )}
-          {location.coverPhotoPath && (
             <button
               type="button"
-              onClick={() => removeLocationCoverPhoto(location.id)}
-              aria-label="Remove photo"
-              className="tap-target flex size-9 items-center justify-center rounded-full bg-white/90 text-ink-fill shadow-sm"
+              onClick={() => { bumpGeneratePhotoKey(); setGeneratePhotoOpen(true); }}
+              disabled={generatingPhoto}
+              aria-label="Generate photo with AI"
+              className="tap-target flex size-9 items-center justify-center rounded-full bg-white/90 text-ink-fill shadow-sm disabled:opacity-60"
             >
-              <Icon name="close" size={16} />
+              {generatingPhoto ? <Icon name="spinner" size={16} className="animate-spin" /> : <Icon name="ai" size={16} className="text-yellow" />}
             </button>
-          )}
-          <button
-            type="button"
-            onClick={() => photoInputRef.current?.click()}
-            disabled={uploadingPhoto}
-            aria-label={location.coverPhotoPath ? "Change photo" : "Add photo"}
-            className="tap-target flex size-9 items-center justify-center rounded-full bg-white/90 text-ink-fill shadow-sm disabled:opacity-60"
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-4">
+          <div>
+            <h1 className="text-screen-title font-medium text-ink">{location.name}</h1>
+            {location.description && <p className="text-caption text-muted-foreground">{location.description}</p>}
+          </div>
+
+          <Link
+            href={`/capture?locationId=${location.id}`}
+            className="tap-target flex items-center justify-center gap-2 rounded-2xl bg-yellow py-3 text-body font-medium text-white shadow-lg"
           >
-            {uploadingPhoto ? <Icon name="spinner" size={16} className="animate-spin" /> : <Icon name="camera" size={16} />}
-          </button>
-          <button
-            type="button"
-            onClick={() => { bumpGeneratePhotoKey(); setGeneratePhotoOpen(true); }}
-            disabled={generatingPhoto}
-            aria-label="Generate photo with AI"
-            className="tap-target flex size-9 items-center justify-center rounded-full bg-white/90 text-ink-fill shadow-sm disabled:opacity-60"
-          >
-            {generatingPhoto ? <Icon name="spinner" size={16} className="animate-spin" /> : <Icon name="ai" size={16} className="text-yellow" />}
-          </button>
+            <Icon name="camera" size={16} /> Add items
+          </Link>
+
+          <div className="grid grid-cols-2 gap-2">
+            <Link
+              href={`/add?locationId=${location.id}`}
+              className="tap-target flex items-center justify-center gap-2 rounded-2xl border border-border bg-card py-3 text-body font-medium text-ink shadow-sm"
+            >
+              <Icon name="edit" size={16} /> Add manually
+            </Link>
+            <Link
+              href={`/capture/barcode?locationId=${location.id}`}
+              className="tap-target flex items-center justify-center gap-2 rounded-2xl border border-border bg-card py-3 text-body font-medium text-ink shadow-sm"
+            >
+              <Icon name="scanBarcode" size={16} /> Scan Barcode
+            </Link>
+          </div>
+
+          <Button variant="secondary" size="lg" onClick={() => { bumpAddContainerKey(); setAddContainerOpen(true); }}>
+            <Icon name="plus" size={16} /> Add Container
+          </Button>
         </div>
       </div>
-
-      <div>
-        <h1 className="text-screen-title font-medium text-ink">{location.name}</h1>
-        {location.description && <p className="text-caption text-muted-foreground">{location.description}</p>}
-      </div>
-
-      <Link
-        href={`/capture?locationId=${location.id}`}
-        className="tap-target flex items-center justify-center gap-2 rounded-2xl bg-yellow py-3 text-body font-medium text-white shadow-lg"
-      >
-        <Icon name="camera" size={16} /> Add items
-      </Link>
-
-      <div className="grid grid-cols-2 gap-2">
-        <Link
-          href={`/add?locationId=${location.id}`}
-          className="tap-target flex items-center justify-center gap-2 rounded-2xl border border-border bg-card py-3 text-body font-medium text-ink shadow-sm"
-        >
-          <Icon name="edit" size={16} /> Add manually
-        </Link>
-        <Link
-          href={`/capture/barcode?locationId=${location.id}`}
-          className="tap-target flex items-center justify-center gap-2 rounded-2xl border border-border bg-card py-3 text-body font-medium text-ink shadow-sm"
-        >
-          <Icon name="scanBarcode" size={16} /> Scan Barcode
-        </Link>
-      </div>
-
-      <Button variant="secondary" size="lg" onClick={() => { bumpAddContainerKey(); setAddContainerOpen(true); }}>
-        <Icon name="plus" size={16} /> Add Container
-      </Button>
 
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">

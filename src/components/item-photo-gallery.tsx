@@ -106,8 +106,14 @@ export function ItemPhotoGallery({ item, studioPhotos }: { item: Item; studioPho
   }
 
   if (!active) {
+    // No md:max-w-md here (or below) — that cap used to live on this
+    // component itself, which left a wide, empty gap next to the photo on
+    // desktop since nothing ever used the freed-up space (real user
+    // report). items/[id]/page.tsx now puts this gallery in a two-column
+    // grid at md+ instead — the grid's own column width does the capping,
+    // and the item's name/quantity/category fill the space beside it.
     return (
-      <div className="relative md:max-w-md">
+      <div className="relative">
         <PhotoThumb emoji={item.photoEmoji} coverPhotoPath={null} className="aspect-square w-full" emojiClassName="text-8xl" fit="cover" />
         <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChosen} />
         <button
@@ -124,7 +130,7 @@ export function ItemPhotoGallery({ item, studioPhotos }: { item: Item; studioPho
   }
 
   return (
-    <div className="flex flex-col gap-2 md:max-w-md">
+    <div className="flex flex-col gap-2">
       <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-surface-muted">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={coverPhotoUrl(active.path)} alt={active.label ?? item.name} className="size-full object-cover" />

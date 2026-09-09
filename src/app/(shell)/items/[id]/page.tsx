@@ -87,89 +87,102 @@ export default function ItemDetailPage() {
         </div>
       )}
 
-      <ItemPhotoGallery item={item} studioPhotos={itemStudioPhotos.filter((p) => p.itemId === item.id)} />
+      {/* Two columns at md+ — photo on the left, name/quantity/category
+          beside it on the right. Used to be a single column with the
+          gallery alone capped at md:max-w-md, which just left a wide
+          empty gap next to the photo on desktop (real user report,
+          nothing filled the freed-up space). minmax(0,28rem) keeps the
+          photo column the same size that cap used to give the photo
+          itself; 1fr lets the details column take whatever's left. */}
+      <div className="flex flex-col gap-5 md:grid md:grid-cols-[minmax(0,28rem)_1fr] md:items-start md:gap-8">
+        <div className="flex flex-col gap-3">
+          <ItemPhotoGallery item={item} studioPhotos={itemStudioPhotos.filter((p) => p.itemId === item.id)} />
 
-      {/* Right under the gallery, not down with the item's other detail
-          cards — a caption for the photo above it (see this component's
-          own doc comment), not a separate section of page content. */}
-      {item.status === "active" && <ItemStudioPhotosSection item={item} />}
-
-      <div className="flex flex-col gap-1">
-        <div className="flex items-start justify-between gap-2">
-          <h1 className="text-screen-title font-semibold text-ink">{item.name}</h1>
-          <div className="flex shrink-0 flex-wrap items-center justify-end gap-x-3 gap-y-1">
-            {item.lowStockSince && (
-              <span className="flex items-center gap-1.5 text-micro font-medium text-danger">
-                <span className="size-1.5 rounded-full bg-danger" aria-hidden /> Running low
-              </span>
-            )}
-            {item.needsReview && (
-              <span className="flex items-center gap-1.5 text-micro font-medium text-muted-foreground">
-                <span className="size-1.5 rounded-full bg-yellow" aria-hidden /> Needs review
-              </span>
-            )}
-          </div>
+          {/* Right under the gallery, not down with the item's other detail
+              cards — a caption for the photo above it (see this component's
+              own doc comment), not a separate section of page content. */}
+          {item.status === "active" && <ItemStudioPhotosSection item={item} />}
         </div>
-        <BreadcrumbTrail segments={breadcrumb} />
+
+        <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-1">
+            <div className="flex items-start justify-between gap-2">
+              <h1 className="text-screen-title font-semibold text-ink">{item.name}</h1>
+              <div className="flex shrink-0 flex-wrap items-center justify-end gap-x-3 gap-y-1">
+                {item.lowStockSince && (
+                  <span className="flex items-center gap-1.5 text-micro font-medium text-danger">
+                    <span className="size-1.5 rounded-full bg-danger" aria-hidden /> Running low
+                  </span>
+                )}
+                {item.needsReview && (
+                  <span className="flex items-center gap-1.5 text-micro font-medium text-muted-foreground">
+                    <span className="size-1.5 rounded-full bg-yellow" aria-hidden /> Needs review
+                  </span>
+                )}
+              </div>
+            </div>
+            <BreadcrumbTrail segments={breadcrumb} />
+          </div>
+
+          <dl className="grid grid-cols-2 gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
+            <div>
+              <dt className="text-caption text-muted-foreground">Quantity</dt>
+              <dd className="mt-1.5 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => updateItem(item.id, { quantity: item.quantity - 1 })}
+                  disabled={item.status !== "active" || item.quantity <= 0}
+                  aria-label="Decrease quantity"
+                  className="tap-target flex size-7 items-center justify-center rounded-full border border-border text-ink disabled:opacity-40"
+                >
+                  −
+                </button>
+                <span className="w-6 text-center text-body font-semibold text-ink">{item.quantity}</span>
+                <button
+                  type="button"
+                  onClick={() => updateItem(item.id, { quantity: item.quantity + 1 })}
+                  disabled={item.status !== "active" || item.quantity >= 9999}
+                  aria-label="Increase quantity"
+                  className="tap-target flex size-7 items-center justify-center rounded-full border border-border text-ink disabled:opacity-40"
+                >
+                  +
+                </button>
+              </dd>
+              {item.minQuantity !== null && <p className="mt-1 text-micro text-muted-foreground">Minimum {item.minQuantity}</p>}
+            </div>
+            <Field label="Category" value={item.category} />
+            {item.estimatedValue !== null && <Field label="Estimated value" value={formatCurrency(item.estimatedValue)} />}
+            <ItemOwnershipSection itemId={item.id} />
+            {item.description && (
+              <div className="col-span-2">
+                <dt className="text-caption text-muted-foreground">Description</dt>
+                <dd className="mt-1 text-body text-ink">{item.description}</dd>
+              </div>
+            )}
+            {item.tagIds.length > 0 && (
+              <div className="col-span-2">
+                <dt className="text-caption text-muted-foreground">Tags</dt>
+                <dd className="mt-1.5 flex flex-wrap gap-1.5">
+                  <TagList itemId={item.id} />
+                </dd>
+              </div>
+            )}
+            <Field label="Updated" value={relativeTime(item.updatedAt)} />
+            {item.notes && (
+              <div className="col-span-2">
+                <dt className="text-caption text-muted-foreground">Notes</dt>
+                <dd className="mt-1 text-body text-ink">{item.notes}</dd>
+              </div>
+            )}
+            {item.originalDetectedName && item.originalDetectedName !== item.name && (
+              <div className="col-span-2 border-t border-border pt-3">
+                <dt className="text-caption text-muted-foreground">Originally detected as</dt>
+                <dd className="mt-1 text-caption text-ink">{item.originalDetectedName}</dd>
+              </div>
+            )}
+          </dl>
+        </div>
       </div>
-
-      <dl className="grid grid-cols-2 gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm">
-        <div>
-          <dt className="text-caption text-muted-foreground">Quantity</dt>
-          <dd className="mt-1.5 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => updateItem(item.id, { quantity: item.quantity - 1 })}
-              disabled={item.status !== "active" || item.quantity <= 0}
-              aria-label="Decrease quantity"
-              className="tap-target flex size-7 items-center justify-center rounded-full border border-border text-ink disabled:opacity-40"
-            >
-              −
-            </button>
-            <span className="w-6 text-center text-body font-semibold text-ink">{item.quantity}</span>
-            <button
-              type="button"
-              onClick={() => updateItem(item.id, { quantity: item.quantity + 1 })}
-              disabled={item.status !== "active" || item.quantity >= 9999}
-              aria-label="Increase quantity"
-              className="tap-target flex size-7 items-center justify-center rounded-full border border-border text-ink disabled:opacity-40"
-            >
-              +
-            </button>
-          </dd>
-          {item.minQuantity !== null && <p className="mt-1 text-micro text-muted-foreground">Minimum {item.minQuantity}</p>}
-        </div>
-        <Field label="Category" value={item.category} />
-        {item.estimatedValue !== null && <Field label="Estimated value" value={formatCurrency(item.estimatedValue)} />}
-        <ItemOwnershipSection itemId={item.id} />
-        {item.description && (
-          <div className="col-span-2">
-            <dt className="text-caption text-muted-foreground">Description</dt>
-            <dd className="mt-1 text-body text-ink">{item.description}</dd>
-          </div>
-        )}
-        {item.tagIds.length > 0 && (
-          <div className="col-span-2">
-            <dt className="text-caption text-muted-foreground">Tags</dt>
-            <dd className="mt-1.5 flex flex-wrap gap-1.5">
-              <TagList itemId={item.id} />
-            </dd>
-          </div>
-        )}
-        <Field label="Updated" value={relativeTime(item.updatedAt)} />
-        {item.notes && (
-          <div className="col-span-2">
-            <dt className="text-caption text-muted-foreground">Notes</dt>
-            <dd className="mt-1 text-body text-ink">{item.notes}</dd>
-          </div>
-        )}
-        {item.originalDetectedName && item.originalDetectedName !== item.name && (
-          <div className="col-span-2 border-t border-border pt-3">
-            <dt className="text-caption text-muted-foreground">Originally detected as</dt>
-            <dd className="mt-1 text-caption text-ink">{item.originalDetectedName}</dd>
-          </div>
-        )}
-      </dl>
 
       {extraFields.length > 0 && (
         <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
