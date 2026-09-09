@@ -40,8 +40,14 @@ export default function HomePage() {
   return (
     <main className="min-h-dvh bg-background text-ink">
       <div className="mx-auto flex w-full max-w-6xl flex-col px-6">
-        {/* NAV — minimal, per the brief: logo, sign in, one primary CTA. */}
-        <nav className="flex items-center justify-between py-6">
+        {/* NAV — minimal, per the brief: logo, sign in, one primary CTA.
+            pt uses the same env(safe-area-inset-top) convention as every
+            authenticated app-shell header (e.g. src/app/add/page.tsx) —
+            this page is the one place that was missing it, invisible on
+            the web (no OS status bar drawn over a browser tab) until the
+            iOS Capacitor wrapper actually put a status bar/Dynamic Island
+            on top of it. */}
+        <nav className="flex items-center justify-between pb-6 pt-[max(1.5rem,env(safe-area-inset-top))]">
           <Link href="/" className="flex items-center gap-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/icon.svg" alt="" width={32} height={32} className="size-8 rounded-lg" />
