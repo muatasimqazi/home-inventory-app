@@ -8,8 +8,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 // Guaranteed-unauthenticated routes per src/proxy.ts's own PUBLIC_PATHS —
 // hydrate() would just hit the "not signed in" branch here, so skip it
-// entirely rather than waste a round trip.
-const PUBLIC_PATHS = ["/", "/sign-in", "/reset-password", "/privacy", "/terms", "/auth/callback"];
+// entirely rather than waste a round trip. Keep this in sync with that
+// list by hand — /contact was missing here for a while (proxy.ts served
+// it fine for a signed-out visitor, but this gate still called hydrate(),
+// got "Not signed in.", and rendered the hydrationError screen over the
+// real page content instead).
+const PUBLIC_PATHS = ["/", "/sign-in", "/reset-password", "/privacy", "/terms", "/contact", "/auth/callback"];
 
 /**
  * Runs hydrate() once for every real route in the app — not just the
