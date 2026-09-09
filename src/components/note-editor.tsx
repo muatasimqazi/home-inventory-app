@@ -9,6 +9,7 @@ import TaskItem from "@tiptap/extension-task-item";
 import Placeholder from "@tiptap/extension-placeholder";
 import { Markdown, type MarkdownStorage } from "tiptap-markdown";
 import { Icon, type IconName } from "@/components/icon";
+import { VoiceInputButton } from "@/components/voice-input-button";
 import { cn } from "@/lib/utils";
 
 interface NoteEditorProps {
@@ -142,6 +143,21 @@ function NoteEditorToolbar({ editor }: { editor: Editor }) {
       <ToolbarDivider />
       <ToolbarButton icon="undo" label="Undo" onClick={() => chain().undo().run()} />
       <ToolbarButton icon="redo" label="Redo" onClick={() => chain().redo().run()} />
+      <ToolbarDivider />
+      {/* Dictate straight into the note (docs/Voice Input Addendum.md's own
+          §5 flagged this as future scope — "this is a search/ask input,
+          not a dictation tool" — reopened here on request). Inserts at the
+          current cursor position as one real transaction, same as typing,
+          so it lands wherever the cursor already is and Undo above
+          reverts it like anything else. */}
+      <VoiceInputButton
+        onTranscript={(text) => {
+          const trimmed = text.trim();
+          if (!trimmed) return;
+          chain().insertContent(`${trimmed} `).run();
+        }}
+        className="size-8"
+      />
     </div>
   );
 }

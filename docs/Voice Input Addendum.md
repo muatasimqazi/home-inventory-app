@@ -36,9 +36,13 @@ A real gift here: Ask's own system prompt (`lib/ask/ask.ts`) already mandates "p
 - **Android** (docs/Mobile App Addendum.md's native shell): add `RECORD_AUDIO` to `AndroidManifest.xml`, same pattern as the existing `CAMERA`/`ACCESS_FINE_LOCATION` entries added for the capture/location flows — no Capacitor plugin needed, since `MediaRecorder`/`getUserMedia` already work in the WebView the same way camera capture already does.
 - **iOS** (once Phase 4 starts): `NSMicrophoneUsageDescription` in `Info.plist` — noted here so it isn't missed when that phase begins, not something to act on now.
 
-## 5. Open questions
+## 5. Dictation into Notes (reopened)
+
+§6's original open question below called this "a search/ask input, not a dictation tool." Reopened on request: `components/note-editor.tsx`'s toolbar (editable mode only, so create/edit only — not the read view) gets the same `VoiceInputButton`, wired to `editor.chain().insertContent(...)` instead of `onTranscript` populating a text field — it inserts the transcript at the current cursor position as one real ProseMirror transaction, so it lands exactly where typing would have and the toolbar's own Undo reverts a bad dictation like any other edit. `components/note-assistant-bar.tsx`'s own prompt input (talk *to* the note's AI assistant, not into the note itself) gets the same button too, same "populates the field, never auto-submits" convention as everywhere else in this doc.
+
+## 6. Open questions
 
 - Exact transcription/speech model ids to use from the Gateway's catalog (OpenAI's `whisper-1`/`tts-1` are the known-good defaults; confirm availability/pricing at build time via `gateway.getAvailableModels()`).
 - Language: default to auto-detect (no language hint) rather than hardcoding `en` — simplest default, revisit only if transcription quality turns out to need it.
-- Max recording length (a sane cap, e.g. 30–60s, both for cost and because this is a search/ask input, not a dictation tool).
+- Max recording length (a sane cap, e.g. 30–60s, both for cost and because most uses here are a search/ask input, not a dictation tool — §5's Notes dictation is the one deliberate exception, and shares the same cap for now rather than getting its own longer one).
 - Voice choice for TTS — `alloy` as a neutral default, or worth letting the user pick one of OpenAI's other built-in voices from Settings? Not blocking for v1 either way.

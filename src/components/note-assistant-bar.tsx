@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
+import { VoiceInputButton } from "@/components/voice-input-button";
 import { cn } from "@/lib/utils";
 import type { NoteAssistTurn } from "@/lib/ask/note-assist";
 
@@ -95,6 +96,11 @@ export function NoteAssistantBar({ title, content, onApplyEdit }: NoteAssistantB
           disabled={pending}
           className="min-w-0 flex-1 bg-transparent text-caption text-ink placeholder:text-muted-foreground focus:outline-none disabled:opacity-60"
         />
+        {/* Voice input for the assistant prompt itself — same "populates
+            the field, never auto-submits" convention as Ask/Search
+            (docs/Voice Input Addendum.md §2), just wired to this bar's
+            own input instead. */}
+        <VoiceInputButton onTranscript={setInput} className="size-8" />
         <button
           type="submit"
           disabled={!input.trim() || pending}
