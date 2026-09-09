@@ -167,25 +167,6 @@ export default function NotificationSettingsPage() {
             {busy ? <Icon name="spinner" size={16} className="animate-spin" /> : "Turn off on this device"}
           </Button>
         )}
-        {/* TEMPORARY — real-device verification for the iOS native-push
-            work (docs/Mobile App Addendum.md §2.1/§5.4). Self-scoped
-            (src/app/api/v1/push/test-send/route.ts always sends to the
-            caller's own devices only). Remove alongside that route once
-            delivery is confirmed. */}
-        {isNative && state === "subscribed" && (
-          <Button
-            variant="outline"
-            size="lg"
-            onClick={() =>
-              fetch("/api/v1/push/test-send", { method: "POST" })
-                .then((r) => r.json())
-                .then((r) => toast(r.error ? `Test send failed: ${r.error}` : `Sent ${r.sent}, removed ${r.removed}`))
-                .catch((error) => toast(`Test send failed: ${error}`))
-            }
-          >
-            Send test notification
-          </Button>
-        )}
       </div>
 
       {state === "subscribed" && (

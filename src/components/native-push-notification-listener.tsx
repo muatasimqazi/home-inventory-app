@@ -14,7 +14,14 @@ function registerDeviceToken(householdId: string, fcmToken: string) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ householdId, platform: Capacitor.getPlatform(), fcmToken }),
-  }).catch((error) => console.error("NativePushNotificationListener: failed to register device:", error));
+  })
+    .then((res) => {
+      // fetch() only rejects on a true network failure, never on a 4xx/5xx
+      // status — a server-side rejection (auth, validation, DB error)
+      // needs its own check to actually surface.
+      if (!res.ok) console.error(`NativePushNotificationListener: register-device responded ${res.status}`);
+    })
+    .catch((error) => console.error("NativePushNotificationListener: failed to register device:", error));
 }
 
 /**

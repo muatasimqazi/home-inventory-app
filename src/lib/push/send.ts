@@ -100,7 +100,18 @@ export async function sendFcmToUser(admin: SupabaseClient, userId: string, paylo
       await admin.from("device_push_tokens").update({ last_seen_at: new Date().toISOString() }).eq("id", row.id);
     } catch (error) {
       const code = (error as { code?: string }).code;
-      if (code === "messaging/registration-token-not-registered" || code === "messaging/invalid-registration-token") {
+      // invalid-argument covers a token that was never FCM-shaped at all
+      // (e.g. a raw APNs hex token stored before the iOS FCM-exchange fix
+      // — docs/Mobile App Addendum.md §2.1 — landed), not just one that
+      // was valid and has since expired/uninstalled
+      // (registration-token-not-registered/invalid-registration-token) —
+      // both are equally dead ends, so both get cleaned up the same way
+      // rather than erroring on every future send forever.
+      if (
+        code === "messaging/registration-token-not-registered" ||
+        code === "messaging/invalid-registration-token" ||
+        code === "messaging/invalid-argument"
+      ) {
         await admin.from("device_push_tokens").delete().eq("id", row.id);
         removed++;
       } else {
