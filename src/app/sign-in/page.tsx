@@ -116,14 +116,33 @@ function SignInInner() {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-center bg-background px-6">
-      <div className="flex w-full max-w-sm flex-col items-center gap-8">
-        <div className="flex flex-col items-center gap-3 text-center">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/icon.svg" alt="" width={56} height={56} className="size-14 rounded-2xl" />
-          <p className="text-display font-semibold text-ink">Schuaz</p>
-          <p className="text-body text-muted-foreground">Find anything you own, in seconds.</p>
-        </div>
+    <div className="flex min-h-dvh flex-col items-center bg-background px-6 pt-[max(2.5rem,env(safe-area-inset-top))] pb-10">
+      <div className="flex w-full max-w-sm flex-1 flex-col justify-center gap-8">
+        {mode === "default" && (
+          <div className="flex flex-col items-center gap-3 text-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/icon.svg" alt="" width={56} height={56} className="size-14 rounded-2xl" />
+            <p className="text-micro font-semibold tracking-wide text-yellow-text uppercase">One place for household life</p>
+            <h1 className="text-display font-semibold text-ink">Just ask your home.</h1>
+            <p className="text-body text-muted-foreground">Find anything you own, in seconds.</p>
+          </div>
+        )}
+
+        {/* Abstract "storage bins" illustration, default mode only — same
+            role the reference design's hero graphic plays, redrawn with
+            this app's own sage/ink tokens (globals.css's v3 palette)
+            rather than lifted colors from that reference. */}
+        {mode === "default" && (
+          <div className="flex items-center justify-center rounded-3xl bg-surface-muted py-10">
+            <svg width="140" height="96" viewBox="0 0 140 96" fill="none" aria-hidden="true">
+              <rect x="4" y="28" width="36" height="30" rx="8" className="fill-brand-200" />
+              <rect x="52" y="28" width="36" height="30" rx="8" className="fill-brand-200" />
+              <rect x="100" y="28" width="36" height="30" rx="8" className="fill-yellow" />
+              <rect x="28" y="62" width="36" height="30" rx="8" className="fill-ink-fill" />
+              <rect x="76" y="62" width="36" height="30" rx="8" className="fill-brand-200" />
+            </svg>
+          </div>
+        )}
 
         {mode === "authenticating" ? (
           <div className="flex flex-col items-center gap-3 py-6 text-ink">
@@ -198,18 +217,37 @@ function SignInInner() {
         ) : (
           <div className="flex w-full flex-col gap-3">
             {error && <p className="text-center text-caption text-danger">{error}</p>}
-            <Button size="lg" className="bg-ink-fill text-white hover:bg-ink-fill/90" onClick={continueWithGoogle}>
-              Continue with Google
+            {/* Create account / Log in as distinct primary entry points
+                (were a single "Continue with email" before) — both land
+                on the same email-mode form below, differing only in
+                authAction, same as toggling it there always did. */}
+            <Button
+              size="lg"
+              className="bg-ink-fill text-white hover:bg-ink-fill/90"
+              onClick={() => {
+                setAuthAction("signup");
+                setMode("email");
+              }}
+            >
+              Create account
             </Button>
             <Button
               size="lg"
               variant="outline"
               onClick={() => {
-                setMode("email");
                 setAuthAction("signin");
+                setMode("email");
               }}
             >
-              Continue with email
+              Log in
+            </Button>
+            <div className="flex items-center gap-3 py-1">
+              <div className="h-px flex-1 bg-border" />
+              <span className="text-micro text-muted-foreground">or</span>
+              <div className="h-px flex-1 bg-border" />
+            </div>
+            <Button size="lg" variant="outline" onClick={continueWithGoogle}>
+              Continue with Google
             </Button>
           </div>
         )}

@@ -8,6 +8,7 @@ import { PhotoLightbox } from "@/components/photo-lightbox";
 import { PointerEventsWatchdog } from "@/components/pointer-events-watchdog";
 import { NativeAuthDeepLinkListener } from "@/components/native-auth-deep-link-listener";
 import { NativePushNotificationListener } from "@/components/native-push-notification-listener";
+import { NativeSplashScreen } from "@/components/native-splash-screen";
 import { CommandKShortcut } from "@/components/command-k-shortcut";
 import { PHProvider } from "@/components/posthog-provider";
 
@@ -107,6 +108,14 @@ export default function RootLayout({
                 has mounted. See its own file for what bug this guards
                 against ("sometimes doesn't let you click stuff", app-wide). */}
             <PointerEventsWatchdog />
+            {/* Native-app-only — hides the branded launch screen once
+                real content has actually mounted here, not the instant
+                the WebView is created (see its own file for the blank-
+                white-flash gap this closes, and capacitor.config.ts's
+                launchAutoHide: false alongside it). Mounted first, ahead
+                of the other native-only listeners below, so nothing
+                delays this past whenever the rest of the tree is ready. */}
+            <NativeSplashScreen />
             {/* Native-app-only (no-op in a browser/PWA) — completes Google
                 sign-in's round trip through the in-app browser tab. See
                 its own file for the "login opens Chrome and stays there"

@@ -21,6 +21,19 @@ const config: CapacitorConfig = {
     url: "https://schuaz.com",
     androidScheme: "https",
   },
+  plugins: {
+    // Default behavior hides the branded launch screen the instant the
+    // WebView is *created*, not once it has *content* — for an app that
+    // loads a live remote URL over the network rather than bundled
+    // files, that leaves a blank white gap for however long the load
+    // takes (seen directly, repeatedly, capturing screenshots this same
+    // session). launchAutoHide: false keeps it up until
+    // components/native-splash-screen.tsx explicitly calls
+    // SplashScreen.hide() once real page content has actually mounted.
+    SplashScreen: {
+      launchAutoHide: false,
+    },
+  },
 };
 
 export default config;
