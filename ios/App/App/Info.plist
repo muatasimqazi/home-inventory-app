@@ -67,6 +67,27 @@
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
 
+	<!-- Google sign-in's own callback (src/components/native-auth-deep-
+	     link-listener.tsx, src/app/sign-in/page.tsx's NATIVE_AUTH_CALLBACK_URL)
+	     — routes com.schuaz.app://auth/callback back into this app once the
+	     SFSafariViewController opened by Browser.open() finishes the OAuth
+	     redirect chain. Android's equivalent is the custom_url_scheme
+	     intent-filter in AndroidManifest.xml; unlike `cap add android`
+	     (which auto-populates that from strings.xml), `cap add ios` does
+	     NOT auto-generate this — without it, iOS has no handler registered
+	     for the scheme at all, and the in-app Safari view fails with
+	     "Safari cannot open the page because the address is not valid"
+	     the moment the redirect hits it. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.schuaz.app</string>
+			</array>
+		</dict>
+	</array>
+
 	<!-- Capture flows (src/app/capture/*, src/app/scan, src/app/finance/scan)
 	     use getUserMedia() directly in the WebView (no @capacitor/camera
 	     plugin — see docs/Mobile App Addendum.md §2.2), same as Android.
