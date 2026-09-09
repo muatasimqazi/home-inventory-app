@@ -7,7 +7,15 @@ import { Capacitor } from "@capacitor/core";
 import { PushNotifications, type Token, type PushNotificationSchema, type ActionPerformed } from "@capacitor/push-notifications";
 import { FCM } from "@capacitor-community/fcm";
 import { useInventoryStore } from "@/lib/store";
-import { setNativePushToken } from "@/lib/native-push-token";
+import { getNativePushToken, setNativePushToken } from "@/lib/native-push-token";
+
+function registerDeviceToken(householdId: string, fcmToken: string) {
+  fetch("/api/v1/push/register-device", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ householdId, platform: Capacitor.getPlatform(), fcmToken }),
+  }).catch((error) => console.error("NativePushNotificationListener: failed to register device:", error));
+}
 
 /**
  * Native push's passive listeners (docs/Mobile App Addendum.md §2.1) —
@@ -56,22 +64,12 @@ export function NativePushNotificationListener() {
       FCM.getToken()
         .then(({ token: fcmToken }) => {
           setNativePushToken(fcmToken);
-          if (!householdId) return;
-          fetch("/api/v1/push/register-device", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ householdId, platform: Capacitor.getPlatform(), fcmToken }),
-          }).catch((error) => console.error("NativePushNotificationListener: failed to register device:", error));
+          if (householdId) registerDeviceToken(householdId, fcmToken);
         })
         .catch((error) => {
           console.error("NativePushNotificationListener: FCM.getToken() failed, falling back to raw registration token:", error);
           setNativePushToken(token.value);
-          if (!householdId) return;
-          fetch("/api/v1/push/register-device", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ householdId, platform: Capacitor.getPlatform(), fcmToken: token.value }),
-          }).catch((err) => console.error("NativePushNotificationListener: failed to register device:", err));
+          if (householdId) registerDeviceToken(householdId, token.value);
         });
     });
 
@@ -110,6 +108,25 @@ export function NativePushNotificationListener() {
       tapHandle.then((h) => h.remove());
     };
   }, [router, householdId]);
+
+  // Closes a real race the fetch above can't: the native 'registration'
+  // event fires once per app launch — typically very early, often before
+  // currentHouseholdId has loaded from Supabase into the store yet — and
+  // Capacitor doesn't replay it to a freshly re-subscribed listener once
+  // it's already fired. Without this, a token that arrived while
+  // householdId was still null would just be dropped for the rest of
+  // that session (confirmed on a real device: registration succeeded,
+  // FCM.getToken() succeeded, but device_push_tokens ended up with zero
+  // rows for the user). This effect independently re-checks once
+  // householdId actually becomes available, using whatever token the
+  // listener above already cached via setNativePushToken — a no-op if
+  // registration hasn't fired yet by then (the normal case, where the
+  // listener's own fetch already covers it directly).
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform() || !householdId) return;
+    const token = getNativePushToken();
+    if (token) registerDeviceToken(householdId, token);
+  }, [householdId]);
 
   return null;
 }

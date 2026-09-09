@@ -77,7 +77,7 @@ interface DeviceTokenRow {
  * retried forever, same "don't let one bad device stop the rest of the
  * household" posture Web Push's own loop already has.
  */
-async function sendFcmToUser(admin: SupabaseClient, userId: string, payload: PushPayload): Promise<{ sent: number; removed: number }> {
+export async function sendFcmToUser(admin: SupabaseClient, userId: string, payload: PushPayload): Promise<{ sent: number; removed: number }> {
   const app = getFirebaseApp();
   if (!app) return { sent: 0, removed: 0 };
 
