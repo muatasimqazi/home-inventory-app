@@ -1,9 +1,25 @@
 "use client";
 
-import { forwardRef } from "react";
+import { forwardRef, useSyncExternalStore } from "react";
 import { Icon } from "@/components/icon";
 import { VoiceInputButton } from "@/components/voice-input-button";
 import { cn } from "@/lib/utils";
+
+// command-k-shortcut.tsx listens for metaKey (Cmd) *or* ctrlKey (Ctrl) —
+// the actual key on non-Mac platforms is Ctrl, not Cmd, so a hardcoded
+// "⌘K" badge would show the wrong key there. No subscription needed
+// (platform doesn't change at runtime) — just a client-only read, same
+// "neutral until mounted" reasoning settings/page.tsx's own ThemeToggle
+// uses, so SSR doesn't have to guess and risk a hydration mismatch.
+// Defaults true (⌘K) for the server snapshot, matching this badge's
+// previous always-⌘K behavior for the platform it's most likely tested on.
+function useIsMacPlatform(): boolean {
+  return useSyncExternalStore(
+    () => () => {},
+    () => typeof navigator !== "undefined" && /Mac|iPhone|iPad|iPod/.test(navigator.platform),
+    () => true
+  );
+}
 
 interface SearchBarProps {
   value: string;
@@ -28,6 +44,8 @@ export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(function S
   { value, onChange, placeholder = "Search items, transactions, accounts…", autoFocus, className, onFocus },
   ref
 ) {
+  const isMac = useIsMacPlatform();
+
   return (
     <div
       className={cn(
@@ -62,7 +80,7 @@ export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(function S
       <VoiceInputButton onTranscript={onChange} className="absolute right-1 md:right-13" />
       {/* Keyboard shortcut hint — desktop only, per design (never shown on mobile). */}
       <span className="pointer-events-none absolute right-3 hidden items-center justify-center rounded-md bg-surface-muted px-1.5 py-0.5 text-micro text-muted-foreground md:flex">
-        ⌘K
+        {isMac ? "⌘K" : "Ctrl+K"}
       </span>
     </div>
   );

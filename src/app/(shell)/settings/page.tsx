@@ -8,6 +8,7 @@ import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import posthog from "posthog-js";
 import { Icon, type IconName } from "@/components/icon";
+import { AppVersionFooter } from "@/components/app-version-footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -152,6 +153,8 @@ export default function SettingsPage() {
       >
         <Icon name="danger" size={14} /> Delete account
       </Link>
+
+      <AppVersionFooter />
 
       <Sheet open={editOpen} onOpenChange={setEditOpen}>
         <SheetContent side="bottom" className="rounded-t-3xl">
