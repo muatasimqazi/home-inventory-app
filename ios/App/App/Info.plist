@@ -67,6 +67,14 @@
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
 
+	<!-- Standard HTTPS/TLS only (Supabase auth, all networking) — no
+	     custom/proprietary encryption anywhere in this app (checked: no
+	     CryptoKit/CommonCrypto usage). Declaring this here means every
+	     future upload skips App Store Connect's export-compliance
+	     questionnaire instead of asking it per build. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+
 	<!-- Google sign-in's own callback (src/components/native-auth-deep-
 	     link-listener.tsx, src/app/sign-in/page.tsx's NATIVE_AUTH_CALLBACK_URL)
 	     — routes com.schuaz.app://auth/callback back into this app once the
