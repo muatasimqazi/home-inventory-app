@@ -67,6 +67,17 @@
 
     <!-- Voice input (docs/Voice Input Addendum.md) uses getUserMedia()/
          MediaRecorder directly in the WebView, same "no native plugin
-         needed" reasoning as camera/location above. -->
+         needed" reasoning as camera/location above. Capacitor's built-in
+         WebView permission handling (BridgeWebChromeClient.
+         onPermissionRequest, @capacitor/android) requests BOTH of these
+         together for an audio-capture request and only grants the WebView
+         the mic if *both* come back granted — MODIFY_AUDIO_SETTINGS is a
+         "normal" (non-dangerous) permission so it never shows its own
+         prompt, but omitting it from the manifest still makes that half
+         of the request come back denied, which silently failed the whole
+         getUserMedia call even after RECORD_AUDIO's own prompt was
+         accepted (VoiceInputButton's error icon, with no visible second
+         prompt to explain why). -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 </manifest>
