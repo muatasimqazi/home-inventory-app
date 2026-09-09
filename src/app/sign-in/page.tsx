@@ -260,9 +260,12 @@ function SignInInner() {
                 (were a single "Continue with email" before) — both land
                 on the same email-mode form below, differing only in
                 authAction, same as toggling it there always did. */}
+            {/* Default variant (bg-primary) — same sage brand color the
+                email-mode form's own Create account/Continue button
+                below already uses via that same default, rather than
+                the off-brand bg-ink-fill override this had before. */}
             <Button
               size="lg"
-              className="bg-ink-fill text-white hover:bg-ink-fill/90"
               onClick={() => {
                 setAuthAction("signup");
                 setMode("email");
