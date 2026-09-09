@@ -8,6 +8,7 @@ import { PhotoLightbox } from "@/components/photo-lightbox";
 import { PointerEventsWatchdog } from "@/components/pointer-events-watchdog";
 import { NativeAuthDeepLinkListener } from "@/components/native-auth-deep-link-listener";
 import { NativePushNotificationListener } from "@/components/native-push-notification-listener";
+import { CommandKShortcut } from "@/components/command-k-shortcut";
 import { PHProvider } from "@/components/posthog-provider";
 
 export const metadata: Metadata = {
@@ -116,6 +117,9 @@ export default function RootLayout({
                 app is on (see its own file for why this has to be global
                 rather than living in Settings > Notifications' hook). */}
             <NativePushNotificationListener />
+            {/* Cmd/Ctrl+K -> Search — a hardware-keyboard shortcut, so this
+                is harmless (just never fires) on native/touch. */}
+            <CommandKShortcut />
           </ThemeProvider>
         </PHProvider>
       </body>
