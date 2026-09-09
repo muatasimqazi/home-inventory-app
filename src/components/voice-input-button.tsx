@@ -1,8 +1,10 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { Haptics, ImpactStyle, NotificationType } from "@capacitor/haptics";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
+import { playRecordingStartTone, playRecordingStopTone } from "@/lib/audio-feedback";
 
 type RecordingState = "idle" | "recording" | "transcribing" | "error";
 
@@ -45,6 +47,7 @@ export function VoiceInputButton({ onTranscript, className }: { onTranscript: (t
     } catch (error) {
       console.error("VoiceInputButton: transcription failed:", error);
       setState("error");
+      void Haptics.notification({ type: NotificationType.Error }).catch(() => {});
       setTimeout(() => setState("idle"), 2000);
     }
   }
@@ -65,17 +68,25 @@ export function VoiceInputButton({ onTranscript, className }: { onTranscript: (t
       recorder.onstop = () => {
         stream.getTracks().forEach((t) => t.stop());
         if (stopTimerRef.current) clearTimeout(stopTimerRef.current);
+        // Fires whether stopped by a tap or by MAX_RECORDING_MS's own
+        // auto-stop, so "closing makes a noise" holds either way rather
+        // than only for the explicit-tap path.
+        playRecordingStopTone();
+        void Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
         void transcribeRecording();
       };
       mediaRecorderRef.current = recorder;
       recorder.start();
       setState("recording");
+      playRecordingStartTone();
+      void Haptics.impact({ style: ImpactStyle.Medium }).catch(() => {});
       stopTimerRef.current = setTimeout(() => recorder.stop(), MAX_RECORDING_MS);
     } catch (error) {
       // The common case here is the user declining the permission prompt
       // — not a real error to log loudly about, just reflect it in the UI.
       console.error("VoiceInputButton: couldn't access the microphone:", error);
       setState("error");
+      void Haptics.notification({ type: NotificationType.Error }).catch(() => {});
       setTimeout(() => setState("idle"), 2000);
     }
   }
