@@ -211,7 +211,22 @@ export default function OverviewPage() {
         </div>
       </div>
 
-      <SearchBar value="" onChange={() => {}} onFocus={() => router.push("/search")} className="md:hidden" />
+      {/* value/onChange are dummies on purpose — this bar is a tap
+          target that redirects to /search, not a real input, so typing
+          into it never did anything either. Voice input is a real
+          exception: VoiceInputButton doesn't trigger the text input's
+          own onFocus the way tapping the field does, so a transcript
+          used to just call this same no-op onChange and vanish — the
+          recording looked broken because nothing visibly happened.
+          Routing the transcript to /search?q= instead makes voice
+          input on this bar actually go somewhere, same destination
+          typing here always redirected to anyway. */}
+      <SearchBar
+        value=""
+        onChange={(v) => router.push(`/search?q=${encodeURIComponent(v)}`)}
+        onFocus={() => router.push("/search")}
+        className="md:hidden"
+      />
 
       {/* The one, consolidated "what needs doing" surface — sits right
           below Search, above Notes/Tasks, so anything time-sensitive is
