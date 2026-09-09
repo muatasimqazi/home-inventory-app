@@ -75,14 +75,18 @@ export const FINANCE_LINKS: NavLink[] = [
   { href: "/finance/categories", icon: "pieChart", label: "Categories & Rules" },
 ];
 
-// Activity/Trash/Import CSV/Search were consolidated into one shared page
-// each (docs note: Trash keeps two tabbed panels, Activity a real combined
-// feed) rather than living duplicated in both domains. On mobile these
-// live on /settings instead of here — Settings is the one already-reachable
-// surface that lists them (see app/(shell)/settings/page.tsx) — so this
-// array isn't rendered on /more to avoid re-duplicating them a second way.
+// Activity/Trash/Import CSV were consolidated into one shared page each
+// (docs note: Trash keeps two tabbed panels, Activity a real combined feed)
+// rather than living duplicated in both domains. On mobile these live on
+// /settings instead of here — Settings is the one already-reachable surface
+// that lists them (see app/(shell)/settings/page.tsx) — so this array isn't
+// rendered on /more to avoid re-duplicating them a second way.
+//
+// Search isn't in here: DesktopSidebar already gives it its own permanent
+// entry above Overview (mirroring the bottom-nav's Search tab on mobile) —
+// listing it again down here in Shared would just be the same /search link
+// twice on the same sidebar.
 export const SHARED_LINKS: NavLink[] = [
-  { href: "/search", icon: "search", label: "Search" },
   { href: "/activity", icon: "activity", label: "Activity" },
   { href: "/trash", icon: "trash", label: "Trash" },
   { href: "/import", icon: "upload", label: "Import CSV" },
