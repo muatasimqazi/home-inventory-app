@@ -97,6 +97,17 @@ export function DesktopSidebar() {
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto">
+        {/* Search — the very first item, above Overview. Desktop had no
+            persistent way to reach /search at all before this: the
+            dashboard's own SearchBar is md:hidden (mobile only), and the
+            desktop overview page's "Active items" stat tile links there
+            but isn't a real nav entry. Bottom-nav gives mobile a
+            permanent Search tab; this is that same permanent entry
+            point's desktop equivalent, not a duplicate of anything. */}
+        <nav aria-label="Search">
+          <SidebarLink href="/search" icon="search" label="Search" pathname={pathname} collapsed={collapsed} />
+        </nav>
+
         {/* Cross-domain landing page (see src/app/(shell)/page.tsx) — its
             own top-level section, same reasoning as Settings living below
             the divider: it isn't part of either domain, it sits above both. */}
