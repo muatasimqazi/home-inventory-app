@@ -29,6 +29,16 @@ export function VoiceInputButton({ onTranscript, className }: { onTranscript: (t
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const stopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // A plain ref, not React state — state updates are batched/async, so
+  // `state` in the onClick handler's closure can still read "idle" for
+  // a beat after a tap already started startRecording() (setState
+  // "recording" doesn't happen until getUserMedia resolves, which isn't
+  // instant). A fast double-tap in that window used to call
+  // startRecording() twice before either render caught up, firing the
+  // start tone/haptic twice — reported as "two tones". A ref is read
+  // and set synchronously, so it closes that window immediately instead
+  // of racing a render.
+  const startingRef = useRef(false);
 
   async function transcribeRecording() {
     setState("transcribing");
@@ -53,7 +63,10 @@ export function VoiceInputButton({ onTranscript, className }: { onTranscript: (t
   }
 
   async function startRecording() {
+    if (startingRef.current) return;
+    startingRef.current = true;
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+      startingRef.current = false;
       setState("error");
       setTimeout(() => setState("idle"), 2000);
       return;
@@ -90,11 +103,13 @@ export function VoiceInputButton({ onTranscript, className }: { onTranscript: (t
       mediaRecorderRef.current = recorder;
       recorder.start();
       setState("recording");
+      startingRef.current = false;
       stopTimerRef.current = setTimeout(() => recorder.stop(), MAX_RECORDING_MS);
     } catch (error) {
       // The common case here is the user declining the permission prompt
       // — not a real error to log loudly about, just reflect it in the UI.
       console.error("VoiceInputButton: couldn't access the microphone:", error);
+      startingRef.current = false;
       setState("error");
       void Haptics.notification({ type: NotificationType.Error }).catch(() => {});
       setTimeout(() => setState("idle"), 2000);
