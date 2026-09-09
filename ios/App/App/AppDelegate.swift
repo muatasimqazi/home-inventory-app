@@ -1,5 +1,6 @@
 import UIKit
 import Capacitor
+import FirebaseMessaging
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -9,6 +10,31 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Override point for customization after application launch.
         return true
+    }
+
+    // Capacitor does NOT swizzle these — confirmed against its own current
+    // docs (capacitorjs.com/docs/apis/push-notifications) after two failed
+    // real-device attempts assuming otherwise. `cap add ios`'s stock
+    // template never scaffolds this at all (it's only needed once Push
+    // Notifications is added as a capability), so @capacitor/push-
+    // notifications' 'registration'/'registrationError' JS events simply
+    // never fired — not a Firebase conflict, a genuinely missing required
+    // step. Posting these NotificationCenter notifications is what the
+    // plugin's own iOS side actually listens for.
+    //
+    // The apnsToken assignment is this app's own addition on top of that:
+    // with FirebaseAppDelegateProxyEnabled off (Info.plist), Firebase no
+    // longer captures the token itself via its own (separate, and
+    // unrelated to the above) swizzling, so @capacitor-community/fcm's
+    // getToken() needs it forwarded explicitly to have anything to
+    // exchange for a real FCM token.
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        Messaging.messaging().apnsToken = deviceToken
+        NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications, object: deviceToken)
+    }
+
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications, object: error)
     }
 
     func applicationWillResignActive(_ application: UIApplication) {

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Capacitor } from "@capacitor/core";
 import { PushNotifications, type Token, type PushNotificationSchema, type ActionPerformed } from "@capacitor/push-notifications";
+import { FCM } from "@capacitor-community/fcm";
 import { useInventoryStore } from "@/lib/store";
 import { setNativePushToken } from "@/lib/native-push-token";
 
@@ -40,14 +41,38 @@ export function NativePushNotificationListener() {
       if (status.receive === "granted") PushNotifications.register();
     });
 
+    // `token.value` here is the raw platform registration token, not
+    // necessarily an FCM one: Android's push system *is* FCM at the OS
+    // level, so it's already correct there, but @capacitor/push-notifications
+    // has no Firebase dependency on iOS at all (checked its Swift source)
+    // — on iOS this event's token is the raw APNs device token, which
+    // Firebase Admin's messaging().send() rejects outright as an invalid
+    // registration token. @capacitor-community/fcm's getToken() wraps the
+    // native Firebase Messaging SDK (auto-configured from
+    // GoogleService-Info.plist) to do the actual APNs→FCM exchange, and
+    // returns the same value Android already had, so calling it
+    // unconditionally here (not just for iOS) is correct for both.
     const registrationHandle = PushNotifications.addListener("registration", (token: Token) => {
-      setNativePushToken(token.value);
-      if (!householdId) return;
-      fetch("/api/v1/push/register-device", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ householdId, platform: Capacitor.getPlatform(), fcmToken: token.value }),
-      }).catch((error) => console.error("NativePushNotificationListener: failed to register device:", error));
+      FCM.getToken()
+        .then(({ token: fcmToken }) => {
+          setNativePushToken(fcmToken);
+          if (!householdId) return;
+          fetch("/api/v1/push/register-device", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ householdId, platform: Capacitor.getPlatform(), fcmToken }),
+          }).catch((error) => console.error("NativePushNotificationListener: failed to register device:", error));
+        })
+        .catch((error) => {
+          console.error("NativePushNotificationListener: FCM.getToken() failed, falling back to raw registration token:", error);
+          setNativePushToken(token.value);
+          if (!householdId) return;
+          fetch("/api/v1/push/register-device", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ householdId, platform: Capacitor.getPlatform(), fcmToken: token.value }),
+          }).catch((err) => console.error("NativePushNotificationListener: failed to register device:", err));
+        });
     });
 
     const errorHandle = PushNotifications.addListener("registrationError", (error) => {

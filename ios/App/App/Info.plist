@@ -78,6 +78,19 @@
 	     for the scheme at all, and the in-app Safari view fails with
 	     "Safari cannot open the page because the address is not valid"
 	     the moment the redirect hits it. -->
+	<!-- @capacitor-community/fcm (via FirebaseMessaging) and Capacitor's own
+	     core both do runtime method-swizzling of AppDelegate's
+	     didRegisterForRemoteNotificationsWithDeviceToken to capture the
+	     APNs token — with both enabled, PushNotifications.register()
+	     resolved and neither the 'registration' nor 'registrationError'
+	     event ever fired (confirmed on a real device: permission granted,
+	     register() called, 60s+ of silence). Disabling Firebase's own
+	     swizzling here and forwarding the token to it manually instead
+	     (AppDelegate.swift) removes the conflict — Capacitor's swizzling,
+	     now the only one touching this method, is untouched. -->
+	<key>FirebaseAppDelegateProxyEnabled</key>
+	<false/>
+
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
