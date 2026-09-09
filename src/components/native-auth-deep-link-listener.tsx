@@ -15,19 +15,23 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 const AUTH_CALLBACK_URL = "com.schuaz.app://auth/callback";
 
 /**
- * Completes Google sign-in inside the native app (docs/Mobile App
- * Addendum.md) — this is the fix for "login opens Chrome and after
+ * Completes Google and Apple sign-in inside the native app (docs/Mobile
+ * App Addendum.md) — this is the fix for "login opens Chrome and after
  * login stays in the web version." Google's OAuth pages refuse to
  * render inside an embedded WebView at all (a long-standing anti-
  * phishing policy on Google's end, not a bug in this app), so
- * sign-in/page.tsx's continueWithGoogle() opens the flow in an in-app
+ * sign-in/page.tsx's continueWithGoogle()/continueWithApple() (same
+ * pattern, just a different provider) open the flow in an in-app
  * browser tab instead (Browser.open() — Chrome Custom Tabs under the
  * hood, a real system-browser UI Google's check accepts, not the app's
  * own WebView) rather than a same-window redirect. Without this
  * listener, that flow had nothing telling it to hand control back to
- * the app once Google finished — the user just stayed in that browser
- * tab, now signed in on the *website*, with the native app still
- * sitting on its sign-in screen underneath.
+ * the app once the provider finished — the user just stayed in that
+ * browser tab, now signed in on the *website*, with the native app
+ * still sitting on its sign-in screen underneath. This handler itself
+ * only ever looks at the callback URL's scheme and its `code` param —
+ * it never branches on which provider produced either, so it needed no
+ * changes at all to also cover Apple once that was added.
  *
  * The fix: point that flow's redirect at this app's own custom URL
  * scheme instead of a real https:// URL. Android's intent-filter for

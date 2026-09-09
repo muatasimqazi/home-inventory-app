@@ -83,6 +83,45 @@ function SignInInner() {
     }
   }
 
+  // Mirrors continueWithGoogle() exactly (same skipBrowserRedirect +
+  // Browser.open() pattern, same native-scheme redirectTo) — the only
+  // difference is provider: "apple". Apple's own HIG "recommends" the
+  // native AuthenticationServices sheet over a web redirect when
+  // available, but doesn't require it — Guideline 4.8 only requires
+  // offering an equivalent option, which this satisfies the same way
+  // Google already does, reusing infrastructure (NativeAuthDeepLinkListener,
+  // the redirectTo callback route) already proven working rather than
+  // adding a second, native-only plugin/flow.
+  async function continueWithApple() {
+    setError(null);
+    setMode("authenticating");
+    const supabase = getSupabaseBrowserClient();
+    const next = searchParams.get("next") ?? "/dashboard";
+
+    if (Capacitor.isNativePlatform()) {
+      const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: "apple",
+        options: { redirectTo: `${NATIVE_AUTH_CALLBACK_URL}?next=${encodeURIComponent(next)}`, skipBrowserRedirect: true },
+      });
+      if (oauthError || !data.url) {
+        setError(oauthError?.message ?? "Couldn't start sign-in.");
+        setMode("default");
+        return;
+      }
+      await Browser.open({ url: data.url });
+      return;
+    }
+
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      provider: "apple",
+      options: { redirectTo: `${appOrigin()}/auth/callback?next=${encodeURIComponent(next)}` },
+    });
+    if (oauthError) {
+      setError(oauthError.message);
+      setMode("default");
+    }
+  }
+
   async function submitEmailForm() {
     setError(null);
     setMode("authenticating");
@@ -248,6 +287,9 @@ function SignInInner() {
             </div>
             <Button size="lg" variant="outline" onClick={continueWithGoogle}>
               Continue with Google
+            </Button>
+            <Button size="lg" variant="outline" className="bg-black text-white hover:bg-black/90" onClick={continueWithApple}>
+              Continue with Apple
             </Button>
           </div>
         )}
