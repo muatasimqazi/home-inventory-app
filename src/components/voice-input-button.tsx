@@ -58,6 +58,15 @@ export function VoiceInputButton({ onTranscript, className }: { onTranscript: (t
       setTimeout(() => setState("idle"), 2000);
       return;
     }
+    // Fired here, before getUserMedia — not after, like the original cut
+    // of this did. Requesting the mic switches iOS's AVAudioSession into
+    // a recording category, and that switch appears to step on/mute
+    // audio already mid-flight from a separate output-only AudioContext
+    // (matches what was reported: tones "not fully working" — inconsistent
+    // rather than fully silent). Firing before the switch happens, right
+    // on the tap itself, avoids the race instead of trying to win it.
+    playRecordingStartTone();
+    void Haptics.impact({ style: ImpactStyle.Medium }).catch(() => {});
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
@@ -70,7 +79,10 @@ export function VoiceInputButton({ onTranscript, className }: { onTranscript: (t
         if (stopTimerRef.current) clearTimeout(stopTimerRef.current);
         // Fires whether stopped by a tap or by MAX_RECORDING_MS's own
         // auto-stop, so "closing makes a noise" holds either way rather
-        // than only for the explicit-tap path.
+        // than only for the explicit-tap path. Unlike the start tone,
+        // this one has no competing session-switch race — the mic
+        // track's already stopped on the line above by the time this
+        // plays.
         playRecordingStopTone();
         void Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
         void transcribeRecording();
@@ -78,8 +90,6 @@ export function VoiceInputButton({ onTranscript, className }: { onTranscript: (t
       mediaRecorderRef.current = recorder;
       recorder.start();
       setState("recording");
-      playRecordingStartTone();
-      void Haptics.impact({ style: ImpactStyle.Medium }).catch(() => {});
       stopTimerRef.current = setTimeout(() => recorder.stop(), MAX_RECORDING_MS);
     } catch (error) {
       // The common case here is the user declining the permission prompt
