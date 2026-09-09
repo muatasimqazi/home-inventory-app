@@ -211,16 +211,17 @@ export default function OverviewPage() {
         </div>
       </div>
 
-      {/* The one, consolidated "what needs doing" surface — moved to the
-          very top of the page, above even Search/Notes/Tasks, so anything
-          time-sensitive is the first thing seen, not something scrolled
-          past first. Used to be shown twice (a "Needs Attention" stat
-          tile up here, and an almost-identical "Action queue" card
-          repeated a few hundred pixels later in Home Inventory) with no
-          two of the three chips ever quite matching between them.
-          Zero-state collapses to a single calm line instead of three
-          chips all reading "0" — that's not information worth making
-          someone parse. */}
+      <SearchBar value="" onChange={() => {}} onFocus={() => router.push("/search")} className="md:hidden" />
+
+      {/* The one, consolidated "what needs doing" surface — sits right
+          below Search, above Notes/Tasks, so anything time-sensitive is
+          still one of the first things seen, not something scrolled past.
+          Used to be shown twice (a "Needs Attention" stat tile up here,
+          and an almost-identical "Action queue" card repeated a few
+          hundred pixels later in Home Inventory) with no two of the three
+          chips ever quite matching between them. Zero-state collapses to
+          a single calm line instead of three chips all reading "0" —
+          that's not information worth making someone parse. */}
       {needsAttentionChips.length > 0 ? (
         <div className="flex items-center justify-between gap-3 rounded-2xl border border-badge-orange-border bg-badge-orange-bg/40 p-4 shadow-sm">
           <div className="min-w-0">
@@ -238,8 +239,6 @@ export default function OverviewPage() {
           <p className="text-caption text-muted-foreground">All caught up — nothing needs attention right now.</p>
         </div>
       )}
-
-      <SearchBar value="" onChange={() => {}} onFocus={() => router.push("/search")} className="md:hidden" />
 
       {/* Notes and Tasks are always-on, ungated domains (no
           household.xEnabled toggle — same as Inventory/Finance being
