@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useRef, useState } from "react";
+import { toast } from "sonner";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Capacitor } from "@capacitor/core";
@@ -67,6 +68,14 @@ function SignInInner() {
         setMode("default");
         return;
       }
+      // TEMPORARY diagnostic — "Continue with Google opens Apple's sign-in
+      // page instead" reported; showing the actual URL Supabase handed
+      // back settles whether that's this code asking for the wrong
+      // provider or something happening after Browser.open(). A brief
+      // delay before actually opening it, since the browser sheet would
+      // otherwise cover the toast instantly. Remove once resolved.
+      toast(`Opening: ${data.url}`, { duration: 8000 });
+      await new Promise((resolve) => setTimeout(resolve, 3000));
       await Browser.open({ url: data.url });
       return;
     }
