@@ -13,7 +13,14 @@ import { EmptyState } from "@/components/empty-state";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { RecurringBillFormSheet } from "@/components/recurring-bill-form-sheet";
 import { useInventoryStore } from "@/lib/store";
-import { upcomingRecurringBills, upcomingDebtPaymentBills, daysUntil, advanceDueDate } from "@/lib/selectors";
+import {
+  upcomingRecurringBills,
+  upcomingDebtPaymentBills,
+  upcomingSubscriptionBills,
+  annualizedBillAmount,
+  daysUntil,
+  advanceDueDate,
+} from "@/lib/selectors";
 import { formatCurrency, formatShortDate } from "@/lib/format";
 import { useRemountKey } from "@/hooks/use-remount-key";
 import type { RecurringBill } from "@/lib/types";
@@ -43,8 +50,14 @@ export default function RecurringBillsPage() {
 
   const bills = upcomingRecurringBills(recurringBills);
   const debtBills = upcomingDebtPaymentBills(recurringBills);
+  const subscriptionBills = upcomingSubscriptionBills(recurringBills);
   const debtBillIds = new Set(debtBills.map((b) => b.id));
-  const otherBills = bills.filter((b) => !debtBillIds.has(b.id));
+  const subscriptionBillIds = new Set(subscriptionBills.map((b) => b.id));
+  // "Everything else" — not a debt payment, not a subscription. Bills &
+  // Utilities per the reference this section split was modeled on.
+  const otherBills = bills.filter((b) => !debtBillIds.has(b.id) && !subscriptionBillIds.has(b.id));
+  const subscriptionsAnnualTotal = subscriptionBills.reduce((sum, b) => sum + annualizedBillAmount(b), 0);
+  const otherBillsAnnualTotal = otherBills.reduce((sum, b) => sum + annualizedBillAmount(b), 0);
   const otherMembers = members.filter((m) => m.userId !== currentUserId);
   const editingBill = recurringBills.find((b) => b.id === editingId);
   const editingShares = financeBillShares.filter((s) => s.billId === editingId);
@@ -123,9 +136,30 @@ export default function RecurringBillsPage() {
             </section>
           )}
 
+          {subscriptionBills.length > 0 && (
+            <section className="flex flex-col gap-2">
+              <div className="flex items-baseline justify-between">
+                <h2 className="text-section-title font-medium text-ink">
+                  {subscriptionBills.length} Subscription{subscriptionBills.length === 1 ? "" : "s"}
+                </h2>
+                <p className="text-caption text-muted-foreground">{formatCurrency(subscriptionsAnnualTotal)}/year</p>
+              </div>
+              <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-card shadow-sm">
+                {subscriptionBills.map((b) => (
+                  <BillRow key={b.id} bill={b} icon="repeat" tone="muted" onEdit={() => setEditingId(b.id)} onMarkPaid={() => markPaid(b)} />
+                ))}
+              </div>
+            </section>
+          )}
+
           {otherBills.length > 0 && (
             <section className="flex flex-col gap-2">
-              {debtBills.length > 0 && <h2 className="text-section-title font-medium text-ink">Other Bills</h2>}
+              <div className="flex items-baseline justify-between">
+                <h2 className="text-section-title font-medium text-ink">
+                  {debtBills.length > 0 || subscriptionBills.length > 0 ? "Bills & Utilities" : "Other Bills"}
+                </h2>
+                <p className="text-caption text-muted-foreground">{formatCurrency(otherBillsAnnualTotal)}/year</p>
+              </div>
               <div className="flex flex-col divide-y divide-border rounded-2xl border border-border bg-card shadow-sm">
                 {otherBills.map((b) => (
                   <BillRow key={b.id} bill={b} icon="repeat" tone="muted" onEdit={() => setEditingId(b.id)} onMarkPaid={() => markPaid(b)} />
@@ -169,6 +203,7 @@ export default function RecurringBillsPage() {
               categoryId: values.categoryId,
               accountId: values.accountId,
               isDebtPayment: values.isDebtPayment,
+              isSubscription: values.isSubscription,
               ownerUserId: values.isPersonal ? (editingBill.ownerUserId ?? currentUserId) : null,
             });
             applySharing(editingBill.id, values.isPersonal, values.sharedWithUserIds, editingShares);

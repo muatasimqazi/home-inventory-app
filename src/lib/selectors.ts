@@ -994,6 +994,41 @@ export function upcomingDebtPaymentBills(bills: RecurringBill[]): RecurringBill[
   return upcomingRecurringBills(bills).filter((b) => b.isDebtPayment);
 }
 
+/** Same role as looksLikeDebtPaymentCategory just below — a convenience default for RecurringBillFormSheet's "This is a subscription" checkbox when a matching category gets picked, never the source of truth itself (RecurringBill.isSubscription, explicit and always correctable in the form). */
+export function looksLikeSubscriptionCategory(categoryName: string): boolean {
+  const name = categoryName.toLowerCase();
+  return ["subscription", "streaming", "entertainment", "software", "membership"].some((kw) => name.includes(kw));
+}
+
+/**
+ * Upcoming recurring bills explicitly marked as a subscription
+ * (RecurringBill.isSubscription) — additive on top of
+ * upcomingRecurringBills' own active/not-trashed/sorted result, same
+ * "callers filter the negation for everything else" contract as
+ * upcomingDebtPaymentBills just above. Deliberately excludes debt
+ * payments even if one were also flagged a subscription (shouldn't
+ * happen via the form, which doesn't offer both at once, but a bill
+ * belongs to exactly one of Credit Cards & Loans / Subscriptions /
+ * Bills & Utilities, never two) — callers should filter debt payments
+ * out of the list they pass in first, as the Recurring Bills page does.
+ */
+export function upcomingSubscriptionBills(bills: RecurringBill[]): RecurringBill[] {
+  return upcomingRecurringBills(bills).filter((b) => b.isSubscription && !b.isDebtPayment);
+}
+
+const ANNUAL_OCCURRENCES: Record<RecurringBillFrequency, number> = {
+  weekly: 52,
+  biweekly: 26,
+  monthly: 12,
+  quarterly: 4,
+  yearly: 1,
+};
+
+/** A bill's expectedAmount projected out to a yearly figure, for a section total (e.g. "$4,113 per year") — frequency-aware, not just expectedAmount × 12. */
+export function annualizedBillAmount(bill: Pick<RecurringBill, "expectedAmount" | "frequency">): number {
+  return bill.expectedAmount * ANNUAL_OCCURRENCES[bill.frequency];
+}
+
 /**
  * A Finance category name that reads as "this bill IS a credit card/loan/
  * mortgage payment" — e.g. "Card Payment," a category one real household

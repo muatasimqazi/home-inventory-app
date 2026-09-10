@@ -10,7 +10,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { useAutoFocusVisible } from "@/hooks/use-autofocus-visible";
-import { sortByLabel, looksLikeDebtPaymentCategory } from "@/lib/selectors";
+import { sortByLabel, looksLikeDebtPaymentCategory, looksLikeSubscriptionCategory } from "@/lib/selectors";
 import type { Account, FinanceCategory, Member, RecurringBill, RecurringBillFrequency } from "@/lib/types";
 
 const FREQUENCIES: { value: RecurringBillFrequency; label: string }[] = [
@@ -39,6 +39,7 @@ interface RecurringBillFormSheetProps {
     categoryId: string | null;
     accountId: string | null;
     isDebtPayment: boolean;
+    isSubscription: boolean;
     isPersonal: boolean;
     sharedWithUserIds: string[];
   }) => void;
@@ -84,6 +85,8 @@ export function RecurringBillFormSheet({
   // overriding it from category selection — the checkbox is always the
   // real source of truth, this is just a one-time helpful default.
   const [debtPaymentTouched, setDebtPaymentTouched] = useState(false);
+  const [isSubscription, setIsSubscription] = useState(initial?.isSubscription ?? false);
+  const [subscriptionTouched, setSubscriptionTouched] = useState(false);
   const [isPersonal, setIsPersonal] = useState(initial ? initial.ownerUserId !== null : false);
   const [sharedWithUserIds, setSharedWithUserIds] = useState<string[]>(initialSharedWithUserIds);
   const [error, setError] = useState<string | null>(null);
@@ -116,6 +119,7 @@ export function RecurringBillFormSheet({
       categoryId: categoryId || null,
       accountId: accountId || null,
       isDebtPayment,
+      isSubscription,
       isPersonal,
       sharedWithUserIds: isPersonal ? sharedWithUserIds : [],
     });
@@ -181,6 +185,10 @@ export function RecurringBillFormSheet({
                     const category = categories.find((c) => c.id === id);
                     if (category && looksLikeDebtPaymentCategory(category.name)) setIsDebtPayment(true);
                   }
+                  if (!subscriptionTouched) {
+                    const category = categories.find((c) => c.id === id);
+                    if (category && looksLikeSubscriptionCategory(category.name)) setIsSubscription(true);
+                  }
                 }}
               >
                 <SelectTrigger className="h-11 w-full">
@@ -231,6 +239,28 @@ export function RecurringBillFormSheet({
               </span>
             </span>
           </label>
+
+          {/* A bill belongs to exactly one Recurring Bills section — Credit
+              Cards & Loans, Subscriptions, or Bills & Utilities — so this
+              only makes sense (and only shows) once debt-payment is off. */}
+          {!isDebtPayment && (
+            <label className="flex items-start gap-2 text-caption text-ink">
+              <Checkbox
+                checked={isSubscription}
+                onCheckedChange={(v) => {
+                  setIsSubscription(v === true);
+                  setSubscriptionTouched(true);
+                }}
+                className="mt-0.5"
+              />
+              <span>
+                This is a subscription
+                <span className="block text-micro text-muted-foreground">
+                  Groups it under Subscriptions instead of Bills &amp; Utilities, each with its own yearly total.
+                </span>
+              </span>
+            </label>
+          )}
 
           <div>
             <label className="mb-1 block text-caption text-muted-foreground">Ownership</label>

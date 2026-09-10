@@ -1390,6 +1390,7 @@ export interface RecurringBillRow {
   account_id: string | null;
   owner_user_id: string | null;
   is_debt_payment: boolean;
+  is_subscription: boolean;
   is_active: boolean;
   trashed_at: string | null;
   permanently_delete_after: string | null;
@@ -1407,6 +1408,7 @@ export function rowToRecurringBill(row: RecurringBillRow): RecurringBill {
     accountId: row.account_id,
     ownerUserId: row.owner_user_id,
     isDebtPayment: row.is_debt_payment,
+    isSubscription: row.is_subscription,
     isActive: row.is_active,
     trashedAt: row.trashed_at,
     permanentlyDeleteAfter: row.permanently_delete_after,
@@ -1425,6 +1427,7 @@ export function recurringBillToInsertRow(b: RecurringBill): RecurringBillRow {
     account_id: b.accountId,
     owner_user_id: b.ownerUserId,
     is_debt_payment: b.isDebtPayment,
+    is_subscription: b.isSubscription,
     is_active: b.isActive,
     trashed_at: b.trashedAt,
     permanently_delete_after: b.permanentlyDeleteAfter,

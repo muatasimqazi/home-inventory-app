@@ -314,6 +314,8 @@ export interface NewRecurringBillInput {
   ownerUserId?: string | null;
   /** Explicit "this bill IS a payment toward a debt account's balance" — independent of accountId, which just means "charged to/paid from this account" (a subscription's accountId is routinely a credit card too). Defaults false; drives the Recurring Bills page's "Credit Cards & Loans" section and the same-day debt-payment push reminder. */
   isDebtPayment?: boolean;
+  /** Explicit "this is a subscription" — defaults false; splits the Recurring Bills page's non-debt-payment bills into Subscriptions vs Bills & Utilities. */
+  isSubscription?: boolean;
 }
 
 interface InventoryState {
@@ -3959,6 +3961,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
       accountId: input.accountId ?? null,
       ownerUserId: input.ownerUserId ?? null,
       isDebtPayment: input.isDebtPayment ?? false,
+      isSubscription: input.isSubscription ?? false,
       isActive: true,
       trashedAt: null,
       permanentlyDeleteAfter: null,
