@@ -15,6 +15,7 @@ import { taskCategoryIcon } from "@/lib/task-category";
 import { formatShortDate } from "@/lib/format";
 import type { HouseholdTask } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { hapticSuccess } from "@/lib/haptics";
 
 const BUCKET_LABEL: Record<TaskDueBucket, string> = { overdue: "Overdue", today: "Today", upcoming: "Upcoming" };
 
@@ -200,6 +201,7 @@ function TaskRow({
           type="button"
           onClick={() => {
             onComplete(task.id);
+            hapticSuccess();
             toast.success(`Completed "${task.title}"`);
           }}
           aria-label="Mark complete"

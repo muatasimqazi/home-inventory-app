@@ -15,6 +15,7 @@ import { taskCategoryIcon } from "@/lib/task-category";
 import { formatShortDate, relativeTime } from "@/lib/format";
 import type { HouseholdTask } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { hapticSuccess, hapticTap } from "@/lib/haptics";
 
 /** The task's own current lifecycle state, surfaced as one prominent pill next to its title — previously just an easy-to-miss "· Completed" tacked onto the meta line, with no equivalent treatment at all for overdue/due-today/upcoming. Same tone tokens the Tasks list page (bucket headers) and Overview's ActionChip already use for these exact states, so "Overdue" reads the same color everywhere it appears. */
 function taskStatus(task: HouseholdTask, bucket: TaskDueBucket): { label: string; className: string } {
@@ -127,6 +128,7 @@ export default function TaskDetailPage() {
           className="bg-ink-fill text-white hover:bg-ink-fill/90"
           onClick={() => {
             completeTask(task.id);
+            hapticSuccess();
             toast.success(`Completed "${task.title}"`);
             if (task.scheduleType === "one_time") router.back();
           }}
@@ -293,7 +295,10 @@ function SubtasksSection({ taskId }: { taskId: string }) {
                 <div key={s.id} className="flex items-center gap-2 py-2">
                   <button
                     type="button"
-                    onClick={() => toggleSubtask(s.id)}
+                    onClick={() => {
+                      toggleSubtask(s.id);
+                      hapticTap();
+                    }}
                     aria-label={s.isCompleted ? "Mark not done" : "Mark done"}
                     className={cn(
                       "tap-target flex size-6 shrink-0 items-center justify-center rounded-full border-2",

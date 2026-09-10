@@ -1,10 +1,10 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Haptics, ImpactStyle, NotificationType } from "@capacitor/haptics";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { playRecordingStartTone, playRecordingStopTone } from "@/lib/audio-feedback";
+import { hapticTap, hapticError } from "@/lib/haptics";
 
 type RecordingState = "idle" | "recording" | "transcribing" | "error";
 
@@ -57,7 +57,7 @@ export function VoiceInputButton({ onTranscript, className }: { onTranscript: (t
     } catch (error) {
       console.error("VoiceInputButton: transcription failed:", error);
       setState("error");
-      void Haptics.notification({ type: NotificationType.Error }).catch(() => {});
+      hapticError();
       setTimeout(() => setState("idle"), 2000);
     }
   }
@@ -79,7 +79,7 @@ export function VoiceInputButton({ onTranscript, className }: { onTranscript: (t
     // rather than fully silent). Firing before the switch happens, right
     // on the tap itself, avoids the race instead of trying to win it.
     playRecordingStartTone();
-    void Haptics.impact({ style: ImpactStyle.Medium }).catch(() => {});
+    hapticTap();
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
@@ -97,7 +97,7 @@ export function VoiceInputButton({ onTranscript, className }: { onTranscript: (t
         // track's already stopped on the line above by the time this
         // plays.
         playRecordingStopTone();
-        void Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
+        hapticTap();
         void transcribeRecording();
       };
       mediaRecorderRef.current = recorder;
@@ -111,7 +111,7 @@ export function VoiceInputButton({ onTranscript, className }: { onTranscript: (t
       console.error("VoiceInputButton: couldn't access the microphone:", error);
       startingRef.current = false;
       setState("error");
-      void Haptics.notification({ type: NotificationType.Error }).catch(() => {});
+      hapticError();
       setTimeout(() => setState("idle"), 2000);
     }
   }

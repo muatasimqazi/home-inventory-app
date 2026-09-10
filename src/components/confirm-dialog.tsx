@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Icon, type IconName } from "@/components/icon";
+import { hapticTap, hapticWarning } from "@/lib/haptics";
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -44,6 +45,16 @@ export function ConfirmDialog({
   const [pending, setPending] = useState(false);
 
   async function handleConfirm() {
+    // Fired here, not gated on onConfirm() actually succeeding — this
+    // is confirming the *intent* to act (the same moment a native
+    // "Delete" alert's own haptic would fire), matching every other
+    // haptic in the app being a response to a tap, not to a server
+    // round trip. Shared by every destructive/owner-only confirmation
+    // in the app (~20 call sites) in one place, tone-appropriate:
+    // "danger" is the one truly irreversible action (permanent delete),
+    // everything else recoverable gets the lighter tap.
+    if (tone === "danger") hapticWarning();
+    else hapticTap();
     setPending(true);
     try {
       await onConfirm();
