@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import posthog from "posthog-js";
@@ -39,7 +38,6 @@ interface Preview {
  * (the strongest pattern that existed before this) — before it fires.
  */
 export default function DeleteAccountPage() {
-  const router = useRouter();
   const currentUserEmail = useInventoryStore((s) => s.currentUserEmail);
 
   const [preview, setPreview] = useState<Preview | "loading" | "error">("loading");
@@ -96,10 +94,13 @@ export default function DeleteAccountPage() {
       useInventoryStore.getState().unsubscribeRealtime();
       await getSupabaseBrowserClient().auth.signOut();
       // Same reasoning as settings/page.tsx's own sign-out — disconnects
-      // future events from this now-deleted identity before the
-      // client-side nav below.
+      // future events from this now-deleted identity, and a hard
+      // navigation rather than router.push so the in-memory store (every
+      // household/item/transaction/etc. this now-deleted account had
+      // loaded) actually gets wiped rather than surviving into whoever
+      // signs in next on this device.
       posthog.reset();
-      router.push("/sign-in");
+      window.location.href = "/sign-in";
     } catch {
       toast.error("Couldn't delete your account.");
     } finally {

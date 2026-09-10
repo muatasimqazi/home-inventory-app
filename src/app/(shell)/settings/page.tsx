@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useRef, useState, useSyncExternalStore } from "react";
 import { useAutoFocusVisible } from "@/hooks/use-autofocus-visible";
-import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import posthog from "posthog-js";
@@ -25,7 +24,6 @@ import { cn } from "@/lib/utils";
 const AUTO_TIMEZONE_VALUE = "__auto__";
 
 export default function SettingsPage() {
-  const router = useRouter();
   const household = useCurrentHousehold();
   const currentUserId = useInventoryStore((s) => s.currentUserId);
   const members = useInventoryStore((s) => s.members);
@@ -134,13 +132,21 @@ export default function SettingsPage() {
           useInventoryStore.getState().unsubscribeRealtime();
           await getSupabaseBrowserClient().auth.signOut();
           // Disconnects future events from this now-signed-out identity —
-          // a client-side nav (router.push, not a full reload) below, so
           // posthog's persisted identity would otherwise survive into
           // whoever signs in next on this device. Only ever called here
           // and in delete-account's own sign-out — never on every render,
           // which would mint a fresh anonymous user on each page load.
           posthog.reset();
-          router.push("/sign-in");
+          // A hard navigation, not router.push — found live: the
+          // in-memory Zustand store (households, items, transactions,
+          // notes, tasks, the user's own profile — everything) was never
+          // being cleared on sign-out, so a client-side SPA nav to
+          // /sign-in left it all sitting there, and whoever signed in
+          // next (a different account) saw the previous user's data
+          // until something happened to refetch it. A full reload wipes
+          // every piece of that in one place instead of hand-enumerating
+          // (and inevitably missing some of) what the store holds.
+          window.location.href = "/sign-in";
         }}
         className="tap-target flex items-center justify-center gap-2 rounded-2xl border border-border bg-card py-3 text-body font-medium text-danger"
       >
