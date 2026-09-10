@@ -42,6 +42,7 @@ export default function RecurringBillsPage() {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [createKey, bumpCreateKey] = useRemountKey();
+  const [classifying, setClassifying] = useState(false);
   // Deep-link from the Home/Finance dashboard's "Upcoming bills" widget
   // (?billId=...) — same read-once-via-lazy-initializer convention as
   // Transactions' own ?transactionId= deep link.
@@ -72,6 +73,46 @@ export default function RecurringBillsPage() {
     const nextDueDate = advanceDueDate(bill.nextDueDate, bill.frequency);
     updateRecurringBill(bill.id, { nextDueDate });
     toast.success(`Marked ${bill.name} as paid — next due ${formatShortDate(nextDueDate)}`);
+  }
+
+  // AI subscription classification — scoped to Bills & Utilities (not the
+  // whole household bill list) since the point is finding subscriptions
+  // hiding in there, not re-litigating bills already correctly bucketed;
+  // never touches Credit Cards & Loans. Applied directly rather than
+  // going through a review-first sheet the way Transactions' "Suggest
+  // categories" does (categorize-suggestions-sheet.tsx) — a wrong
+  // category assignment is a real data-quality issue that feeds
+  // spending breakdowns, but isSubscription is just which of two visible
+  // sections a bill sits in, corrected with the same one-tap checkbox
+  // either way, so a whole extra review UI isn't proportionate here.
+  async function handleClassifySubscriptions() {
+    if (otherBills.length === 0) {
+      toast("No bills in Bills & Utilities to classify.");
+      return;
+    }
+    setClassifying(true);
+    try {
+      const res = await fetch("/api/v1/finance/classify-subscriptions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bills: otherBills.map((b) => ({ id: b.id, name: b.name, frequency: b.frequency, expectedAmount: b.expectedAmount })),
+        }),
+      });
+      const data = (await res.json()) as { classifications?: { billId: string; isSubscription: boolean; confidence: number }[]; error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Couldn't classify subscriptions.");
+      const moved = (data.classifications ?? []).filter((c) => c.isSubscription);
+      for (const c of moved) updateRecurringBill(c.billId, { isSubscription: true });
+      if (moved.length === 0) {
+        toast("AI didn't find any subscriptions in Bills & Utilities.");
+      } else {
+        toast.success(`Moved ${moved.length} bill${moved.length === 1 ? "" : "s"} to Subscriptions`);
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't classify subscriptions. Please try again.");
+    } finally {
+      setClassifying(false);
+    }
   }
 
   function applySharing(billId: string, isPersonal: boolean, nextIds: string[], previousShares: { sharedWithUserId: string }[]) {
@@ -165,6 +206,17 @@ export default function RecurringBillsPage() {
                   <BillRow key={b.id} bill={b} icon="repeat" tone="muted" onEdit={() => setEditingId(b.id)} onMarkPaid={() => markPaid(b)} />
                 ))}
               </div>
+              <button
+                type="button"
+                onClick={handleClassifySubscriptions}
+                disabled={classifying}
+                className="flex items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-card px-4 py-3 text-caption font-medium text-ink disabled:opacity-60"
+              >
+                <Icon name="ai" size={16} className={classifying ? "animate-pulse" : undefined} />
+                {classifying
+                  ? "Classifying…"
+                  : `Classify ${otherBills.length} bill${otherBills.length === 1 ? "" : "s"} with AI`}
+              </button>
             </section>
           )}
         </>
