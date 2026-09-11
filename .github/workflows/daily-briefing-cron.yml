@@ -12,9 +12,20 @@ name: Daily briefing cron
 # CRON_SECRET is a repo secret (Settings > Secrets and variables >
 # Actions), the same bearer token every other cron-triggered route in
 # this app already checks.
+#
+# Runs at :07, not :00 — GitHub's own docs call out the top of every
+# hour as the highest-load, most-delayed time for `schedule` triggers
+# ("To decrease the chance of delay, schedule your workflow to run at a
+# different time of the hour"), and a real run confirmed it: the very
+# first :00 tick after this workflow went live never fired at all
+# (only the manual workflow_dispatch test run showed up in the run
+# history, even 15+ minutes past that hour). Running a few minutes
+# off the hour doesn't change which local hour the route matches
+# against (still whole-hour resolution, lib/timezone.ts's
+# currentLocalHour), just avoids the exact-`:00` pileup.
 on:
   schedule:
-    - cron: "0 * * * *"
+    - cron: "7 * * * *"
   workflow_dispatch: {}
 
 jobs:
