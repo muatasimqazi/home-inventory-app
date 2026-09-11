@@ -1,0 +1,33 @@
+name: Daily briefing cron
+
+# Pings send-daily-briefing hourly (Vercel Cron itself can't: this
+# account is on Vercel's Hobby plan, which caps its own Cron Jobs
+# feature at once a day, but the per-user custom send-hour this route
+# supports needs an hourly check — see that route's own doc comment).
+# GitHub Actions' `schedule` trigger only fires off the workflow file as
+# it exists on the repo's default branch (main here, not develop, which
+# is where all real app development happens) — this file has to be kept
+# in sync on both.
+#
+# CRON_SECRET is a repo secret (Settings > Secrets and variables >
+# Actions), the same bearer token every other cron-triggered route in
+# this app already checks.
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger send-daily-briefing
+        run: |
+          status=$(curl -s -o response.txt -w "%{http_code}" -X POST "https://schuaz.com/api/v1/push/send-daily-briefing" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
+          echo "Response status: $status"
+          cat response.txt
+          if [ "$status" -ge 300 ]; then
+            echo "::error::send-daily-briefing returned $status"
+            exit 1
+          fi
