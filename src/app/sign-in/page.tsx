@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Capacitor } from "@capacitor/core";
@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { appOrigin } from "@/lib/urls";
 import { useAutoFocusVisible } from "@/hooks/use-autofocus-visible";
+import { consumeOAuthCallbackReceived } from "@/lib/oauth-callback-flag";
 
 // Must match native-auth-deep-link-listener.tsx's own copy of this same
 // constant (see that file's comment on why it isn't shared via import).
@@ -37,6 +38,26 @@ function SignInInner() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(searchParams.get("error"));
+
+  // Reported live: dismissing the OAuth browser sheet before completing
+  // sign-in (backing out of Google/Apple's page) left this screen stuck
+  // on "Signing in…" forever — nothing ever reset `mode` back to
+  // "default", since that reset previously only ever happened by way of
+  // a real callback completing (which was never coming). 'browserFinished'
+  // fires when that sheet closes for *either* reason — a real callback
+  // arriving (native-auth-deep-link-listener.tsx calls Browser.close()
+  // itself as the first step of handling one) or the user dismissing it
+  // on their own — so oauth-callback-flag.ts's shared flag is what tells
+  // the two apart: only reset here if no real callback was ever received.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    const handle = Browser.addListener("browserFinished", () => {
+      if (!consumeOAuthCallbackReceived()) setMode((m) => (m === "authenticating" ? "default" : m));
+    });
+    return () => {
+      handle.then((h) => h.remove());
+    };
+  }, []);
 
   async function continueWithGoogle() {
     setError(null);

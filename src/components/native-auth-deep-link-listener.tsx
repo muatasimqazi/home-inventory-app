@@ -6,6 +6,7 @@ import { Capacitor } from "@capacitor/core";
 import { App, type URLOpenListenerEvent } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { markOAuthCallbackReceived } from "@/lib/oauth-callback-flag";
 
 // Must match capacitor.config.ts's appId (also strings.xml's
 // custom_url_scheme, auto-set to the same value by `cap add android`) —
@@ -93,6 +94,12 @@ export function NativeAuthDeepLinkListener() {
       } catch {
         return;
       }
+
+      // Flagged before Browser.close() below — that call fires the same
+      // 'browserFinished' event sign-in/page.tsx listens for to detect
+      // an *unsuccessful* dismissal (see oauth-callback-flag.ts's own
+      // comment for why the two need telling apart).
+      markOAuthCallbackReceived();
 
       // Dismiss the Custom Tab first — the exchange below can take a
       // moment, and there's no reason to leave it sitting on top while
