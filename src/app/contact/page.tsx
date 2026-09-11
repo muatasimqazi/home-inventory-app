@@ -1,13 +1,16 @@
 import Link from "next/link";
+import { BackButton } from "@/components/back-button";
 
 export default function ContactPage() {
   return (
-    <main className="min-h-dvh bg-background px-6 py-10 text-ink">
+    <main className="min-h-dvh bg-background px-6 pt-[max(2.5rem,env(safe-area-inset-top))] pb-10 text-ink">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
+        {/* Same fix as privacy/page.tsx and terms/page.tsx, same bug
+            report — the fixed "/" link this replaced stranded a signed-in
+            user outside their own session instead of returning them to
+            wherever they actually came from. */}
         <header className="flex flex-col gap-3">
-          <Link href="/" className="text-caption font-medium text-muted-foreground">
-            Schuaz
-          </Link>
+          <BackButton />
           <div>
             <h1 className="text-screen-title font-semibold">Contact Us</h1>
             <p className="mt-2 text-caption text-muted-foreground">Reach the Schuaz operator directly — there&rsquo;s no support team, just one person reading this inbox.</p>

@@ -1,13 +1,18 @@
-import Link from "next/link";
+import { BackButton } from "@/components/back-button";
 
 export default function TermsPage() {
   return (
-    <main className="min-h-dvh bg-background px-6 py-10 text-ink">
+    <main className="min-h-dvh bg-background px-6 pt-[max(2.5rem,env(safe-area-inset-top))] pb-10 text-ink">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
+        {/* router.back() — same fix as privacy/page.tsx, same bug report
+            ("no way to get back to app"): the fixed "/" link this
+            replaced took a signed-in user reading this from Settings to
+            the public marketing page instead of back into their own
+            session. Not hidden on desktop — this page isn't reachable
+            from the sidebar, so desktop needs this exactly as much as
+            mobile does. */}
         <header className="flex flex-col gap-3">
-          <Link href="/" className="text-caption font-medium text-muted-foreground">
-            Schuaz
-          </Link>
+          <BackButton />
           <div>
             <h1 className="text-screen-title font-semibold">Terms of Service</h1>
             <p className="mt-2 text-caption text-muted-foreground">Last updated: August 30, 2026</p>
