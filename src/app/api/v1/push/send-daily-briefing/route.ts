@@ -202,8 +202,11 @@ export async function POST(request: Request) {
       const myTasks = pref.include_tasks ? tasksDueToday.filter((t) => taskVisibleToUser(t, userId, peopleById)) : [];
       const myBills = pref.include_bills ? billsDueToday.filter((b) => billVisibleToUser(b, userId)) : [];
 
-      const title =
-        pref.include_weather && condition && snapshot ? `Good morning! ${condition.emoji} H${snapshot.todayHighF}° L${snapshot.todayLowF}°` : "Good morning!";
+      // "Good morning!" was hardcoded even for a briefing set to fire in
+      // the afternoon or evening — the feature is opt-in with a custom
+      // hour precisely so it isn't only a morning thing.
+      const greeting = pref.notification_hour < 12 ? "Good morning!" : pref.notification_hour < 18 ? "Good afternoon!" : "Good evening!";
+      const title = pref.include_weather && condition && snapshot ? `${greeting} ${condition.emoji} H${snapshot.todayHighF}° L${snapshot.todayLowF}°` : greeting;
 
       const parts: string[] = [];
       if (pref.include_outfit && outfitHint) parts.push(outfitHint.charAt(0).toUpperCase() + outfitHint.slice(1));

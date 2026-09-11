@@ -934,7 +934,7 @@ export interface NotificationPreference {
   updatedAt: string;
 }
 
-/** Per-user customization for the morning briefing push (0059) — opt-in, unlike every other event type's opt-out default in NotificationPreference, with its own preferred send hour and which content sections to include. */
+/** Per-user customization for the daily briefing push (0059) — opt-in, unlike every other event type's opt-out default in NotificationPreference, with its own preferred send hour and which content sections to include. */
 export interface DailyBriefingPreference {
   id: string;
   householdId: string;

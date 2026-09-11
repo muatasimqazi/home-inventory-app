@@ -34,7 +34,7 @@ function storeDismissed(): void {
 }
 
 /**
- * A one-time nudge toward the Morning briefing feature (settings/
+ * A one-time nudge toward the Daily briefing feature (settings/
  * notifications/daily-briefing/) — opt-in and off by default, so unlike
  * every other push event nobody discovers it just by having
  * notifications on. Sits right above Needs attention, dismissable
@@ -86,8 +86,8 @@ export function DailyBriefingPromoTile() {
         <Icon name="sun" size={18} className="text-yellow" />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-body font-medium text-ink">Start your day with a briefing</p>
-        <p className="text-caption text-muted-foreground">A morning greeting with weather, what to wear, and what&apos;s due — opt in and pick your time.</p>
+        <p className="text-body font-medium text-ink">Get a daily briefing</p>
+        <p className="text-caption text-muted-foreground">A greeting with weather, what to wear, and what&apos;s due — opt in and pick your own time.</p>
       </div>
       <Link href="/settings/notifications/daily-briefing" className="shrink-0 text-caption font-medium text-yellow">
         Set up

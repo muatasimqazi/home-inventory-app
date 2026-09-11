@@ -33,7 +33,7 @@ const CONTENT_TOGGLES: { key: "includeWeather" | "includeOutfit" | "includeTasks
 ];
 
 /**
- * Customization for the "Morning briefing" push (household.daily_briefing,
+ * Customization for the "Daily briefing" push (household.daily_briefing,
  * send-daily-briefing/route.ts) — unlike this app's other push events,
  * which are opt-out toggles on the parent notifications page, this one is
  * opt-in with its own send hour and which sections to include, so it
@@ -107,7 +107,7 @@ export default function DailyBriefingSettingsPage() {
       <div className="flex items-center gap-2">
         <BackButton />
         <div>
-          <h1 className="text-screen-title font-semibold text-ink">Morning briefing</h1>
+          <h1 className="text-screen-title font-semibold text-ink">Daily briefing</h1>
           <p className="mt-0.5 text-caption text-muted-foreground">A greeting with what&apos;s ahead of you today.</p>
         </div>
       </div>
@@ -121,8 +121,8 @@ export default function DailyBriefingSettingsPage() {
           <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
             <label className="flex items-center gap-3">
               <div className="min-w-0 flex-1">
-                <p className="text-body font-medium text-ink">Send me a morning briefing</p>
-                <p className="text-caption text-muted-foreground">Off by default — turn on to get a daily push at your chosen time.</p>
+                <p className="text-body font-medium text-ink">Send me a daily briefing</p>
+                <p className="text-caption text-muted-foreground">Off by default — turn on to get a daily push at your chosen time, any time of day.</p>
               </div>
               <input
                 type="checkbox"
