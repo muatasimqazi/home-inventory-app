@@ -291,7 +291,18 @@ function SignInInner() {
             <Button size="lg" variant="outline" onClick={continueWithGoogle}>
               Continue with Google
             </Button>
-            <Button size="lg" variant="outline" className="bg-black text-white hover:bg-black/90" onClick={continueWithApple}>
+            {/* hover:text-white pinned explicitly — the "outline" variant's
+                own hover:text-foreground (dark ink) otherwise wins on
+                hover via CSS specificity (a hover pseudo-class beats a
+                plain base class), which combined with hover:bg-black/90
+                staying dark made the text unreadable on hover: reported
+                live as "white invisible text on hover". */}
+            <Button
+              size="lg"
+              variant="outline"
+              className="bg-black text-white hover:bg-black/90 hover:text-white"
+              onClick={continueWithApple}
+            >
               Continue with Apple
             </Button>
           </div>
