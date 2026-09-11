@@ -933,3 +933,18 @@ export interface NotificationPreference {
   enabled: boolean;
   updatedAt: string;
 }
+
+/** Per-user customization for the morning briefing push (0059) — opt-in, unlike every other event type's opt-out default in NotificationPreference, with its own preferred send hour and which content sections to include. */
+export interface DailyBriefingPreference {
+  id: string;
+  householdId: string;
+  userId: string;
+  enabled: boolean;
+  /** Local hour (0-23) in the household's own derived timezone (lib/timezone.ts) — not UTC. */
+  notificationHour: number;
+  includeWeather: boolean;
+  includeOutfit: boolean;
+  includeTasks: boolean;
+  includeBills: boolean;
+  updatedAt: string;
+}

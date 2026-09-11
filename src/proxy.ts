@@ -32,13 +32,24 @@ import { NextResponse, type NextRequest } from "next/server";
 // discovered after the fact. /api/v1/push/send-task-reminders (Household
 // Tasks domain) is the same again, same reasoning.
 //
-// This list has bitten a new CRON_SECRET-bearer route often enough
-// (three separate times before this comment existed) that it's worth
-// naming as its own lesson: adding a route like that means adding it
-// here too, or it silently 307s to /sign-in before its own auth check
-// (or any of its logic) ever runs — CRON_SECRET, Vercel's own SSO/
-// deployment protection, and everything else about the route can be
-// completely correct and it'll still never fire.
+// /api/v1/push/send-weather-alerts turned out to be a *fourth* live
+// instance — missing from this list since it shipped, found only while
+// adding send-daily-briefing below and checking this list again. Every
+// weather alert this cron ever attempted to send in production almost
+// certainly 307'd before it began. /api/v1/push/send-daily-briefing
+// itself was added here up front.
+//
+// This list has now bitten a new CRON_SECRET-bearer route four separate
+// times — three caught before this comment existed, a fourth (weather
+// alerts) caught only by re-reading this same comment while adding a
+// fifth route and taking its own advice seriously. Worth naming
+// plainly: adding a route like that means adding it here too, or it
+// silently 307s to /sign-in before its own auth check (or any of its
+// logic) ever runs — CRON_SECRET, Vercel's own SSO/deployment
+// protection, and everything else about the route can be completely
+// correct and it'll still never fire. Checking this list is apparently
+// not enough on its own; it's worth an explicit line item in whatever
+// checklist/PR-template a new push job goes through from here on.
 const PUBLIC_PATHS = [
   "/",
   "/sign-in",
@@ -54,6 +65,14 @@ const PUBLIC_PATHS = [
   "/api/v1/push/send-debt-payments-due-today",
   "/api/v1/push/send-low-stock-alerts",
   "/api/v1/push/send-task-reminders",
+  // Found missing from this list entirely while adding send-daily-
+  // briefing below — the exact CRON_SECRET-bearer-route-forgot-this-list
+  // bug this file's own header comment already names three prior
+  // instances of, a fourth. Same silent 307-to-/sign-in-before-any-
+  // route-code-runs failure mode; this cron has very likely never
+  // actually sent a single weather alert in production since it shipped.
+  "/api/v1/push/send-weather-alerts",
+  "/api/v1/push/send-daily-briefing",
   "/api/v1/public",
 ];
 

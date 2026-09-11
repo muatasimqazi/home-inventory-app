@@ -80,6 +80,7 @@ import type {
   PlaidItemStatus,
   PushDeviceSubscription,
   NotificationPreference,
+  DailyBriefingPreference,
   ApiKey,
 } from "../types";
 
@@ -1969,5 +1970,46 @@ export function rowToNotificationPreference(row: NotificationPreferenceRow): Not
     channel: row.channel as NotificationPreference["channel"],
     enabled: row.enabled,
     updatedAt: row.updated_at,
+  };
+}
+
+export interface DailyBriefingPreferenceRow {
+  id: string;
+  household_id: string;
+  user_id: string;
+  enabled: boolean;
+  notification_hour: number;
+  include_weather: boolean;
+  include_outfit: boolean;
+  include_tasks: boolean;
+  include_bills: boolean;
+  updated_at: string;
+}
+
+export function rowToDailyBriefingPreference(row: DailyBriefingPreferenceRow): DailyBriefingPreference {
+  return {
+    id: row.id,
+    householdId: row.household_id,
+    userId: row.user_id,
+    enabled: row.enabled,
+    notificationHour: row.notification_hour,
+    includeWeather: row.include_weather,
+    includeOutfit: row.include_outfit,
+    includeTasks: row.include_tasks,
+    includeBills: row.include_bills,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function dailyBriefingPreferenceToUpsertRow(p: Omit<DailyBriefingPreference, "id" | "updatedAt">): Omit<DailyBriefingPreferenceRow, "id" | "updated_at"> {
+  return {
+    household_id: p.householdId,
+    user_id: p.userId,
+    enabled: p.enabled,
+    notification_hour: p.notificationHour,
+    include_weather: p.includeWeather,
+    include_outfit: p.includeOutfit,
+    include_tasks: p.includeTasks,
+    include_bills: p.includeBills,
   };
 }

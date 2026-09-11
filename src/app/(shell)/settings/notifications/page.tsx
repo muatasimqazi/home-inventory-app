@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { Capacitor } from "@capacitor/core";
 import { Icon } from "@/components/icon";
@@ -13,7 +14,17 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { rowToNotificationPreference } from "@/lib/supabase/mappers";
 import type { NotificationPreferenceRow } from "@/lib/supabase/mappers";
 
-/** Event types wired to a real send job (Household Hub Addendum §5's generalized push infrastructure) — bill.due (Finance's recurring bills), debt_payment.due_today (the same recurring bills, but only credit card/loan/mortgage ones, and only exactly on the due date — see send-debt-payments-due-today/route.ts for why this needs its own event key rather than reusing bill.due's), capture.nudge (Household Ledger PRD §26 — the finance-triggered inventory capture nudge, src/app/api/v1/push/send-capture-nudges/), item.low_stock (0032_low_stock_alerts.sql, src/app/api/v1/push/send-low-stock-alerts/), task.due (household_tasks' reminders/chores/appointments, src/app/api/v1/push/send-task-reminders/), weather.daily_summary (one push a day once a household sets a location, 0054_household_location.sql, src/app/api/v1/push/send-weather-alerts/), and household.activity (real-time, src/app/api/v1/webhooks/activity-log/ — a database trigger on activity_log, not a cron poll like the others). More rows get added here as future domains plug into the same pipeline. */
+/** Event types wired to a real send job (Household Hub Addendum §5's generalized push infrastructure) — bill.due (Finance's recurring bills), debt_payment.due_today (the same recurring bills, but only credit card/loan/mortgage ones, and only exactly on the due date — see send-debt-payments-due-today/route.ts for why this needs its own event key rather than reusing bill.due's), capture.nudge (Household Ledger PRD §26 — the finance-triggered inventory capture nudge, src/app/api/v1/push/send-capture-nudges/), item.low_stock (0032_low_stock_alerts.sql, src/app/api/v1/push/send-low-stock-alerts/), task.due (household_tasks' reminders/chores/appointments, src/app/api/v1/push/send-task-reminders/), weather.daily_summary (one push a day once a household sets a location, 0054_household_location.sql, src/app/api/v1/push/send-weather-alerts/), and household.activity (real-time, src/app/api/v1/webhooks/activity-log/ — a database trigger on activity_log, not a cron poll like the others). More rows get added here as future domains plug into the same pipeline.
+ *
+ * The morning briefing (household.daily_briefing — a richer, separate
+ * digest: greeting, weather + outfit hint, tasks/bills due today, sent
+ * at each user's own chosen local hour, src/app/api/v1/push/send-daily-
+ * briefing/, lib/timezone.ts) deliberately isn't in this list: it's
+ * opt-in (off by default, unlike every row below) with its own send
+ * hour and which sections to include, which doesn't fit a plain
+ * enabled/disabled toggle row — it gets its own settings/notifications/
+ * daily-briefing/ sub-page instead, backed by daily_briefing_preferences
+ * (0059) rather than notification_preferences. */
 const EVENT_TYPES: { domainKey: string; eventType: string; label: string; description: string }[] = [
   { domainKey: "finance", eventType: "bill.due", label: "Bill reminders", description: "A recurring bill is due within a few days" },
   {
@@ -193,6 +204,22 @@ export default function NotificationSettingsPage() {
             })}
           </div>
         </div>
+      )}
+
+      {state === "subscribed" && (
+        <Link
+          href="/settings/notifications/daily-briefing"
+          className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 shadow-sm"
+        >
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-brand-100">
+            <Icon name="sun" size={18} className="text-yellow" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-body font-medium text-ink">Morning briefing</p>
+            <p className="text-caption text-muted-foreground">Opt in for a daily greeting with weather, what to wear, and what&apos;s due</p>
+          </div>
+          <Icon name="chevronRight" size={18} className="shrink-0 text-muted-foreground" />
+        </Link>
       )}
 
       <p className="text-center text-micro text-muted-foreground">
