@@ -33,6 +33,26 @@ const config: CapacitorConfig = {
     SplashScreen: {
       launchAutoHide: false,
     },
+    // Without this, neither platform shows anything at all for a push
+    // that arrives while the app is in the foreground — found live on a
+    // real device: a diagnostic push reported "sent ok" by FCM/APNs and
+    // never appeared while the app was open. Both platforms' native
+    // plugin code reads this exact config key and silently does nothing
+    // when it's unset, checked directly in node_modules:
+    //   - iOS: PushNotificationsHandler.willPresent (…/ios/Sources/
+    //     PushNotificationsPlugin/PushNotificationsHandler.swift) falls
+    //     back to an empty UNNotificationPresentationOptions set.
+    //   - Android: PushNotificationsPlugin.fireNotification (…/android/
+    //     .../PushNotificationsPlugin.java) only calls
+    //     notificationManager.notify(...) when this array contains
+    //     "alert"/"banner"/"list" — otherwise the whole block is skipped.
+    // A backgrounded or killed app is unaffected either way — the OS
+    // displays the system notification tray entry itself without
+    // consulting this plugin at all; this only governs the foreground
+    // in-app case.
+    PushNotifications: {
+      presentationOptions: ["badge", "sound", "alert"],
+    },
   },
 };
 
