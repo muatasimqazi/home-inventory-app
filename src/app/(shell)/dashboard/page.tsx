@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { SearchBar } from "@/components/search-bar";
-import { DailyBriefingPromoTile } from "@/components/daily-briefing-promo-tile";
+import { DailyBriefingSection } from "@/components/daily-briefing-section";
 import { ContainerCarousel } from "@/components/container-carousel";
 import { CreateChooserSheet } from "@/components/create-chooser-sheet";
 import { Icon, type IconName } from "@/components/icon";
@@ -229,7 +229,7 @@ export default function OverviewPage() {
         className="md:hidden"
       />
 
-      <DailyBriefingPromoTile />
+      <DailyBriefingSection />
 
       {/* The one, consolidated "what needs doing" surface — sits right
           below Search, above Notes/Tasks, so anything time-sensitive is

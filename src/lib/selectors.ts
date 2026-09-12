@@ -440,6 +440,20 @@ export function dueTodayOrOverdueTasksCount(tasks: HouseholdTask[]): number {
   return tasks.filter((t) => t.isActive && !t.trashedAt && taskDueBucket(t.dueAt) !== "upcoming").length;
 }
 
+/** Calendar-day comparison in the caller's own local time zone — unlike
+ * taskDueBucket's day-diff bucketing above (floor(ms/24h), which can
+ * misclassify something due later tonight as "tomorrow" depending on
+ * what time it is right now), this directly compares Y-M-D. Used by the
+ * Daily briefing dashboard card (daily-briefing-card.tsx) to mirror what
+ * send-daily-briefing/route.ts considers "due today" in the household's
+ * own timezone — this runs client-side instead, so it's the browser's
+ * local zone, the same one in practice for a household's own members. */
+export function isDueToday(dateIso: string): boolean {
+  const d = new Date(dateIso);
+  const now = new Date();
+  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+}
+
 // ---------------------------------------------------------------------------
 // Finance domain (docs/Personal Finance PRD.md §13 Dashboard Requirements).
 // No visibility filtering happens here — RLS already scoped `accounts`/
