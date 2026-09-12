@@ -108,9 +108,24 @@ export async function POST(request: Request) {
 
   const admin = getSupabaseAdminClient();
 
-  const { data: households, error } = await admin.from("households").select("id, latitude, longitude, location_label").not("latitude", "is", null).not("longitude", "is", null);
-  if (error) {
-    console.error("push/send-daily-briefing: couldn't list households:", error);
+  // Retried once — a transient Supabase gateway timeout on this exact
+  // query cost a real user their briefing (Postgrest 500'd the whole
+  // request before ever reaching their preference's hour check), and
+  // unlike most other cron jobs here, a missed hour isn't just "try
+  // again on the next tick": the next tick is a different local hour,
+  // so this specific hour's chance is gone for the rest of the day.
+  // One short-backoff retry is cheap insurance against exactly that.
+  let households: HouseholdRow[] | null = null;
+  let householdsError: unknown = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 750));
+    const result = await admin.from("households").select("id, latitude, longitude, location_label").not("latitude", "is", null).not("longitude", "is", null);
+    households = result.data as HouseholdRow[] | null;
+    householdsError = result.error;
+    if (!householdsError) break;
+  }
+  if (householdsError) {
+    console.error("push/send-daily-briefing: couldn't list households:", householdsError);
     return NextResponse.json({ error: "Couldn't list households." }, { status: 500 });
   }
 
