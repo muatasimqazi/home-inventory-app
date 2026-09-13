@@ -108,17 +108,26 @@ export async function POST(request: Request) {
 
   const admin = getSupabaseAdminClient();
 
-  // Retried once — a transient Supabase gateway timeout on this exact
-  // query cost a real user their briefing (Postgrest 500'd the whole
-  // request before ever reaching their preference's hour check), and
-  // unlike most other cron jobs here, a missed hour isn't just "try
-  // again on the next tick": the next tick is a different local hour,
-  // so this specific hour's chance is gone for the rest of the day.
-  // One short-backoff retry is cheap insurance against exactly that.
+  // Retried up to 3 times with growing backoff — a transient Supabase
+  // gateway timeout on this exact query cost a real user their briefing
+  // (Postgrest 500'd the whole request before ever reaching their
+  // preference's hour check), and unlike most other cron jobs here, a
+  // missed hour isn't just "try again on the next tick": the next tick
+  // is a different local hour, so this specific hour's chance is gone
+  // for the rest of the day. A single 750ms retry (the original fix)
+  // turned out not to be enough — production logs then showed the exact
+  // same timeout recurring on 3 separate hourly runs in a row, always
+  // within ~10 seconds of the top of the hour, meaning the underlying
+  // contention isn't a one-off blip but a real, several-second window
+  // clustered right at :00 (the outside pinger's own schedule) that one
+  // quick retry lands right back inside. Three attempts with 750ms/2s/4s
+  // backoff (~7s total) gives real odds of landing after that window
+  // clears, well inside Vercel's function timeout.
   let households: HouseholdRow[] | null = null;
   let householdsError: unknown = null;
-  for (let attempt = 0; attempt < 2; attempt++) {
-    if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 750));
+  const RETRY_BACKOFF_MS = [750, 2000, 4000];
+  for (let attempt = 0; attempt <= RETRY_BACKOFF_MS.length; attempt++) {
+    if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, RETRY_BACKOFF_MS[attempt - 1]));
     const result = await admin.from("households").select("id, latitude, longitude, location_label").not("latitude", "is", null).not("longitude", "is", null);
     households = result.data as HouseholdRow[] | null;
     householdsError = result.error;
