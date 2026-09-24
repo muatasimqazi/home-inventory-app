@@ -26,6 +26,10 @@ export interface Household {
   stripePriceId: string | null;
   subscriptionCurrentPeriodEnd: string | null;
   subscriptionUpdatedAt: string;
+  /** Which system currently owns this household's paid subscription, if any — "stripe" (web/Android checkout) or "apple" (iOS In-App Purchase via RevenueCat). Null for a free household. Lets a webhook from one provider avoid clobbering an active subscription the *other* provider owns (0060_apple_iap_billing.sql). */
+  billingProvider: "stripe" | "apple" | null;
+  /** Latest Apple original_transaction_id RevenueCat reported, if billed through Apple — for support/debugging lookups in the RevenueCat dashboard, not a stable id to join on. */
+  appleOriginalTransactionId: string | null;
   /** Household's home location (Overview weather widget, 0054_household_location.sql) — null until a household member sets one via "Use my location" or a city search. Editable by the owner only, same as name/domain toggles. */
   latitude: number | null;
   longitude: number | null;

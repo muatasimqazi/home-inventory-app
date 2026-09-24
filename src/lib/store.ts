@@ -667,6 +667,8 @@ interface InventoryState {
   }) => Promise<Household>;
   /** Swaps the active household's data for another one the current user belongs to (fetched fresh, or from this session's cache). No-op if already current. */
   switchHousehold: (householdId: string) => Promise<void>;
+  /** Re-fetches just this one household row and patches it into state — for settings/billing/page.tsx's iOS purchase flow, which needs to see subscription_tier flip after webhooks/revenuecat/route.ts processes RevenueCat's webhook, without waiting for a full app relaunch. hydrate() itself can't be reused for this: it's a one-shot, no-ops on every call after the first (see its own early-return guard). Silently no-ops on a fetch error — the caller is polling in a loop already, so one failed attempt just tries again. */
+  refreshHouseholdBilling: (householdId: string) => Promise<void>;
   /** Owner-only (RLS: "household owner update" on households) change to the domain choice made at household-setup (0033_household_domains.sql). Rejects client-side before the round-trip if it would leave both disabled — the DB's own check constraint would reject it anyway, this just gives a real error message instead of a generic one. */
   updateHouseholdDomains: (
     householdId: string,
@@ -1703,6 +1705,14 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     }));
     get().subscribeRealtime(household.id);
     return household;
+  },
+
+  refreshHouseholdBilling: async (householdId) => {
+    const supabase = getSupabaseBrowserClient();
+    const { data, error } = await supabase.from("households").select("*").eq("id", householdId).single();
+    if (error || !data) return;
+    const refreshed = rowToHousehold(data as HouseholdRow);
+    set((s) => ({ households: s.households.map((h) => (h.id === householdId ? refreshed : h)) }));
   },
 
   updateHouseholdDomains: async (householdId, patch) => {

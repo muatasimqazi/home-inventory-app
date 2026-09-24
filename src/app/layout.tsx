@@ -9,6 +9,7 @@ import { PointerEventsWatchdog } from "@/components/pointer-events-watchdog";
 import { NativeAuthDeepLinkListener } from "@/components/native-auth-deep-link-listener";
 import { NativePushNotificationListener } from "@/components/native-push-notification-listener";
 import { NativeSplashScreen } from "@/components/native-splash-screen";
+import { NativeRevenueCatInit } from "@/components/native-revenuecat-init";
 import { CommandKShortcut } from "@/components/command-k-shortcut";
 import { PHProvider } from "@/components/posthog-provider";
 
@@ -126,6 +127,12 @@ export default function RootLayout({
                 app is on (see its own file for why this has to be global
                 rather than living in Settings > Notifications' hook). */}
             <NativePushNotificationListener />
+            {/* Native-app-only (iOS only for now) — configures the
+                RevenueCat SDK for the current household so settings/
+                billing/page.tsx's iOS purchase flow has something to
+                call. See its own file for why this has to be global
+                rather than living in that page's own effect. */}
+            <NativeRevenueCatInit />
             {/* Cmd/Ctrl+K -> Search — a hardware-keyboard shortcut, so this
                 is harmless (just never fires) on native/touch. */}
             <CommandKShortcut />

@@ -11,19 +11,38 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { BILLING_PLAN_DESCRIPTION, BILLING_PLAN_FEATURES, BILLING_PLAN_LABEL, PAID_SUBSCRIPTION_TIERS, subscriptionIsActive, type PaidSubscriptionTier, type SubscriptionTier } from "@/lib/billing";
 import { formatShortDate } from "@/lib/format";
+import { hapticError, hapticSuccess } from "@/lib/haptics";
+import { purchaseTier, restorePurchases } from "@/lib/revenuecat-client";
 import { useCurrentHousehold, useInventoryStore } from "@/lib/store";
 import { appOrigin } from "@/lib/urls";
 import { cn } from "@/lib/utils";
+
+/** Household row's subscription_tier lags a real purchase by however
+ * long RevenueCat's webhook takes to fire and this route's own DB write
+ * to land — usually a couple seconds, not instant. Polls
+ * refreshHouseholdBilling short-interval rather than making the user
+ * force-quit/reopen the app (or wait for the next unrelated re-render)
+ * to see their new plan reflected. Gives up after this many attempts —
+ * the purchase itself already succeeded by then, this is purely "how
+ * fast does the UI catch up," so a timeout just falls back to a wording
+ * that sets the right expectation instead of erroring. */
+const BILLING_REFRESH_ATTEMPTS = 10;
+const BILLING_REFRESH_INTERVAL_MS = 1500;
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 export default function BillingSettingsPage() {
   const household = useCurrentHousehold();
   const members = useInventoryStore((s) => s.members);
   const currentUserId = useInventoryStore((s) => s.currentUserId);
+  const refreshHouseholdBilling = useInventoryStore((s) => s.refreshHouseholdBilling);
   const me = members.find((m) => m.userId === currentUserId);
   const isOwner = me?.role === "owner";
   const searchParams = useSearchParams();
   const checkoutResult = searchParams.get("checkout");
-  const [loadingTier, setLoadingTier] = useState<PaidSubscriptionTier | "portal" | null>(null);
+  const [loadingTier, setLoadingTier] = useState<PaidSubscriptionTier | "portal" | "restore" | null>(null);
 
   const currentTier = household.subscriptionTier;
   const active = subscriptionIsActive(household.subscriptionStatus);
@@ -31,20 +50,58 @@ export default function BillingSettingsPage() {
 
   const plans = useMemo(() => ["free", ...PAID_SUBSCRIPTION_TIERS] as SubscriptionTier[], []);
   const isNative = Capacitor.isNativePlatform();
+  const isIOS = Capacitor.getPlatform() === "ios";
+
+  /** Polls until the household row reflects `tier` (or gives up) — see
+   * this file's own top-of-file comment for why a purchase's server-side
+   * confirmation isn't instant. */
+  async function waitForTierUpdate(tier: PaidSubscriptionTier) {
+    for (let attempt = 0; attempt < BILLING_REFRESH_ATTEMPTS; attempt++) {
+      await refreshHouseholdBilling(household.id);
+      if (useInventoryStore.getState().households.find((h) => h.id === household.id)?.subscriptionTier === tier) return true;
+      await delay(BILLING_REFRESH_INTERVAL_MS);
+    }
+    return false;
+  }
 
   async function startCheckout(tier: PaidSubscriptionTier) {
-    // Google Play policy requires Google Play Billing for a digital
-    // subscription purchased and consumed from inside the app — a
-    // Stripe Checkout redirect inside the app's own WebView is exactly
-    // what that policy targets. Rather than build out real Play Billing
-    // (a whole separate entitlement system, plus Google's revenue share)
-    // for an initial submission, native just hands off to a real Custom
-    // Tab pointed at the website's own upgrade flow — same "escape the
-    // WebView for anything payment/OAuth-related" pattern sign-in/page.tsx
-    // already uses for Google sign-in. Existing subscribers keep full app
-    // access either way; only *starting* a new paid plan moves to the
-    // browser. openPortal() below (managing/cancelling an existing
-    // subscription) isn't a new purchase, so it's left working natively.
+    // iOS: a real StoreKit purchase via RevenueCat (Apple Guideline
+    // 3.1.1 — a Stripe Checkout redirect, even via an external browser,
+    // isn't allowed here for a digital subscription unlocked in-app).
+    // Android keeps the external-browser handoff below for now: Google
+    // Play's equivalent policy hasn't blocked a submission yet, and
+    // building out Play Billing too is separate scope from the App
+    // Store rejection this was written to fix.
+    if (isIOS) {
+      setLoadingTier(tier);
+      const result = await purchaseTier(tier);
+      if (!result.ok) {
+        setLoadingTier(null);
+        if (result.cancelled) return; // backed out of the native sheet — not an error
+        hapticError();
+        toast.error(result.error ?? `Couldn't start ${BILLING_PLAN_LABEL[tier]} checkout.`);
+        return;
+      }
+      const updated = await waitForTierUpdate(tier);
+      setLoadingTier(null);
+      if (updated) {
+        hapticSuccess();
+        toast.success(`You're on ${BILLING_PLAN_LABEL[tier]} now.`);
+      } else {
+        toast.success("Purchase complete — your plan will update in a moment.");
+      }
+      return;
+    }
+
+    // Same Google Play policy reasoning as this function's iOS branch
+    // above, but Android doesn't have a real Play Billing integration
+    // yet — native just hands off to a real Custom Tab pointed at the
+    // website's own upgrade flow, same "escape the WebView for anything
+    // payment/OAuth-related" pattern sign-in/page.tsx already uses for
+    // Google sign-in. Existing subscribers keep full app access either
+    // way; only *starting* a new paid plan moves to the browser.
+    // openPortal() below (managing/cancelling an existing subscription)
+    // isn't a new purchase, so it's left working natively.
     if (Capacitor.isNativePlatform()) {
       await Browser.open({ url: `${appOrigin()}/settings/billing` });
       return;
@@ -64,6 +121,24 @@ export default function BillingSettingsPage() {
       toast.error(error instanceof Error ? error.message : "Couldn't start checkout.");
       setLoadingTier(null);
     }
+  }
+
+  /** Apple requires a visible way to restore a previous purchase (a
+   * reinstall, a new device) without paying again — StoreKit itself has
+   * no separate "restore" UI of its own, apps have to provide one. */
+  async function handleRestorePurchases() {
+    setLoadingTier("restore");
+    const result = await restorePurchases();
+    if (!result.ok) {
+      setLoadingTier(null);
+      hapticError();
+      toast.error(result.error ?? "Couldn't restore purchases.");
+      return;
+    }
+    await refreshHouseholdBilling(household.id);
+    setLoadingTier(null);
+    hapticSuccess();
+    toast.success("Purchases restored.");
   }
 
   async function openPortal() {
@@ -151,6 +226,8 @@ export default function BillingSettingsPage() {
                     <Icon name="spinner" size={16} className="animate-spin" />
                   ) : selected ? (
                     "Current plan"
+                  ) : isIOS ? (
+                    `Choose ${BILLING_PLAN_LABEL[tier]}`
                   ) : isNative ? (
                     "Continue on schuaz.com"
                   ) : (
@@ -166,7 +243,18 @@ export default function BillingSettingsPage() {
           );
         })}
       </div>
-      {isNative && <p className="text-center text-caption text-muted-foreground">Upgrading opens schuaz.com in your browser — everything else about your plan works the same in the app.</p>}
+      {isIOS && (
+        <div className="flex flex-col items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleRestorePurchases} disabled={loadingTier !== null}>
+            {loadingTier === "restore" ? <Icon name="spinner" size={14} className="animate-spin" /> : <Icon name="restore" size={14} />}
+            Restore purchases
+          </Button>
+          <p className="text-center text-micro text-muted-foreground">Reinstalled the app, or switched devices? This brings back a plan you already paid for — no new charge.</p>
+        </div>
+      )}
+      {isNative && !isIOS && (
+        <p className="text-center text-caption text-muted-foreground">Upgrading opens schuaz.com in your browser — everything else about your plan works the same in the app.</p>
+      )}
     </div>
   );
 }

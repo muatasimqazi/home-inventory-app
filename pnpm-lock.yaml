@@ -41,6 +41,9 @@ importers:
       '@posthog/react':
         specifier: ^1.10.5
         version: 1.10.5(@types/react@19.2.17)(posthog-js@1.427.2(@types/react@19.2.17)(react@19.2.4))(react@19.2.4)
+      '@revenuecat/purchases-capacitor':
+        specifier: 13.6.1
+        version: 13.6.1(@capacitor/core@8.5.1)
       '@supabase/ssr':
         specifier: ^0.12.3
         version: 0.12.3(@supabase/supabase-js@2.110.8)
@@ -1645,6 +1648,14 @@ packages:
 
   '@radix-ui/rect@1.1.3':
     resolution: {integrity: sha512-JtyZR+mqgBibTo8xea3B6ZRmzZiM/YeVBtUkas6zMuXjAlfIFIW2FgqeM9eLyvEaYX66vr6DJMK+4U6LV0KhNw==}
+
+  '@revenuecat/purchases-capacitor@13.6.1':
+    resolution: {integrity: sha512-HXTFmqjGkYjUBSscsrKyHJ3hCKvHehWkH0v95D45yiHhy9JKO3WPvTTFnMkhGInVRrUpCx5v7OkmmLZRbygcJg==}
+    peerDependencies:
+      '@capacitor/core': '>=8.0.0'
+
+  '@revenuecat/purchases-typescript-internal-esm@19.3.1':
+    resolution: {integrity: sha512-EJ3AI3T0cOd57IgLktjjRZfUQK1WRvfuIDeHzfgwhfRZYX00hUxxsKctjwOgKjFztRoE7CNW1e3NzBMIJNFuNw==}
 
   '@rtsao/scc@1.1.0':
     resolution: {integrity: sha512-zt6OdqaDoOnJ1ZYsCYGt9YmWzDXl4vQdKTyJev62gFhRGKdx7mcT54V9KIjg+d2wi9EXsPvAPKe7i7WjfVWB8g==}
@@ -7329,6 +7340,13 @@ snapshots:
       '@types/react-dom': 19.2.3(@types/react@19.2.17)
 
   '@radix-ui/rect@1.1.3': {}
+
+  '@revenuecat/purchases-capacitor@13.6.1(@capacitor/core@8.5.1)':
+    dependencies:
+      '@capacitor/core': 8.5.1
+      '@revenuecat/purchases-typescript-internal-esm': 19.3.1
+
+  '@revenuecat/purchases-typescript-internal-esm@19.3.1': {}
 
   '@rtsao/scc@1.1.0': {}
 
