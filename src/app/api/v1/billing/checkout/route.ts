@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
 import Stripe from "stripe";
-import { BILLING_PLAN_LABEL, isPaidSubscriptionTier, type PaidSubscriptionTier } from "@/lib/billing";
+import { BILLING_PLAN_LABEL, isPaidSubscriptionTier, subscriptionIsActive, type PaidSubscriptionTier } from "@/lib/billing";
 import { requireHouseholdOwner } from "@/lib/authorize";
 import { getStripeClient, stripePriceIdForTier } from "@/lib/stripe";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -14,11 +14,24 @@ interface HouseholdBillingRow {
   id: string;
   name: string;
   stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  subscription_tier: string;
+  subscription_status: string | null;
+  billing_provider: "stripe" | "apple" | null;
 }
 
 /**
  * Starts Stripe Checkout for a household plan. Billing is household-level:
  * one Owner manages payment, every member gets the resulting entitlement.
+ *
+ * A household only ever has one subscription at a time. Switching plans
+ * while a Stripe subscription is already active swaps that same
+ * subscription's price (prorated, invoiced immediately — same as an App
+ * Store upgrade within one subscription group) rather than starting a
+ * second Checkout, which used to leave the old plan running and billing
+ * alongside the new one. A plan billed through the App Store has to be
+ * changed there: Apple doesn't let an app or server cancel a customer's
+ * subscription, so starting a Stripe one on top would double-bill.
  */
 export async function POST(request: Request) {
   let body: unknown;
@@ -41,12 +54,31 @@ export async function POST(request: Request) {
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const admin = getSupabaseAdminClient();
-  const { data: household, error: householdError } = await admin.from("households").select("id, name, stripe_customer_id").eq("id", householdId).single();
+  const { data: household, error: householdError } = await admin
+    .from("households")
+    .select("id, name, stripe_customer_id, stripe_subscription_id, subscription_tier, subscription_status, billing_provider")
+    .eq("id", householdId)
+    .single<HouseholdBillingRow>();
   if (householdError || !household) return NextResponse.json({ error: "Household not found." }, { status: 404 });
+
+  if (household.billing_provider === "apple" && household.subscription_tier !== "free" && subscriptionIsActive(household.subscription_status)) {
+    return NextResponse.json({ error: "This household's plan is billed through the App Store — change it from the iPhone app, or cancel it in iOS Settings → Subscriptions first." }, { status: 409 });
+  }
 
   const { data: member } = await admin.from("members").select("email, display_name").eq("household_id", householdId).eq("user_id", auth.userId).maybeSingle();
   const stripe = getStripeClient();
   const selectedTier = tier as PaidSubscriptionTier;
+
+  /** null for a subscription id that no longer exists under the current
+   * Stripe key pair — same stale-id situation as the customer id below. */
+  async function retrieveSubscriptionIfExists(subscriptionId: string): Promise<Stripe.Subscription | null> {
+    try {
+      return await stripe.subscriptions.retrieve(subscriptionId);
+    } catch (error) {
+      if (error instanceof Stripe.errors.StripeInvalidRequestError && error.code === "resource_missing") return null;
+      throw error;
+    }
+  }
 
   async function createCustomer(): Promise<string> {
     const customer = await stripe.customers.create({
@@ -71,7 +103,29 @@ export async function POST(request: Request) {
   // creating a fresh customer and retrying once; any other error just
   // gets reported clearly instead of crashing.
   try {
-    let customerId = (household as HouseholdBillingRow).stripe_customer_id ?? (await createCustomer());
+    if (household.stripe_subscription_id) {
+      const existing = await retrieveSubscriptionIfExists(household.stripe_subscription_id);
+      if (existing && subscriptionIsActive(existing.status)) {
+        const item = existing.items.data[0];
+        if (!item) throw new Error("Existing subscription has no items.");
+        // customer.subscription.updated → webhooks/stripe syncs the
+        // household row, same as any other change to the subscription.
+        await stripe.subscriptions.update(existing.id, {
+          items: [{ id: item.id, price: stripePriceIdForTier(selectedTier) }],
+          proration_behavior: "always_invoice",
+          // A failed prorated charge rejects the switch outright instead
+          // of leaving the subscription half-changed and past_due.
+          payment_behavior: "error_if_incomplete",
+          // Switching plans is an explicit "keep paying" — undoes a
+          // pending cancellation rather than switching into one.
+          cancel_at_period_end: false,
+          metadata: { householdId, tier: selectedTier },
+        });
+        return NextResponse.json({ switched: true });
+      }
+    }
+
+    let customerId = household.stripe_customer_id ?? (await createCustomer());
 
     async function startCheckout() {
       return stripe.checkout.sessions.create({

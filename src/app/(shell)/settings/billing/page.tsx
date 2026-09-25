@@ -46,6 +46,9 @@ export default function BillingSettingsPage() {
 
   const currentTier = household.subscriptionTier;
   const active = subscriptionIsActive(household.subscriptionStatus);
+  // One subscription per household — see billing/checkout/route.ts's own
+  // comment. Picking another plan while one is active is a switch.
+  const hasPaidPlan = currentTier !== "free" && active;
   const periodEnd = household.subscriptionCurrentPeriodEnd ? formatShortDate(household.subscriptionCurrentPeriodEnd) : null;
 
   const plans = useMemo(() => ["free", ...PAID_SUBSCRIPTION_TIERS] as SubscriptionTier[], []);
@@ -88,6 +91,14 @@ export default function BillingSettingsPage() {
     // building out Play Billing too is separate scope from the App
     // Store rejection this was written to fix.
     if (isIOS) {
+      // Apple can only replace a plan it's billing itself (Plus and Pro
+      // share one App Store subscription group) — buying through StoreKit
+      // on top of a Stripe subscription would double-bill.
+      if (hasPaidPlan && household.billingProvider === "stripe") {
+        hapticError();
+        toast.error("Your plan is billed on schuaz.com — switch plans there instead.");
+        return;
+      }
       setLoadingTier(tier);
       const result = await purchaseTier(tier);
       if (!result.ok) {
@@ -129,8 +140,17 @@ export default function BillingSettingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ householdId: household.id, tier }),
       });
-      const data = (await response.json()) as { url?: string; error?: string };
-      if (!response.ok || !data.url) throw new Error(data.error ?? "Couldn't start checkout.");
+      const data = (await response.json()) as { url?: string; switched?: boolean; error?: string };
+      if (!response.ok) throw new Error(data.error ?? "Couldn't start checkout.");
+      // Existing Stripe subscription switched in place — no Checkout
+      // redirect, the change is already made; just wait for the webhook.
+      if (data.switched) {
+        const updated = await waitForTierUpdate(tier);
+        setLoadingTier(null);
+        toast.success(updated ? `You're on ${BILLING_PLAN_LABEL[tier]} now.` : "Plan switched — it'll update here in a moment.");
+        return;
+      }
+      if (!data.url) throw new Error("Couldn't start checkout.");
       window.location.assign(data.url);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Couldn't start checkout.");
@@ -251,12 +271,10 @@ export default function BillingSettingsPage() {
                     <Icon name="spinner" size={16} className="animate-spin" />
                   ) : selected ? (
                     "Current plan"
-                  ) : isIOS ? (
-                    `Choose ${BILLING_PLAN_LABEL[tier]}`
-                  ) : isNative ? (
+                  ) : isNative && !isIOS ? (
                     "Continue on schuaz.com"
                   ) : (
-                    `Choose ${BILLING_PLAN_LABEL[tier]}`
+                    `${hasPaidPlan ? "Switch to" : "Choose"} ${BILLING_PLAN_LABEL[tier]}`
                   )}
                 </Button>
               ) : (
