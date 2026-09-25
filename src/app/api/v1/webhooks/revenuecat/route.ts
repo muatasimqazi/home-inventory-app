@@ -32,14 +32,16 @@ interface RevenueCatEvent {
 const ACTIVE_EVENT_TYPES = new Set(["INITIAL_PURCHASE", "RENEWAL", "UNCANCELLATION", "PRODUCT_CHANGE", "NON_RENEWING_PURCHASE"]);
 
 // CANCELLATION only turns off auto-renew — same as a Stripe subscription
-// with cancel_at_period_end: the household keeps access until the
-// period actually ends. Only EXPIRATION means the entitlement is
-// actually gone right now. Everything else (BILLING_ISSUE, TRANSFER,
-// SUBSCRIPTION_PAUSED, TEST, …) is acknowledged but doesn't change
-// subscription_tier — a failed renewal charge still has a grace period
-// before Apple itself expires the entitlement, at which point RevenueCat
-// sends a real EXPIRATION.
+// with cancel_at_period_end: the household keeps its current tier until
+// the period actually ends, handled in its own branch below (sets
+// subscription_cancel_at_period_end, deliberately leaves tier/status
+// alone). Only EXPIRATION means the entitlement is actually gone right
+// now. Everything else (BILLING_ISSUE, TRANSFER, SUBSCRIPTION_PAUSED,
+// TEST, …) is acknowledged but doesn't change anything here — a failed
+// renewal charge still has a grace period before Apple itself expires
+// the entitlement, at which point RevenueCat sends a real EXPIRATION.
 const EXPIRED_EVENT_TYPES = new Set(["EXPIRATION"]);
+const CANCELLED_EVENT_TYPES = new Set(["CANCELLATION"]);
 
 /**
  * Keeps households.subscription_tier in sync for the iOS In-App
@@ -98,6 +100,10 @@ export async function POST(request: Request) {
           apple_original_transaction_id: event.original_transaction_id,
           subscription_current_period_end: event.expiration_at_ms ? new Date(event.expiration_at_ms).toISOString() : null,
           subscription_updated_at: new Date().toISOString(),
+          // Any of these event types means auto-renew is (or is back to
+          // being) on — including UNCANCELLATION itself, which is
+          // literally "a cancelled subscription was re-enabled."
+          subscription_cancel_at_period_end: false,
         })
         .eq("id", householdId);
       if (error) throw new Error(error.message);
@@ -109,14 +115,29 @@ export async function POST(request: Request) {
           subscription_status: "expired",
           subscription_current_period_end: event.expiration_at_ms ? new Date(event.expiration_at_ms).toISOString() : null,
           subscription_updated_at: new Date().toISOString(),
+          subscription_cancel_at_period_end: false,
         })
         .eq("id", householdId)
         .eq("billing_provider", "apple"); // don't clobber a Stripe-owned subscription
       if (error) throw new Error(error.message);
+    } else if (CANCELLED_EVENT_TYPES.has(event.type)) {
+      // Deliberately touches nothing but this one flag — the household
+      // keeps its current tier/status until the period actually ends
+      // (EXPIRATION above). Confirmed live: RevenueCat's CANCELLATION
+      // payload for this exact scenario carries entitlement_ids/
+      // product_id still reflecting the CURRENT plan, so there was
+      // never a real "what tier" question here, only "should the UI
+      // show this is about to end" — which is what this flag answers.
+      const { error } = await admin
+        .from("households")
+        .update({ subscription_cancel_at_period_end: true, subscription_updated_at: new Date().toISOString() })
+        .eq("id", householdId)
+        .eq("billing_provider", "apple"); // don't clobber a Stripe-owned subscription
+      if (error) throw new Error(error.message);
     }
-    // Every other event type (CANCELLATION, BILLING_ISSUE, TRANSFER, …)
-    // is intentionally a no-op on subscription_tier — see the constants'
-    // own comments above.
+    // Every other event type (BILLING_ISSUE, TRANSFER, SUBSCRIPTION_PAUSED,
+    // TEST, …) is intentionally a no-op here — see the constants' own
+    // comments above.
   } catch (error) {
     console.error("webhooks/revenuecat: couldn't sync subscription:", error);
     return NextResponse.json({ error: "Couldn't sync subscription." }, { status: 500 });

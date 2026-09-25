@@ -200,9 +200,19 @@ export default function BillingSettingsPage() {
             <p className="text-caption text-muted-foreground">Current plan</p>
             <div className="mt-1 flex flex-wrap items-center gap-2">
               <h2 className="text-section-title font-semibold text-ink">{BILLING_PLAN_LABEL[currentTier]}</h2>
-              {currentTier !== "free" && <Badge className={active ? "bg-badge-green-bg text-badge-green-text" : "bg-badge-orange-bg text-badge-orange-text"}>{household.subscriptionStatus}</Badge>}
+              {currentTier !== "free" &&
+                (household.subscriptionCancelAtPeriodEnd ? (
+                  <Badge className="bg-badge-orange-bg text-badge-orange-text">Cancels {periodEnd}</Badge>
+                ) : (
+                  <Badge className={active ? "bg-badge-green-bg text-badge-green-text" : "bg-badge-orange-bg text-badge-orange-text"}>{household.subscriptionStatus}</Badge>
+                ))}
             </div>
-            {periodEnd && <p className="mt-1 text-caption text-muted-foreground">Current period ends {periodEnd}</p>}
+            {periodEnd &&
+              (household.subscriptionCancelAtPeriodEnd ? (
+                <p className="mt-1 text-caption text-muted-foreground">You&apos;ll keep {BILLING_PLAN_LABEL[currentTier]} until {periodEnd}, then drop to Free.</p>
+              ) : (
+                <p className="mt-1 text-caption text-muted-foreground">Current period ends {periodEnd}</p>
+              ))}
           </div>
           {household.stripeCustomerId && (
             <Button variant="outline" size="sm" onClick={openPortal} disabled={!isOwner || loadingTier !== null}>

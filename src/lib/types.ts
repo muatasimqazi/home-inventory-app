@@ -26,6 +26,8 @@ export interface Household {
   stripePriceId: string | null;
   subscriptionCurrentPeriodEnd: string | null;
   subscriptionUpdatedAt: string;
+  /** True when the current paid period is the last one — the household keeps subscriptionTier until subscriptionCurrentPeriodEnd, then drops to free (0061_subscription_cancel_at_period_end.sql). Set from Stripe's own cancel_at_period_end, or from RevenueCat's CANCELLATION/UNCANCELLATION events for the Apple path. */
+  subscriptionCancelAtPeriodEnd: boolean;
   /** Which system currently owns this household's paid subscription, if any — "stripe" (web/Android checkout) or "apple" (iOS In-App Purchase via RevenueCat). Null for a free household. Lets a webhook from one provider avoid clobbering an active subscription the *other* provider owns (0060_apple_iap_billing.sql). */
   billingProvider: "stripe" | "apple" | null;
   /** Latest Apple original_transaction_id RevenueCat reported, if billed through Apple — for support/debugging lookups in the RevenueCat dashboard, not a stable id to join on. */

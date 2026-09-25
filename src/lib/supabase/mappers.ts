@@ -98,6 +98,7 @@ export interface HouseholdRow {
   stripe_price_id: string | null;
   subscription_current_period_end: string | null;
   subscription_updated_at: string;
+  subscription_cancel_at_period_end: boolean;
   billing_provider: string | null;
   apple_original_transaction_id: string | null;
   latitude: number | null;
@@ -120,6 +121,7 @@ export function rowToHousehold(row: HouseholdRow): Household {
     stripePriceId: row.stripe_price_id,
     subscriptionCurrentPeriodEnd: row.subscription_current_period_end,
     subscriptionUpdatedAt: row.subscription_updated_at,
+    subscriptionCancelAtPeriodEnd: row.subscription_cancel_at_period_end,
     billingProvider: row.billing_provider as Household["billingProvider"],
     appleOriginalTransactionId: row.apple_original_transaction_id,
     latitude: row.latitude,

@@ -32,6 +32,13 @@ async function syncSubscription(subscription: Stripe.Subscription) {
     stripe_price_id: priceId,
     subscription_current_period_end: subscriptionPeriodEnd(subscription),
     subscription_updated_at: new Date().toISOString(),
+    // Real gap found live testing the Apple path (RevenueCat's own
+    // CANCELLATION event, same idea): a subscription set to cancel
+    // stays fully active — Stripe's own status here doesn't change
+    // either — so without this, the UI had no way to show a
+    // cancellation had actually registered at all.
+    subscription_cancel_at_period_end: subscription.cancel_at_period_end,
+    billing_provider: "stripe",
   };
 
   const query = householdId
@@ -53,6 +60,8 @@ async function markSubscriptionDeleted(subscription: Stripe.Subscription) {
       stripe_price_id: null,
       subscription_current_period_end: subscriptionPeriodEnd(subscription),
       subscription_updated_at: new Date().toISOString(),
+      subscription_cancel_at_period_end: false,
+      billing_provider: null,
     })
     .eq("stripe_customer_id", customerId);
   if (error) throw new Error(error.message);
