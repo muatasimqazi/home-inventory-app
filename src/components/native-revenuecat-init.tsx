@@ -1,10 +1,13 @@
 "use client";
 
 import { useEffect } from "react";
+import { App } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 import { Purchases } from "@revenuecat/purchases-capacitor";
 import { useInventoryStore } from "@/lib/store";
 import { ensureRevenueCatConfigured } from "@/lib/revenuecat-client";
+
+const BILLING_FOLLOW_UP_REFRESH_MS = 4000;
 
 /**
  * Native-app-only (iOS specifically — see revenuecat-client.ts's own
@@ -45,8 +48,7 @@ export function NativeRevenueCatInit() {
     if (Capacitor.getPlatform() !== "ios") return;
     let listenerId: string | undefined;
     Purchases.addCustomerInfoUpdateListener(() => {
-      const currentHouseholdId = useInventoryStore.getState().currentHouseholdId;
-      if (currentHouseholdId) void useInventoryStore.getState().refreshHouseholdBilling(currentHouseholdId);
+      refreshCurrentHouseholdBilling();
     })
       .then((id) => {
         listenerId = id;
@@ -59,5 +61,40 @@ export function NativeRevenueCatInit() {
     };
   }, []);
 
+  // Neither of the above covers returning from the background: the
+  // Realtime households subscription's WebSocket drops while the WebView
+  // is suspended and Supabase doesn't replay what it missed, the billing
+  // page is still mounted so its refresh-on-mount doesn't re-run, and
+  // RevenueCat only re-fetches CustomerInfo on foreground once its cache
+  // is stale. Exactly the path a user takes to cancel in iOS Settings →
+  // Subscriptions (or, on Android, returning from the Stripe portal's
+  // Custom Tab) — so re-read the household row on every resume. All
+  // native platforms, not just iOS: nothing here is RevenueCat-specific.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    const handle = App.addListener("resume", () => {
+      refreshCurrentHouseholdBilling();
+    });
+    return () => {
+      void handle.then((h) => h.remove());
+    };
+  }, []);
+
   return null;
+}
+
+/** Webhook-driven, so the households row usually lags whatever just
+ * triggered this by a few seconds (RevenueCat pushes CustomerInfo the
+ * moment StoreKit finishes, before its own webhook has landed; on
+ * resume, Realtime takes a moment to reconnect) — a second read shortly
+ * after catches that window. Anything later than that arrives through
+ * the Realtime households subscription once it's reconnected. Reads the
+ * current household id fresh each time rather than from a closure. */
+function refreshCurrentHouseholdBilling() {
+  const refresh = () => {
+    const { currentHouseholdId, refreshHouseholdBilling } = useInventoryStore.getState();
+    if (currentHouseholdId) void refreshHouseholdBilling(currentHouseholdId);
+  };
+  refresh();
+  setTimeout(refresh, BILLING_FOLLOW_UP_REFRESH_MS);
 }
