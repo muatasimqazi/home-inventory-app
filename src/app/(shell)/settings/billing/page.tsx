@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Capacitor } from "@capacitor/core";
 import { Browser } from "@capacitor/browser";
@@ -51,6 +51,21 @@ export default function BillingSettingsPage() {
   const plans = useMemo(() => ["free", ...PAID_SUBSCRIPTION_TIERS] as SubscriptionTier[], []);
   const isNative = Capacitor.isNativePlatform();
   const isIOS = Capacitor.getPlatform() === "ios";
+
+  // Defense-in-depth alongside NativeRevenueCatInit's CustomerInfo
+  // listener: confirmed live that the households row updates correctly
+  // (the webhook path works) but the app kept showing a stale plan —
+  // the only refresh that used to happen was startCheckout()'s own
+  // post-purchase poll below, which never runs for a transaction that
+  // reached RevenueCat any other way (a sandbox purchase made outside
+  // this exact button, App Review's own testing, a renewal while the
+  // app wasn't open). Refreshing on every visit to this page means
+  // "did I actually get what I paid for" never depends on how the
+  // purchase happened to go through.
+  useEffect(() => {
+    refreshHouseholdBilling(household.id).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [household.id]);
 
   /** Polls until the household row reflects `tier` (or gives up) — see
    * this file's own top-of-file comment for why a purchase's server-side

@@ -66,6 +66,15 @@ export async function purchaseTier(tier: PaidSubscriptionTier): Promise<Purchase
     const pkg = current.availablePackages.find((p) => p.identifier === packageId);
     if (!pkg) return { ok: false, error: "That plan isn't set up for purchase yet." };
 
+    // No Purchases.syncPurchases() call after this on purpose — its own
+    // doc comment explicitly warns it "should only be called if you're
+    // not calling purchase[...]Package". purchasePackage() already
+    // reports the transaction to RevenueCat itself; syncPurchases() here
+    // would be redundant against that warning, not a fix for anything
+    // (confirmed live: the webhook path already updates the household
+    // correctly on its own — the real bug traced to the app never
+    // re-reading that update, fixed instead by NativeRevenueCatInit's
+    // CustomerInfo listener and this page's own refresh-on-mount).
     await Purchases.purchasePackage({ aPackage: pkg });
     return { ok: true };
   } catch (error) {
@@ -84,6 +93,9 @@ export async function purchaseTier(tier: PaidSubscriptionTier): Promise<Purchase
 
 export async function restorePurchases(): Promise<PurchaseOutcome> {
   try {
+    // Same reasoning as purchaseTier() above for not also calling
+    // syncPurchases() here — restorePurchases() already re-syncs the
+    // device's App Store transactions with RevenueCat as its whole job.
     await Purchases.restorePurchases();
     return { ok: true };
   } catch (error) {

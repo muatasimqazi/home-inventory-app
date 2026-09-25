@@ -21,6 +21,14 @@ interface RevenueCatEvent {
 
 // Event types that mean "this household has (or still has) an active
 // paid entitlement right now" — apply the new tier and mark active.
+// "RESTORE" is deliberately NOT in this list — RevenueCat has no such
+// webhook event (checked their current docs directly: https://www.
+// revenuecat.com/docs/integrations/webhooks/event-types-and-fields).
+// Restoring an already-active purchase produces no new event at all;
+// restoring one that moves to a different app_user_id sends TRANSFER
+// instead, which this route currently just acknowledges as a no-op
+// (see EXPIRED_EVENT_TYPES' own comment) rather than something worth
+// half-handling.
 const ACTIVE_EVENT_TYPES = new Set(["INITIAL_PURCHASE", "RENEWAL", "UNCANCELLATION", "PRODUCT_CHANGE", "NON_RENEWING_PURCHASE"]);
 
 // CANCELLATION only turns off auto-renew — same as a Stripe subscription
