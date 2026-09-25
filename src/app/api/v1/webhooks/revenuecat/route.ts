@@ -29,14 +29,25 @@ interface RevenueCatEvent {
 // instead, which this route currently just acknowledges as a no-op
 // (see EXPIRED_EVENT_TYPES' own comment) rather than something worth
 // half-handling.
-const ACTIVE_EVENT_TYPES = new Set(["INITIAL_PURCHASE", "RENEWAL", "UNCANCELLATION", "PRODUCT_CHANGE", "NON_RENEWING_PURCHASE"]);
+//
+// PRODUCT_CHANGE is deliberately NOT in this list either: its
+// product_id/entitlement_ids/expiration_at_ms all describe the product
+// being switched *from*, and RevenueCat's own docs say to treat it as
+// informational only (https://www.revenuecat.com/docs/subscription-
+// guidance/managing-subscriptions). An App Store upgrade sends it
+// alongside a RENEWAL for the new product, milliseconds apart and in no
+// guaranteed order — handling it here wrote Plus back over Pro whenever
+// it landed second (seen live: a Plus → Pro upgrade that never showed
+// as Pro). A deferred downgrade likewise takes effect via the RENEWAL
+// at the period boundary, not this event.
+const ACTIVE_EVENT_TYPES = new Set(["INITIAL_PURCHASE", "RENEWAL", "UNCANCELLATION", "NON_RENEWING_PURCHASE"]);
 
 // CANCELLATION only turns off auto-renew — same as a Stripe subscription
 // with cancel_at_period_end: the household keeps its current tier until
 // the period actually ends, handled in its own branch below (sets
 // subscription_cancel_at_period_end, deliberately leaves tier/status
 // alone). Only EXPIRATION means the entitlement is actually gone right
-// now. Everything else (BILLING_ISSUE, TRANSFER, SUBSCRIPTION_PAUSED,
+// now. Everything else (PRODUCT_CHANGE, BILLING_ISSUE, TRANSFER, SUBSCRIPTION_PAUSED,
 // TEST, …) is acknowledged but doesn't change anything here — a failed
 // renewal charge still has a grace period before Apple itself expires
 // the entitlement, at which point RevenueCat sends a real EXPIRATION.
@@ -83,6 +94,7 @@ export async function POST(request: Request) {
 
   const householdId = event.app_user_id;
   const admin = getSupabaseAdminClient();
+  console.log(`webhooks/revenuecat: ${event.type} for ${householdId} (product ${event.product_id}, entitlements ${event.entitlement_ids}, ${event.environment})`);
 
   try {
     if (ACTIVE_EVENT_TYPES.has(event.type)) {
@@ -135,7 +147,7 @@ export async function POST(request: Request) {
         .eq("billing_provider", "apple"); // don't clobber a Stripe-owned subscription
       if (error) throw new Error(error.message);
     }
-    // Every other event type (BILLING_ISSUE, TRANSFER, SUBSCRIPTION_PAUSED,
+    // Every other event type (PRODUCT_CHANGE, BILLING_ISSUE, TRANSFER, SUBSCRIPTION_PAUSED,
     // TEST, …) is intentionally a no-op here — see the constants' own
     // comments above.
   } catch (error) {
