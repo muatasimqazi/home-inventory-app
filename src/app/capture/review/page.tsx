@@ -704,7 +704,7 @@ function BulkRow({
               value={row.quantity}
               disabled={row.excluded}
               onChange={(e) => onChange({ quantity: Math.max(0, Math.min(9999, Number(e.target.value) || 0)) })}
-              className="h-8 w-16 text-caption"
+              className="h-8 w-16 md:text-caption"
               aria-label="Quantity"
             />
             <div className="relative w-20">
@@ -717,7 +717,7 @@ function BulkRow({
                 disabled={row.excluded}
                 onChange={(e) => onChange({ estimatedValue: e.target.value === "" ? null : Math.max(0, Number(e.target.value) || 0) })}
                 placeholder="value"
-                className="h-8 pl-5 text-caption"
+                className="h-8 pl-5 md:text-caption"
                 aria-label="Estimated value"
               />
             </div>

@@ -108,7 +108,7 @@ export function FinanceAiCard({ householdId, categorySpend }: { householdId: str
               setInput(e.target.value);
             }}
             placeholder="Ask anything about your finances…"
-            className="h-10 flex-1 text-caption"
+            className="h-10 flex-1 md:text-caption"
           />
           <VoiceInputButton
             onTranscript={(text) => {

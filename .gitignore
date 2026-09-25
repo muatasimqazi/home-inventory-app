@@ -46,3 +46,6 @@ next-env.d.ts
 
 # supabase
 supabase/.temp
+
+# Product video exports and editing projects (large binaries, never commit)
+store-assets/product-video/

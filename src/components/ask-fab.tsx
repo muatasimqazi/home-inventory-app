@@ -165,7 +165,7 @@ export function AskFab() {
                 setInput(e.target.value);
               }}
               placeholder="Ask anything…"
-              className="h-10 flex-1 text-caption"
+              className="h-10 flex-1 md:text-caption"
             />
             <VoiceInputButton
               onTranscript={(text) => {
