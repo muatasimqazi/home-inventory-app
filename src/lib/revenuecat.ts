@@ -26,9 +26,9 @@ interface RevenueCatSubscriberResponse {
  * deriving the tier from each event separately got it wrong whenever
  * events raced (PRODUCT_CHANGE vs RENEWAL on an upgrade), carried no
  * product at all (TRANSFER), or described one of two parallel
- * subscriptions. The highest active tier wins — entitlement identifiers
- * were set up in the RevenueCat dashboard as the literal strings
- * "plus"/"pro" (same as SubscriptionTier), so they match directly.
+ * subscriptions. The highest active tier wins. RevenueCat's Pro
+ * entitlement is "schuaz_pro"; also accept the original "plus"/"pro"
+ * identifiers for existing entitlements.
  *
  * `acceptSandbox: false` ignores sandbox purchases entirely — same rule
  * the webhook route already applies to sandbox events in production.
@@ -47,13 +47,14 @@ export async function fetchAppleBillingState(appUserId: string, { acceptSandbox 
   const now = Date.now();
   let best: { tier: PaidSubscriptionTier; expiresDate: string | null; productId: string } | null = null;
   for (const [entitlementId, entitlement] of Object.entries(subscriber.entitlements ?? {})) {
-    if (!isPaidSubscriptionTier(entitlementId)) continue;
+    const tier = entitlementId === "schuaz_pro" ? "pro" : entitlementId;
+    if (!isPaidSubscriptionTier(tier)) continue;
     const accessUntil = entitlement.grace_period_expires_date ?? entitlement.expires_date;
     if (accessUntil !== null && new Date(accessUntil).getTime() <= now) continue;
     const subscription = subscriber.subscriptions?.[entitlement.product_identifier];
     if (subscription?.is_sandbox && !acceptSandbox) continue;
-    if (!best || (entitlementId === "pro" && best.tier !== "pro")) {
-      best = { tier: entitlementId as PaidSubscriptionTier, expiresDate: entitlement.expires_date, productId: entitlement.product_identifier };
+    if (!best || (tier === "pro" && best.tier !== "pro")) {
+      best = { tier, expiresDate: entitlement.expires_date, productId: entitlement.product_identifier };
     }
   }
 
