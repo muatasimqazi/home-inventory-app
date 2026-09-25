@@ -1,35 +1,66 @@
 import "server-only";
 import { isPaidSubscriptionTier, type PaidSubscriptionTier } from "@/lib/billing";
 
-/**
- * Product id -> tier mapping, same shape as lib/stripe.ts's
- * subscriptionTierForPriceId — kept as a static map (not env-driven like
- * Stripe's price ids) because App Store Connect product ids are public,
- * stable strings chosen once at creation, not secrets that rotate
- * between environments.
- */
-const PRODUCT_ID_TIER: Record<string, PaidSubscriptionTier> = {
-  "com.schuaz.app.plus.monthly": "plus",
-  "com.schuaz.app.pro.monthly": "pro",
-};
+/** What RevenueCat itself currently says one app user id (= one household
+ * id) is entitled to — see fetchAppleBillingState(). `tier: null` means no
+ * active paid entitlement at all. */
+export interface AppleBillingState {
+  tier: PaidSubscriptionTier | null;
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+}
 
-export function tierForProductId(productId: string | null | undefined): PaidSubscriptionTier | null {
-  if (!productId) return null;
-  return PRODUCT_ID_TIER[productId] ?? null;
+interface RevenueCatSubscriberResponse {
+  subscriber: {
+    entitlements: Record<string, { expires_date: string | null; grace_period_expires_date: string | null; product_identifier: string }>;
+    subscriptions: Record<string, { unsubscribe_detected_at: string | null; is_sandbox: boolean }>;
+  };
 }
 
 /**
- * Prefers RevenueCat's own entitlement_ids over parsing product_id —
- * entitlement identifiers were deliberately set up in the RevenueCat
- * dashboard to be the literal strings "plus"/"pro" (same as
- * SubscriptionTier), so this is a direct match, not a lookup, and stays
- * correct even if a product id ever gets renamed. Falls back to
- * product_id only for event types that don't carry entitlement_ids.
- * The highest tier wins if somehow more than one is present.
+ * Reads the subscriber's current entitlements from RevenueCat's REST API
+ * (https://www.revenuecat.com/docs/api-v1/customers) rather than trusting
+ * any single webhook event's payload — which is what RevenueCat itself
+ * recommends, and what webhooks/revenuecat/route.ts relies on: an event
+ * describes one transaction, not the customer's overall state, so
+ * deriving the tier from each event separately got it wrong whenever
+ * events raced (PRODUCT_CHANGE vs RENEWAL on an upgrade), carried no
+ * product at all (TRANSFER), or described one of two parallel
+ * subscriptions. The highest active tier wins — entitlement identifiers
+ * were set up in the RevenueCat dashboard as the literal strings
+ * "plus"/"pro" (same as SubscriptionTier), so they match directly.
+ *
+ * `acceptSandbox: false` ignores sandbox purchases entirely — same rule
+ * the webhook route already applies to sandbox events in production.
  */
-export function tierForEntitlementIds(entitlementIds: string[] | null | undefined, productId: string | null | undefined): PaidSubscriptionTier | null {
-  const fromEntitlements = (entitlementIds ?? []).find(isPaidSubscriptionTier) as PaidSubscriptionTier | undefined;
-  if (fromEntitlements === "pro") return "pro";
-  if (fromEntitlements) return fromEntitlements;
-  return tierForProductId(productId);
+export async function fetchAppleBillingState(appUserId: string, { acceptSandbox }: { acceptSandbox: boolean }): Promise<AppleBillingState> {
+  const apiKey = process.env.REVENUECAT_SECRET_API_KEY;
+  if (!apiKey) throw new Error("REVENUECAT_SECRET_API_KEY is not configured.");
+
+  const response = await fetch(`https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(appUserId)}`, {
+    headers: { Authorization: `Bearer ${apiKey}`, Accept: "application/json" },
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error(`RevenueCat subscriber lookup failed (${response.status}).`);
+  const { subscriber } = (await response.json()) as RevenueCatSubscriberResponse;
+
+  const now = Date.now();
+  let best: { tier: PaidSubscriptionTier; expiresDate: string | null; productId: string } | null = null;
+  for (const [entitlementId, entitlement] of Object.entries(subscriber.entitlements ?? {})) {
+    if (!isPaidSubscriptionTier(entitlementId)) continue;
+    const accessUntil = entitlement.grace_period_expires_date ?? entitlement.expires_date;
+    if (accessUntil !== null && new Date(accessUntil).getTime() <= now) continue;
+    const subscription = subscriber.subscriptions?.[entitlement.product_identifier];
+    if (subscription?.is_sandbox && !acceptSandbox) continue;
+    if (!best || (entitlementId === "pro" && best.tier !== "pro")) {
+      best = { tier: entitlementId as PaidSubscriptionTier, expiresDate: entitlement.expires_date, productId: entitlement.product_identifier };
+    }
+  }
+
+  if (!best) return { tier: null, currentPeriodEnd: null, cancelAtPeriodEnd: false };
+  return {
+    tier: best.tier,
+    currentPeriodEnd: best.expiresDate,
+    cancelAtPeriodEnd: Boolean(subscriber.subscriptions?.[best.productId]?.unsubscribe_detected_at),
+  };
 }
