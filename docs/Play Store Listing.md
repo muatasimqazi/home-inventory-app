@@ -49,11 +49,11 @@ Google's Data Safety form asks what data the app *collects and shares*, per cate
 | **Name** | Yes | No | Account management, App functionality | Household member display name |
 | **Email address** | Yes | No | Account management, App functionality | Supabase Auth |
 | **User IDs** | Yes | No | Account management, Analytics | Supabase user id; also the PostHog `distinct_id` |
-| **Physical address / Location (approximate)** | Yes | Yes — Google (weather), AI Gateway providers (geocoding) | App functionality | Household location for weather-based reminders; geocoded via `/api/v1/weather/geocode` |
+| **Physical address / Location (approximate)** | Yes | Yes — Google (weather, Analytics), AI Gateway providers (geocoding) | App functionality, Analytics | Household location for weather-based reminders; geocoded via `/api/v1/weather/geocode`. Google Analytics also derives approximate location from IP address |
 | **Photos** | Yes | Yes — AI Gateway model providers | App functionality | Item/location/receipt photos, sent for AI detection/generation when the user captures via AI-assisted flows |
 | **Financial info (purchase history, other financial info)** | Yes | Yes — Plaid, Stripe | App functionality, Account management | Bank-linked transactions (Plaid, opt-in), receipts, subscription billing (Stripe) |
-| **App activity (app interactions, in-app search history)** | Yes | Yes — PostHog | Analytics | Product analytics + session recording (`components/posthog-provider.tsx`); session replay is content-masked (all inputs/text masked) |
-| **Device or other IDs** | Yes | Yes — Firebase/FCM | App functionality | Push notification device tokens |
+| **App activity (app interactions, in-app search history)** | Yes | Yes — PostHog, Google Analytics | Analytics | Product analytics + session recording (`components/posthog-provider.tsx`); session replay is content-masked (all inputs/text masked). Google Analytics 4 (`G-ZXPQBJVFV0`, root `src/app/layout.tsx`) records page views and interactions in the WebView too, since the app loads the live site |
+| **Device or other IDs** | Yes | Yes — Firebase/FCM, Google Analytics | App functionality, Analytics | Push notification device tokens; Google Analytics client ID (cookie-based, not the Android advertising ID) |
 | **Audio** | Yes | Yes — AI Gateway (Whisper) | App functionality | Voice input for Search/Ask, transcribed server-side, not stored as audio afterward |
 
 **Data deletion**: `/settings/delete-account` provides a real, working in-app account deletion flow — check the box in Play Console's Data Safety form saying you support this.

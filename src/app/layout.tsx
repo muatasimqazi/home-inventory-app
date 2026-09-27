@@ -12,6 +12,7 @@ import { NativeSplashScreen } from "@/components/native-splash-screen";
 import { NativeRevenueCatInit } from "@/components/native-revenuecat-init";
 import { CommandKShortcut } from "@/components/command-k-shortcut";
 import { PHProvider } from "@/components/posthog-provider";
+import { GoogleAnalytics } from "@next/third-parties/google";
 
 export const metadata: Metadata = {
   title: "Schuaz",
@@ -139,6 +140,10 @@ export default function RootLayout({
           </ThemeProvider>
         </PHProvider>
       </body>
+      {/* GA4 via Next's own gtag.js wrapper — loads after hydration, on
+          every route (web and the native shells, which load this same
+          deployment). Alongside PostHog, not replacing it. */}
+      <GoogleAnalytics gaId="G-ZXPQBJVFV0" />
     </html>
   );
 }
