@@ -6,6 +6,8 @@ import { Icon } from "@/components/icon";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/format";
 import type { CategorySpendSuggestion } from "@/lib/selectors";
+import { ensureAiConsent } from "@/lib/ai-consent-store";
+import { AI_CONSENT_DECLINED_MESSAGE } from "@/lib/ai-consent";
 
 interface Suggestion {
   categoryId: string;
@@ -33,6 +35,10 @@ export function BudgetRecommendationsCard({
   const [appliedIds, setAppliedIds] = useState<Set<string>>(new Set());
 
   async function fetchRecommendations() {
+    if (!(await ensureAiConsent())) {
+      toast(AI_CONSENT_DECLINED_MESSAGE);
+      return;
+    }
     setStatus("loading");
     try {
       const res = await fetch("/api/v1/finance/budget-recommendations", {

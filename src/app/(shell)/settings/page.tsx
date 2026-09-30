@@ -114,6 +114,7 @@ export default function SettingsPage() {
         <SettingsRow icon="attachment" label="Email Receipts" sublabel="Forward purchases with no physical receipt" href="/settings/email-receipts" />
         <SettingsRow icon="download" label="Data & Export" sublabel="CSV, PDF, JSON" href="/settings/export" />
         <SettingsRow icon="mail" label="Contact Support" sublabel="Bugs, billing, feature requests" href="/contact" />
+        <SettingsRow icon="ai" label="AI Features" sublabel="What's shared with AI services" href="/settings/ai" />
         <SettingsRow icon="shieldCheck" label="Privacy Policy" href="/privacy" />
         <SettingsRow icon="file" label="Terms of Service" href="/terms" />
         <SettingsRow icon="tag" label="Tags" sublabel={`${tags.length} tags`} href="/tags" />

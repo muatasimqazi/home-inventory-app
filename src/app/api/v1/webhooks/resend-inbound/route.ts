@@ -14,6 +14,7 @@ import {
   rowToCategoryRule,
 } from "@/lib/supabase/mappers";
 import { newId } from "@/lib/id";
+import { hasAiConsent } from "@/lib/ai-consent";
 import type { ReceiptScanBatch, ScannedTransactionDraft, ScannedReceiptLineItem } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -169,8 +170,16 @@ export async function POST(request: Request) {
     // needs-review draft rather than dropping the email entirely.
   }
 
+  // Reading the email means sending it to AI Gateway, which needs the
+  // user's AI data-sharing consent (lib/ai-consent.ts). There's no
+  // signed-in user here, so it's the owner's — the same member this batch
+  // is attributed to. Without it the email still lands as an unparsed
+  // draft to fill in by hand, exactly like an extraction failure below.
+  const { data: ownerAuth } = await admin.auth.admin.getUserById(owner.userId);
+  const aiAllowed = hasAiConsent(ownerAuth?.user);
+
   let extracted = null;
-  if (bodyText) {
+  if (bodyText && aiAllowed) {
     try {
       extracted = await extractReceiptFromEmail(subjectText, bodyText);
     } catch (error) {
@@ -186,7 +195,12 @@ export async function POST(request: Request) {
   const receiptConfidence = extracted && itemCount > 0 ? avg(extracted.items.map((it) => it.confidence)) : 0.5;
   const { needsReview, reviewReason } = extracted
     ? draftNeedsReview(receiptConfidence, category, account, itemCount)
-    : { needsReview: true, reviewReason: `Couldn't automatically read this email (from ${from}, subject "${subjectText}") — check the details manually.` };
+    : {
+        needsReview: true,
+        reviewReason: aiAllowed
+          ? `Couldn't automatically read this email (from ${from}, subject "${subjectText}") — check the details manually.`
+          : `This email (from ${from}, subject "${subjectText}") wasn't read automatically because AI features are off — turn them on in Settings, or fill in the details manually.`,
+      };
 
   const batchId = newId();
   const batch: ReceiptScanBatch = {

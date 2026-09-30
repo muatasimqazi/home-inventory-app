@@ -5,6 +5,9 @@ import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { playRecordingStartTone, playRecordingStopTone } from "@/lib/audio-feedback";
 import { hapticTap, hapticError } from "@/lib/haptics";
+import { toast } from "sonner";
+import { ensureAiConsent } from "@/lib/ai-consent-store";
+import { AI_CONSENT_DECLINED_MESSAGE } from "@/lib/ai-consent";
 
 type RecordingState = "idle" | "recording" | "transcribing" | "error";
 
@@ -65,6 +68,13 @@ export function VoiceInputButton({ onTranscript, className }: { onTranscript: (t
   async function startRecording() {
     if (startingRef.current) return;
     startingRef.current = true;
+    // Before the mic opens, not after: the recording itself is what gets
+    // sent to OpenAI for transcription (lib/ai-consent.ts).
+    if (!(await ensureAiConsent())) {
+      startingRef.current = false;
+      toast(AI_CONSENT_DECLINED_MESSAGE);
+      return;
+    }
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
       startingRef.current = false;
       setState("error");

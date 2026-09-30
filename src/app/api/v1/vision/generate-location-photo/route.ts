@@ -5,6 +5,7 @@ import { generateLocationPhoto } from "@/lib/vision/generate-location-photo";
 import { newId } from "@/lib/id";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { checkAndConsumeStudioGenerationQuota } from "@/lib/studio-generation-quota";
+import { requireAiConsent } from "@/lib/ai-consent-server";
 
 export const runtime = "nodejs";
 
@@ -53,6 +54,9 @@ export async function POST(request: Request) {
 
   const auth = await requireHouseholdMember(householdId);
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
+  const consentResponse = await requireAiConsent();
+  if (consentResponse) return consentResponse;
 
   // docs/Rate Limiting Addendum.md — generates a real, billed image on
   // every call.

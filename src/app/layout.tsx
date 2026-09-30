@@ -12,6 +12,7 @@ import { NativeSplashScreen } from "@/components/native-splash-screen";
 import { NativeRevenueCatInit } from "@/components/native-revenuecat-init";
 import { CommandKShortcut } from "@/components/command-k-shortcut";
 import { PHProvider } from "@/components/posthog-provider";
+import { AiConsentDialog } from "@/components/ai-consent-dialog";
 import { GoogleAnalytics } from "@next/third-parties/google";
 
 export const metadata: Metadata = {
@@ -104,6 +105,10 @@ export default function RootLayout({
             {/* One instance for the whole app — any component opens it via
                 useLightboxStore().openLightbox(...), no per-page wiring. */}
             <PhotoLightbox />
+            {/* One instance for the whole app — any AI feature opens it via
+                ensureAiConsent() before sending data (App Store 5.1.2(i);
+                see lib/ai-consent.ts). */}
+            <AiConsentDialog />
             {/* Outside HydrationGate/DomainGate on purpose — it needs to run
                 (and be able to unstick the page) even if one of those is
                 itself the thing showing, not just once the real app content

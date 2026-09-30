@@ -10,6 +10,8 @@ import { coverPhotoUrl } from "@/lib/cover-photo";
 import { WARDROBE_STYLE_LABEL, stylesForCategory } from "@/lib/wardrobe-styles";
 import { cn } from "@/lib/utils";
 import type { Item, ItemStudioPhoto, ItemStudioPhotoAspectRatio, ItemStudioPhotoStyle } from "@/lib/types";
+import { ensureAiConsent } from "@/lib/ai-consent-store";
+import { AI_CONSENT_DECLINED_MESSAGE } from "@/lib/ai-consent";
 
 // Ghost Mannequin front + profile by default (user request) — the most
 // ecommerce-relevant treatment for an actual garment, as two genuinely
@@ -80,6 +82,7 @@ export function WardrobeStudioSheet({
   }
 
   async function requestGeneration(styles: ItemStudioPhotoStyle[]): Promise<ItemStudioPhoto[]> {
+    if (!(await ensureAiConsent())) throw new Error(AI_CONSENT_DECLINED_MESSAGE);
     const res = await fetch("/api/v1/vision/generate-studio-photo", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

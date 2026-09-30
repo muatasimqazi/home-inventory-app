@@ -1,3 +1,4 @@
+import { AI_CONSENT_DECLINED_MESSAGE } from "@/lib/ai-consent";
 // VisionProvider abstraction per PRD §24: detectItems(photo) -> DetectedItem[].
 // MockVisionProvider stands in for a real model until credentials exist —
 // swap the export at the bottom for a real implementation later without
@@ -355,6 +356,20 @@ function weightedSingleOrFew(): number {
 }
 
 /**
+ * Every Http*Provider below sends user data to an AI route, so each asks
+ * for AI data-sharing consent first (lib/ai-consent.ts). Lazy import: API
+ * routes import this module for its shared types/constants, and the
+ * consent store is browser-only — it's only ever loaded when a provider
+ * method actually runs, which is always client-side. "Not now" surfaces
+ * as a non-retryable VisionDetectionError, the same shape every caller
+ * already handles for any other failure.
+ */
+async function requireAiConsentOrThrow(): Promise<void> {
+  const { ensureAiConsent } = await import("@/lib/ai-consent-store");
+  if (!(await ensureAiConsent())) throw new VisionDetectionError(AI_CONSENT_DECLINED_MESSAGE, false);
+}
+
+/**
  * Real, active provider — client-safe by construction: it only ever calls
  * the /api/v1/vision/detect route over fetch, never touches a model
  * provider directly (that lives server-side in lib/vision/detect.ts, which
@@ -362,6 +377,7 @@ function weightedSingleOrFew(): number {
  */
 export class HttpVisionProvider implements VisionProvider {
   async detectItems(photos: string[], locationName?: string | null): Promise<DetectedItem[]> {
+    await requireAiConsentOrThrow();
     let res: Response;
     try {
       res = await fetch("/api/v1/vision/detect", {
@@ -387,6 +403,7 @@ export class HttpVisionProvider implements VisionProvider {
   }
 
   async extractReceipts(photos: string[]): Promise<ReceiptExtraction[]> {
+    await requireAiConsentOrThrow();
     let res: Response;
     try {
       res = await fetch("/api/v1/vision/extract-receipts", {
@@ -406,6 +423,7 @@ export class HttpVisionProvider implements VisionProvider {
   }
 
   async extractStatement(fileDataUrl: string): Promise<StatementTransactionExtraction[]> {
+    await requireAiConsentOrThrow();
     let res: Response;
     try {
       res = await fetch("/api/v1/vision/extract-statement", {
@@ -425,6 +443,7 @@ export class HttpVisionProvider implements VisionProvider {
   }
 
   async detectApplianceLabel(photos: string[]): Promise<ApplianceLabelDetection> {
+    await requireAiConsentOrThrow();
     let res: Response;
     try {
       res = await fetch("/api/v1/vision/detect-appliance", {
@@ -443,6 +462,7 @@ export class HttpVisionProvider implements VisionProvider {
   }
 
   async detectWardrobeItem(photos: string[]): Promise<WardrobeItemDetection> {
+    await requireAiConsentOrThrow();
     let res: Response;
     try {
       res = await fetch("/api/v1/vision/detect-wardrobe-item", {
@@ -461,6 +481,7 @@ export class HttpVisionProvider implements VisionProvider {
   }
 
   async detectDocument(photos: string[]): Promise<DocumentDetection> {
+    await requireAiConsentOrThrow();
     let res: Response;
     try {
       res = await fetch("/api/v1/vision/detect-document", {
@@ -562,6 +583,7 @@ export class MockCategorizationProvider implements CategorizationProvider {
  */
 export class HttpCategorizationProvider implements CategorizationProvider {
   async suggestCategories(transactions: CategorySuggestionTransaction[], categories: CategorySuggestionCategory[]): Promise<CategorySuggestion[]> {
+    await requireAiConsentOrThrow();
     let res: Response;
     try {
       res = await fetch("/api/v1/finance/categorize", {
@@ -646,6 +668,7 @@ export class MockContainerNamingProvider implements ContainerNamingProvider {
  */
 export class HttpContainerNamingProvider implements ContainerNamingProvider {
   async suggestContainerLabel(itemNames: string[]): Promise<ContainerLabelSuggestion> {
+    await requireAiConsentOrThrow();
     let res: Response;
     try {
       res = await fetch("/api/v1/inventory/suggest-container-name", {

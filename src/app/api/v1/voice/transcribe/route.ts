@@ -3,6 +3,7 @@ import { transcribe } from "ai";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { upstreamStatusCode } from "@/lib/upstream-error";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { requireAiConsent } from "@/lib/ai-consent-server";
 
 export const runtime = "nodejs";
 
@@ -29,6 +30,9 @@ export async function POST(request: Request) {
   if (!user) {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });
   }
+
+  const consentResponse = await requireAiConsent(user);
+  if (consentResponse) return consentResponse;
 
   // docs/Rate Limiting Addendum.md — shares Ask's own limiter tier;
   // voice is just a different way in to the same feature.

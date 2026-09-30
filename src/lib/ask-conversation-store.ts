@@ -2,6 +2,8 @@
 
 import { create } from "zustand";
 import { useInventoryStore } from "@/lib/store";
+import { ensureAiConsent } from "@/lib/ai-consent-store";
+import { AI_CONSENT_DECLINED_MESSAGE } from "@/lib/ai-consent";
 
 /** Mirrors lib/ask/ask.ts's AskReference shape — redefined locally rather than imported so client components never have any import graph touching a "server-only"-guarded module, even a type-only one. Keep `kind` in sync with that file's own union by hand. */
 export interface AskReference {
@@ -91,6 +93,12 @@ export const useAskConversationStore = create<AskConversationState>()((set, get)
     const trimmed = question.trim();
     if (!trimmed || !householdId) return;
     const id = crypto.randomUUID();
+    if (!(await ensureAiConsent())) {
+      set((s) => ({
+        entries: [...s.entries, { id, question: trimmed, answer: null, references: [], pendingActions: [], error: AI_CONSENT_DECLINED_MESSAGE, pending: false }],
+      }));
+      return;
+    }
     set((s) => ({
       entries: [...s.entries, { id, question: trimmed, answer: null, references: [], pendingActions: [], error: null, pending: true }],
     }));

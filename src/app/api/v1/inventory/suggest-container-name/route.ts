@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { suggestContainerLabel } from "@/lib/inventory/suggest-container-name";
 import { normalizeCodePrefix } from "@/lib/display-code";
 import { upstreamStatusCode } from "@/lib/upstream-error";
+import { requireAiConsent } from "@/lib/ai-consent-server";
 
 export const runtime = "nodejs";
 
@@ -15,6 +16,9 @@ const MAX_ITEMS = 60;
 // Gateway-routed primary+fallback reliability shape as every other AI
 // route in this app.
 export async function POST(request: Request) {
+  const consentResponse = await requireAiConsent();
+  if (consentResponse) return consentResponse;
+
   let body: unknown;
   try {
     body = await request.json();

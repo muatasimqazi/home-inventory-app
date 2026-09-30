@@ -24,6 +24,8 @@ import {
 import { formatCurrency, formatShortDate } from "@/lib/format";
 import { useRemountKey } from "@/hooks/use-remount-key";
 import type { RecurringBill } from "@/lib/types";
+import { ensureAiConsent } from "@/lib/ai-consent-store";
+import { AI_CONSENT_DECLINED_MESSAGE } from "@/lib/ai-consent";
 
 export default function RecurringBillsPage() {
   const recurringBills = useInventoryStore((s) => s.recurringBills);
@@ -88,6 +90,10 @@ export default function RecurringBillsPage() {
   async function handleClassifySubscriptions() {
     if (otherBills.length === 0) {
       toast("No bills in Bills & Utilities to classify.");
+      return;
+    }
+    if (!(await ensureAiConsent())) {
+      toast(AI_CONSENT_DECLINED_MESSAGE);
       return;
     }
     setClassifying(true);

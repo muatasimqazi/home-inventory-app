@@ -3,6 +3,7 @@ import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { askQuestion } from "@/lib/ask/ask";
 import { upstreamStatusCode } from "@/lib/upstream-error";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { requireAiConsent } from "@/lib/ai-consent-server";
 
 export const runtime = "nodejs";
 
@@ -44,6 +45,9 @@ export async function POST(request: Request) {
   if (!user) {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });
   }
+
+  const consentResponse = await requireAiConsent(user);
+  if (consentResponse) return consentResponse;
 
   // docs/Rate Limiting Addendum.md — Ask calls a real, billed model on
   // every question.

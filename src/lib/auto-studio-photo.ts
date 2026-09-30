@@ -1,6 +1,8 @@
 "use client";
 
 import type { ItemStudioPhoto, ItemStudioPhotoStyle } from "@/lib/types";
+import { ensureAiConsent } from "@/lib/ai-consent-store";
+import { AI_CONSENT_DECLINED_MESSAGE } from "@/lib/ai-consent";
 
 /**
  * The single default studio style used for automatic, one-photo generation
@@ -42,6 +44,8 @@ export async function generateAutoStudioPhoto(params: {
   category: string;
 }): Promise<ItemStudioPhoto> {
   const style = defaultStudioStyle(params.category);
+  // Callers already treat a throw as "keep the original cover photo".
+  if (!(await ensureAiConsent())) throw new Error(AI_CONSENT_DECLINED_MESSAGE);
 
   for (let attempt = 0; ; attempt++) {
     const res = await fetch("/api/v1/vision/generate-studio-photo", {

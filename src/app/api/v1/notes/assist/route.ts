@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { assistWithNote, type NoteAssistTurn } from "@/lib/ask/note-assist";
 import { upstreamStatusCode } from "@/lib/upstream-error";
+import { requireAiConsent } from "@/lib/ai-consent-server";
 
 export const runtime = "nodejs";
 
@@ -22,6 +23,9 @@ function isValidTurn(t: unknown): t is NoteAssistTurn {
 }
 
 export async function POST(request: Request) {
+  const consentResponse = await requireAiConsent();
+  if (consentResponse) return consentResponse;
+
   let body: unknown;
   try {
     body = await request.json();

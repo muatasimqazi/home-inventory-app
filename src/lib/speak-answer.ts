@@ -1,5 +1,7 @@
 "use client";
 
+import { ensureAiConsent } from "@/lib/ai-consent-store";
+
 // Shared by every Ask surface that offers voice input (ask-fab.tsx,
 // finance-ai-card.tsx) — docs/Voice Input Addendum.md §3: plays an
 // answer back only when the question that produced it came in by voice,
@@ -9,6 +11,9 @@
 export function speakAnswer(text: string): void {
   (async () => {
     try {
+      // Normally already granted — the question itself went through an AI
+      // route — but the answer text is sent to OpenAI too, so check anyway.
+      if (!(await ensureAiConsent())) return;
       const res = await fetch("/api/v1/voice/speak", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

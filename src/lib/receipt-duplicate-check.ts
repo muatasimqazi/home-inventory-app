@@ -3,6 +3,7 @@
 import { findDuplicateTransaction, descriptionSimilarity } from "@/lib/csv-import-resolution";
 import { parseCalendarDate } from "@/lib/format";
 import type { ScannedTransactionDraft, Transaction } from "@/lib/types";
+import { ensureAiConsent } from "@/lib/ai-consent-store";
 
 export interface PossibleDuplicateMatch {
   transaction: Transaction;
@@ -72,6 +73,9 @@ export async function findPossibleDuplicateForDraft(draft: ScannedTransactionDra
 
   const candidates = looseCandidates(draft, transactions);
   if (candidates.length === 0) return null;
+  // The fuzzy match sends transactions to AI; without consent, fall back
+  // to the exact-match result above (none), same as when the model is unavailable.
+  if (!(await ensureAiConsent())) return null;
 
   try {
     const res = await fetch("/api/v1/finance/match-transaction", {

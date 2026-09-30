@@ -178,6 +178,8 @@ import type {
 } from "./types";
 import { TRASH_RETENTION_DAYS } from "./types";
 import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
+import { ensureAiConsent } from "@/lib/ai-consent-store";
+import { AI_CONSENT_DECLINED_MESSAGE } from "@/lib/ai-consent";
 
 // Supabase-backed data layer — households, members, invites, locations,
 // containers, items, tags, favorites, activity log, attachments, label
@@ -1164,6 +1166,7 @@ async function generateCoverPhotoViaAI(
   roomType: string,
   detail: string
 ): Promise<{ ok: true; path: string } | { ok: false; error: string }> {
+  if (!(await ensureAiConsent())) return { ok: false, error: AI_CONSENT_DECLINED_MESSAGE };
   try {
     const res = await fetch("/api/v1/vision/generate-location-photo", {
       method: "POST",
@@ -2656,6 +2659,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => {
     if (!manufacturer || !modelNumber) {
       return { ok: false, error: "Set a manufacturer and model number first." };
     }
+    if (!(await ensureAiConsent())) return { ok: false, error: AI_CONSENT_DECLINED_MESSAGE };
 
     let suggestion: { manualUrl: string | null; manualLabel: string; warrantyUrl: string | null; warrantyLabel: string };
     try {

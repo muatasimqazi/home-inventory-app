@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { requireAiConsent } from "@/lib/ai-consent-server";
 
 // docs/Rate Limiting Addendum.md — the 17 AI Gateway-backed routes (Ask/
 // Voice, Vision/Capture, Finance AI) had no request ceiling at all before
@@ -101,6 +102,13 @@ export async function rateLimitGate(tier: RateLimitTier): Promise<{ ok: true; us
   if (!user) {
     return { ok: false, response: NextResponse.json({ error: "Not signed in." }, { status: 401 }) };
   }
+
+  // Every caller of this gate forwards user data to AI Gateway, so it's
+  // also where those routes enforce the user's AI data-sharing consent
+  // (lib/ai-consent.ts) — checked before the limiter, so a refused call
+  // doesn't spend the user's quota.
+  const consentResponse = await requireAiConsent(user);
+  if (consentResponse) return { ok: false, response: consentResponse };
 
   const limit = await checkRateLimit(tier, user.id);
   if (!limit.ok) {

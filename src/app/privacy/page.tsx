@@ -1,4 +1,5 @@
 import { BackButton } from "@/components/back-button";
+import { AI_DATA_SENT, AI_RECIPIENTS } from "@/lib/ai-consent";
 
 export default function PrivacyPage() {
   return (
@@ -15,7 +16,7 @@ export default function PrivacyPage() {
           <BackButton />
           <div>
             <h1 className="text-screen-title font-semibold">Privacy Policy</h1>
-            <p className="mt-2 text-caption text-muted-foreground">Last updated: September 27, 2026</p>
+            <p className="mt-2 text-caption text-muted-foreground">Last updated: September 30, 2026</p>
           </div>
         </header>
 
@@ -60,6 +61,59 @@ export default function PrivacyPage() {
           </p>
         </section>
 
+        {/* App Store 5.1.1(i)/5.1.2(i). The lists render from lib/ai-consent.ts,
+            the same source as the in-app consent dialog, so the two can't
+            describe different things. */}
+        <section className="flex flex-col gap-3">
+          <h2 className="text-section-title font-medium">AI Features</h2>
+          <p className="text-body text-muted-foreground">
+            Some Schuaz features use third-party AI services. Nothing is sent to them until you tap Allow in the in-app prompt that appears the
+            first time you use one of these features. You can turn this on or off at any time in Settings → AI Features. With it off, the rest of
+            Schuaz keeps working.
+          </p>
+          <p className="text-body font-medium text-ink">What is sent</p>
+          <ul className="list-disc space-y-2 pl-5 text-body text-muted-foreground">
+            {AI_DATA_SENT.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+          <p className="text-body font-medium text-ink">How it is collected</p>
+          <p className="text-body text-muted-foreground">
+            Only when you use an AI feature: asking a question, scanning or uploading a photo or statement, recording with the microphone, asking
+            for suggestions, or generating a photo. Receipts forwarded to your household&apos;s email address are read by AI only if the household
+            owner has turned AI features on; otherwise they are saved for you to fill in by hand.
+          </p>
+          <p className="text-body font-medium text-ink">Who receives it</p>
+          <ul className="list-disc space-y-2 pl-5 text-body text-muted-foreground">
+            {AI_RECIPIENTS.map((r) => (
+              <li key={r.name}>
+                {r.name}: {r.role}
+              </li>
+            ))}
+          </ul>
+          <p className="text-body font-medium text-ink">How it is used</p>
+          <p className="text-body text-muted-foreground">
+            Only to produce the result you asked for: an answer, filled-in item or receipt details, a category or budget suggestion, a generated
+            photo, a transcript, or a spoken answer. Results are saved in your household like anything else you enter. We don&apos;t use this data
+            for advertising, don&apos;t sell it, and don&apos;t send it to any other AI service.
+          </p>
+          <p className="text-body text-muted-foreground">
+            These providers process the data to return results to Schuaz under their own terms and privacy policies:{" "}
+            <a href="https://vercel.com/legal/privacy-policy" className="font-medium text-yellow-text underline">
+              Vercel
+            </a>
+            ,{" "}
+            <a href="https://policies.google.com/privacy" className="font-medium text-yellow-text underline">
+              Google
+            </a>
+            , and{" "}
+            <a href="https://openai.com/policies/privacy-policy" className="font-medium text-yellow-text underline">
+              OpenAI
+            </a>
+            .
+          </p>
+        </section>
+
         <section className="flex flex-col gap-3">
           <h2 className="text-section-title font-medium">Analytics</h2>
           <p className="text-body text-muted-foreground">
@@ -99,6 +153,7 @@ export default function PrivacyPage() {
             <li>You can disable push notifications in app settings or your browser/OS settings.</li>
             <li>You can disconnect bank accounts where supported by the app and Plaid.</li>
             <li>You can request account deletion from Settings.</li>
+            <li>You can turn AI features on or off in Settings → AI Features.</li>
             <li>
               On the web, you can block analytics cookies in your browser settings or install the{" "}
               <a href="https://tools.google.com/dlpage/gaoptout" className="font-medium text-yellow-text underline">

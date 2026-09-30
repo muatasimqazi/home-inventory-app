@@ -8,6 +8,8 @@ import { WardrobeStudioSheet } from "@/components/wardrobe-studio-sheet";
 import { useInventoryStore } from "@/lib/store";
 import { WARDROBE_STYLE_LABEL } from "@/lib/wardrobe-styles";
 import type { Item, ItemStudioPhotoStyle } from "@/lib/types";
+import { ensureAiConsent } from "@/lib/ai-consent-store";
+import { AI_CONSENT_DECLINED_MESSAGE } from "@/lib/ai-consent";
 
 /**
  * Wardrobe Photo Studio's generate/retry controls for one item (docs/
@@ -41,6 +43,10 @@ export function ItemStudioPhotosSection({ item }: { item: Item }) {
   const sourcePhotoPath = item.coverPhotoPath;
 
   async function handleRetry(photoId: string, style: ItemStudioPhotoStyle) {
+    if (!(await ensureAiConsent())) {
+      toast(AI_CONSENT_DECLINED_MESSAGE);
+      return;
+    }
     setRetryingId(photoId);
     try {
       const res = await fetch("/api/v1/vision/generate-studio-photo", {

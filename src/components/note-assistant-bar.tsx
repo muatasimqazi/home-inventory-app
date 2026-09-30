@@ -6,6 +6,8 @@ import { Icon } from "@/components/icon";
 import { VoiceInputButton } from "@/components/voice-input-button";
 import { cn } from "@/lib/utils";
 import type { NoteAssistTurn } from "@/lib/ask/note-assist";
+import { ensureAiConsent } from "@/lib/ai-consent-store";
+import { AI_CONSENT_DECLINED_MESSAGE } from "@/lib/ai-consent";
 
 interface NoteAssistantBarProps {
   title: string;
@@ -38,6 +40,10 @@ export function NoteAssistantBar({ title, content, onApplyEdit }: NoteAssistantB
   const [lastAnswer, setLastAnswer] = useState<string | null>(null);
 
   async function submit(message: string) {
+    if (!(await ensureAiConsent())) {
+      toast(AI_CONSENT_DECLINED_MESSAGE);
+      return;
+    }
     setInput("");
     setLastAnswer(null);
     setPending(true);
